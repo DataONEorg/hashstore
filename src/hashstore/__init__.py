@@ -1,0 +1,1 @@
+from hashstore.hashstore import hello

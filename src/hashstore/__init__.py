@@ -1,1 +1,1 @@
-from hashstore.hashstore import hello
+from hashstore.hashstore import D1Store

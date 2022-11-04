@@ -1,6 +1,8 @@
 import hashstore
 
 def test_hello():
-    assert 2+3==5
-    value = hashstore.hello()
-    assert value == 'Hello!'
+    store = hashstore.D1Store()
+    value = store.version()
+    assert value == '0.0.1'
+    store.init()
+    #assert fs.size() > 2

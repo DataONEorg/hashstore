@@ -47,24 +47,25 @@ class ObjectStore:
         address = self.sysmeta.put(pid)
         return address.id
 
-    def path(self, cid):
+    def abs_path(self, cid):
         """Get the local path for a given content identifier (cid)"""
         address = self.objects.get(cid)
-        return address.abspath
+        if address == None:
+            address = self.sysmeta.get(cid)
+        if address == None:
+            return None
+        else:
+            return address.abspath
 
     def count(self):
         return self.objects.count()
 
     def hash_string(self, input):
-        """ "This function returns the SHA-256 hash of the input
-        string passed into it"""
-
+        """Calculate the SHA-256 digest for a string, and return it in a base64 hex encoded string"""
         hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
-
-        # return the hex representation of digest
         return hex
 
-    def get_path(self, hash):
+    def rel_path(self, hash):
         """Return the storage path for a given hash hexdigest"""
         chunks = []
         for i in range(self.dir_depth):

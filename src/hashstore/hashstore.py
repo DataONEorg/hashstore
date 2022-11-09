@@ -1,5 +1,6 @@
 # Core module for hashstore
 from hashfs import HashFS
+from pathlib import Path
 import hashlib
 import importlib.metadata
 
@@ -7,8 +8,9 @@ class ObjectStore:
     """Class representing the object store for Metacat"""
 
     # Class variables
-    dir_depth = 3
-    dir_width = 2
+    dir_depth = 3  # The number of directory levels for storing files
+    dir_width = 2  # The width of the directory names, in characters
+    SYSMETA_NS = 'http://ns.dataone.org/service/types/v2.0'
 
     def version(self):
         """Return the version number"""
@@ -17,20 +19,21 @@ class ObjectStore:
 
     def __init__(self, store_path):
         """initialize the hashstore"""
+        self.store_path = store_path
         self.objects = HashFS(
-            store_path + "/objects",
+            self.store_path + "/objects",
             depth=self.dir_depth,
             width=self.dir_width,
             algorithm="sha256",
         )
         self.sysmeta = HashFS(
-            store_path + "/sysmeta",
+            self.store_path + "/sysmeta",
             depth=self.dir_depth,
             width=self.dir_width,
             algorithm="sha256",
         )
         self.tags = HashFS(
-            store_path + "/tags",
+            self.store_path + "/tags",
             depth=self.dir_depth,
             width=self.dir_width,
             algorithm="sha256",
@@ -42,10 +45,20 @@ class ObjectStore:
         address = self.objects.put(data)
         return address.id
 
-    def add_sysmeta(self, pid):
+    def add_sysmeta(self, pid, sysmeta):
         """Add a sysmeta document to the store"""
-        address = self.sysmeta.put(pid)
-        return address.id
+        cid = self.hash_string(pid)
+        rel_path = self.rel_path(cid)
+        full_path = Path(self.store_path) / 'sysmeta' / rel_path
+        parent = full_path.parent
+        parent.mkdir(parents=True, exist_ok=True)
+        with full_path.open(mode='wb') as file:
+            file.write(cid.encode('utf-8'))
+            formatId=' ' + self.SYSMETA_NS
+            file.write(formatId.encode('utf-8'))
+            file.write(b'\x00')
+            file.write(sysmeta)
+        return cid
 
     def abs_path(self, cid):
         """Get the local path for a given content identifier (cid)"""

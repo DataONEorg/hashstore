@@ -1,8 +1,7 @@
 # Core module for hashstore
 from hashfs import HashFS
 import hashlib
-from io import StringIO
-
+import importlib.metadata
 
 class ObjectStore:
     """Class representing the object store for Metacat"""
@@ -13,7 +12,8 @@ class ObjectStore:
 
     def version(self):
         """Return the version number"""
-        return "0.2.0"
+        __version__ = importlib.metadata.version('hashstore')
+        return __version__
 
     def __init__(self, store_path):
         """initialize the hashstore"""

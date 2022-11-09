@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hashstore"
-version = "0.1.0"
+version = "0.6.2"
 description = ""
 authors = ["Matt Jones <gitcode@magisa.org>"]
 readme = "README.md"

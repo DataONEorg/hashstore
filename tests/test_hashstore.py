@@ -3,6 +3,7 @@ from pathlib import Path
 import importlib.metadata
 import pytest
 
+
 @pytest.fixture
 def pids():
     pids = {
@@ -12,10 +13,12 @@ def pids():
     }
     return pids
 
+
 @pytest.fixture
 def store():
     store = HashStore(store_path="/tmp/metacat")
     return store
+
 
 def test_pids_length(pids):
     assert len(pids) == 3
@@ -23,7 +26,7 @@ def test_pids_length(pids):
 
 def test_init(store):
     value = store.version()
-    assert value == importlib.metadata.version('hashstore')
+    assert value == importlib.metadata.version("hashstore")
 
 
 def test_add_files(pids, store):
@@ -32,7 +35,7 @@ def test_add_files(pids, store):
         path = test_dir + pid.replace("/", "_")
         cid = store.add_object(path)
         assert len(cid) == 64
-        filename = pid.replace("/", "_") + '.xml'
+        filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
         s_cid = store.add_sysmeta(pid, sysmeta)

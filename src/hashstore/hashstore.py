@@ -4,17 +4,18 @@ from pathlib import Path
 import hashlib
 import importlib.metadata
 
+
 class HashStore:
     """Class representing the object store using hashes as keys"""
 
     # Class variables
     dir_depth = 3  # The number of directory levels for storing files
     dir_width = 2  # The width of the directory names, in characters
-    SYSMETA_NS = 'http://ns.dataone.org/service/types/v2.0'
+    SYSMETA_NS = "http://ns.dataone.org/service/types/v2.0"
 
     def version(self):
         """Return the version number"""
-        __version__ = importlib.metadata.version('hashstore')
+        __version__ = importlib.metadata.version("hashstore")
         return __version__
 
     def __init__(self, store_path):
@@ -49,14 +50,14 @@ class HashStore:
         """Add a sysmeta document to the store"""
         cid = self.hash_string(pid)
         rel_path = self.rel_path(cid)
-        full_path = Path(self.store_path) / 'sysmeta' / rel_path
+        full_path = Path(self.store_path) / "sysmeta" / rel_path
         parent = full_path.parent
         parent.mkdir(parents=True, exist_ok=True)
-        with full_path.open(mode='wb') as file:
-            file.write(cid.encode('utf-8'))
-            formatId=' ' + self.SYSMETA_NS
-            file.write(formatId.encode('utf-8'))
-            file.write(b'\x00')
+        with full_path.open(mode="wb") as file:
+            file.write(cid.encode("utf-8"))
+            formatId = " " + self.SYSMETA_NS
+            file.write(formatId.encode("utf-8"))
+            file.write(b"\x00")
             file.write(sysmeta)
         return cid
 

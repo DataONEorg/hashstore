@@ -15,7 +15,17 @@ DataONE in general, and HashStore in particular, are open source, community proj
 
 Documentation is a work in progress, and can be found on the [Metacat repository](https://github.com/NCEAS/metacat/blob/feature-1436-storage-and-indexing/docs/user/metacat/source/storage-subsystem.rst#physical-file-layout) as part of the storage redesign planning. Furture updates will include documentation here as the package matures.
 
------------------
+## Development build
+
+HashStore is a python package, and built using the [Python Poetry](https://python-poetry.org) build tool.
+
+To install `hashstore` locally, create a virtual environment for python 3.9+, 
+install poetry, and then build or install the package with:
+
+```
+$ poetry install
+$ poetry build
+```
 
 ## License
 ```

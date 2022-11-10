@@ -65,8 +65,10 @@ class HashStore:
         """Get the local path for a given content identifier (cid)"""
         address = self.objects.get(cid)
         if address == None:
+            print("Not found in objects")
             address = self.sysmeta.get(cid)
         if address == None:
+            print("Not found in sysmeta")
             return None
         else:
             return address.abspath
@@ -83,7 +85,6 @@ class HashStore:
         """Return the storage path for a given hash hexdigest"""
         chunks = []
         for i in range(self.dir_depth):
-            print(i)
             temp = hash[: self.dir_width]
             hash = hash[self.dir_width :]
             chunks.append(temp)

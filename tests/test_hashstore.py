@@ -15,8 +15,10 @@ def pids():
 
 
 @pytest.fixture
-def store():
-    store = HashStore(store_path="/tmp/metacat")
+def store(tmp_path):
+    d = tmp_path / "metacat"
+    d.mkdir()
+    store = HashStore(store_path=d.as_posix())
     return store
 
 
@@ -39,6 +41,7 @@ def test_add_files(pids, store):
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
         s_cid = store.add_sysmeta(pid, sysmeta)
+        assert s_cid==pids[pid]
     assert store.count() == 3
 
 
@@ -48,9 +51,9 @@ def test_hash_string(pids, store):
         assert hash_val == pids[pid]
 
 
-def test_path(pids, store):
+def test_rel_path(pids, store):
     path = store.rel_path(pids["doi:10.18739/A2901ZH2M"])
+    print(path)
     assert len(path) == 67
     assert path.startswith("0d/55/5e/d7")
     assert path.endswith("7052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e")
-    assert store.abs_path(pids["doi:10.18739/A2901ZH2M"]).endswith(path)

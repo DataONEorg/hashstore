@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns3:systemMetadata xmlns:ns2="http://ns.dataone.org/service/types/v1" xmlns:ns3="http://ns.dataone.org/service/types/v2.0">
+    <serialVersion>0</serialVersion>
+    <identifier>doi:10.18739/A2901ZH2M</identifier>
+    <formatId>http://www.isotc211.org/2005/gmd</formatId>
+    <size>39993</size>
+    <checksum algorithm="SHA-256">4d198171eef969d553d4c9537b1811a7b078f9a3804fc978a761bc014c05972c</checksum>
+    <submitter>http://orcid.org/0000-0003-4703-1974</submitter>
+    <rightsHolder>http://orcid.org/0000-0003-4703-1974</rightsHolder>
+    <accessPolicy>
+        <allow>
+            <subject>public</subject>
+            <permission>read</permission>
+        </allow>
+        <allow>
+            <subject>CN=arctic-data-admins,DC=dataone,DC=org</subject>
+            <permission>read</permission>
+            <permission>write</permission>
+            <permission>changePermission</permission>
+        </allow>
+    </accessPolicy>
+    <replicationPolicy replicationAllowed="false" numberReplicas="0">
+        <blockedMemberNode>urn:node:KNB</blockedMemberNode>
+        <blockedMemberNode>urn:node:mnUCSB1</blockedMemberNode>
+    </replicationPolicy>
+    <archived>false</archived>
+    <dateUploaded>2021-11-02T23:08:20.770+00:00</dateUploaded>
+    <dateSysMetadataModified>2021-11-02T23:08:20.770+00:00</dateSysMetadataModified>
+    <originMemberNode>urn:node:mnTestARCTIC</originMemberNode>
+    <authoritativeMemberNode>urn:node:mnTestARCTIC</authoritativeMemberNode>
+    <fileName>metadata.xml</fileName>
+</ns3:systemMetadata>

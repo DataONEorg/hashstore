@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns3:systemMetadata xmlns:ns2="http://ns.dataone.org/service/types/v1" xmlns:ns3="http://ns.dataone.org/service/types/v2.0">
+    <serialVersion>0</serialVersion>
+    <identifier>jtao.1700.1</identifier>
+    <formatId>https://eml.ecoinformatics.org/eml-2.2.0</formatId>
+    <size>8724</size>
+    <checksum algorithm="MD5">f4ea2d07db950873462a064937197b0f</checksum>
+    <submitter>http://orcid.org/0000-0002-1209-5268</submitter>
+    <rightsHolder>uid=tao,o=NCEAS,dc=ecoinformatics,dc=org</rightsHolder>
+    <accessPolicy>
+        <allow>
+            <subject>http://orcid.org/0000-0002-1209-5268</subject>
+            <permission>read</permission>
+            <permission>write</permission>
+            <permission>changePermission</permission>
+        </allow>
+        <allow>
+            <subject>public</subject>
+            <permission>read</permission>
+        </allow>
+    </accessPolicy>
+    <replicationPolicy replicationAllowed="false"/>
+    <archived>false</archived>
+    <dateUploaded>2019-11-02T00:28:25.503+00:00</dateUploaded>
+    <dateSysMetadataModified>2019-11-02T00:28:25.503+00:00</dateSysMetadataModified>
+    <originMemberNode>urn:node:mnTestARCTIC</originMemberNode>
+    <authoritativeMemberNode>urn:node:mnSandboxUCSB2</authoritativeMemberNode>
+</ns3:systemMetadata>

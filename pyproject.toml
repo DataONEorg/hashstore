@@ -1,13 +1,14 @@
 [tool.poetry]
 name = "hashstore"
 version = "0.7.0"
-description = ""
+description = "HashStore, a hash-based object store for data packages."
 authors = ["Matt Jones <gitcode@magisa.org>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.9"
 hashfs = "^0.7.2"
+pathlib = "^1.0.1"
 
 
 [tool.poetry.group.dev.dependencies]

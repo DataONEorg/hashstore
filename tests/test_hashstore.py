@@ -30,17 +30,27 @@ def test_init(store):
     value = store.version()
     assert value == importlib.metadata.version("hashstore")
 
+def test_store_files(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        sysmeta = syspath.read_bytes()
+        s_cid = store.store(pid, sysmeta, path)
+        assert s_cid==pids[pid]
+    assert store.count() == 3
 
 def test_add_files(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        cid = store.add_object(path)
+        cid = store._add_object(path)
         assert len(cid) == 64
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        s_cid = store.add_sysmeta(pid, sysmeta)
+        s_cid = store._set_sysmeta(pid, sysmeta)
         assert s_cid==pids[pid]
     assert store.count() == 3
 

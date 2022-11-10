@@ -41,12 +41,21 @@ class HashStore:
         )
         return None
 
-    def add_object(self, data):
+    def store(self, pid, sysmeta, data):
+        """Add a data object and metadata to the store"""
+        # TODO: decide if pid is needed as an arg
+        # it can be extracted from the sysmeta for consistency
+        cid = self._add_object(data)
+        s_cid = self._set_sysmeta(pid, sysmeta)
+        return s_cid
+
+    def _add_object(self, data):
         """Add a data blob to the store"""
+        # TODO: check that objects are not added if they already exist
         address = self.objects.put(data)
         return address.id
 
-    def add_sysmeta(self, pid, sysmeta):
+    def _set_sysmeta(self, pid, sysmeta):
         """Add a sysmeta document to the store"""
         cid = self.hash_string(pid)
         rel_path = self.rel_path(cid)
@@ -91,3 +100,4 @@ class HashStore:
             if i == self.dir_depth - 1:
                 chunks.append(hash)
         return "/".join(chunks)
+

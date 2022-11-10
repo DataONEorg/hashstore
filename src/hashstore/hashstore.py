@@ -4,8 +4,8 @@ from pathlib import Path
 import hashlib
 import importlib.metadata
 
-class ObjectStore:
-    """Class representing the object store for Metacat"""
+class HashStore:
+    """Class representing the object store using hashes as keys"""
 
     # Class variables
     dir_depth = 3  # The number of directory levels for storing files

@@ -1,1 +1,1 @@
-from hashstore.hashstore import ObjectStore
+from hashstore.hashstore import HashStore

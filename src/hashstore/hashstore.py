@@ -46,7 +46,7 @@ class HashStore:
         # TODO: decide if pid is needed as an arg
         # it can be extracted from the sysmeta for consistency
         cid = self._add_object(data)
-        s_cid = self._set_sysmeta(pid, sysmeta)
+        s_cid = self._set_sysmeta(pid, sysmeta, cid)
         return s_cid
 
     def _add_object(self, data):
@@ -55,20 +55,20 @@ class HashStore:
         address = self.objects.put(data)
         return address.id
 
-    def _set_sysmeta(self, pid, sysmeta):
+    def _set_sysmeta(self, pid, sysmeta, obj_cid):
         """Add a sysmeta document to the store"""
-        cid = self.hash_string(pid)
-        rel_path = self.rel_path(cid)
+        s_cid = self.hash_string(pid)
+        rel_path = self.rel_path(s_cid)
         full_path = Path(self.store_path) / "sysmeta" / rel_path
         parent = full_path.parent
         parent.mkdir(parents=True, exist_ok=True)
         with full_path.open(mode="wb") as file:
-            file.write(cid.encode("utf-8"))
+            file.write(obj_cid.encode("utf-8"))
             formatId = " " + self.SYSMETA_NS
             file.write(formatId.encode("utf-8"))
             file.write(b"\x00")
             file.write(sysmeta)
-        return cid
+        return s_cid
 
     def abs_path(self, cid):
         """Get the local path for a given content identifier (cid)"""
@@ -100,4 +100,3 @@ class HashStore:
             if i == self.dir_depth - 1:
                 chunks.append(hash)
         return "/".join(chunks)
-

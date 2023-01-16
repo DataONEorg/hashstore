@@ -71,7 +71,7 @@ def test_rel_path(pids, store):
     assert path.endswith("7052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e")
 
 
-def test_sysmeta_cid(store):
+def test_retrieve(store):
     test_dir = "tests/testdata/"
     obj_cid = "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
     pid = "jtao.1700.1"
@@ -79,7 +79,6 @@ def test_sysmeta_cid(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    s_cid = store.store(pid, sysmeta, path)
-    s_cid_path = store.abs_path(s_cid)
-    s_cid_result = open(s_cid_path, "r").read(64)
-    assert s_cid_result == obj_cid
+    store.store(pid, sysmeta, path)
+    cid = store.retrieve(pid)
+    assert cid == obj_cid

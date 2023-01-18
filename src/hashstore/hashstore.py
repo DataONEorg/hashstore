@@ -77,10 +77,17 @@ class HashStore:
         s_content = s_path.read_text()
         return s_content
 
-    def retrieve(self, pid):
+    def retrieve(self, pid, stream=False):
         """Returns the content of the obj requested from the store"""
-        # TODO: Retrieve the content of the cid
-        return
+        sys_content = self._get_sysmeta(pid)
+        cid = sys_content[:64]
+        c_path = Path(self.abs_path(cid))
+        if stream:
+            c_data = open(c_path, mode="rb")
+        else:
+            with open(c_path, mode="rb") as c_file:
+                c_data = c_file.read()
+        return c_data
 
     def abs_path(self, cid):
         """Get the local path for a given content identifier (cid)"""

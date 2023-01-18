@@ -109,6 +109,11 @@ class HashStore:
         hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
         return hex
 
+    def hash_content_string(self, data):
+        """Calculate the SHA-256 digest for upload data, and return it in a base64 hex encoded string"""
+        hex = hashlib.sha256(data).hexdigest()
+        return hex
+
     def rel_path(self, hash):
         """Return the storage path for a given hash hexdigest"""
         chunks = []

@@ -84,5 +84,17 @@ def test_sysmeta_cid(store):
     cid = s_content[:64]
     assert cid == obj_cid
 
-def test_retrieve(store):
-    # TODO: test all of the files in the test harness
+
+def test_retrieve(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        sysmeta = syspath.read_bytes()
+        store.store(pid, sysmeta, path)
+        s_content = store._get_sysmeta(pid)
+        cid = s_content[:64]
+        cid_content = store.retrieve(pid)
+        cid_hash = store.hash_content_string(cid_content)
+        assert cid == cid_hash

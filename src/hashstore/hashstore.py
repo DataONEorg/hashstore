@@ -1,6 +1,7 @@
 # Core module for hashstore
 from hashfs import HashFS
 from pathlib import Path
+import io
 import hashlib
 import importlib.metadata
 
@@ -70,24 +71,24 @@ class HashStore:
             file.write(sysmeta)
         return s_cid
 
-    def _get_sysmeta(self, pid):
-        """Returns sysmeta content given persistent identifier (pid)"""
+    def get_sysmeta(self, pid):
+        """Returns a list containing the sysmeta header and content given a persistent identifier (pid)"""
         s_cid = self.hash_string(pid)
         s_path = Path(self.abs_path(s_cid))
-        s_content = s_path.read_text()
+        with open(s_path, mode="rb") as s_file:
+            s_content = s_file.read().decode("utf-8").split("\x00", 1)
         return s_content
 
-    def retrieve(self, pid, stream=False):
-        """Returns the content of the obj requested from the store"""
-        sys_content = self._get_sysmeta(pid)
-        cid = sys_content[:64]
+    def retrieve(self, pid):
+        """Returns the sysmeta and a buffered stream of a cid obj given a persistent identifier (pid)"""
+        sys_content = self.get_sysmeta(pid)
+        cid = sys_content[0][:64]
+        sysmeta = sys_content[1]
         c_path = Path(self.abs_path(cid))
-        if stream:
-            c_data = open(c_path, mode="rb")
-        else:
-            with open(c_path, mode="rb") as c_file:
-                c_data = c_file.read()
-        return c_data
+        with open(c_path, mode="rb") as c_content:
+            c_data = c_content.read()
+            c_stream = io.BytesIO(c_data)
+        return sysmeta, c_stream
 
     def abs_path(self, cid):
         """Get the local path for a given content identifier (cid)"""
@@ -109,8 +110,8 @@ class HashStore:
         hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
         return hex
 
-    def hash_content_string(self, data):
-        """Calculate the SHA-256 digest for upload data, and return it in a base64 hex encoded string"""
+    def hash_blob_string(self, data):
+        """Calculate the SHA-256 digest for a blob, and return it in a base64 hex encoded string"""
         hex = hashlib.sha256(data).hexdigest()
         return hex
 

@@ -80,8 +80,8 @@ def test_sysmeta_cid(store):
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
     store.store(pid, sysmeta, path)
-    s_content = store._get_sysmeta(pid)
-    cid = s_content[:64]
+    s_content = store.get_sysmeta(pid)
+    cid = s_content[0][:64]
     assert cid == obj_cid
 
 
@@ -93,8 +93,10 @@ def test_retrieve(pids, store):
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
         store.store(pid, sysmeta, path)
-        s_content = store._get_sysmeta(pid)
-        cid = s_content[:64]
-        cid_content = store.retrieve(pid)
-        cid_hash = store.hash_content_string(cid_content)
+        s_content = store.get_sysmeta(pid)
+        cid = s_content[0][:64]
+        cid_stream = store.retrieve(pid)[1]
+        cid_content = cid_stream.read1()
+        cid_stream.close()
+        cid_hash = store.hash_blob_string(cid_content)
         assert cid == cid_hash

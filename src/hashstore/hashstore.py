@@ -85,6 +85,7 @@ class HashStore:
         return sysmeta
 
     def _read_chunks(self, file_obj, chunk_size=1024):
+        """Read a file_obj in chunks"""
         while True:
             data = file_obj.read(chunk_size)
             if not data:

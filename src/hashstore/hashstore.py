@@ -84,15 +84,24 @@ class HashStore:
         sysmeta = self._get_sysmeta(pid)[1]
         return sysmeta
 
+    def _read_chunks(self, file_obj, chunk_size=1024):
+        while True:
+            data = file_obj.read(chunk_size)
+            if not data:
+                break
+            yield data
+
     def retrieve(self, pid):
         """Returns the sysmeta and a buffered stream of a cid obj given a persistent identifier (pid)"""
         sys_content = self._get_sysmeta(pid)
         cid = sys_content[0][:64]
         sysmeta = sys_content[1]
         c_path = Path(self.abs_path(cid))
-        # TODO: Update to read/write into stream efficiently
         with open(c_path, mode="rb") as c_content:
-            c_stream = io.BytesIO(c_content.read())
+            c_stream = io.BytesIO()
+            for chunk in self._read_chunks(c_content):
+                c_stream.write(chunk)
+            c_stream.seek(0)
         return sysmeta, c_stream
 
     def abs_path(self, cid):

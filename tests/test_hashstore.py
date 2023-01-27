@@ -108,7 +108,6 @@ def test_retrieve(pids, store):
         s_content = store._get_sysmeta(pid)
         cid = s_content[0][:64]
         cid_stream = store.retrieve(pid)[1]
-        # TODO: Review test implementation
         cid_content = cid_stream.read()
         cid_stream.close()
         cid_hash = store.hash_blob_string(cid_content)

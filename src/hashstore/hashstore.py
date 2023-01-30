@@ -74,9 +74,9 @@ class HashStore:
     def _get_sysmeta(self, pid):
         """Returns a list containing the sysmeta header and content given a persistent identifier (pid)"""
         s_cid = self.hash_string(pid)
-        s_path = Path(self.abs_path(s_cid))
-        with open(s_path, mode="rb") as s_file:
-            s_content = s_file.read().decode("utf-8").split("\x00", 1)
+        s_path = self.sysmeta.open(s_cid)
+        s_content = s_path.read().decode("utf-8").split("\x00", 1)
+        s_path.close()
         return s_content
 
     def retrieve_sysmeta(self, pid):

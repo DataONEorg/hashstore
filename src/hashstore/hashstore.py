@@ -89,8 +89,7 @@ class HashStore:
         sys_content = self._get_sysmeta(pid)
         cid = sys_content[0][:64]
         sysmeta = sys_content[1]
-        c_path = Path(self.abs_path(cid))
-        c_stream = open(c_path, mode="rb")
+        c_stream = self.objects.open(cid)
         return sysmeta, c_stream
 
     def abs_path(self, cid):

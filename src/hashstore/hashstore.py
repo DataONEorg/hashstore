@@ -1,7 +1,6 @@
 # Core module for hashstore
 from hashfs import HashFS
 from pathlib import Path
-import io
 import hashlib
 import importlib.metadata
 
@@ -108,11 +107,13 @@ class HashStore:
         return self.objects.count()
 
     def hash_string(self, input):
+        # Make private
         """Calculate the SHA-256 digest for a string, and return it in a base64 hex encoded string"""
         hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
         return hex
 
     def hash_blob_string(self, data):
+        # Move to testing if needed
         """Calculate the SHA-256 digest for a blob, and return it in a base64 hex encoded string"""
         hex = hashlib.sha256(data).hexdigest()
         return hex

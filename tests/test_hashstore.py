@@ -1,5 +1,6 @@
 from hashstore import HashStore
 from pathlib import Path
+import hashlib
 import importlib.metadata
 import pytest
 
@@ -20,6 +21,12 @@ def store(tmp_path):
     d.mkdir()
     store = HashStore(store_path=d.as_posix())
     return store
+
+
+def hash_blob_string(data):
+    """Calculate the SHA-256 digest for a blob, and return it in a base64 hex encoded string"""
+    hex = hashlib.sha256(data).hexdigest()
+    return hex
 
 
 def test_pids_length(pids):
@@ -110,5 +117,5 @@ def test_retrieve(pids, store):
         cid_stream = store.retrieve(pid)[1]
         cid_content = cid_stream.read()
         cid_stream.close()
-        cid_hash = store.hash_blob_string(cid_content)
+        cid_hash = hash_blob_string(cid_content)
         assert cid == cid_hash

@@ -59,6 +59,19 @@ class HashStore:
         s_cid = self._set_sysmeta(pid, sysmeta, cid)
         return s_cid
 
+    def retrieve_sysmeta(self, pid):
+        """Returns the sysmeta of a given persistent identifier (pid)"""
+        sysmeta = self._get_sysmeta(pid)[1]
+        return sysmeta
+
+    def retrieve(self, pid):
+        """Returns the sysmeta and a buffered stream of a cid obj given a persistent identifier (pid)"""
+        sys_content = self._get_sysmeta(pid)
+        cid = sys_content[0][:64]
+        sysmeta = sys_content[1]
+        c_stream = self.objects.open(cid)
+        return sysmeta, c_stream
+
     def _add_object(self, data):
         """Add a data blob to the store"""
         address = self.objects.put(data)
@@ -87,19 +100,6 @@ class HashStore:
         s_path.close()
         return s_content
 
-    def retrieve_sysmeta(self, pid):
-        """Returns the sysmeta of a given persistent identifier (pid)"""
-        sysmeta = self._get_sysmeta(pid)[1]
-        return sysmeta
-
-    def retrieve(self, pid):
-        """Returns the sysmeta and a buffered stream of a cid obj given a persistent identifier (pid)"""
-        sys_content = self._get_sysmeta(pid)
-        cid = sys_content[0][:64]
-        sysmeta = sys_content[1]
-        c_stream = self.objects.open(cid)
-        return sysmeta, c_stream
-
     def abs_path(self, cid):
         """Get the local path for a given content identifier (cid)"""
         address = self.objects.get(cid)
@@ -118,12 +118,6 @@ class HashStore:
     def _hash_string(self, input):
         """Calculate the SHA-256 digest for a string, and return it in a base64 hex encoded string"""
         hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
-        return hex
-
-    def hash_blob_string(self, data):
-        # Move to testing if needed
-        """Calculate the SHA-256 digest for a blob, and return it in a base64 hex encoded string"""
-        hex = hashlib.sha256(data).hexdigest()
         return hex
 
     def rel_path(self, hash):

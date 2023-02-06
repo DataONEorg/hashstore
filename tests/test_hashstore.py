@@ -47,7 +47,7 @@ def test_store_files(pids, store):
         sysmeta = syspath.read_bytes()
         s_cid = store.store(pid, sysmeta, path)
         assert s_cid == pids[pid]
-    assert store._count() == 3
+    assert store.objects.count() == 3
 
 
 def test_add_files(pids, store):
@@ -61,7 +61,7 @@ def test_add_files(pids, store):
         sysmeta = syspath.read_bytes()
         s_cid = store._set_sysmeta(pid, sysmeta, cid)
         assert s_cid == pids[pid]
-    assert store._count() == 3
+    assert store.objects.count() == 3
 
 
 def test_hash_string(pids, store):

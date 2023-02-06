@@ -127,6 +127,3 @@ class HashStore:
             if i == self.dir_depth - 1:
                 chunks.append(hash)
         return "/".join(chunks)
-
-    def _count(self):
-        return self.objects.count()

@@ -66,7 +66,7 @@ class HashStore:
 
     def _set_sysmeta(self, pid, sysmeta, obj_cid):
         """Add a sysmeta document to the store"""
-        s_cid = self.hash_string(pid)
+        s_cid = self._hash_string(pid)
         rel_path = self.rel_path(s_cid)
         full_path = Path(self.store_path) / "sysmeta" / rel_path
         parent = full_path.parent
@@ -81,7 +81,7 @@ class HashStore:
 
     def _get_sysmeta(self, pid):
         """Returns a list containing the sysmeta header and content given a persistent identifier (pid)"""
-        s_cid = self.hash_string(pid)
+        s_cid = self._hash_string(pid)
         s_path = self.sysmeta.open(s_cid)
         s_content = s_path.read().decode("utf-8").split("\x00", 1)
         s_path.close()
@@ -115,8 +115,7 @@ class HashStore:
     def count(self):
         return self.objects.count()
 
-    def hash_string(self, input):
-        # Make private
+    def _hash_string(self, input):
         """Calculate the SHA-256 digest for a string, and return it in a base64 hex encoded string"""
         hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
         return hex

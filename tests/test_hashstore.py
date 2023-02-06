@@ -59,7 +59,7 @@ def test_add_files(pids, store):
 
 def test_hash_string(pids, store):
     for pid in pids:
-        hash_val = store.hash_string(pid)
+        hash_val = store._hash_string(pid)
         assert hash_val == pids[pid]
 
 

@@ -47,7 +47,7 @@ def test_store_files(pids, store):
         sysmeta = syspath.read_bytes()
         s_cid = store.store(pid, sysmeta, path)
         assert s_cid == pids[pid]
-    assert store.count() == 3
+    assert store._count() == 3
 
 
 def test_add_files(pids, store):
@@ -61,7 +61,7 @@ def test_add_files(pids, store):
         sysmeta = syspath.read_bytes()
         s_cid = store._set_sysmeta(pid, sysmeta, cid)
         assert s_cid == pids[pid]
-    assert store.count() == 3
+    assert store._count() == 3
 
 
 def test_hash_string(pids, store):
@@ -71,7 +71,7 @@ def test_hash_string(pids, store):
 
 
 def test_rel_path(pids, store):
-    path = store.rel_path(pids["doi:10.18739/A2901ZH2M"])
+    path = store._rel_path(pids["doi:10.18739/A2901ZH2M"])
     print(path)
     assert len(path) == 67
     assert path.startswith("0d/55/5e/d7")

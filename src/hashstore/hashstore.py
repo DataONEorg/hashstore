@@ -80,7 +80,7 @@ class HashStore:
     def _set_sysmeta(self, pid, sysmeta, obj_cid):
         """Add a sysmeta document to the store"""
         s_cid = self._hash_string(pid)
-        rel_path = self.rel_path(s_cid)
+        rel_path = self._rel_path(s_cid)
         full_path = Path(self.store_path) / "sysmeta" / rel_path
         parent = full_path.parent
         parent.mkdir(parents=True, exist_ok=True)
@@ -100,7 +100,12 @@ class HashStore:
         s_path.close()
         return s_content
 
-    def abs_path(self, cid):
+    def _hash_string(self, input):
+        """Calculate the SHA-256 digest for a string, and return it in a base64 hex encoded string"""
+        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
+        return hex
+
+    def _abs_path(self, cid):
         """Get the local path for a given content identifier (cid)"""
         address = self.objects.get(cid)
         if address == None:
@@ -112,15 +117,7 @@ class HashStore:
         else:
             return address.abspath
 
-    def count(self):
-        return self.objects.count()
-
-    def _hash_string(self, input):
-        """Calculate the SHA-256 digest for a string, and return it in a base64 hex encoded string"""
-        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
-        return hex
-
-    def rel_path(self, hash):
+    def _rel_path(self, hash):
         """Return the storage path for a given hash hexdigest"""
         chunks = []
         for i in range(self.dir_depth):
@@ -130,3 +127,6 @@ class HashStore:
             if i == self.dir_depth - 1:
                 chunks.append(hash)
         return "/".join(chunks)
+
+    def _count(self):
+        return self.objects.count()

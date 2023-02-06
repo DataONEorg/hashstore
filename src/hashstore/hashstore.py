@@ -49,6 +49,16 @@ class HashStore:
         s_cid = self._set_sysmeta(pid, sysmeta, cid)
         return s_cid
 
+    def store_object(self, data):
+        """Add a data object to the store"""
+        cid = self._add_object(data)
+        return cid
+
+    def store_sysmeta(self, pid, sysmeta, cid):
+        """Add a metadata object to the store"""
+        s_cid = self._set_sysmeta(pid, sysmeta, cid)
+        return s_cid
+
     def _add_object(self, data):
         """Add a data blob to the store"""
         address = self.objects.put(data)

@@ -51,7 +51,6 @@ class HashStore:
 
     def _add_object(self, data):
         """Add a data blob to the store"""
-        # TODO: check that objects are not added if they already exist
         address = self.objects.put(data)
         return address.id
 

@@ -45,7 +45,8 @@ def test_store_files(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        s_cid = store.store(pid, sysmeta, path)
+        cid = store.store_object(path)
+        s_cid = store.store_sysmeta(pid, sysmeta, cid)
         assert s_cid == pids[pid]
     assert store.objects.count() == 3
 
@@ -85,7 +86,8 @@ def test_retrieve_sysmeta(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    store.store(pid, sysmeta, path)
+    cid = store.store_object(path)
+    s_cid = store.store_sysmeta(pid, sysmeta, cid)
     sysmeta_ret = store.retrieve_sysmeta(pid)
     assert sysmeta.decode("utf-8") == sysmeta_ret
 
@@ -98,7 +100,8 @@ def test_sysmeta_cid(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    store.store(pid, sysmeta, path)
+    cid = store.store_object(path)
+    store.store_sysmeta(pid, sysmeta, cid)
     s_content = store._get_sysmeta(pid)
     cid = s_content[0][:64]
     assert cid == obj_cid
@@ -111,7 +114,8 @@ def test_retrieve(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        store.store(pid, sysmeta, path)
+        obj_cid = store.store_object(path)
+        store.store_sysmeta(pid, sysmeta, obj_cid)
         s_content = store._get_sysmeta(pid)
         cid = s_content[0][:64]
         cid_stream = store.retrieve(pid)[1]

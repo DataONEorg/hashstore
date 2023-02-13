@@ -51,7 +51,7 @@ def test_store_files(pids, store):
     assert store.objects.count() == 3
 
 
-def test_store_object_algorithm_not_in_list(store):
+def test_store_object_algorithm_values(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -61,6 +61,9 @@ def test_store_object_algorithm_not_in_list(store):
         cid
         == "Algorithm is not supported at this time. List of supported algorithms: ['md5', 'sha1', 'sha256', 'sha512']. Please contact Arctic Data Center support at support@arcticdata.io"
     )
+    algorithm_with_hyphen_and_upper = "SHA-256"
+    cid = store.store_object(path, algorithm_with_hyphen_and_upper)
+    assert cid == "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
 
 
 def test_add_files(pids, store):

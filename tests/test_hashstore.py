@@ -51,6 +51,19 @@ def test_store_files(pids, store):
     assert store.objects.count() == 3
 
 
+def test_store_object_algorithm_not_in_list(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    algorithm_not_in_list = "abc"
+    cid = store.store_object(path, algorithm_not_in_list)
+    print(cid)
+    assert (
+        cid
+        == "Algorithm is not supported at this time. Please contact Arctic Data Center support at support@arcticdata.io"
+    )
+
+
 def test_add_files(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():

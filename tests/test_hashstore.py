@@ -55,12 +55,12 @@ def test_add_files(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        cid = store._add_object(path)
+        cid = store.store_object(path, "sha256")
         assert len(cid) == 64
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        s_cid = store._set_sysmeta(pid, sysmeta, cid)
+        s_cid = store.store_sysmeta(pid, sysmeta, cid)
         assert s_cid == pids[pid]
     assert store.objects.count() == 3
 

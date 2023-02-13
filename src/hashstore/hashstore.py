@@ -102,18 +102,6 @@ class HashStore:
         hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
         return hex
 
-    def _abs_path(self, cid):
-        """Get the local path for a given content identifier (cid)"""
-        address = self.objects.get(cid)
-        if address == None:
-            print("Not found in objects")
-            address = self.sysmeta.get(cid)
-        if address == None:
-            print("Not found in sysmeta")
-            return None
-        else:
-            return address.abspath
-
     def _rel_path(self, hash):
         """Return the storage path for a given hash hexdigest"""
         chunks = []

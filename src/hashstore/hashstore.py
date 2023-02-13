@@ -41,8 +41,13 @@ class HashStore:
         )
         return None
 
-    def store_object(self, data):
+    def store_object(self, data, algorithm):
         """Add a data object to the store"""
+        algorithm_list = ["md5", "sha1", "sha256", "sha512"]
+        check_algorithm = algorithm.lower().replace("-", "")
+        if check_algorithm not in algorithm_list:
+            err_msg = "Algorithm is not supported at this time. Please contact Arctic Data Center support at support@arcticdata.io"
+            return err_msg
         cid = self._add_object(data)
         return cid
 

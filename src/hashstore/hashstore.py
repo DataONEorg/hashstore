@@ -46,7 +46,7 @@ class HashStore:
         algorithm_list = ["md5", "sha1", "sha256", "sha512"]
         check_algorithm = algorithm.lower().replace("-", "")
         if check_algorithm not in algorithm_list:
-            err_msg = "Algorithm is not supported at this time. Please contact Arctic Data Center support at support@arcticdata.io"
+            err_msg = f"Algorithm is not supported at this time. List of supported algorithms: {algorithm_list}. Please contact Arctic Data Center support at support@arcticdata.io"
             return err_msg
         cid = self._add_object(data)
         return cid

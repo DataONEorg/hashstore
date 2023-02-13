@@ -57,10 +57,9 @@ def test_store_object_algorithm_not_in_list(store):
     path = test_dir + pid
     algorithm_not_in_list = "abc"
     cid = store.store_object(path, algorithm_not_in_list)
-    print(cid)
     assert (
         cid
-        == "Algorithm is not supported at this time. Please contact Arctic Data Center support at support@arcticdata.io"
+        == "Algorithm is not supported at this time. List of supported algorithms: ['md5', 'sha1', 'sha256', 'sha512']. Please contact Arctic Data Center support at support@arcticdata.io"
     )
 
 

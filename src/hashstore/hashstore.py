@@ -53,8 +53,6 @@ class HashStore:
 
     def store_sysmeta(self, pid, sysmeta, cid):
         """Add a metadata object to the store"""
-        # TODO: decide if pid is needed as an arg
-        # it can be extracted from the sysmeta for consistency
         s_cid = self._set_sysmeta(pid, sysmeta, cid)
         return s_cid
 

@@ -43,7 +43,7 @@ class HashStore:
 
     def store_object(self, data, algorithm):
         """Add a data object to the store"""
-        algorithm_list = ["md5", "sha1", "sha256", "sha512"]
+        algorithm_list = ["md5", "sha1", "sha256", "sha384", "sha512"]
         check_algorithm = algorithm.lower().replace("-", "")
         if check_algorithm not in algorithm_list:
             return None

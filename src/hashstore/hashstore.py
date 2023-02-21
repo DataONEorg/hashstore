@@ -48,8 +48,7 @@ class HashStore:
         if check_algorithm not in algorithm_list:
             return None
         checksums = self._add_object(data)
-        cid = checksums.get("sha256")
-        return cid
+        return checksums
 
     def store_sysmeta(self, pid, sysmeta, cid):
         """Add a metadata object to the store"""

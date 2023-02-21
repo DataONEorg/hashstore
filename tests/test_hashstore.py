@@ -45,7 +45,8 @@ def test_store_files(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        cid = store.store_object(path, "sha256")
+        checksums = store.store_object(path, "sha256")
+        cid = checksums.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
         assert s_cid == pids[pid]
     assert store.objects.count() == 3
@@ -56,10 +57,11 @@ def test_store_object_algorithm_values(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_not_in_list = "abc"
-    cid = store.store_object(path, algorithm_not_in_list)
-    assert cid == None
+    checksums = store.store_object(path, algorithm_not_in_list)
+    assert checksums == None
     algorithm_with_hyphen_and_upper = "SHA-256"
-    cid = store.store_object(path, algorithm_with_hyphen_and_upper)
+    checksums = store.store_object(path, algorithm_with_hyphen_and_upper)
+    cid = checksums.get("sha256")
     assert cid == "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
 
 
@@ -67,7 +69,8 @@ def test_add_files(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        cid = store.store_object(path, "sha256")
+        checksums = store.store_object(path, "sha256")
+        cid = checksums.get("sha256")
         assert len(cid) == 64
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -98,7 +101,8 @@ def test_retrieve_sysmeta(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    cid = store.store_object(path, "sha256")
+    checksums = store.store_object(path, "sha256")
+    cid = checksums.get("sha256")
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
     sysmeta_ret = store.retrieve_sysmeta(pid)
     assert sysmeta.decode("utf-8") == sysmeta_ret
@@ -112,7 +116,8 @@ def test_sysmeta_cid(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    cid = store.store_object(path, "sha256")
+    checksums = store.store_object(path, "sha256")
+    cid = checksums.get("sha256")
     store.store_sysmeta(pid, sysmeta, cid)
     s_content = store._get_sysmeta(pid)
     cid = s_content[0][:64]
@@ -126,7 +131,8 @@ def test_retrieve(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        obj_cid = store.store_object(path, "sha256")
+        checksums = store.store_object(path, "sha256")
+        obj_cid = checksums.get("sha256")
         store.store_sysmeta(pid, sysmeta, obj_cid)
         s_content = store._get_sysmeta(pid)
         cid = s_content[0][:64]

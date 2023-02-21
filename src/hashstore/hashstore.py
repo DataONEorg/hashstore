@@ -47,7 +47,8 @@ class HashStore:
         check_algorithm = algorithm.lower().replace("-", "")
         if check_algorithm not in algorithm_list:
             return None
-        cid = self._add_object(data)
+        checksums = self._add_object(data)
+        cid = checksums.get("sha256")
         return cid
 
     def store_sysmeta(self, pid, sysmeta, cid):
@@ -71,7 +72,7 @@ class HashStore:
     def _add_object(self, data):
         """Add a data blob to the store"""
         address = self.objects.put(data)
-        return address.id
+        return address.checksums
 
     def _set_sysmeta(self, pid, sysmeta, obj_cid):
         """Add a sysmeta document to the store"""

@@ -48,7 +48,6 @@ def test_store_files(pids, store):
         checksums = store.store_object(path, "sha256")
         cid = checksums.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
-        assert s_cid == pids[pid]
     assert store.objects.count() == 3
 
 
@@ -84,35 +83,20 @@ def test_store_duplicate_objects(store):
     assert is_duplicate == None
 
 
-def test_hash_string(pids, store):
-    for pid in pids:
-        hash_val = store._hash_string(pid)
-        assert hash_val == pids[pid]
-
-
-def test_rel_path(pids, store):
-    path = store._rel_path(pids["doi:10.18739/A2901ZH2M"])
-    print(path)
-    assert len(path) == 67
-    assert path.startswith("0d/55/5e/d7")
-    assert path.endswith("7052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e")
-
-
-def test_retrieve_sysmeta(store):
+def test_store_sysmeta_s_cid(pids, store):
     test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    filename = pid + ".xml"
-    syspath = Path(test_dir) / filename
-    sysmeta = syspath.read_bytes()
-    checksums = store.store_object(path, "sha256")
-    cid = checksums.get("sha256")
-    s_cid = store.store_sysmeta(pid, sysmeta, cid)
-    sysmeta_ret = store.retrieve_sysmeta(pid)
-    assert sysmeta.decode("utf-8") == sysmeta_ret
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        sysmeta = syspath.read_bytes()
+        checksums = store.store_object(path, "sha256")
+        cid = checksums.get("sha256")
+        s_cid = store.store_sysmeta(pid, sysmeta, cid)
+        assert s_cid == pids[pid]
 
 
-def test_sysmeta_cid(store):
+def test_store_sysmeta_cid(store):
     test_dir = "tests/testdata/"
     obj_cid = "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
     pid = "jtao.1700.1"
@@ -145,3 +129,31 @@ def test_retrieve(pids, store):
         cid_stream.close()
         cid_hash = hash_blob_string(cid_content)
         assert cid == cid_hash
+
+
+def test_retrieve_sysmeta(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    filename = pid + ".xml"
+    syspath = Path(test_dir) / filename
+    sysmeta = syspath.read_bytes()
+    checksums = store.store_object(path, "sha256")
+    cid = checksums.get("sha256")
+    s_cid = store.store_sysmeta(pid, sysmeta, cid)
+    sysmeta_ret = store.retrieve_sysmeta(pid)
+    assert sysmeta.decode("utf-8") == sysmeta_ret
+
+
+def test_hash_string(pids, store):
+    for pid in pids:
+        hash_val = store._hash_string(pid)
+        assert hash_val == pids[pid]
+
+
+def test_rel_path(pids, store):
+    path = store._rel_path(pids["doi:10.18739/A2901ZH2M"])
+    print(path)
+    assert len(path) == 67
+    assert path.startswith("0d/55/5e/d7")
+    assert path.endswith("7052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e")

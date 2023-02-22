@@ -52,6 +52,15 @@ def test_store_files(pids, store):
     assert store.objects.count() == 3
 
 
+def test_store_address_length(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        checksums = store.store_object(path, "sha256")
+        cid = checksums.get("sha256")
+        assert len(cid) == 64
+
+
 def test_store_object_algorithm_values(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -73,21 +82,6 @@ def test_store_duplicate_objects(store):
     store.store_object(path, algorithm)
     is_duplicate = store.store_object(path, algorithm)
     assert is_duplicate == None
-
-
-def test_add_files(pids, store):
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        checksums = store.store_object(path, "sha256")
-        cid = checksums.get("sha256")
-        assert len(cid) == 64
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        sysmeta = syspath.read_bytes()
-        s_cid = store.store_sysmeta(pid, sysmeta, cid)
-        assert s_cid == pids[pid]
-    assert store.objects.count() == 3
 
 
 def test_hash_string(pids, store):

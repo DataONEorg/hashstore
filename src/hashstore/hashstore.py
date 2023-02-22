@@ -71,6 +71,8 @@ class HashStore:
     def _add_object(self, data):
         """Add a data blob to the store"""
         address = self.objects.put(data)
+        if address.is_duplicate:
+            return None
         return address.checksums
 
     def _set_sysmeta(self, pid, sysmeta, obj_cid):

@@ -65,6 +65,16 @@ def test_store_object_algorithm_values(store):
     assert cid == "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
 
 
+def test_store_duplicate_objects(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    algorithm = "sha256"
+    store.store_object(path, algorithm)
+    is_duplicate = store.store_object(path, algorithm)
+    assert is_duplicate == None
+
+
 def test_add_files(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():

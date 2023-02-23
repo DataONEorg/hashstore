@@ -3,6 +3,7 @@ from hashfs import HashFS
 from pathlib import Path
 import hashlib
 import importlib.metadata
+import shutil
 
 
 class HashStore:
@@ -33,8 +34,8 @@ class HashStore:
             width=self.dir_width,
             algorithm="sha256",
         )
-        self.tags = HashFS(
-            self.store_path + "/tags",
+        self.tmp = HashFS(
+            self.store_path + "/tmp",
             depth=self.dir_depth,
             width=self.dir_width,
             algorithm="sha256",
@@ -80,15 +81,32 @@ class HashStore:
         s_cid = self._hash_string(pid)
         rel_path = self._rel_path(s_cid)
         full_path = Path(self.store_path) / "sysmeta" / rel_path
-        parent = full_path.parent
-        parent.mkdir(parents=True, exist_ok=True)
-        with full_path.open(mode="wb") as file:
-            file.write(obj_cid.encode("utf-8"))
-            formatId = " " + self.SYSMETA_NS
-            file.write(formatId.encode("utf-8"))
-            file.write(b"\x00")
-            file.write(sysmeta)
-        return s_cid
+        sysmeta_file_exists = self.sysmeta.exists(s_cid)
+        try:
+            if sysmeta_file_exists:
+                # Move existing file to /tmp
+                tmp_file_path = Path(self.store_path) / "tmp" / rel_path
+                shutil.move(full_path, tmp_file_path)
+            parent = full_path.parent
+            parent.mkdir(parents=True, exist_ok=True)
+            with full_path.open(mode="wb") as file:
+                file.write(obj_cid.encode("utf-8"))
+                formatId = " " + self.SYSMETA_NS
+                file.write(formatId.encode("utf-8"))
+                file.write(b"\x00")
+                file.write(sysmeta)
+        except Exception as err:
+            print(err)
+            tmp_file_exists = self.tmp.exists(s_cid)
+            sysmeta_file_exists = self.sysmeta.exists(s_cid)
+            if tmp_file_exists and not sysmeta_file_exists:
+                shutil.move(tmp_file_path, full_path)
+            return None
+        else:
+            tmp_file_exists = self.tmp.exists(s_cid)
+            if tmp_file_exists:
+                self.tmp.delete(rel_path)
+            return s_cid
 
     def _get_sysmeta(self, pid):
         """Returns a list containing the sysmeta header and content given a persistent identifier (pid)"""

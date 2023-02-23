@@ -108,8 +108,8 @@ def test_store_sysmeta_cid(store):
     cid = checksums.get("sha256")
     store.store_sysmeta(pid, sysmeta, cid)
     s_content = store._get_sysmeta(pid)
-    cid = s_content[0][:64]
-    assert cid == obj_cid
+    cid_get = s_content[0][:64]
+    assert cid_get == obj_cid
 
 
 def test_update_sysmeta(store):
@@ -123,14 +123,11 @@ def test_update_sysmeta(store):
     checksums = store.store_object(path, "sha256")
     cid = checksums.get("sha256")
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
+    cid_new = obj_cid[::-1]
+    store.store_sysmeta(pid, sysmeta, cid_new)
     s_content = store._get_sysmeta(pid)
-    cid = s_content[0][:64]
-    assert cid == obj_cid
-    update_cid = obj_cid[::-1]
-    store.store_sysmeta(pid, sysmeta, update_cid)
-    update_s_content = store._get_sysmeta(pid)
-    cid_new = update_s_content[0][:64]
-    assert cid_new == update_cid
+    cid_get = s_content[0][:64]
+    assert cid_new == cid_get
     tmp_sysmeta = store.tmp.exists(s_cid)
     assert tmp_sysmeta == False
     sys_sysmeta = store.sysmeta.exists(s_cid)

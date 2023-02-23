@@ -112,6 +112,31 @@ def test_store_sysmeta_cid(store):
     assert cid == obj_cid
 
 
+def test_update_sysmeta(store):
+    test_dir = "tests/testdata/"
+    obj_cid = "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    filename = pid + ".xml"
+    syspath = Path(test_dir) / filename
+    sysmeta = syspath.read_bytes()
+    checksums = store.store_object(path, "sha256")
+    cid = checksums.get("sha256")
+    s_cid = store.store_sysmeta(pid, sysmeta, cid)
+    s_content = store._get_sysmeta(pid)
+    cid = s_content[0][:64]
+    assert cid == obj_cid
+    update_cid = obj_cid[::-1]
+    store.store_sysmeta(pid, sysmeta, update_cid)
+    update_s_content = store._get_sysmeta(pid)
+    cid_new = update_s_content[0][:64]
+    assert cid_new == update_cid
+    tmp_sysmeta = store.tmp.exists(s_cid)
+    assert tmp_sysmeta == False
+    sys_sysmeta = store.sysmeta.exists(s_cid)
+    assert sys_sysmeta == True
+
+
 def test_retrieve(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():

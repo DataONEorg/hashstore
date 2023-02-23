@@ -86,6 +86,8 @@ class HashStore:
             if sysmeta_file_exists:
                 # Move existing file to /tmp
                 tmp_file_path = Path(self.store_path) / "tmp" / rel_path
+                tmp_parent = tmp_file_path.parent
+                tmp_parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(full_path, tmp_file_path)
             parent = full_path.parent
             parent.mkdir(parents=True, exist_ok=True)

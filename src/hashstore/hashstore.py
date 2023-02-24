@@ -81,9 +81,8 @@ class HashStore:
         s_cid = self._hash_string(pid)
         rel_path = self._rel_path(s_cid)
         full_path = Path(self.store_path) / "sysmeta" / rel_path
-        sysmeta_file_exists = self.sysmeta.exists(s_cid)
         try:
-            if sysmeta_file_exists:
+            if self.sysmeta.exists(s_cid):
                 # Move existing file to /tmp
                 tmp_file_path = Path(self.store_path) / "tmp" / rel_path
                 tmp_parent = tmp_file_path.parent
@@ -99,14 +98,14 @@ class HashStore:
                 file.write(sysmeta)
         except Exception as err:
             print(err)
-            tmp_file_exists = self.tmp.exists(s_cid)
-            sysmeta_file_exists = self.sysmeta.exists(s_cid)
-            if tmp_file_exists and not sysmeta_file_exists:
+            if self.tmp.exists(s_cid):
+                if self.sysmeta.exists(s_cid):
+                    self.sysmeta.delete(rel_path)
+                # Return sysmeta to original location
                 shutil.move(tmp_file_path, full_path)
             return None
         else:
-            tmp_file_exists = self.tmp.exists(s_cid)
-            if tmp_file_exists:
+            if self.tmp.exists(s_cid):
                 self.tmp.delete(rel_path)
             return s_cid
 

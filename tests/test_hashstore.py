@@ -178,7 +178,7 @@ def test_retrieve(pids, store):
         store.store_sysmeta(pid, sysmeta, obj_cid)
         s_content = store._get_sysmeta(pid)
         cid = s_content[0][:64]
-        cid_stream = store.retrieve(pid)[1]
+        cid_stream = store.retrieve_object(pid)[1]
         cid_content = cid_stream.read()
         cid_stream.close()
         cid_hash = hash_blob_string(cid_content)

@@ -56,18 +56,18 @@ class HashStore:
         s_cid = self._set_sysmeta(pid, sysmeta, cid)
         return s_cid
 
-    def retrieve_sysmeta(self, pid):
-        """Returns the sysmeta of a given persistent identifier (pid)"""
-        sysmeta = self._get_sysmeta(pid)[1]
-        return sysmeta
-
-    def retrieve(self, pid):
+    def retrieve_object(self, pid):
         """Returns the sysmeta and a buffered stream of a cid obj given a persistent identifier (pid)"""
         sys_content = self._get_sysmeta(pid)
         cid = sys_content[0][:64]
         sysmeta = sys_content[1]
         c_stream = self.objects.open(cid)
         return sysmeta, c_stream
+
+    def retrieve_sysmeta(self, pid):
+        """Returns the sysmeta of a given persistent identifier (pid)"""
+        sysmeta = self._get_sysmeta(pid)[1]
+        return sysmeta
 
     def _add_object(self, data):
         """Add a data blob to the store"""

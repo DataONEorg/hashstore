@@ -166,7 +166,7 @@ def test_store_sysmeta_update(store):
     assert sys_sysmeta == True
 
 
-def test_retrieve(pids, store):
+def test_retrieve_object(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")

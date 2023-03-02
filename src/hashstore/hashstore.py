@@ -47,7 +47,7 @@ class HashStore:
         algorithm_list = ["md5", "sha1", "sha256", "sha384", "sha512"]
         check_algorithm = algorithm.lower().replace("-", "")
         if check_algorithm not in algorithm_list:
-            return None
+            raise Exception("Algorithm not supported")
         checksums = self._add_object(data)
         return checksums
 
@@ -81,6 +81,7 @@ class HashStore:
         s_cid = self._hash_string(pid)
         rel_path = self._rel_path(s_cid)
         full_path = Path(self.store_path) / "sysmeta" / rel_path
+
         try:
             if self.sysmeta.exists(s_cid):
                 # Move existing file to /tmp

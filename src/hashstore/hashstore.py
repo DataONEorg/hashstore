@@ -44,11 +44,29 @@ class HashStore:
 
     def store_object(self, data, algorithm):
         """Add a data object to the store"""
-        algorithm_list = ["md5", "sha1", "sha256", "sha384", "sha512"]
-        check_algorithm = algorithm.lower().replace("-", "")
-        if check_algorithm not in algorithm_list:
-            raise Exception("Algorithm not supported")
-        checksums = self._add_object(data)
+        check_algorithm = algorithm.lower().replace("-", "").replace("_", "")
+        default_algo_list = ["md5", "sha1", "sha256", "sha384", "sha512"]
+        other_algo_list = [
+            "sha3224",
+            "sha3256",
+            "sha3384",
+            "sha3512",
+            "shake128",
+            "shake256",
+            "blake2b",
+            "blake2s",
+            "sm3",
+        ]
+        if (
+            check_algorithm not in default_algo_list
+            and check_algorithm not in other_algo_list
+        ):
+            raise ValueError("Algorithm not supported")
+        elif check_algorithm in other_algo_list:
+            # TODO: Return checksums with additional algo and update test
+            pass
+        else:
+            checksums = self._add_object(data)
         return checksums
 
     def store_sysmeta(self, pid, sysmeta, cid):

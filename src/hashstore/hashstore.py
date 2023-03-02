@@ -87,6 +87,14 @@ class HashStore:
         sysmeta = self._get_sysmeta(pid)[1]
         return sysmeta
 
+    def delete(self, pid):
+        """Deletes sysmeta document and associated object"""
+        s_content = self._get_sysmeta(pid)
+        s_cid = self._hash_string(pid)
+        cid = s_content[0][:64]
+        self.sysmeta.delete(s_cid)
+        self.objects.delete(cid)
+
     def _add_object(self, data):
         """Add a data blob to the store"""
         address = self.objects.put(data)

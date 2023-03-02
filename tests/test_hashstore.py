@@ -199,6 +199,21 @@ def test_retrieve_sysmeta(store):
     assert sysmeta.decode("utf-8") == sysmeta_ret
 
 
+def test_delete(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        sysmeta = syspath.read_bytes()
+        checksums = store.store_object(path, "sha256")
+        cid = checksums.get("sha256")
+        s_cid = store.store_sysmeta(pid, sysmeta, cid)
+        store.delete(pid)
+    assert store.objects.count() == 0
+    assert store.sysmeta.count() == 0
+
+
 def test_hash_string(pids, store):
     for pid in pids:
         hash_val = store._hash_string(pid)

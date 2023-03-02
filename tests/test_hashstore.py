@@ -98,8 +98,8 @@ def test_store_object_algorithm_args(pids, store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_not_in_list = "abc"
-    checksums = store.store_object(path, algorithm_not_in_list)
-    assert checksums == None
+    with pytest.raises(ValueError, match="Algorithm not supported"):
+        checksums = store.store_object(path, algorithm_not_in_list)
     algorithm_with_hyphen_and_upper = "SHA-256"
     checksums = store.store_object(path, algorithm_with_hyphen_and_upper)
     cid = checksums.get("sha256")

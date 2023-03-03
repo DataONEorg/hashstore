@@ -4,6 +4,7 @@ from pathlib import Path
 import hashlib
 import importlib.metadata
 import os
+import fcntl
 
 
 class HashStore:
@@ -117,11 +118,16 @@ class HashStore:
             parent = full_path.parent
             parent.mkdir(parents=True, exist_ok=True)
             with full_path.open(mode="wb") as file:
+                # LOCK_EX – acquire an exclusive lock
+                # LOCK_NB - to avoid blocking on lock acquisition
+                fcntl.flock(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 file.write(obj_cid.encode("utf-8"))
                 formatId = " " + self.SYSMETA_NS
                 file.write(formatId.encode("utf-8"))
                 file.write(b"\x00")
                 file.write(sysmeta)
+                # LOCK_UN – unlock
+                fcntl.flock(file, fcntl.LOCK_UN)
             if self.sysmeta.exists(sysmeta_path_tmp):
                 self.sysmeta.delete(sysmeta_path_tmp)
             return s_cid

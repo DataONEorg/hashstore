@@ -3,7 +3,7 @@ from hashfs import HashFS
 from pathlib import Path
 import hashlib
 import importlib.metadata
-import shutil
+import os
 
 
 class HashStore:
@@ -107,14 +107,13 @@ class HashStore:
         s_cid = self._hash_string(pid)
         rel_path = self._rel_path(s_cid)
         full_path = Path(self.store_path) / "sysmeta" / rel_path
-
         try:
+            sysmeta_path_tmp = ""
             if self.sysmeta.exists(s_cid):
-                # Move existing file to /tmp
-                tmp_file_path = Path(self.store_path) / "tmp" / rel_path
-                tmp_parent = tmp_file_path.parent
-                tmp_parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(full_path, tmp_file_path)
+                # Rename existing s_cid
+                sysmeta_path = self.sysmeta.realpath(s_cid)
+                sysmeta_path_tmp = sysmeta_path + ".tmp"
+                os.rename(sysmeta_path, sysmeta_path_tmp)
             parent = full_path.parent
             parent.mkdir(parents=True, exist_ok=True)
             with full_path.open(mode="wb") as file:
@@ -123,18 +122,16 @@ class HashStore:
                 file.write(formatId.encode("utf-8"))
                 file.write(b"\x00")
                 file.write(sysmeta)
-        except Exception as err:
-            print(err)
-            if self.tmp.exists(s_cid):
-                if self.sysmeta.exists(s_cid):
-                    self.sysmeta.delete(rel_path)
-                # Return sysmeta to original location
-                shutil.move(tmp_file_path, full_path)
-            return None
-        else:
-            if self.tmp.exists(s_cid):
-                self.tmp.delete(rel_path)
+            if self.sysmeta.exists(sysmeta_path_tmp):
+                self.sysmeta.delete(sysmeta_path_tmp)
             return s_cid
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            if self.sysmeta.exists(sysmeta_path_tmp):
+                if self.sysmeta.exists(s_cid):
+                    self.sysmeta.delete(s_cid)
+                    os.rename(sysmeta_path_tmp, sysmeta_path)
+            raise
 
     def _get_sysmeta(self, pid):
         """Returns a list containing the sysmeta header and content given a persistent identifier (pid)"""

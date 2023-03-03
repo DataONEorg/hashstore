@@ -160,10 +160,6 @@ def test_store_sysmeta_update(store):
     s_content = store._get_sysmeta(pid)
     cid_get = s_content[0][:64]
     assert cid_new == cid_get
-    tmp_sysmeta = store.tmp.exists(s_cid)
-    assert tmp_sysmeta == False
-    sys_sysmeta = store.sysmeta.exists(s_cid)
-    assert sys_sysmeta == True
 
 
 def test_retrieve_object(pids, store):

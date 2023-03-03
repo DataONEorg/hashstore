@@ -72,8 +72,14 @@ class HashStore:
 
     def store_sysmeta(self, pid, sysmeta, cid):
         """Add a metadata object to the store"""
-        s_cid = self._set_sysmeta(pid, sysmeta, cid)
-        return s_cid
+        s_cid = self._hash_string(pid)
+        sysmeta_path = self.sysmeta.realpath(s_cid)
+        if sysmeta_path is not None:
+            sysmeta_path_tmp = sysmeta_path + ".tmp"
+            if self.sysmeta.exists(sysmeta_path_tmp):
+                raise OSError("File in use")
+        sysmeta_cid = self._set_sysmeta(pid, sysmeta, cid)
+        return sysmeta_cid
 
     def retrieve_object(self, pid):
         """Returns the sysmeta and a buffered stream of a cid obj given a persistent identifier (pid)"""
@@ -122,8 +128,8 @@ class HashStore:
                 # LOCK_NB - to avoid blocking on lock acquisition
                 fcntl.flock(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 file.write(obj_cid.encode("utf-8"))
-                formatId = " " + self.SYSMETA_NS
-                file.write(formatId.encode("utf-8"))
+                format_id = " " + self.SYSMETA_NS
+                file.write(format_id.encode("utf-8"))
                 file.write(b"\x00")
                 file.write(sysmeta)
                 # LOCK_UN – unlock

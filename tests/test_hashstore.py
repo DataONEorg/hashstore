@@ -205,7 +205,8 @@ def test_delete(pids, store):
         checksums = store.store_object(path, "sha256")
         cid = checksums.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
-        store.delete(pid)
+        store.delete_object(pid)
+        store.delete_sysmeta(pid)
     assert store.objects.count() == 0
     assert store.sysmeta.count() == 0
 

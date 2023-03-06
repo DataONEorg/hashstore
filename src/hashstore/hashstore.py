@@ -74,12 +74,6 @@ class HashStore:
 
     def store_sysmeta(self, pid, sysmeta, cid):
         """Add a metadata object to the store"""
-        s_cid = self._hash_string(pid)
-        sysmeta_path = self.sysmeta.realpath(s_cid)
-        if sysmeta_path is not None:
-            sysmeta_path_tmp = sysmeta_path + ".tmp"
-            if self.sysmeta.exists(sysmeta_path_tmp):
-                raise OSError("File in use")
         sysmeta_cid = self._set_sysmeta(pid, sysmeta, cid)
         return sysmeta_cid
 

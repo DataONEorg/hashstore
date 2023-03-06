@@ -1,6 +1,6 @@
 from hashstore import HashStore
 from pathlib import Path
-from multiprocessing import Process
+from threading import Thread
 import hashlib
 import importlib.metadata
 import pytest
@@ -175,14 +175,16 @@ def test_store_sysmeta_thread_lock(store):
     cid = checksums.get("sha256")
     store.store_sysmeta(pid, sysmeta, cid)
     test_cid = obj_cid[::-1]
-    with pytest.raises(TypeError):
-        p1 = Process(target=store.store_sysmeta, args=(pid, sysmeta, test_cid))
-        p1.start()
-        p2 = Process(target=store.store_sysmeta, args=(pid, sysmeta, test_cid))
-        p2.start()
-        p1.join()
-        p2.join()
-    assert cid == obj_cid
+    test_cid_two = "9999b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
+    # Start threads
+    thread1 = Thread(target=store.store_sysmeta, args=(pid, sysmeta, test_cid))
+    thread2 = Thread(target=store.store_sysmeta, args=(pid, sysmeta, test_cid_two))
+    thread1.start()
+    thread2.start()
+    thread1.join()
+    thread2.join()
+    cid_check = store._get_sysmeta(pid)[0][:64]
+    assert cid_check == test_cid or cid_check == test_cid_two
     assert store.objects.count() == 1
     assert store.sysmeta.count() == 1
 

@@ -94,13 +94,19 @@ def test_store_checksums(pids, store):
         assert checksums.get("sha512") == pids[pid]["sha512"]
 
 
-def test_store_object_algorithm_args(pids, store):
+def test_store_object_algorithm_args_invalid(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_not_in_list = "abc"
     with pytest.raises(ValueError, match="Algorithm not supported"):
         checksums = store.store_object(path, algorithm_not_in_list)
+
+
+def test_store_object_algorithm_args_hyphen(pids, store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
     algorithm_with_hyphen_and_upper = "SHA-256"
     checksums = store.store_object(path, algorithm_with_hyphen_and_upper)
     cid = checksums.get("sha256")

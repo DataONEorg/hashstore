@@ -45,7 +45,7 @@ class HashStore:
         self.lock = Lock()
         return None
 
-    def store_object(self, data, algorithm):
+    def store_object(self, data, algorithm=None, checksum=None):
         """Add a data object to the store"""
         check_algorithm = algorithm.lower().replace("-", "")
         default_algo_list = ["md5", "sha1", "sha256", "sha384", "sha512"]
@@ -63,11 +63,8 @@ class HashStore:
             and check_algorithm not in other_algo_list
         ):
             raise ValueError("Algorithm not supported")
-        elif check_algorithm in other_algo_list:
-            # TODO: Return checksums with additional algo and update test
-            pass
         else:
-            checksums = self._add_object(data)
+            checksums = self._add_object(data, algorithm, checksum)
         return checksums
 
     def store_sysmeta(self, pid, sysmeta, cid):
@@ -99,9 +96,9 @@ class HashStore:
         s_cid = self._hash_string(pid)
         self.sysmeta.delete(s_cid)
 
-    def _add_object(self, data):
+    def _add_object(self, data, algorithm=None, checksum=None):
         """Add a data blob to the store"""
-        address = self.objects.put(data)
+        address = self.objects.put(data, algorithm, checksum)
         if address.is_duplicate:
             return None
         return address.checksums

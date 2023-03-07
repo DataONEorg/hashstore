@@ -67,7 +67,7 @@ def test_store_files(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path, "sha256")
+        checksums = store.store_object(path)
         cid = checksums.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
     assert store.objects.count() == 3
@@ -77,7 +77,7 @@ def test_store_address_length(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        checksums = store.store_object(path, "sha256")
+        checksums = store.store_object(path)
         cid = checksums.get("sha256")
         assert len(cid) == 64
 
@@ -86,7 +86,7 @@ def test_store_checksums(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        checksums = store.store_object(path, "sha256")
+        checksums = store.store_object(path)
         assert checksums.get("md5") == pids[pid]["md5"]
         assert checksums.get("sha1") == pids[pid]["sha1"]
         assert checksums.get("sha256") == pids[pid]["sha256"]
@@ -113,13 +113,25 @@ def test_store_object_algorithm_args_hyphen(pids, store):
     assert cid == pids[pid]["sha256"]
 
 
+def test_store_object_algorithm_args_other(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    algorithm_other = "sha3_256"
+    checksums = store.store_object(path, algorithm_other)
+    cid = checksums.get("sha3_256")
+    sha3_256_checksum = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    assert cid == sha3_256_checksum
+
+
 def test_store_duplicate_objects(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    algorithm = "sha256"
-    store.store_object(path, algorithm)
-    is_duplicate = store.store_object(path, algorithm)
+    store.store_object(path)
+    is_duplicate = store.store_object(path)
     assert is_duplicate == None
 
 
@@ -130,7 +142,7 @@ def test_store_sysmeta_s_cid(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path, "sha256")
+        checksums = store.store_object(path)
         cid = checksums.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
         assert s_cid == pids[pid]["s_cid"]
@@ -143,7 +155,7 @@ def test_store_sysmeta_cid(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path, "sha256")
+        checksums = store.store_object(path)
         cid = checksums.get("sha256")
         store.store_sysmeta(pid, sysmeta, cid)
         s_content = store._get_sysmeta(pid)
@@ -159,7 +171,7 @@ def test_store_sysmeta_update(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    checksums = store.store_object(path, "sha256")
+    checksums = store.store_object(path)
     cid = checksums.get("sha256")
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
     cid_new = obj_cid[::-1]
@@ -177,7 +189,7 @@ def test_store_sysmeta_thread_lock(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    checksums = store.store_object(path, "sha256")
+    checksums = store.store_object(path)
     cid = checksums.get("sha256")
     store.store_sysmeta(pid, sysmeta, cid)
     test_cid = obj_cid[::-1]
@@ -202,7 +214,7 @@ def test_retrieve_object(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path, "sha256")
+        checksums = store.store_object(path)
         obj_cid = checksums.get("sha256")
         store.store_sysmeta(pid, sysmeta, obj_cid)
         s_content = store._get_sysmeta(pid)
@@ -221,7 +233,7 @@ def test_retrieve_sysmeta(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    checksums = store.store_object(path, "sha256")
+    checksums = store.store_object(path)
     cid = checksums.get("sha256")
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
     sysmeta_ret = store.retrieve_sysmeta(pid)
@@ -235,7 +247,7 @@ def test_delete(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path, "sha256")
+        checksums = store.store_object(path)
         cid = checksums.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
         store.delete_object(pid)

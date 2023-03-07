@@ -47,18 +47,16 @@ class HashStore:
 
     def store_object(self, data, algorithm):
         """Add a data object to the store"""
-        check_algorithm = algorithm.lower().replace("-", "").replace("_", "")
+        check_algorithm = algorithm.lower().replace("-", "")
         default_algo_list = ["md5", "sha1", "sha256", "sha384", "sha512"]
         other_algo_list = [
-            "sha3224",
-            "sha3256",
-            "sha3384",
-            "sha3512",
-            "shake128",
-            "shake256",
+            "sha224",
+            "sha3_224",
+            "sha3_256",
+            "sha3_384",
+            "sha3_512",
             "blake2b",
             "blake2s",
-            "sm3",
         ]
         if (
             check_algorithm not in default_algo_list

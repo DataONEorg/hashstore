@@ -126,6 +126,19 @@ def test_store_object_algorithm_args_other(store):
     assert cid == sha3_256_checksum
 
 
+def test_store_object_algorithm_args_incorrect_checksum(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    algorithm_other = "sha3_256"
+    checksum_incorrect = (
+        "bbbb069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    with pytest.raises(ValueError):
+        store.store_object(path, algorithm_other, checksum_incorrect)
+    assert store.objects.count() == 0
+
+
 def test_store_duplicate_objects(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"

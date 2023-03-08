@@ -198,6 +198,7 @@ def test_store_sysmeta_thread_lock(store):
     test_dir = "tests/testdata/"
     obj_cid = "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
     pid = "jtao.1700.1"
+    pid_two = "jtao.1700.2"
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
@@ -210,14 +211,17 @@ def test_store_sysmeta_thread_lock(store):
     # Start threads
     thread1 = Thread(target=store.store_sysmeta, args=(pid, sysmeta, test_cid))
     thread2 = Thread(target=store.store_sysmeta, args=(pid, sysmeta, test_cid_two))
+    thread3 = Thread(target=store.store_sysmeta, args=(pid_two, sysmeta, cid))
     thread1.start()
     thread2.start()
+    thread3.start()
     thread1.join()
     thread2.join()
+    thread3.join()
     cid_check = store._get_sysmeta(pid)[0][:64]
     assert cid_check == test_cid or cid_check == test_cid_two
     assert store.objects.count() == 1
-    assert store.sysmeta.count() == 1
+    assert store.sysmeta.count() == 2
 
 
 def test_retrieve_object(pids, store):

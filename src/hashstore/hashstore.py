@@ -1,7 +1,8 @@
 # Core module for hashstore
 from hashfs import HashFS
 from pathlib import Path
-from threading import Lock
+import threading
+import time
 import hashlib
 import importlib.metadata
 import os
@@ -42,7 +43,9 @@ class HashStore:
             width=self.dir_width,
             algorithm="sha256",
         )
-        self.lock = Lock()
+        self.time_out = 1
+        self.lock = threading.Lock()
+        self.locked_pids = []
         return None
 
     def store_object(self, data, algorithm="sha256", checksum=None):
@@ -66,7 +69,21 @@ class HashStore:
 
     def store_sysmeta(self, pid, sysmeta, cid):
         """Add a metadata object to the store"""
-        sysmeta_cid = self._set_sysmeta(pid, sysmeta, cid)
+        with self.lock:
+            while pid in self.locked_pids:
+                try:
+                    time.sleep(self.time_out)
+                except Exception as err:
+                    print(f"Unexpected {err=}, {type(err)=}")
+                    raise
+            self.locked_pids.append(pid)
+        try:
+            sysmeta_cid = self._set_sysmeta(pid, sysmeta, cid)
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            raise
+        finally:
+            self.locked_pids.remove(pid)
         return sysmeta_cid
 
     def retrieve_object(self, pid):
@@ -106,29 +123,28 @@ class HashStore:
         rel_path = self._rel_path(s_cid)
         full_path = Path(self.store_path) / "sysmeta" / rel_path
         try:
-            with self.lock:
-                sysmeta_path_tmp = ""
-                if self.sysmeta.exists(s_cid):
-                    # Rename existing s_cid
-                    sysmeta_path = self.sysmeta.realpath(s_cid)
-                    sysmeta_path_tmp = sysmeta_path + ".tmp"
-                    os.rename(sysmeta_path, sysmeta_path_tmp)
-                parent = full_path.parent
-                parent.mkdir(parents=True, exist_ok=True)
-                with full_path.open(mode="wb") as file:
-                    # LOCK_EX – acquire an exclusive lock
-                    # LOCK_NB - to avoid blocking on lock acquisition
-                    fcntl.flock(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    file.write(obj_cid.encode("utf-8"))
-                    format_id = " " + self.SYSMETA_NS
-                    file.write(format_id.encode("utf-8"))
-                    file.write(b"\x00")
-                    file.write(sysmeta)
-                    # LOCK_UN – unlock
-                    fcntl.flock(file, fcntl.LOCK_UN)
-                if self.sysmeta.exists(sysmeta_path_tmp):
-                    self.sysmeta.delete(sysmeta_path_tmp)
-                return s_cid
+            sysmeta_path_tmp = ""
+            if self.sysmeta.exists(s_cid):
+                # Rename existing s_cid
+                sysmeta_path = self.sysmeta.realpath(s_cid)
+                sysmeta_path_tmp = sysmeta_path + ".tmp"
+                os.rename(sysmeta_path, sysmeta_path_tmp)
+            parent = full_path.parent
+            parent.mkdir(parents=True, exist_ok=True)
+            with full_path.open(mode="wb") as file:
+                # LOCK_EX – acquire an exclusive lock
+                # LOCK_NB - to avoid blocking on lock acquisition
+                fcntl.flock(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                file.write(obj_cid.encode("utf-8"))
+                format_id = " " + self.SYSMETA_NS
+                file.write(format_id.encode("utf-8"))
+                file.write(b"\x00")
+                file.write(sysmeta)
+                # LOCK_UN – unlock
+                fcntl.flock(file, fcntl.LOCK_UN)
+            if self.sysmeta.exists(sysmeta_path_tmp):
+                self.sysmeta.delete(sysmeta_path_tmp)
+            return s_cid
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             if self.sysmeta.exists(sysmeta_path_tmp):

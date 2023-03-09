@@ -146,6 +146,23 @@ def test_store_duplicate_objects(store):
     store.store_object(path)
     is_duplicate = store.store_object(path)
     assert is_duplicate == None
+    assert store.objects.count() == 1
+
+
+def test_store_duplicate_object_threads(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    thread1 = Thread(target=store.store_object, args=(path,))
+    thread2 = Thread(target=store.store_object, args=(path,))
+    thread3 = Thread(target=store.store_object, args=(path,))
+    thread1.start()
+    thread2.start()
+    thread3.start()
+    thread1.join()
+    thread2.join()
+    thread3.join()
+    assert store.objects.count() == 1
 
 
 def test_store_sysmeta_s_cid(pids, store):

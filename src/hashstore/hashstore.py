@@ -44,7 +44,7 @@ class HashStore:
             algorithm="sha256",
         )
         self.time_out = 1
-        self.lock = threading.Lock()
+        self.sysmeta_lock = threading.Lock()
         self.locked_pids = []
         return None
 
@@ -69,7 +69,7 @@ class HashStore:
 
     def store_sysmeta(self, pid, sysmeta, cid):
         """Add a metadata object to the store"""
-        with self.lock:
+        with self.sysmeta_lock:
             while pid in self.locked_pids:
                 try:
                     time.sleep(self.time_out)

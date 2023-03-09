@@ -69,13 +69,13 @@ class HashStore:
 
     def store_sysmeta(self, pid, sysmeta, cid):
         """Add a metadata object to the store"""
+        while pid in self.locked_pids:
+            try:
+                time.sleep(self.time_out)
+            except Exception as err:
+                print(f"Unexpected {err=}, {type(err)=}")
+                raise
         with self.sysmeta_lock:
-            while pid in self.locked_pids:
-                try:
-                    time.sleep(self.time_out)
-                except Exception as err:
-                    print(f"Unexpected {err=}, {type(err)=}")
-                    raise
             self.locked_pids.append(pid)
         try:
             sysmeta_cid = self._set_sysmeta(pid, sysmeta, cid)
@@ -83,7 +83,8 @@ class HashStore:
             print(f"Unexpected {err=}, {type(err)=}")
             raise
         finally:
-            self.locked_pids.remove(pid)
+            with self.sysmeta_lock:
+                self.locked_pids.remove(pid)
         return sysmeta_cid
 
     def retrieve_object(self, pid):

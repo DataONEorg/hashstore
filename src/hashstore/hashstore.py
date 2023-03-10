@@ -79,7 +79,11 @@ class HashStore:
         return checksums
 
     def store_sysmeta(self, pid, sysmeta, cid):
-        """Add a metadata object to the store"""
+        """Add a system metadata object to the store. Returns the sysmeta content
+        identifier (s_cid) which is the address of the sysmeta document. Multiple calls
+        to this method are non-blocking and will be executed in parallel using locked_pids
+        for synchronization.
+        """
         while pid in self.locked_pids:
             try:
                 time.sleep(self.time_out)

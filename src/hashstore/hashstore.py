@@ -46,19 +46,7 @@ class HashStore:
         self.time_out = 1
         self.sysmeta_lock = threading.Lock()
         self.locked_pids = []
-        return None
-
-    def store_object(self, data, algorithm="sha256", checksum=None):
-        """Add a data object to the store. If the object is not a duplicate,
-        a dictionary containing hash algorithms and their checksum values will be
-        returned. The default checksum list are algorithms supported in hashlib for
-        Python 3.9. If an algorithm is passed that is not included in the default list,
-        but is supported, checksum list will contain the additional algorithm & checksum.
-
-        Default Algorithms in Checksum List: md5, sha1, sha256, sha384, sha512
-        """
-        algorithm = algorithm.lower().replace("-", "")
-        supported_algorithms = [
+        self.supported_algorithms = [
             "md5",
             "sha1",
             "sha256",
@@ -72,11 +60,25 @@ class HashStore:
             "blake2b",
             "blake2s",
         ]
-        if algorithm not in supported_algorithms:
+        return None
+
+    def store_object(self, data, algorithm="sha256", checksum=None):
+        """Add a data object to the store. If the object is not a duplicate,
+        a dictionary containing hash algorithms and their hex digest values will be
+        returned. The supported algorithms list is based on algorithms supported in
+        hashlib for Python 3.9. If an algorithm is passed that is supported, the hex
+        digest dictionary returned will include the additional algorithm & hex digest.
+
+        Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512
+        """
+        algorithm = algorithm.lower().replace("-", "")
+        if algorithm not in self.supported_algorithms:
             raise ValueError("Algorithm not supported")
         else:
-            checksums = self._add_object(data, algorithm=algorithm, checksum=checksum)
-        return checksums
+            hex_digest_dict = self._add_object(
+                data, algorithm=algorithm, checksum=checksum
+            )
+        return hex_digest_dict
 
     def store_sysmeta(self, pid, sysmeta, cid):
         """Add a system metadata object to the store. Returns the sysmeta content
@@ -127,12 +129,25 @@ class HashStore:
         s_cid = self._hash_string(pid)
         self.sysmeta.delete(s_cid)
 
+    def get_hex_digest(self, pid, algorithm):
+        """Returns the hex digest based on the hash algorithm passed with a given pid"""
+        s_cid = self._hash_string(pid)
+        if not self.sysmeta.exists(s_cid):
+            raise ValueError(f"No sysmeta found for pid: {pid}")
+        if algorithm not in self.supported_algorithms:
+            raise ValueError(f"Algorithm not supported: {algorithm}")
+        s_content = self._get_sysmeta(pid)
+        cid_get = s_content[0][:64]
+        c_stream = self.objects.open(cid_get)
+        hex_digest = self.objects.computehash(c_stream, algorithm=algorithm)
+        return hex_digest
+
     def _add_object(self, data, algorithm, checksum):
         """Add a data blob to the store."""
         address = self.objects.put(data, algorithm=algorithm, checksum=checksum)
         if address.is_duplicate:
             return None
-        return address.checksums
+        return address.hex_digests
 
     def _set_sysmeta(self, pid, sysmeta, obj_cid):
         """Add a sysmeta document to the store."""

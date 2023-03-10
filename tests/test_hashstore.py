@@ -67,8 +67,8 @@ def test_store_files(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path)
-        cid = checksums.get("sha256")
+        hex_digest_dict = store.store_object(path)
+        cid = hex_digest_dict.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
     assert store.objects.count() == 3
 
@@ -77,21 +77,21 @@ def test_store_address_length(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        checksums = store.store_object(path)
-        cid = checksums.get("sha256")
+        hex_digest_dict = store.store_object(path)
+        cid = hex_digest_dict.get("sha256")
         assert len(cid) == 64
 
 
-def test_store_checksums(pids, store):
+def test_store_hex_digests(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        checksums = store.store_object(path)
-        assert checksums.get("md5") == pids[pid]["md5"]
-        assert checksums.get("sha1") == pids[pid]["sha1"]
-        assert checksums.get("sha256") == pids[pid]["sha256"]
-        assert checksums.get("sha384") == pids[pid]["sha384"]
-        assert checksums.get("sha512") == pids[pid]["sha512"]
+        hex_digest_dict = store.store_object(path)
+        assert hex_digest_dict.get("md5") == pids[pid]["md5"]
+        assert hex_digest_dict.get("sha1") == pids[pid]["sha1"]
+        assert hex_digest_dict.get("sha256") == pids[pid]["sha256"]
+        assert hex_digest_dict.get("sha384") == pids[pid]["sha384"]
+        assert hex_digest_dict.get("sha512") == pids[pid]["sha512"]
 
 
 def test_store_object_algorithm_args_invalid(store):
@@ -100,7 +100,7 @@ def test_store_object_algorithm_args_invalid(store):
     path = test_dir + pid
     algorithm_not_in_list = "abc"
     with pytest.raises(ValueError, match="Algorithm not supported"):
-        checksums = store.store_object(path, algorithm_not_in_list)
+        store.store_object(path, algorithm_not_in_list)
 
 
 def test_store_object_algorithm_args_hyphen(pids, store):
@@ -108,8 +108,8 @@ def test_store_object_algorithm_args_hyphen(pids, store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_with_hyphen_and_upper = "SHA-256"
-    checksums = store.store_object(path, algorithm_with_hyphen_and_upper)
-    cid = checksums.get("sha256")
+    hex_digest_dict = store.store_object(path, algorithm_with_hyphen_and_upper)
+    cid = hex_digest_dict.get("sha256")
     assert cid == pids[pid]["sha256"]
 
 
@@ -118,8 +118,8 @@ def test_store_object_algorithm_args_other(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_other = "sha3_256"
-    checksums = store.store_object(path, algorithm_other)
-    cid = checksums.get("sha3_256")
+    hex_digest_dict = store.store_object(path, algorithm_other)
+    cid = hex_digest_dict.get("sha3_256")
     sha3_256_checksum = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
@@ -172,8 +172,8 @@ def test_store_sysmeta_s_cid(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path)
-        cid = checksums.get("sha256")
+        hex_digest_dict = store.store_object(path)
+        cid = hex_digest_dict.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
         assert s_cid == pids[pid]["s_cid"]
 
@@ -185,8 +185,8 @@ def test_store_sysmeta_cid(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path)
-        cid = checksums.get("sha256")
+        hex_digest_dict = store.store_object(path)
+        cid = hex_digest_dict.get("sha256")
         store.store_sysmeta(pid, sysmeta, cid)
         s_content = store._get_sysmeta(pid)
         cid_get = s_content[0][:64]
@@ -201,8 +201,8 @@ def test_store_sysmeta_update(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    checksums = store.store_object(path)
-    cid = checksums.get("sha256")
+    hex_digest_dict = store.store_object(path)
+    cid = hex_digest_dict.get("sha256")
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
     cid_new = obj_cid[::-1]
     store.store_sysmeta(pid, sysmeta, cid_new)
@@ -220,8 +220,8 @@ def test_store_sysmeta_thread_lock(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    checksums = store.store_object(path)
-    cid = checksums.get("sha256")
+    hex_digest_dict = store.store_object(path)
+    cid = hex_digest_dict.get("sha256")
     store.store_sysmeta(pid, sysmeta, cid)
     test_cid = obj_cid[::-1]
     test_cid_two = "9999b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
@@ -251,8 +251,8 @@ def test_retrieve_object(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path)
-        obj_cid = checksums.get("sha256")
+        hex_digest_dict = store.store_object(path)
+        obj_cid = hex_digest_dict.get("sha256")
         store.store_sysmeta(pid, sysmeta, obj_cid)
         s_content = store._get_sysmeta(pid)
         cid = s_content[0][:64]
@@ -270,8 +270,8 @@ def test_retrieve_sysmeta(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    checksums = store.store_object(path)
-    cid = checksums.get("sha256")
+    hex_digest_dict = store.store_object(path)
+    cid = hex_digest_dict.get("sha256")
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
     sysmeta_ret = store.retrieve_sysmeta(pid)
     assert sysmeta.decode("utf-8") == sysmeta_ret
@@ -284,13 +284,51 @@ def test_delete(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        checksums = store.store_object(path)
-        cid = checksums.get("sha256")
+        hex_digest_dict = store.store_object(path)
+        cid = hex_digest_dict.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
         store.delete_object(pid)
         store.delete_sysmeta(pid)
     assert store.objects.count() == 0
     assert store.sysmeta.count() == 0
+
+
+def test_get_hex_digest(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    filename = pid + ".xml"
+    syspath = Path(test_dir) / filename
+    sysmeta = syspath.read_bytes()
+    hex_digest_dict = store.store_object(path)
+    cid = hex_digest_dict.get("sha256")
+    s_cid = store.store_sysmeta(pid, sysmeta, cid)
+    sha3_256_hex_digest = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    sha3_256_get = store.get_hex_digest(pid, "sha3_256")
+    assert sha3_256_hex_digest == sha3_256_get
+
+
+def test_get_hex_digest_pid_not_found(store):
+    pid = "jtao.1700.1"
+    pid_does_not_exist = pid + "test"
+    algorithm = "sha256"
+    with pytest.raises(ValueError):
+        store.get_hex_digest(pid_does_not_exist, algorithm)
+
+
+def test_get_hex_digest_pid_unsupported_algorithm(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    filename = pid + ".xml"
+    syspath = Path(test_dir) / filename
+    syspath.read_bytes()
+    store.store_object(path)
+    algorithm = "sm3"
+    with pytest.raises(ValueError):
+        store.get_hex_digest(pid, algorithm)
 
 
 def test_hash_string(pids, store):

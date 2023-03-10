@@ -134,8 +134,7 @@ class HashStore:
             parent.mkdir(parents=True, exist_ok=True)
             with full_path.open(mode="wb") as file:
                 # LOCK_EX – acquire an exclusive lock
-                # LOCK_NB - to avoid blocking on lock acquisition
-                fcntl.flock(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(file, fcntl.LOCK_EX)
                 file.write(obj_cid.encode("utf-8"))
                 format_id = " " + self.SYSMETA_NS
                 file.write(format_id.encode("utf-8"))

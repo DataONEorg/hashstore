@@ -103,7 +103,8 @@ class HashStore:
         return sysmeta_cid
 
     def retrieve_object(self, pid):
-        """Returns the sysmeta and a buffered stream of a cid obj given a persistent identifier (pid)"""
+        """Returns the sysmeta and a buffered stream of a cid obj given a persistent
+        identifier (pid)."""
         sys_content = self._get_sysmeta(pid)
         cid = sys_content[0][:64]
         sysmeta = sys_content[1]
@@ -111,30 +112,30 @@ class HashStore:
         return sysmeta, c_stream
 
     def retrieve_sysmeta(self, pid):
-        """Returns the sysmeta of a given persistent identifier (pid)"""
+        """Returns the sysmeta of a given persistent identifier (pid)."""
         sysmeta = self._get_sysmeta(pid)[1]
         return sysmeta
 
     def delete_object(self, pid):
-        """Deletes sysmeta document and associated object"""
+        """Deletes an object given the pid."""
         s_content = self._get_sysmeta(pid)
         cid = s_content[0][:64]
         self.objects.delete(cid)
 
     def delete_sysmeta(self, pid):
-        """Deletes sysmeta document and associated object"""
+        """Deletes a sysmeta document given the pid."""
         s_cid = self._hash_string(pid)
         self.sysmeta.delete(s_cid)
 
     def _add_object(self, data, algorithm, checksum):
-        """Add a data blob to the store"""
+        """Add a data blob to the store."""
         address = self.objects.put(data, algorithm=algorithm, checksum=checksum)
         if address.is_duplicate:
             return None
         return address.checksums
 
     def _set_sysmeta(self, pid, sysmeta, obj_cid):
-        """Add a sysmeta document to the store"""
+        """Add a sysmeta document to the store."""
         s_cid = self._hash_string(pid)
         rel_path = self._rel_path(s_cid)
         full_path = Path(self.store_path) / "sysmeta" / rel_path
@@ -169,7 +170,8 @@ class HashStore:
             raise
 
     def _get_sysmeta(self, pid):
-        """Returns a list containing the sysmeta header and content given a persistent identifier (pid)"""
+        """Returns a list containing the sysmeta header and content given a persistent
+        identifier (pid)."""
         s_cid = self._hash_string(pid)
         s_path = self.sysmeta.open(s_cid)
         s_content = s_path.read().decode("utf-8").split("\x00", 1)
@@ -177,12 +179,13 @@ class HashStore:
         return s_content
 
     def _hash_string(self, input):
-        """Calculate the SHA-256 digest for a string, and return it in a base64 hex encoded string"""
+        """Calculate the SHA-256 digest for a string, and return it in a base64 hex
+        encoded string."""
         hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
         return hex
 
     def _rel_path(self, hash):
-        """Return the storage path for a given hash hexdigest"""
+        """Return the storage path for a given hash hexdigest."""
         chunks = []
         for i in range(self.dir_depth):
             temp = hash[: self.dir_width]

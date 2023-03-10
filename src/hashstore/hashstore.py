@@ -49,10 +49,21 @@ class HashStore:
         return None
 
     def store_object(self, data, algorithm="sha256", checksum=None):
-        """Add a data object to the store"""
+        """Add a data object to the store. If the object is not a duplicate,
+        a dictionary containing hash algorithms and their checksum values will be
+        returned. The default checksum list are algorithms supported in hashlib for
+        Python 3.9. If an algorithm is passed that is not included in the default list,
+        but is supported, checksum list will contain the additional algorithm & checksum.
+
+        Default Algorithms in Checksum List: md5, sha1, sha256, sha384, sha512
+        """
         algorithm = algorithm.lower().replace("-", "")
-        default_algo_list = ["md5", "sha1", "sha256", "sha384", "sha512"]
-        other_algo_list = [
+        supported_algorithms = [
+            "md5",
+            "sha1",
+            "sha256",
+            "sha384",
+            "sha512",
             "sha224",
             "sha3_224",
             "sha3_256",
@@ -61,7 +72,7 @@ class HashStore:
             "blake2b",
             "blake2s",
         ]
-        if algorithm not in default_algo_list and algorithm not in other_algo_list:
+        if algorithm not in supported_algorithms:
             raise ValueError("Algorithm not supported")
         else:
             checksums = self._add_object(data, algorithm=algorithm, checksum=checksum)

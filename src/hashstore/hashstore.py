@@ -179,7 +179,7 @@ class HashStore:
             return s_cid
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
-            # Abort process and restore existing sysmeta object
+            # Abort process for any exception and restore existing sysmeta object
             if self.sysmeta.exists(sysmeta_path_tmp):
                 if self.sysmeta.exists(s_cid):
                     self.delete_sysmeta(pid)

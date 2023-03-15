@@ -6,7 +6,6 @@ import time
 import hashlib
 import importlib.metadata
 import os
-import fcntl
 
 
 class HashStore:

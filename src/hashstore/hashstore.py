@@ -86,20 +86,16 @@ class HashStore:
         to this method are non-blocking and will be executed in parallel using locked_pids
         for synchronization.
         """
+        # Wait for the pid to release if it's in use
         while pid in self.locked_pids:
-            try:
-                time.sleep(self.time_out)
-            except Exception as err:
-                print(f"Unexpected {err=}, {type(err)=}")
-                raise
+            time.sleep(self.time_out)
+        # Modify locked_pids consecutively
         with self.sysmeta_lock:
             self.locked_pids.append(pid)
         try:
             sysmeta_cid = self._set_sysmeta(pid, sysmeta, cid)
-        except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
-            raise
         finally:
+            # Release pid
             with self.sysmeta_lock:
                 self.locked_pids.remove(pid)
         return sysmeta_cid

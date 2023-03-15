@@ -123,11 +123,13 @@ class HashStore:
         s_content = self._get_sysmeta(pid)
         cid = s_content[0][:64]
         self.objects.delete(cid)
+        return True
 
     def delete_sysmeta(self, pid):
         """Deletes a sysmeta document given the pid."""
         s_cid = self._hash_string(pid)
         self.sysmeta.delete(s_cid)
+        return True
 
     def get_hex_digest(self, pid, algorithm):
         """Returns the hex digest based on the hash algorithm passed with a given pid"""

@@ -160,6 +160,9 @@ class HashStore:
                 # Rename existing s_cid
                 sysmeta_path = self.sysmeta.realpath(s_cid)
                 sysmeta_path_tmp = sysmeta_path + ".tmp"
+                # Delete .tmp file if it already exists
+                if self.sysmeta.exists(sysmeta_path_tmp):
+                    self.sysmeta.delete(sysmeta_path_tmp)
                 os.rename(sysmeta_path, sysmeta_path_tmp)
             parent = full_path.parent
             parent.mkdir(parents=True, exist_ok=True)
@@ -174,10 +177,11 @@ class HashStore:
             return s_cid
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
+            # Abort process and restore existing sysmeta object
             if self.sysmeta.exists(sysmeta_path_tmp):
                 if self.sysmeta.exists(s_cid):
                     self.delete_sysmeta(pid)
-                    os.rename(sysmeta_path_tmp, sysmeta_path)
+                os.rename(sysmeta_path_tmp, sysmeta_path)
             raise
 
     def _get_sysmeta(self, pid):

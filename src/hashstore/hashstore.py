@@ -164,15 +164,11 @@ class HashStore:
             parent = full_path.parent
             parent.mkdir(parents=True, exist_ok=True)
             with full_path.open(mode="wb") as file:
-                # LOCK_EX – acquire an exclusive lock
-                fcntl.flock(file, fcntl.LOCK_EX)
                 file.write(obj_cid.encode("utf-8"))
                 format_id = " " + self.SYSMETA_NS
                 file.write(format_id.encode("utf-8"))
                 file.write(b"\x00")
                 file.write(sysmeta)
-                # LOCK_UN – unlock
-                fcntl.flock(file, fcntl.LOCK_UN)
             if self.sysmeta.exists(sysmeta_path_tmp):
                 self.sysmeta.delete(sysmeta_path_tmp)
             return s_cid

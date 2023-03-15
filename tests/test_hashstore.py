@@ -71,6 +71,7 @@ def test_store_files(pids, store):
         cid = hex_digest_dict.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
     assert store.objects.count() == 3
+    assert store.sysmeta.count() == 3
 
 
 def test_store_address_length(pids, store):
@@ -339,7 +340,6 @@ def test_hash_string(pids, store):
 
 def test_rel_path(pids, store):
     path = store._rel_path(pids["doi:10.18739/A2901ZH2M"]["s_cid"])
-    print(path)
     assert len(path) == 67
     assert path.startswith("0d/55/5e/d7")
     assert path.endswith("7052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e")

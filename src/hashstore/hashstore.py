@@ -16,6 +16,23 @@ class HashStore:
     dir_depth = 3  # The number of directory levels for storing files
     dir_width = 2  # The width of the directory names, in characters
     SYSMETA_NS = "http://ns.dataone.org/service/types/v2.0"
+    sysmeta_lock = threading.Lock()
+    time_out = 1
+    locked_pids = []
+    supported_algorithms = [
+        "md5",
+        "sha1",
+        "sha256",
+        "sha384",
+        "sha512",
+        "sha224",
+        "sha3_224",
+        "sha3_256",
+        "sha3_384",
+        "sha3_512",
+        "blake2b",
+        "blake2s",
+    ]
 
     def version(self):
         """Return the version number"""
@@ -43,23 +60,6 @@ class HashStore:
             width=self.dir_width,
             algorithm="sha256",
         )
-        self.time_out = 1
-        self.sysmeta_lock = threading.Lock()
-        self.locked_pids = []
-        self.supported_algorithms = [
-            "md5",
-            "sha1",
-            "sha256",
-            "sha384",
-            "sha512",
-            "sha224",
-            "sha3_224",
-            "sha3_256",
-            "sha3_384",
-            "sha3_512",
-            "blake2b",
-            "blake2s",
-        ]
         return None
 
     def store_object(self, data, algorithm="sha256", checksum=None):

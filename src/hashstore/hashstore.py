@@ -1,6 +1,11 @@
 # Core module for hashstore
 from hashfs import HashFS
+from hashfs.hashfs import Stream
 from pathlib import Path
+from contextlib import closing
+from tempfile import NamedTemporaryFile
+from collections import namedtuple
+import shutil
 import threading
 import time
 import hashlib
@@ -41,19 +46,19 @@ class HashStore:
     def __init__(self, store_path):
         """initialize the hashstore"""
         self.store_path = store_path
-        self.objects = HashFS(
+        self.objects = HashFSExt(
             self.store_path + "/objects",
             depth=self.dir_depth,
             width=self.dir_width,
             algorithm="sha256",
         )
-        self.sysmeta = HashFS(
+        self.sysmeta = HashFSExt(
             self.store_path + "/sysmeta",
             depth=self.dir_depth,
             width=self.dir_width,
             algorithm="sha256",
         )
-        self.tmp = HashFS(
+        self.tmp = HashFSExt(
             self.store_path + "/tmp",
             depth=self.dir_depth,
             width=self.dir_width,
@@ -206,3 +211,139 @@ class HashStore:
             if i == self.dir_depth - 1:
                 chunks.append(hash)
         return "/".join(chunks)
+
+
+class HashFSExt(HashFS):
+    def to_bytes(self, text):
+        if not isinstance(text, bytes):
+            text = bytes(text, "utf8")
+        return text
+
+    def put(self, file, extension=None, algorithm=None, checksum=None):
+        """Store contents of `file` on disk using its content hash for the
+        address.
+
+        Args:
+            file (mixed): Readable object or path to file.
+            extension (str, optional): Optional extension to append to file
+                when saving.
+            algorithm (str, optional): Optional algorithm value to include
+                when returning hex digests.
+            checksum (str, optional): Optional checksum to validate object
+                against hex digest before moving to permanent location.
+
+        Returns:
+            HashAddress: File's hash address.
+        """
+        stream = Stream(file)
+
+        with closing(stream):
+            hex_digest_dict, filepath, is_duplicate = self._copy(
+                stream, extension, algorithm, checksum
+            )
+
+        id = hex_digest_dict["sha256"]
+
+        return HashAddress(
+            id, self.relpath(filepath), filepath, is_duplicate, hex_digest_dict
+        )
+
+    def _copy(self, stream, extension=None, algorithm=None, checksum=None):
+        """Copy the contents of `stream` onto disk with an optional file
+        extension appended. The copy process uses a temporary file to store the
+        initial contents and returns a dictionary of algorithms and their
+        hex digest values. Once the file has been determined not to exist/be a
+        duplicate, it then moves that file to its final location. If an algorithm
+        and checksum is provided, it will proceed to validate the object and
+        delete the file if the hex digest stored does not match what is provided.
+        """
+
+        # Create temporary file and calculate hex digests
+        hex_digests, fname = self._mktempfile(stream, algorithm)
+        id = hex_digests["sha256"]
+
+        filepath = self.idpath(id, extension)
+        self.makepath(os.path.dirname(filepath))
+
+        if not os.path.isfile(filepath):
+            # Validate object if algorithm and checksum provided
+            if algorithm is not None and checksum is not None:
+                hex_digest_stored = hex_digests[algorithm]
+                if hex_digest_stored != checksum:
+                    self.delete(fname)
+                    raise ValueError(
+                        f"Hex digest and checksum do not match - file not stored. Algorithm: {algorithm}. Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
+                    )
+            # Only move file if it doesn't already exist.
+            is_duplicate = False
+            try:
+                shutil.move(fname, filepath)
+            except Exception as err:
+                print(f"Unexpected {err=}, {type(err)=}")
+                if os.path.isfile(filepath):
+                    self.delete(filepath)
+                self.delete(fname)
+                raise Exception(
+                    f"Aborting Upload - an unexpected error has occurred when moving file: {id} - Error: {err}"
+                )
+        else:
+            # Else delete temporary file
+            is_duplicate = True
+            self.delete(fname)
+
+        return (hex_digests, filepath, is_duplicate)
+
+    def _mktempfile(self, stream, algorithm=None):
+        """Create a named temporary file from a :class:`Stream` object and
+        return its filename and a dictionary of its algorithms and hex digests.
+        If an algorithm is provided, it will add the respective hex digest to
+        the dictionary.
+        """
+        tmp = NamedTemporaryFile(delete=False)
+
+        if self.fmode is not None:
+            oldmask = os.umask(0)
+
+            try:
+                os.chmod(tmp.name, self.fmode)
+            finally:
+                os.umask(oldmask)
+
+        # Hash objects to digest
+        default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
+        other_algo_list = [
+            "sha224",
+            "sha3_224",
+            "sha3_256",
+            "sha3_384",
+            "sha3_512",
+            "blake2b",
+            "blake2s",
+        ]
+        if algorithm is not None and algorithm in other_algo_list:
+            default_algo_list.append(algorithm)
+        hash_algorithms = [hashlib.new(algorithm) for algorithm in default_algo_list]
+
+        for data in stream:
+            tmp.write(self.to_bytes(data))
+            for hash_algorithm in hash_algorithms:
+                hash_algorithm.update(self.to_bytes(data))
+
+        tmp.close()
+
+        hex_digest_list = [
+            hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
+        ]
+        hex_digest_dict = dict(zip(default_algo_list, hex_digest_list))
+
+        return hex_digest_dict, tmp.name
+
+    def computehash(self, stream, algorithm=None):
+        """Compute hash of file using :attr:`algorithm`."""
+        if algorithm is None:
+            hashobj = hashlib.new(self.algorithm)
+        else:
+            hashobj = hashlib.new(algorithm)
+        for data in stream:
+            hashobj.update(self.to_bytes(data))
+        return hashobj.hexdigest()

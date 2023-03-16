@@ -347,3 +347,27 @@ class HashFSExt(HashFS):
         for data in stream:
             hashobj.update(self.to_bytes(data))
         return hashobj.hexdigest()
+
+
+class HashAddress(
+    namedtuple(
+        "HashAddress", ["id", "relpath", "abspath", "is_duplicate", "hex_digests"]
+    )
+):
+    """File address containing file's path on disk and it's content hash ID.
+
+    Attributes:
+        id (str): Hash ID (hexdigest) of file contents.
+        relpath (str): Relative path location to :attr:`HashFS.root`.
+        abspath (str): Absoluate path location of file on disk.
+        is_duplicate (boolean, optional): Whether the hash address created was
+            a duplicate of a previously existing file. Can only be ``True``
+            after a put operation. Defaults to ``False``.
+        hex_digests (dict, optional): A list of hex digests to validate objects (md5, sha1,
+            sha256, sha384, sha512)
+    """
+
+    def __new__(cls, id, relpath, abspath, is_duplicate=False, hex_digests={}):
+        return super(HashAddress, cls).__new__(
+            cls, id, relpath, abspath, is_duplicate, hex_digests
+        )

@@ -219,8 +219,8 @@ class HashFSExt(HashFS):
     currently used in Metacat) and their respective hex digests."""
 
     def computehash(self, stream, algorithm=None):
-        """Compute hash of file using :attr:`algorithm` by default or with optional
-        algorithm supported."""
+        """Compute hash of a file-like object using :attr:`algorithm` by default
+        or with optional algorithm supported."""
         if algorithm is None:
             hashobj = hashlib.new(self.algorithm)
         else:

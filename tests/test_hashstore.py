@@ -45,12 +45,6 @@ def store(tmp_path):
     return store
 
 
-def hash_blob_string(data):
-    """Calculate the SHA-256 digest for a blob, and return it in a base64 hex encoded string"""
-    hex = hashlib.sha256(data).hexdigest()
-    return hex
-
-
 def test_pids_length(pids):
     assert len(pids) == 3
 
@@ -258,9 +252,8 @@ def test_retrieve_object(pids, store):
         s_content = store._get_sysmeta(pid)
         cid = s_content[0][:64]
         cid_stream = store.retrieve_object(pid)[1]
-        cid_content = cid_stream.read()
+        cid_hash = store.objects.computehash(cid_stream)
         cid_stream.close()
-        cid_hash = hash_blob_string(cid_content)
         assert cid == cid_hash
 
 

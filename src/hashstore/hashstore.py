@@ -218,7 +218,7 @@ class HashFSExt(HashFS):
     dictionary consisting of algorithms (based on the most common algorithm types
     currently used in Metacat) and their respective hex digests."""
 
-    def to_bytes(self, text):
+    def _to_bytes(self, text):
         """Convert text to sequence of bytes using utf-8 encoding"""
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")
@@ -333,9 +333,9 @@ class HashFSExt(HashFS):
         # tmp is a file-like object that is already opened for writing by default
         with tmp as tmp_file:
             for data in stream:
-                tmp_file.write(self.to_bytes(data))
+                tmp_file.write(self._to_bytes(data))
                 for hash_algorithm in hash_algorithms:
-                    hash_algorithm.update(self.to_bytes(data))
+                    hash_algorithm.update(self._to_bytes(data))
 
         hex_digest_list = [
             hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
@@ -352,7 +352,7 @@ class HashFSExt(HashFS):
         else:
             hashobj = hashlib.new(algorithm)
         for data in stream:
-            hashobj.update(self.to_bytes(data))
+            hashobj.update(self._to_bytes(data))
         return hashobj.hexdigest()
 
 

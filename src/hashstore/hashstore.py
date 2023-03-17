@@ -218,11 +218,16 @@ class HashFSExt(HashFS):
     dictionary consisting of algorithms (based on the most common algorithm types
     currently used in Metacat) and their respective hex digests."""
 
-    def _to_bytes(self, text):
-        """Convert text to sequence of bytes using utf-8 encoding"""
-        if not isinstance(text, bytes):
-            text = bytes(text, "utf8")
-        return text
+    def computehash(self, stream, algorithm=None):
+        """Compute hash of file using :attr:`algorithm` by default or with optional
+        algorithm supported."""
+        if algorithm is None:
+            hashobj = hashlib.new(self.algorithm)
+        else:
+            hashobj = hashlib.new(algorithm)
+        for data in stream:
+            hashobj.update(self._to_bytes(data))
+        return hashobj.hexdigest()
 
     def put(self, file, extension=None, algorithm=None, checksum=None):
         """Store contents of `file` on disk using its content hash for the
@@ -344,16 +349,11 @@ class HashFSExt(HashFS):
 
         return hex_digest_dict, tmp.name
 
-    def computehash(self, stream, algorithm=None):
-        """Compute hash of file using :attr:`algorithm` by default or with optional
-        algorithm supported."""
-        if algorithm is None:
-            hashobj = hashlib.new(self.algorithm)
-        else:
-            hashobj = hashlib.new(algorithm)
-        for data in stream:
-            hashobj.update(self._to_bytes(data))
-        return hashobj.hexdigest()
+    def _to_bytes(self, text):
+        """Convert text to sequence of bytes using utf-8 encoding"""
+        if not isinstance(text, bytes):
+            text = bytes(text, "utf8")
+        return text
 
 
 class HashAddress(

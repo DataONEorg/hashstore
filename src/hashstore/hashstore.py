@@ -343,7 +343,8 @@ class HashFSExt(HashFS):
         return hex_digest_dict, tmp.name
 
     def computehash(self, stream, algorithm=None):
-        """Compute hash of file using :attr:`algorithm`."""
+        """Compute hash of file using :attr:`algorithm` by default or with optional
+        algorithm supported."""
         if algorithm is None:
             hashobj = hashlib.new(self.algorithm)
         else:

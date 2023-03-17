@@ -214,6 +214,10 @@ class HashStore:
 
 
 class HashFSExt(HashFS):
+    """A subclass of HashFS with extended methods to support the returning of a
+    dictionary consisting of algorithms (based on the most common algorithm types
+    currently used in Metacat) and their respective hex digests."""
+
     def to_bytes(self, text):
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")

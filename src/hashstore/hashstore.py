@@ -305,9 +305,9 @@ class HashFSExt(HashFS):
         """
         tmp = NamedTemporaryFile(delete=False)
 
+        # Ensure tmp file is created with desired permissions
         if self.fmode is not None:
             oldmask = os.umask(0)
-
             try:
                 os.chmod(tmp.name, self.fmode)
             finally:
@@ -328,12 +328,12 @@ class HashFSExt(HashFS):
             default_algo_list.append(algorithm)
         hash_algorithms = [hashlib.new(algorithm) for algorithm in default_algo_list]
 
-        for data in stream:
-            tmp.write(self.to_bytes(data))
-            for hash_algorithm in hash_algorithms:
-                hash_algorithm.update(self.to_bytes(data))
-
-        tmp.close()
+        # tmp is a file-like object that is already opened for writing by default
+        with tmp as tmp_file:
+            for data in stream:
+                tmp_file.write(self.to_bytes(data))
+                for hash_algorithm in hash_algorithms:
+                    hash_algorithm.update(self.to_bytes(data))
 
         hex_digest_list = [
             hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms

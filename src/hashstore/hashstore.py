@@ -269,8 +269,8 @@ class HashFSExt(HashFS):
         filepath = self.idpath(id, extension)
         self.makepath(os.path.dirname(filepath))
 
+        # Only move file if it doesn't already exist.
         if not os.path.isfile(filepath):
-            # Validate object if algorithm and checksum provided
             if algorithm is not None and checksum is not None:
                 hex_digest_stored = hex_digests[algorithm]
                 if hex_digest_stored != checksum:
@@ -278,11 +278,12 @@ class HashFSExt(HashFS):
                     raise ValueError(
                         f"Hex digest and checksum do not match - file not stored. Algorithm: {algorithm}. Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
                     )
-            # Only move file if it doesn't already exist.
             is_duplicate = False
             try:
                 shutil.move(fname, filepath)
             except Exception as err:
+                # Revert storage process for the time being for any failure
+                # TODO: Discuss handling of permissions, memory and storage exceptions
                 print(f"Unexpected {err=}, {type(err)=}")
                 if os.path.isfile(filepath):
                     self.delete(filepath)

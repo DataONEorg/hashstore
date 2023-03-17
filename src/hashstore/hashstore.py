@@ -219,6 +219,7 @@ class HashFSExt(HashFS):
     currently used in Metacat) and their respective hex digests."""
 
     def to_bytes(self, text):
+        """Convert text to sequence of bytes using utf-8 encoding"""
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")
         return text

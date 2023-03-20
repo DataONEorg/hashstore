@@ -1,7 +1,6 @@
 from hashstore import HashStore
 from pathlib import Path
 from threading import Thread
-import hashlib
 import importlib.metadata
 import pytest
 

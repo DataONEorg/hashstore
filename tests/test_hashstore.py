@@ -139,8 +139,8 @@ def test_store_duplicate_objects(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     store.store_object(path)
-    is_duplicate = store.store_object(path)
-    assert is_duplicate == None
+    with pytest.raises(FileExistsError):
+        store.store_object(path)
     assert store.objects.count() == 1
 
 

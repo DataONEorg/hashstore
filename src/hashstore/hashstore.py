@@ -148,7 +148,7 @@ class HashStore:
         """Add a data blob to the store."""
         address = self.objects.put(data, algorithm=algorithm, checksum=checksum)
         if address.is_duplicate:
-            return None
+            raise FileExistsError("Object already exists.")
         return address.hex_digests
 
     def _set_sysmeta(self, pid, sysmeta, obj_cid):

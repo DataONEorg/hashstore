@@ -1,3 +1,4 @@
+import io
 from hashstore import HashStore
 from pathlib import Path
 from threading import Thread
@@ -88,6 +89,21 @@ def test_store_hex_digests(pids, store):
         assert hex_digest_dict.get("sha512") == pids[pid]["sha512"]
 
 
+def test_store_input_stream(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        hex_digest_dict = store.store_object(input_stream)
+        assert hex_digest_dict.get("md5") == pids[pid]["md5"]
+        assert hex_digest_dict.get("sha1") == pids[pid]["sha1"]
+        assert hex_digest_dict.get("sha256") == pids[pid]["sha256"]
+        assert hex_digest_dict.get("sha384") == pids[pid]["sha384"]
+        assert hex_digest_dict.get("sha512") == pids[pid]["sha512"]
+        input_stream.close()
+    return
+
+
 def test_store_object_algorithm_args_invalid(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -144,6 +160,8 @@ def test_store_duplicate_objects(store):
 
 
 def test_store_duplicate_object_threads(store):
+    # FileExistsError can potentially be raised as a warning (expected)
+    # File count must be 1
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid

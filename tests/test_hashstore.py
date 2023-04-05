@@ -427,6 +427,16 @@ def test_put_additional_algorithm(pids, store):
         assert pid_sha224 == pids[pid][algo]
 
 
+def test_put_with_correct_checksums(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        algo = "sha224"
+        algo_checksum = pids[pid][algo]
+        path = test_dir + pid.replace("/", "_")
+        store.objects.put(path, algorithm=algo, checksum=algo_checksum)
+    assert store.objects.count() == 3
+
+
 def test_put_with_incorrect_checksum(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():

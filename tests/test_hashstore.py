@@ -366,3 +366,15 @@ def test_rel_path(pids, store):
     assert len(path) == 67
     assert path.startswith("0d/55/5e/d7")
     assert path.endswith("7052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e")
+
+
+def test_clean_algorithm(store):
+    algorithm_underscore = "sha_256"
+    algorithm_hyphen = "sha-256"
+    algorithm_other_hyphen = "sha3-256"
+    cleaned_algo_underscore = store._clean_algorithm(algorithm_underscore)
+    cleaned_algo_hyphen = store._clean_algorithm(algorithm_hyphen)
+    cleaned_algo_other_hyphen = store._clean_algorithm(algorithm_other_hyphen)
+    assert cleaned_algo_underscore == "sha256"
+    assert cleaned_algo_hyphen == "sha256"
+    assert cleaned_algo_other_hyphen == "sha3_256"

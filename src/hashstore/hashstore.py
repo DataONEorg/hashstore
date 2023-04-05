@@ -224,7 +224,7 @@ class HashStore:
         if count > 3:
             cleaned_string = algorithm_string.lower().replace("-", "_")
         else:
-            cleaned_string = algorithm_string.lower().replace("-", "")
+            cleaned_string = algorithm_string.lower().replace("-", "").replace("_", "")
         return cleaned_string
 
 

@@ -21,7 +21,7 @@ class HashStore:
     dir_width = 2  # The width of the directory names, in characters
     SYSMETA_NS = "http://ns.dataone.org/service/types/v2.0"
     sysmeta_lock = threading.Lock()
-    time_out = 1
+    time_out_sec = 1
     locked_pids = []
     supported_algorithms = [
         "md5",
@@ -92,7 +92,7 @@ class HashStore:
         """
         # Wait for the pid to release if it's in use
         while pid in self.locked_pids:
-            time.sleep(self.time_out)
+            time.sleep(self.time_out_sec)
         # Modify locked_pids consecutively
         with self.sysmeta_lock:
             self.locked_pids.append(pid)

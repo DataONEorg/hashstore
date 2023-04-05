@@ -133,6 +133,7 @@ class HashStore:
 
     def get_hex_digest(self, pid, algorithm):
         """Returns the hex digest based on the hash algorithm passed with a given pid"""
+        algorithm = self._clean_algorithm(algorithm)
         s_cid = self._hash_string(pid)
         if not self.sysmeta.exists(s_cid):
             raise ValueError(f"No sysmeta found for pid: {pid}")

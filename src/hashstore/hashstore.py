@@ -75,9 +75,9 @@ class HashStore:
 
         Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512
         """
-        algorithm = algorithm.lower().replace("-", "")
+        algorithm = self._clean_algorithm(algorithm)
         if algorithm not in self.supported_algorithms:
-            raise ValueError("Algorithm not supported")
+            raise ValueError(f"Algorithm not supported: {algorithm}")
         else:
             hex_digest_dict = self._add_object(
                 data, algorithm=algorithm, checksum=checksum
@@ -212,6 +212,19 @@ class HashStore:
             if i == self.dir_depth - 1:
                 chunks.append(hash)
         return "/".join(chunks)
+
+    def _clean_algorithm(self, algorithm_string):
+        """Return a string that is compatible with generating a new hashlib library
+        hashing object"""
+        count = 0
+        for char in algorithm_string:
+            if char.isdigit():
+                count += 1
+        if count > 3:
+            cleaned_string = algorithm_string.lower().replace("-", "_")
+        else:
+            cleaned_string = algorithm_string.lower().replace("-", "")
+        return cleaned_string
 
 
 class HashFSExt(HashFS):

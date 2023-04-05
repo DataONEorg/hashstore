@@ -1,7 +1,7 @@
-import io
 from hashstore import HashStore
 from pathlib import Path
 from threading import Thread
+import io
 import importlib.metadata
 import pytest
 

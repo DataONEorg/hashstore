@@ -510,3 +510,9 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         algo = "md2"
         with pytest.raises(ValueError):
             hex_digests, tmp_file_name = store.objects._mktempfile(input_stream, algo)
+
+
+def test_to_bytes(store):
+    string = "teststring"
+    string_bytes = store.objects._to_bytes(string)
+    assert isinstance(string_bytes, bytes)

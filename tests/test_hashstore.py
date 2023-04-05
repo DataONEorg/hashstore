@@ -388,3 +388,26 @@ def test_computehash(pids, store):
         cid_hash = store.objects.computehash(cid_stream, "sha256")
         cid_stream.close()
         assert pids[pid]["sha256"] == cid_hash
+
+
+def test_put(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        pid_hashaddress = store.objects.put(path)
+        pid_id = pid_hashaddress.id
+        pid_relpath = pid_hashaddress.relpath
+        pid_abspath = pid_hashaddress.abspath
+        pid_is_duplicate = pid_hashaddress.is_duplicate
+        pid_hex_digests = pid_hashaddress.hex_digests
+        assert pid_id == pids[pid]["sha256"]
+        shard_id_path = "/".join(store.objects.shard(pid_id))
+        assert pid_relpath == shard_id_path
+        id_abs_path = store.objects.realpath(pid_id)
+        assert pid_abspath == id_abs_path
+        assert pid_is_duplicate is False
+        assert pid_hex_digests.get("md5") == pids[pid]["md5"]
+        assert pid_hex_digests.get("sha1") == pids[pid]["sha1"]
+        assert pid_hex_digests.get("sha256") == pids[pid]["sha256"]
+        assert pid_hex_digests.get("sha384") == pids[pid]["sha384"]
+        assert pid_hex_digests.get("sha512") == pids[pid]["sha512"]

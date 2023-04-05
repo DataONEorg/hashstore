@@ -378,3 +378,13 @@ def test_clean_algorithm(store):
     assert cleaned_algo_underscore == "sha256"
     assert cleaned_algo_hyphen == "sha256"
     assert cleaned_algo_other_hyphen == "sha3_256"
+
+
+def test_computehash(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        cid_stream = io.open(path, "rb")
+        cid_hash = store.objects.computehash(cid_stream, "sha256")
+        cid_stream.close()
+        assert pids[pid]["sha256"] == cid_hash

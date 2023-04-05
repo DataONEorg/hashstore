@@ -348,6 +348,9 @@ class HashFSExt(HashFS):
         ]
         if algorithm is not None and algorithm in other_algo_list:
             default_algo_list.append(algorithm)
+        if algorithm is not None and algorithm not in default_algo_list:
+            raise ValueError(f"Algorithm not supported: {algorithm}")
+
         hash_algorithms = [hashlib.new(algorithm) for algorithm in default_algo_list]
 
         # tmp is a file-like object that is already opened for writing by default

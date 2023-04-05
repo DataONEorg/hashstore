@@ -362,7 +362,7 @@ class HashAddress(
         "HashAddress", ["id", "relpath", "abspath", "is_duplicate", "hex_digests"]
     )
 ):
-    """File address containing file's path on disk and it's content hash ID.
+    """File address containing file's path on disk and its content hash ID.
 
     Attributes:
         id (str): Hash ID (hexdigest) of file contents.

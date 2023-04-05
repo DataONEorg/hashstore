@@ -2,6 +2,7 @@ from hashstore import HashStore
 from pathlib import Path
 from threading import Thread
 import io
+import os
 import importlib.metadata
 import pytest
 
@@ -446,3 +447,32 @@ def test_put_with_incorrect_checksum(pids, store):
         with pytest.raises(ValueError):
             store.objects.put(path, algorithm=algo, checksum=algo_checksum)
     assert store.objects.count() == 0
+
+
+def test_copy(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        hex_digests, file_path, is_duplicate = store.objects._copy(input_stream)
+        assert hex_digests.get("md5") == pids[pid]["md5"]
+        assert hex_digests.get("sha1") == pids[pid]["sha1"]
+        assert hex_digests.get("sha256") == pids[pid]["sha256"]
+        assert hex_digests.get("sha384") == pids[pid]["sha384"]
+        assert hex_digests.get("sha512") == pids[pid]["sha512"]
+        assert os.path.isfile(file_path) is True
+        assert is_duplicate is False
+
+
+def test_copy_duplicates(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        store.objects._copy(input_stream)
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        hex_digests, file_path, is_duplicate = store.objects._copy(input_stream)
+        assert is_duplicate is True
+        assert store.objects.count() == 3

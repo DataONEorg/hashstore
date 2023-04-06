@@ -455,6 +455,7 @@ def test_copy(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         hex_digests, file_path, is_duplicate = store.objects._copy(input_stream)
+        input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
         assert hex_digests.get("sha256") == pids[pid]["sha256"]
@@ -470,10 +471,12 @@ def test_copy_duplicates(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         store.objects._copy(input_stream)
+        input_stream.close()
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         hex_digests, file_path, is_duplicate = store.objects._copy(input_stream)
+        input_stream.close()
         assert is_duplicate is True
         assert store.objects.count() == 3
 
@@ -484,6 +487,7 @@ def test_mktempfile(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         hex_digests, tmp_file_name = store.objects._mktempfile(input_stream)
+        input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
         assert hex_digests.get("sha256") == pids[pid]["sha256"]
@@ -499,6 +503,7 @@ def test_mktempfile_with_algorithm(pids, store):
         input_stream = io.open(path, "rb")
         algo = "sha224"
         hex_digests, tmp_file_name = store.objects._mktempfile(input_stream, algo)
+        input_stream.close()
         assert hex_digests.get("sha224") == pids[pid]["sha224"]
 
 
@@ -510,6 +515,7 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         algo = "md2"
         with pytest.raises(ValueError):
             hex_digests, tmp_file_name = store.objects._mktempfile(input_stream, algo)
+        input_stream.close()
 
 
 def test_to_bytes(store):

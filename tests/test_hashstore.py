@@ -536,3 +536,15 @@ def test_to_bytes(store):
     string = "teststring"
     string_bytes = store.objects._to_bytes(string)
     assert isinstance(string_bytes, bytes)
+
+
+def test_get_store_path(store):
+    path_objects = store.objects._get_store_path()
+    path_objects_string = str(path_objects)
+    assert path_objects_string.endswith("/metacat/objects")
+    path_sysmeta = store.sysmeta._get_store_path()
+    path_sysmeta_string = str(path_sysmeta)
+    assert path_sysmeta_string.endswith("/metacat/sysmeta")
+    path_tmp = store.tmp._get_store_path()
+    path_objects_tmp = str(path_tmp)
+    assert path_objects_tmp.endswith("/metacat/tmp")

@@ -165,7 +165,7 @@ class HashStore:
         """Add a sysmeta document to the store."""
         s_cid = self._hash_string(pid)
         rel_path = self._rel_path(s_cid)
-        full_path = Path(self.store_path) / "sysmeta" / rel_path
+        full_path = self.sysmeta._get_store_path() / rel_path
         try:
             sysmeta_path_tmp = ""
             if self.sysmeta.exists(s_cid):
@@ -240,6 +240,10 @@ class HashFSExt(HashFS):
     """A subclass of HashFS with extended methods to support the returning of a
     dictionary consisting of algorithms (based on the most common algorithm types
     currently used in Metacat) and their respective hex digests."""
+
+    def _get_store_path(self):
+        """Return a path object of the root directory of the store."""
+        return Path(self.root)
 
     def computehash(self, stream, algorithm=None):
         """Compute hash of a file-like object using :attr:`algorithm` by default

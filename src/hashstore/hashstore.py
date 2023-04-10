@@ -241,6 +241,18 @@ class HashFSExt(HashFS):
     dictionary consisting of algorithms (based on the most common algorithm types
     currently used in Metacat) and their respective hex digests."""
 
+    # Class variables
+    default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
+    other_algo_list = [
+        "sha224",
+        "sha3_224",
+        "sha3_256",
+        "sha3_384",
+        "sha3_512",
+        "blake2b",
+        "blake2s",
+    ]
+
     def _get_store_path(self):
         """Return a path object of the root directory of the store."""
         return Path(self.root)
@@ -348,22 +360,14 @@ class HashFSExt(HashFS):
                 os.umask(oldmask)
 
         # Hash objects to digest
-        default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
-        other_algo_list = [
-            "sha224",
-            "sha3_224",
-            "sha3_256",
-            "sha3_384",
-            "sha3_512",
-            "blake2b",
-            "blake2s",
-        ]
-        if algorithm is not None and algorithm in other_algo_list:
-            default_algo_list.append(algorithm)
-        if algorithm is not None and algorithm not in default_algo_list:
+        if algorithm is not None and algorithm in self.other_algo_list:
+            self.default_algo_list.append(algorithm)
+        if algorithm is not None and algorithm not in self.default_algo_list:
             raise ValueError(f"Algorithm not supported: {algorithm}")
 
-        hash_algorithms = [hashlib.new(algorithm) for algorithm in default_algo_list]
+        hash_algorithms = [
+            hashlib.new(algorithm) for algorithm in self.default_algo_list
+        ]
 
         # tmp is a file-like object that is already opened for writing by default
         with tmp as tmp_file:
@@ -375,7 +379,7 @@ class HashFSExt(HashFS):
         hex_digest_list = [
             hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
         ]
-        hex_digest_dict = dict(zip(default_algo_list, hex_digest_list))
+        hex_digest_dict = dict(zip(self.default_algo_list, hex_digest_list))
 
         return hex_digest_dict, tmp.name
 

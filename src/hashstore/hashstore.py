@@ -192,7 +192,7 @@ class HashStore:
             # Abort process for any exception and restore existing sysmeta object
             if self.sysmeta.exists(sysmeta_path_tmp):
                 if self.sysmeta.exists(s_cid):
-                    self.delete_sysmeta(pid)
+                    self.sysmeta.delete(s_cid)
                 os.rename(sysmeta_path_tmp, sysmeta_path)
             raise
 

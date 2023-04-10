@@ -291,6 +291,13 @@ def test_retrieve_object(pids, store):
         assert cid == cid_hash
 
 
+def test_retrieve_object_invalid_pid(store):
+    pid = "jtao.1700.1"
+    pid_does_not_exist = pid + "test"
+    with pytest.raises(ValueError):
+        store.retrieve_object(pid_does_not_exist)
+
+
 def test_retrieve_sysmeta(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -303,6 +310,13 @@ def test_retrieve_sysmeta(store):
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
     sysmeta_ret = store.retrieve_sysmeta(pid)
     assert sysmeta.decode("utf-8") == sysmeta_ret
+
+
+def test_retrieve_sysmeta_invalid_pid(store):
+    pid = "jtao.1700.1"
+    pid_does_not_exist = pid + "test"
+    with pytest.raises(ValueError):
+        store.retrieve_sysmeta(pid_does_not_exist)
 
 
 def test_delete(pids, store):

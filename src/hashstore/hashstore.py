@@ -107,15 +107,23 @@ class HashStore:
     def retrieve_object(self, pid):
         """Returns the sysmeta and a buffered stream of a cid obj given a persistent
         identifier (pid)."""
-        sys_content = self._get_sysmeta(pid)
-        cid = sys_content[0][:64]
-        sysmeta = sys_content[1]
-        c_stream = self.objects.open(cid)
+        s_cid_exists = self.sysmeta.exists(self._hash_string(pid))
+        if s_cid_exists:
+            sys_content = self._get_sysmeta(pid)
+            cid = sys_content[0][:64]
+            sysmeta = sys_content[1]
+            c_stream = self.objects.open(cid)
+        else:
+            raise ValueError(f"No sysmeta found for pid: {pid}")
         return sysmeta, c_stream
 
     def retrieve_sysmeta(self, pid):
         """Returns the sysmeta of a given persistent identifier (pid)."""
-        sysmeta = self._get_sysmeta(pid)[1]
+        s_cid_exists = self.sysmeta.exists(self._hash_string(pid))
+        if s_cid_exists:
+            sysmeta = self._get_sysmeta(pid)[1]
+        else:
+            raise ValueError(f"No sysmeta found for pid: {pid}")
         return sysmeta
 
     def delete_object(self, pid):

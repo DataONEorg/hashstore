@@ -206,6 +206,9 @@ class HashStore:
                 if self.sysmeta.exists(s_cid):
                     self.sysmeta.delete(s_cid)
                 os.rename(sysmeta_path_tmp, sysmeta_path)
+            else:
+                if self.sysmeta.exists(s_cid):
+                    self.sysmeta.delete(s_cid)
             raise
 
     def _get_sysmeta(self, pid):

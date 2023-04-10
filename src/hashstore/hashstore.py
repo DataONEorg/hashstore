@@ -299,7 +299,7 @@ class HashFSExt(HashFS):
         stream = Stream(file)
 
         with closing(stream):
-            hex_digest_dict, filepath, is_duplicate = self._copy(
+            hex_digest_dict, filepath, is_duplicate = self._move_and_get_checksums(
                 stream, extension, algorithm, checksum
             )
 
@@ -309,7 +309,9 @@ class HashFSExt(HashFS):
             id, self.relpath(filepath), filepath, is_duplicate, hex_digest_dict
         )
 
-    def _copy(self, stream, extension=None, algorithm=None, checksum=None):
+    def _move_and_get_checksums(
+        self, stream, extension=None, algorithm=None, checksum=None
+    ):
         """Copy the contents of `stream` onto disk with an optional file
         extension appended. The copy process uses a temporary file to store the
         initial contents and returns a dictionary of algorithms and their

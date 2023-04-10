@@ -463,12 +463,14 @@ def test_put_with_incorrect_checksum(pids, store):
     assert store.objects.count() == 0
 
 
-def test_copy(pids, store):
+def test_move_and_get_checksums(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        hex_digests, file_path, is_duplicate = store.objects._copy(input_stream)
+        hex_digests, file_path, is_duplicate = store.objects._move_and_get_checksums(
+            input_stream
+        )
         input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
@@ -479,17 +481,19 @@ def test_copy(pids, store):
         assert is_duplicate is False
 
 
-def test_copy_duplicates(pids, store):
+def test_move_and_get_checksums_duplicates(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        store.objects._copy(input_stream)
+        store.objects._move_and_get_checksums(input_stream)
         input_stream.close()
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        hex_digests, file_path, is_duplicate = store.objects._copy(input_stream)
+        hex_digests, file_path, is_duplicate = store.objects._move_and_get_checksums(
+            input_stream
+        )
         input_stream.close()
         assert is_duplicate is True
         assert store.objects.count() == 3

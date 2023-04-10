@@ -166,16 +166,28 @@ class HashStore:
         s_cid = self._hash_string(pid)
         rel_path = self._rel_path(s_cid)
         full_path = self.sysmeta._get_store_path() / rel_path
+
+        # If sysmeta exists, it is an update request
+        sysmeta_path_tmp = ""
+        sysmeta_path = ""
+        sysmeta_path_tmp = ""
         try:
-            sysmeta_path_tmp = ""
             if self.sysmeta.exists(s_cid):
-                # Rename existing s_cid
                 sysmeta_path = self.sysmeta.realpath(s_cid)
                 sysmeta_path_tmp = sysmeta_path + ".tmp"
                 # Delete .tmp file if it already exists
                 if self.sysmeta.exists(sysmeta_path_tmp):
                     self.sysmeta.delete(sysmeta_path_tmp)
+                # Rename existing s_cid
                 os.rename(sysmeta_path, sysmeta_path_tmp)
+        except Exception as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            if not self.sysmeta.exists(s_cid) and self.sysmeta.exists(sysmeta_path_tmp):
+                os.rename(sysmeta_path_tmp, sysmeta_path)
+            raise
+
+        # Write new sysmeta
+        try:
             parent = full_path.parent
             parent.mkdir(parents=True, exist_ok=True)
             with full_path.open(mode="wb") as file:

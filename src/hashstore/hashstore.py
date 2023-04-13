@@ -119,10 +119,8 @@ class HashStore:
 
     def delete_object(self, pid):
         """Deletes an object given the pid."""
-        s_content = self._get_sysmeta(pid)
-        cid = s_content[0][:64]
-        print(cid)
-        self.objects.delete(cid)
+        pid_hash = self.objects._get_sha256_hex_digest(pid)
+        self.objects.delete(pid_hash)
         return True
 
     def delete_sysmeta(self, pid):

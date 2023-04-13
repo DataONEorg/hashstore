@@ -53,11 +53,12 @@ class HashStore:
         return None
 
     def store_object(self, pid, data, algorithm="sha256", checksum=None):
-        """Add a data object to the store. If the object is not a duplicate,
-        a dictionary containing hash algorithms and their hex digest values will be
-        returned. The supported algorithms list is based on algorithms supported in
-        hashlib for Python 3.9. If an algorithm is passed that is supported, the hex
-        digest dictionary returned will include the additional algorithm & hex digest.
+        """Add a data object to the store. Returns a HashAddress object that contains
+        the permanent address, relative file path, absolute file path, duplicate file
+        boolean and hex digest dictionary. The supported algorithms list is based on
+        algorithms supported in hashlib for Python 3.9. If an algorithm is passed that
+        is supported, the hex digest dictionary returned will include the additional
+        algorithm & hex digest.
 
         Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512
         """
@@ -68,10 +69,10 @@ class HashStore:
         ):
             raise ValueError(f"Algorithm not supported: {algorithm}")
         else:
-            hex_digest_dict = self._add_object(
+            hash_address = self._add_object(
                 pid, data, algorithm=algorithm, checksum=checksum
             )
-        return hex_digest_dict
+        return hash_address
 
     def store_sysmeta(self, pid, sysmeta):
         """Add a system metadata object to the store. Returns the sysmeta content

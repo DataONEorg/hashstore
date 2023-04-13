@@ -66,7 +66,8 @@ def test_store_files(pids, store):
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
         hash_address = store.store_object(pid, path)
-        s_cid = store.store_sysmeta(pid, sysmeta)
+        pid_hash = store.store_sysmeta(pid, sysmeta)
+        assert store.objects.exists(pid_hash)
     assert store.objects.count() == 3
     assert store.sysmeta.count() == 3
 
@@ -76,8 +77,9 @@ def test_store_address_length(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         hash_address = store.store_object(pid, path)
-        cid = hash_address.hex_digests.get("sha256")
-        assert len(cid) == 64
+        pid_hash = hash_address.id
+        assert len(pid_hash) == 64
+        assert store.objects.exists(pid_hash)
 
 
 def test_store_hex_digests(pids, store):
@@ -90,6 +92,8 @@ def test_store_hex_digests(pids, store):
         assert hash_address.hex_digests.get("sha256") == pids[pid]["sha256"]
         assert hash_address.hex_digests.get("sha384") == pids[pid]["sha384"]
         assert hash_address.hex_digests.get("sha512") == pids[pid]["sha512"]
+        pid_hash = store.objects._get_sha256_hex_digest(pid)
+        assert store.objects.exists(pid_hash)
 
 
 def test_store_input_stream(pids, store):
@@ -104,6 +108,8 @@ def test_store_input_stream(pids, store):
         assert hash_address.hex_digests.get("sha384") == pids[pid]["sha384"]
         assert hash_address.hex_digests.get("sha512") == pids[pid]["sha512"]
         input_stream.close()
+        pid_hash = store.objects._get_sha256_hex_digest(pid)
+        assert store.objects.exists(pid_hash)
     return
 
 
@@ -124,6 +130,8 @@ def test_store_object_algorithm_args_hyphen(pids, store):
     hash_address = store.store_object(pid, path, algorithm_with_hyphen_and_upper)
     cid = hash_address.hex_digests.get("sha256")
     assert cid == pids[pid]["sha256"]
+    pid_hash = store.objects._get_sha256_hex_digest(pid)
+    assert store.objects.exists(pid_hash)
 
 
 def test_store_object_algorithm_args_other(store):
@@ -132,11 +140,13 @@ def test_store_object_algorithm_args_other(store):
     path = test_dir + pid
     algorithm_other = "sha3_256"
     hash_address = store.store_object(pid, path, algorithm_other)
-    cid = hash_address.hex_digests.get("sha3_256")
+    additional_hex_digest = hash_address.hex_digests.get("sha3_256")
     sha3_256_checksum = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    assert cid == sha3_256_checksum
+    assert additional_hex_digest == sha3_256_checksum
+    pid_hash = store.objects._get_sha256_hex_digest(pid)
+    assert store.objects.exists(pid_hash)
 
 
 def test_store_object_algorithm_args_other_hyphen(store):
@@ -150,6 +160,8 @@ def test_store_object_algorithm_args_other_hyphen(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     assert cid == sha3_256_checksum
+    pid_hash = store.objects._get_sha256_hex_digest(pid)
+    assert store.objects.exists(pid_hash)
 
 
 def test_store_object_algorithm_args_incorrect_checksum(store):
@@ -163,6 +175,8 @@ def test_store_object_algorithm_args_incorrect_checksum(store):
     with pytest.raises(ValueError):
         store.store_object(path, algorithm_other, checksum_incorrect)
     assert store.objects.count() == 0
+    pid_hash = store.objects._get_sha256_hex_digest(pid)
+    assert store.objects.exists(pid_hash) is False
 
 
 def test_store_duplicate_objects(store):
@@ -173,6 +187,8 @@ def test_store_duplicate_objects(store):
     hash_address_duplicate = store.store_object(pid, path)
     assert hash_address_duplicate.is_duplicate is True
     assert store.objects.count() == 1
+    pid_hash = store.objects._get_sha256_hex_digest(pid)
+    assert store.objects.exists(pid_hash)
 
 
 def test_store_duplicate_object_threads(store):
@@ -191,6 +207,8 @@ def test_store_duplicate_object_threads(store):
     thread2.join()
     thread3.join()
     assert store.objects.count() == 1
+    pid_hash = store.objects._get_sha256_hex_digest(pid)
+    assert store.objects.exists(pid_hash)
 
 
 def test_store_sysmeta_s_cid(pids, store):

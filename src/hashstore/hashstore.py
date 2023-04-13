@@ -52,7 +52,7 @@ class HashStore:
         )
         return None
 
-    def store_object(self, data, algorithm="sha256", checksum=None):
+    def store_object(self, pid, data, algorithm="sha256", checksum=None):
         """Add a data object to the store. If the object is not a duplicate,
         a dictionary containing hash algorithms and their hex digest values will be
         returned. The supported algorithms list is based on algorithms supported in
@@ -69,7 +69,7 @@ class HashStore:
             raise ValueError(f"Algorithm not supported: {algorithm}")
         else:
             hex_digest_dict = self._add_object(
-                data, algorithm=algorithm, checksum=checksum
+                pid, data, algorithm=algorithm, checksum=checksum
             )
         return hex_digest_dict
 
@@ -121,6 +121,7 @@ class HashStore:
         """Deletes an object given the pid."""
         s_content = self._get_sysmeta(pid)
         cid = s_content[0][:64]
+        print(cid)
         self.objects.delete(cid)
         return True
 
@@ -147,9 +148,9 @@ class HashStore:
         hex_digest = self.objects.computehash(c_stream, algorithm=algorithm)
         return hex_digest
 
-    def _add_object(self, data, algorithm, checksum):
+    def _add_object(self, pid, data, algorithm, checksum):
         """Add a data blob to the store."""
-        address = self.objects.put(data, algorithm=algorithm, checksum=checksum)
+        address = self.objects.put(pid, data, algorithm=algorithm, checksum=checksum)
         # Caller to handle address.is_duplicate is true
         return address
 
@@ -277,7 +278,7 @@ class HashFSExt(HashFS):
             hashobj.update(self._to_bytes(data))
         return hashobj.hexdigest()
 
-    def put(self, file, extension=None, algorithm=None, checksum=None):
+    def put(self, pid, file, extension=None, algorithm=None, checksum=None):
         """Store contents of `file` on disk using its content hash for the
         address.
 
@@ -296,18 +297,16 @@ class HashFSExt(HashFS):
         stream = Stream(file)
 
         with closing(stream):
-            hex_digest_dict, filepath, is_duplicate = self._move_and_get_checksums(
-                stream, extension, algorithm, checksum
+            id, hex_digest_dict, filepath, is_duplicate = self._move_and_get_checksums(
+                pid, stream, extension, algorithm, checksum
             )
-
-        id = hex_digest_dict["sha256"]
 
         return HashAddress(
             id, self.relpath(filepath), filepath, is_duplicate, hex_digest_dict
         )
 
     def _move_and_get_checksums(
-        self, stream, extension=None, algorithm=None, checksum=None
+        self, pid, stream, extension=None, algorithm=None, checksum=None
     ):
         """Copy the contents of `stream` onto disk with an optional file
         extension appended. The copy process uses a temporary file to store the
@@ -320,7 +319,7 @@ class HashFSExt(HashFS):
 
         # Create temporary file and calculate hex digests
         hex_digests, fname = self._mktempfile(stream, algorithm)
-        id = hex_digests["sha256"]
+        id = self._get_sha256_hex_digest(pid)
 
         filepath = self.idpath(id, extension)
         self.makepath(os.path.dirname(filepath))
@@ -352,7 +351,7 @@ class HashFSExt(HashFS):
             is_duplicate = True
             self.delete(fname)
 
-        return (hex_digests, filepath, is_duplicate)
+        return id, hex_digests, filepath, is_duplicate
 
     def _mktempfile(self, stream, algorithm=None):
         """Create a named temporary file from a :class:`Stream` object and

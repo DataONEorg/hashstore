@@ -65,7 +65,7 @@ def test_store_files(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        hash_address = store.store_object(path)
+        hash_address = store.store_object(pid, path)
         cid = hash_address.hex_digests.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
     assert store.objects.count() == 3
@@ -76,7 +76,7 @@ def test_store_address_length(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.store_object(path)
+        hash_address = store.store_object(pid, path)
         cid = hash_address.hex_digests.get("sha256")
         assert len(cid) == 64
 
@@ -85,7 +85,7 @@ def test_store_hex_digests(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.store_object(path)
+        hash_address = store.store_object(pid, path)
         assert hash_address.hex_digests.get("md5") == pids[pid]["md5"]
         assert hash_address.hex_digests.get("sha1") == pids[pid]["sha1"]
         assert hash_address.hex_digests.get("sha256") == pids[pid]["sha256"]
@@ -98,7 +98,7 @@ def test_store_input_stream(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        hash_address = store.store_object(input_stream)
+        hash_address = store.store_object(pid, input_stream)
         assert hash_address.hex_digests.get("md5") == pids[pid]["md5"]
         assert hash_address.hex_digests.get("sha1") == pids[pid]["sha1"]
         assert hash_address.hex_digests.get("sha256") == pids[pid]["sha256"]
@@ -114,7 +114,7 @@ def test_store_object_algorithm_args_invalid(store):
     path = test_dir + pid
     algorithm_not_in_list = "abc"
     with pytest.raises(ValueError, match="Algorithm not supported"):
-        store.store_object(path, algorithm_not_in_list)
+        store.store_object(pid, path, algorithm_not_in_list)
 
 
 def test_store_object_algorithm_args_hyphen(pids, store):
@@ -122,7 +122,7 @@ def test_store_object_algorithm_args_hyphen(pids, store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_with_hyphen_and_upper = "SHA-256"
-    hash_address = store.store_object(path, algorithm_with_hyphen_and_upper)
+    hash_address = store.store_object(pid, path, algorithm_with_hyphen_and_upper)
     cid = hash_address.hex_digests.get("sha256")
     assert cid == pids[pid]["sha256"]
 
@@ -132,7 +132,7 @@ def test_store_object_algorithm_args_other(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_other = "sha3_256"
-    hash_address = store.store_object(path, algorithm_other)
+    hash_address = store.store_object(pid, path, algorithm_other)
     cid = hash_address.hex_digests.get("sha3_256")
     sha3_256_checksum = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
@@ -145,7 +145,7 @@ def test_store_object_algorithm_args_other_hyphen(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_other = "sha3-256"
-    hash_address = store.store_object(path, algorithm_other)
+    hash_address = store.store_object(pid, path, algorithm_other)
     cid = hash_address.hex_digests.get("sha3_256")
     sha3_256_checksum = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
@@ -170,8 +170,8 @@ def test_store_duplicate_objects(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    hash_address = store.store_object(path)
-    hash_address_duplicate = store.store_object(path)
+    hash_address = store.store_object(pid, path)
+    hash_address_duplicate = store.store_object(pid, path)
     assert hash_address_duplicate.is_duplicate is True
     assert store.objects.count() == 1
 
@@ -182,9 +182,9 @@ def test_store_duplicate_object_threads(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    thread1 = Thread(target=store.store_object, args=(path,))
-    thread2 = Thread(target=store.store_object, args=(path,))
-    thread3 = Thread(target=store.store_object, args=(path,))
+    thread1 = Thread(target=store.store_object, args=(pid, path))
+    thread2 = Thread(target=store.store_object, args=(pid, path))
+    thread3 = Thread(target=store.store_object, args=(pid, path))
     thread1.start()
     thread2.start()
     thread3.start()
@@ -201,7 +201,7 @@ def test_store_sysmeta_s_cid(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        hash_address = store.store_object(path)
+        hash_address = store.store_object(pid, path)
         cid = hash_address.hex_digests.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
         assert s_cid == pids[pid]["s_cid"]
@@ -214,7 +214,7 @@ def test_store_sysmeta_cid(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        hash_address = store.store_object(path)
+        hash_address = store.store_object(pid, path)
         cid = hash_address.hex_digests.get("sha256")
         store.store_sysmeta(pid, sysmeta, cid)
         s_content = store._get_sysmeta(pid)
@@ -230,7 +230,7 @@ def test_store_sysmeta_update(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    hash_address = store.store_object(path)
+    hash_address = store.store_object(pid, path)
     cid = hash_address.hex_digests.get("sha256")
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
     cid_new = obj_cid[::-1]
@@ -249,7 +249,7 @@ def test_store_sysmeta_thread_lock(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    hash_address = store.store_object(path)
+    hash_address = store.store_object(pid, path)
     cid = hash_address.hex_digests.get("sha256")
     store.store_sysmeta(pid, sysmeta, cid)
     test_cid = obj_cid[::-1]
@@ -280,7 +280,7 @@ def test_retrieve_object(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        hash_address = store.store_object(path)
+        hash_address = store.store_object(pid, path)
         obj_cid = hash_address.hex_digests.get("sha256")
         store.store_sysmeta(pid, sysmeta, obj_cid)
         s_content = store._get_sysmeta(pid)
@@ -305,7 +305,7 @@ def test_retrieve_sysmeta(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    hash_address = store.store_object(path)
+    hash_address = store.store_object(pid, path)
     cid = hash_address.hex_digests.get("sha256")
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
     sysmeta_ret = store.retrieve_sysmeta(pid)
@@ -326,7 +326,7 @@ def test_delete(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
-        hash_address = store.store_object(path)
+        hash_address = store.store_object(pid, path)
         cid = hash_address.hex_digests.get("sha256")
         s_cid = store.store_sysmeta(pid, sysmeta, cid)
         store.delete_object(pid)
@@ -342,7 +342,7 @@ def test_get_hex_digest(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
-    hash_address = store.store_object(path)
+    hash_address = store.store_object(pid, path)
     cid = hash_address.hex_digests.get("sha256")
     s_cid = store.store_sysmeta(pid, sysmeta, cid)
     sha3_256_hex_digest = (
@@ -367,7 +367,7 @@ def test_get_hex_digest_pid_unsupported_algorithm(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     syspath.read_bytes()
-    store.store_object(path)
+    store.store_object(pid, path)
     algorithm = "sm3"
     with pytest.raises(ValueError):
         store.get_hex_digest(pid, algorithm)
@@ -412,13 +412,13 @@ def test_put(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        pid_hashaddress = store.objects.put(path)
+        pid_hashaddress = store.objects.put(pid, path)
         pid_id = pid_hashaddress.id
         pid_relpath = pid_hashaddress.relpath
         pid_abspath = pid_hashaddress.abspath
         pid_is_duplicate = pid_hashaddress.is_duplicate
         pid_hex_digests = pid_hashaddress.hex_digests
-        assert pid_id == pids[pid]["sha256"]
+        assert pid_id == pids[pid]["s_cid"]
         shard_id_path = "/".join(store.objects.shard(pid_id))
         assert pid_relpath == shard_id_path
         id_abs_path = store.objects.realpath(pid_id)
@@ -436,7 +436,7 @@ def test_put_additional_algorithm(pids, store):
     for pid in pids.keys():
         algo = "sha224"
         path = test_dir + pid.replace("/", "_")
-        pid_hashaddress = store.objects.put(path, algorithm=algo)
+        pid_hashaddress = store.objects.put(pid, path, algorithm=algo)
         pid_hex_digests = pid_hashaddress.hex_digests
         pid_sha224 = pid_hex_digests.get(algo)
         assert pid_sha224 == pids[pid][algo]
@@ -448,7 +448,7 @@ def test_put_with_correct_checksums(pids, store):
         algo = "sha224"
         algo_checksum = pids[pid][algo]
         path = test_dir + pid.replace("/", "_")
-        store.objects.put(path, algorithm=algo, checksum=algo_checksum)
+        store.objects.put(pid, path, algorithm=algo, checksum=algo_checksum)
     assert store.objects.count() == 3
 
 
@@ -459,7 +459,7 @@ def test_put_with_incorrect_checksum(pids, store):
         algo_checksum = "badChecksumValue"
         path = test_dir + pid.replace("/", "_")
         with pytest.raises(ValueError):
-            store.objects.put(path, algorithm=algo, checksum=algo_checksum)
+            store.objects.put(pid, path, algorithm=algo, checksum=algo_checksum)
     assert store.objects.count() == 0
 
 
@@ -468,9 +468,12 @@ def test_move_and_get_checksums(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        hex_digests, file_path, is_duplicate = store.objects._move_and_get_checksums(
-            input_stream
-        )
+        (
+            id,
+            hex_digests,
+            file_path,
+            is_duplicate,
+        ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
@@ -486,14 +489,17 @@ def test_move_and_get_checksums_duplicates(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        store.objects._move_and_get_checksums(input_stream)
+        store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        hex_digests, file_path, is_duplicate = store.objects._move_and_get_checksums(
-            input_stream
-        )
+        (
+            id,
+            hex_digests,
+            file_path,
+            is_duplicate,
+        ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         assert is_duplicate is True
         assert store.objects.count() == 3

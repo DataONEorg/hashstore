@@ -23,20 +23,6 @@ class HashStore:
     sysmeta_lock = threading.Lock()
     time_out_sec = 1
     locked_pids = []
-    supported_algorithms = [
-        "md5",
-        "sha1",
-        "sha256",
-        "sha384",
-        "sha512",
-        "sha224",
-        "sha3_224",
-        "sha3_256",
-        "sha3_384",
-        "sha3_512",
-        "blake2b",
-        "blake2s",
-    ]
 
     def version(self):
         """Return the version number"""
@@ -76,7 +62,10 @@ class HashStore:
         Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512
         """
         algorithm = self._clean_algorithm(algorithm)
-        if algorithm not in self.supported_algorithms:
+        if (
+            algorithm not in self.objects.default_algo_list
+            and algorithm not in self.objects.other_algo_list
+        ):
             raise ValueError(f"Algorithm not supported: {algorithm}")
         else:
             hex_digest_dict = self._add_object(
@@ -147,7 +136,10 @@ class HashStore:
         pid_hash = self.sysmeta._get_sha256_hex_digest(pid)
         if not self.sysmeta.exists(pid_hash):
             raise ValueError(f"No sysmeta found for pid: {pid}")
-        if algorithm not in self.supported_algorithms:
+        if (
+            algorithm not in self.sysmeta.default_algo_list
+            and algorithm not in self.sysmeta.other_algo_list
+        ):
             raise ValueError(f"Algorithm not supported: {algorithm}")
         s_content = self._get_sysmeta(pid)
         cid_get = s_content[0][:64]

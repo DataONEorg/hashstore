@@ -255,16 +255,6 @@ class HashFSExt(HashFS):
         "blake2s",
     ]
 
-    def _get_store_path(self):
-        """Return a path object of the root directory of the store."""
-        return Path(self.root)
-
-    def _get_sha256_hex_digest(self, input):
-        """Calculate the SHA-256 digest for a string, and return it in a base64 hex
-        encoded string."""
-        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
-        return hex
-
     def computehash(self, stream, algorithm=None):
         """Compute hash of a file-like object using :attr:`algorithm` by default
         or with optional algorithm supported."""
@@ -396,6 +386,16 @@ class HashFSExt(HashFS):
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")
         return text
+
+    def _get_store_path(self):
+        """Return a path object of the root directory of the store."""
+        return Path(self.root)
+
+    def _get_sha256_hex_digest(self, input):
+        """Calculate the SHA-256 digest for a string, and return it in a base64 hex
+        encoded string."""
+        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
+        return hex
 
 
 class HashAddress(

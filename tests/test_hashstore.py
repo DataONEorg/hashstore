@@ -373,9 +373,9 @@ def test_get_hex_digest_pid_unsupported_algorithm(store):
         store.get_hex_digest(pid, algorithm)
 
 
-def test_hash_string(pids, store):
+def test_get_sha256_hex_digest(pids, store):
     for pid in pids:
-        hash_val = store._hash_string(pid)
+        hash_val = store.objects._get_sha256_hex_digest(pid)
         assert hash_val == pids[pid]["s_cid"]
 
 

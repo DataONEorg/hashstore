@@ -107,7 +107,8 @@ class HashStore:
     def retrieve_object(self, pid):
         """Returns the sysmeta and a buffered stream of a cid obj given a persistent
         identifier (pid)."""
-        s_cid_exists = self.sysmeta.exists(self._hash_string(pid))
+        pid_hash = self.objects._get_sha256_hex_digest(pid)
+        s_cid_exists = self.sysmeta.exists(pid_hash)
         if s_cid_exists:
             sys_content = self._get_sysmeta(pid)
             cid = sys_content[0][:64]
@@ -119,7 +120,8 @@ class HashStore:
 
     def retrieve_sysmeta(self, pid):
         """Returns the sysmeta of a given persistent identifier (pid)."""
-        s_cid_exists = self.sysmeta.exists(self._hash_string(pid))
+        pid_hash = self.sysmeta._get_sha256_hex_digest(pid)
+        s_cid_exists = self.sysmeta.exists(pid_hash)
         if s_cid_exists:
             sysmeta = self._get_sysmeta(pid)[1]
         else:
@@ -135,15 +137,15 @@ class HashStore:
 
     def delete_sysmeta(self, pid):
         """Deletes a sysmeta document given the pid."""
-        s_cid = self._hash_string(pid)
-        self.sysmeta.delete(s_cid)
+        pid_hash = self.sysmeta._get_sha256_hex_digest(pid)
+        self.sysmeta.delete(pid_hash)
         return True
 
     def get_hex_digest(self, pid, algorithm):
         """Returns the hex digest based on the hash algorithm passed with a given pid"""
         algorithm = self._clean_algorithm(algorithm)
-        s_cid = self._hash_string(pid)
-        if not self.sysmeta.exists(s_cid):
+        pid_hash = self.sysmeta._get_sha256_hex_digest(pid)
+        if not self.sysmeta.exists(pid_hash):
             raise ValueError(f"No sysmeta found for pid: {pid}")
         if algorithm not in self.supported_algorithms:
             raise ValueError(f"Algorithm not supported: {algorithm}")
@@ -163,8 +165,8 @@ class HashStore:
 
     def _set_sysmeta(self, pid, sysmeta, obj_cid):
         """Add a sysmeta document to the store."""
-        s_cid = self._hash_string(pid)
-        rel_path = self._rel_path(s_cid)
+        pid_hash = self.sysmeta._get_sha256_hex_digest(pid)
+        rel_path = self._rel_path(pid_hash)
         full_path = self.sysmeta._get_store_path() / rel_path
 
         # If sysmeta exists, it is an update request
@@ -172,8 +174,8 @@ class HashStore:
         sysmeta_path = ""
         sysmeta_path_tmp = ""
         try:
-            if self.sysmeta.exists(s_cid):
-                sysmeta_path = self.sysmeta.realpath(s_cid)
+            if self.sysmeta.exists(pid_hash):
+                sysmeta_path = self.sysmeta.realpath(pid_hash)
                 sysmeta_path_tmp = sysmeta_path + ".tmp"
                 # Delete .tmp file if it already exists
                 if self.sysmeta.exists(sysmeta_path_tmp):
@@ -182,7 +184,9 @@ class HashStore:
                 os.rename(sysmeta_path, sysmeta_path_tmp)
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
-            if not self.sysmeta.exists(s_cid) and self.sysmeta.exists(sysmeta_path_tmp):
+            if not self.sysmeta.exists(pid_hash) and self.sysmeta.exists(
+                sysmeta_path_tmp
+            ):
                 os.rename(sysmeta_path_tmp, sysmeta_path)
             raise
 
@@ -198,33 +202,27 @@ class HashStore:
                 file.write(sysmeta)
             if self.sysmeta.exists(sysmeta_path_tmp):
                 self.sysmeta.delete(sysmeta_path_tmp)
-            return s_cid
+            return pid_hash
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")
             # Abort process for any exception and restore existing sysmeta object
             if self.sysmeta.exists(sysmeta_path_tmp):
-                if self.sysmeta.exists(s_cid):
-                    self.sysmeta.delete(s_cid)
+                if self.sysmeta.exists(pid_hash):
+                    self.sysmeta.delete(pid_hash)
                 os.rename(sysmeta_path_tmp, sysmeta_path)
             else:
-                if self.sysmeta.exists(s_cid):
-                    self.sysmeta.delete(s_cid)
+                if self.sysmeta.exists(pid_hash):
+                    self.sysmeta.delete(pid_hash)
             raise
 
     def _get_sysmeta(self, pid):
         """Returns a list containing the sysmeta header and content given a persistent
         identifier (pid)."""
-        s_cid = self._hash_string(pid)
-        s_path = self.sysmeta.open(s_cid)
+        pid_hash = self.sysmeta._get_sha256_hex_digest(pid)
+        s_path = self.sysmeta.open(pid_hash)
         s_content = s_path.read().decode("utf-8").split("\x00", 1)
         s_path.close()
         return s_content
-
-    def _hash_string(self, input):
-        """Calculate the SHA-256 digest for a string, and return it in a base64 hex
-        encoded string."""
-        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
-        return hex
 
     def _rel_path(self, hash):
         """Return the storage path for a given hash hexdigest."""
@@ -271,6 +269,12 @@ class HashFSExt(HashFS):
     def _get_store_path(self):
         """Return a path object of the root directory of the store."""
         return Path(self.root)
+
+    def _get_sha256_hex_digest(self, input):
+        """Calculate the SHA-256 digest for a string, and return it in a base64 hex
+        encoded string."""
+        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
+        return hex
 
     def computehash(self, stream, algorithm=None):
         """Compute hash of a file-like object using :attr:`algorithm` by default

@@ -140,9 +140,7 @@ class HashStore:
             and algorithm not in self.sysmeta.other_algo_list
         ):
             raise ValueError(f"Algorithm not supported: {algorithm}")
-        s_content = self._get_sysmeta(pid)
-        cid_get = s_content[0][:64]
-        c_stream = self.objects.open(cid_get)
+        c_stream = self.objects.open(pid_hash)
         hex_digest = self.objects.computehash(c_stream, algorithm=algorithm)
         return hex_digest
 

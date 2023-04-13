@@ -66,8 +66,7 @@ def test_store_files(pids, store):
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
         hash_address = store.store_object(pid, path)
-        cid = hash_address.hex_digests.get("sha256")
-        s_cid = store.store_sysmeta(pid, sysmeta, cid)
+        s_cid = store.store_sysmeta(pid, sysmeta)
     assert store.objects.count() == 3
     assert store.sysmeta.count() == 3
 
@@ -202,8 +201,7 @@ def test_store_sysmeta_s_cid(pids, store):
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
         hash_address = store.store_object(pid, path)
-        cid = hash_address.hex_digests.get("sha256")
-        s_cid = store.store_sysmeta(pid, sysmeta, cid)
+        s_cid = store.store_sysmeta(pid, sysmeta)
         assert s_cid == pids[pid]["s_cid"]
 
 
@@ -215,11 +213,10 @@ def test_store_sysmeta_cid(pids, store):
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
         hash_address = store.store_object(pid, path)
-        cid = hash_address.hex_digests.get("sha256")
-        store.store_sysmeta(pid, sysmeta, cid)
+        store.store_sysmeta(pid, sysmeta)
         s_content = store._get_sysmeta(pid)
         cid_get = s_content[0][:64]
-        assert cid_get == pids[pid]["sha256"]
+        assert cid_get == pids[pid]["s_cid"]
 
 
 def test_store_sysmeta_update(store):
@@ -231,34 +228,29 @@ def test_store_sysmeta_update(store):
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
     hash_address = store.store_object(pid, path)
-    cid = hash_address.hex_digests.get("sha256")
-    s_cid = store.store_sysmeta(pid, sysmeta, cid)
-    cid_new = obj_cid[::-1]
-    store.store_sysmeta(pid, sysmeta, cid_new)
-    s_content = store._get_sysmeta(pid)
+    s_cid = store.store_sysmeta(pid, sysmeta)
+    pid_new = s_cid[::-1]
+    store.store_object(pid_new, path)
+    s_cid = store.store_sysmeta(pid_new, sysmeta)
+    s_content = store._get_sysmeta(pid_new)
     cid_get = s_content[0][:64]
-    assert cid_new == cid_get
+    assert s_cid == cid_get
 
 
 def test_store_sysmeta_thread_lock(store):
     test_dir = "tests/testdata/"
-    obj_cid = "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
     pid = "jtao.1700.1"
-    pid_two = pid + "2"
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
     hash_address = store.store_object(pid, path)
-    cid = hash_address.hex_digests.get("sha256")
-    store.store_sysmeta(pid, sysmeta, cid)
-    test_cid = obj_cid[::-1]
-    test_cid_two = "9999b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
+    store.store_sysmeta(pid, sysmeta)
     # Start threads
-    thread1 = Thread(target=store.store_sysmeta, args=(pid, sysmeta, cid))
-    thread2 = Thread(target=store.store_sysmeta, args=(pid, sysmeta, test_cid))
-    thread3 = Thread(target=store.store_sysmeta, args=(pid_two, sysmeta, cid))
-    thread4 = Thread(target=store.store_sysmeta, args=(pid, sysmeta, test_cid_two))
+    thread1 = Thread(target=store.store_sysmeta, args=(pid, sysmeta))
+    thread2 = Thread(target=store.store_sysmeta, args=(pid, sysmeta))
+    thread3 = Thread(target=store.store_sysmeta, args=(pid, sysmeta))
+    thread4 = Thread(target=store.store_sysmeta, args=(pid, sysmeta))
     thread1.start()
     thread2.start()
     thread3.start()
@@ -267,10 +259,11 @@ def test_store_sysmeta_thread_lock(store):
     thread2.join()
     thread3.join()
     thread4.join()
-    cid_check = store._get_sysmeta(pid)[0][:64]
-    assert cid_check == test_cid or cid_check == test_cid_two
+    pid_hash = store.objects._get_sha256_hex_digest(pid)
+    s_cid = store._get_sysmeta(pid)[0][:64]
+    assert s_cid == pid_hash
     assert store.objects.count() == 1
-    assert store.sysmeta.count() == 2
+    assert store.sysmeta.count() == 1
 
 
 def test_retrieve_object(pids, store):
@@ -281,14 +274,13 @@ def test_retrieve_object(pids, store):
         syspath = Path(test_dir) / filename
         sysmeta = syspath.read_bytes()
         hash_address = store.store_object(pid, path)
-        obj_cid = hash_address.hex_digests.get("sha256")
-        store.store_sysmeta(pid, sysmeta, obj_cid)
+        store.store_sysmeta(pid, sysmeta)
         s_content = store._get_sysmeta(pid)
         cid = s_content[0][:64]
         cid_stream = store.retrieve_object(pid)[1]
-        cid_hash = store.objects.computehash(cid_stream)
+        pid_hash = store.objects._get_sha256_hex_digest(pid)
         cid_stream.close()
-        assert cid == cid_hash
+        assert cid == pid_hash
 
 
 def test_retrieve_object_invalid_pid(store):
@@ -307,7 +299,7 @@ def test_retrieve_sysmeta(store):
     sysmeta = syspath.read_bytes()
     hash_address = store.store_object(pid, path)
     cid = hash_address.hex_digests.get("sha256")
-    s_cid = store.store_sysmeta(pid, sysmeta, cid)
+    s_cid = store.store_sysmeta(pid, sysmeta)
     sysmeta_ret = store.retrieve_sysmeta(pid)
     assert sysmeta.decode("utf-8") == sysmeta_ret
 
@@ -328,7 +320,7 @@ def test_delete(pids, store):
         sysmeta = syspath.read_bytes()
         hash_address = store.store_object(pid, path)
         cid = hash_address.hex_digests.get("sha256")
-        s_cid = store.store_sysmeta(pid, sysmeta, cid)
+        s_cid = store.store_sysmeta(pid, sysmeta)
         store.delete_object(pid)
         store.delete_sysmeta(pid)
     assert store.objects.count() == 0
@@ -343,8 +335,7 @@ def test_get_hex_digest(store):
     syspath = Path(test_dir) / filename
     sysmeta = syspath.read_bytes()
     hash_address = store.store_object(pid, path)
-    cid = hash_address.hex_digests.get("sha256")
-    s_cid = store.store_sysmeta(pid, sysmeta, cid)
+    s_cid = store.store_sysmeta(pid, sysmeta)
     sha3_256_hex_digest = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )

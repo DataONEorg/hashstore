@@ -73,7 +73,7 @@ class HashStore:
             )
         return hex_digest_dict
 
-    def store_sysmeta(self, pid, sysmeta, cid):
+    def store_sysmeta(self, pid, sysmeta):
         """Add a system metadata object to the store. Returns the sysmeta content
         identifier (s_cid) which is the address of the sysmeta document. Multiple calls
         to this method are non-blocking and will be executed in parallel using locked_pids
@@ -86,7 +86,7 @@ class HashStore:
         with self.sysmeta_lock:
             self.locked_pids.append(pid)
         try:
-            sysmeta_cid = self._set_sysmeta(pid, sysmeta, cid)
+            sysmeta_cid = self._set_sysmeta(pid, sysmeta)
         finally:
             # Release pid
             with self.sysmeta_lock:
@@ -154,7 +154,7 @@ class HashStore:
         # Caller to handle address.is_duplicate is true
         return address
 
-    def _set_sysmeta(self, pid, sysmeta, obj_cid):
+    def _set_sysmeta(self, pid, sysmeta):
         """Add a sysmeta document to the store."""
         pid_hash = self.sysmeta._get_sha256_hex_digest(pid)
         rel_path = self._rel_path(pid_hash)
@@ -186,7 +186,7 @@ class HashStore:
             parent = full_path.parent
             parent.mkdir(parents=True, exist_ok=True)
             with full_path.open(mode="wb") as file:
-                file.write(obj_cid.encode("utf-8"))
+                file.write(pid_hash.encode("utf-8"))
                 format_id = " " + self.SYSMETA_NS
                 file.write(format_id.encode("utf-8"))
                 file.write(b"\x00")

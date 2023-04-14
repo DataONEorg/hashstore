@@ -95,17 +95,15 @@ class HashStore:
         return sysmeta_cid
 
     def retrieve_object(self, pid):
-        """Returns the sysmeta and a buffered stream of a pid_hash given a persistent
+        """Returns a buffered stream of a pid_hash given a persistent
         identifier (pid)."""
         pid_hash = self.objects._get_sha256_hex_digest(pid)
         s_cid_exists = self.sysmeta.exists(pid_hash)
         if s_cid_exists:
-            sys_content = self._get_sysmeta(pid)
-            sysmeta = sys_content[1]
-            c_stream = self.objects.open(pid_hash)
+            obj_stream = self.objects.open(pid_hash)
         else:
             raise ValueError(f"No sysmeta found for pid: {pid}")
-        return sysmeta, c_stream
+        return obj_stream
 
     def retrieve_sysmeta(self, pid):
         """Returns the sysmeta of a given persistent identifier (pid)."""

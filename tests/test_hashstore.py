@@ -293,12 +293,10 @@ def test_retrieve_object(pids, store):
         sysmeta = syspath.read_bytes()
         hash_address = store.store_object(pid, path)
         store.store_sysmeta(pid, sysmeta)
-        s_content = store._get_sysmeta(pid)
-        cid = s_content[0][:64]
-        cid_stream = store.retrieve_object(pid)[1]
-        pid_hash = store.objects._get_sha256_hex_digest(pid)
-        cid_stream.close()
-        assert cid == pid_hash
+        obj_stream = store.retrieve_object(pid)
+        sha256_hex = store.objects.computehash(obj_stream)
+        obj_stream.close()
+        assert sha256_hex == hash_address.hex_digests.get("sha256")
 
 
 def test_retrieve_object_invalid_pid(store):

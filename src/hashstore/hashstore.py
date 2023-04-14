@@ -341,7 +341,13 @@ class HashFSExt(HashFS):
         If an algorithm is provided, it will add the respective hex digest to
         the dictionary.
         """
-        tmp = NamedTemporaryFile(delete=False)
+
+        # Create temporary file in /metacat/tmp
+        tmp_root_path = self._get_store_path().parent / "tmp"
+        # Physically create directory if it doesn't exist
+        if os.path.exists(tmp_root_path) is False:
+            self.makepath(tmp_root_path)
+        tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
 
         # Ensure tmp file is created with desired permissions
         if self.fmode is not None:
@@ -351,7 +357,7 @@ class HashFSExt(HashFS):
             finally:
                 os.umask(oldmask)
 
-        # Hash objects to digest
+        # Additional hash object to digest
         if algorithm is not None and algorithm in self.other_algo_list:
             self.default_algo_list.append(algorithm)
         if algorithm is not None and algorithm not in self.default_algo_list:

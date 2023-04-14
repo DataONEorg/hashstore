@@ -44,12 +44,6 @@ class HashStore:
             width=self.dir_width,
             algorithm="sha256",
         )
-        self.tmp = HashFSExt(
-            self.store_path + "/tmp",
-            depth=self.dir_depth,
-            width=self.dir_width,
-            algorithm="sha256",
-        )
         return None
 
     def store_object(self, pid, data, algorithm="sha256", checksum=None):

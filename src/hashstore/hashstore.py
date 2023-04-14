@@ -76,9 +76,9 @@ class HashStore:
 
     def store_sysmeta(self, pid, sysmeta):
         """Add a system metadata object to the store. Returns the sysmeta content
-        identifier (s_cid) which is the address of the sysmeta document. Multiple calls
-        to this method are non-blocking and will be executed in parallel using locked_pids
-        for synchronization.
+        identifier (pid sha256 hash) which is the address of the sysmeta document.
+        Multiple calls to this method are non-blocking and will be executed in parallel
+        using locked_pids for synchronization.
         """
         # Wait for the pid to release if it's in use
         while pid in self.locked_pids:
@@ -98,8 +98,8 @@ class HashStore:
         """Returns a buffered stream of a pid_hash given a persistent
         identifier (pid)."""
         pid_hash = self.objects._get_sha256_hex_digest(pid)
-        s_cid_exists = self.sysmeta.exists(pid_hash)
-        if s_cid_exists:
+        sysmeta_exists = self.sysmeta.exists(pid_hash)
+        if sysmeta_exists:
             obj_stream = self.objects.open(pid_hash)
         else:
             raise ValueError(f"No sysmeta found for pid: {pid}")
@@ -108,8 +108,8 @@ class HashStore:
     def retrieve_sysmeta(self, pid):
         """Returns the sysmeta of a given persistent identifier (pid)."""
         pid_hash = self.sysmeta._get_sha256_hex_digest(pid)
-        s_cid_exists = self.sysmeta.exists(pid_hash)
-        if s_cid_exists:
+        sysmeta_exists = self.sysmeta.exists(pid_hash)
+        if sysmeta_exists:
             sysmeta = self._get_sysmeta(pid)[1]
         else:
             raise ValueError(f"No sysmeta found for pid: {pid}")
@@ -165,7 +165,7 @@ class HashStore:
                 # Delete .tmp file if it already exists
                 if self.sysmeta.exists(sysmeta_path_tmp):
                     self.sysmeta.delete(sysmeta_path_tmp)
-                # Rename existing s_cid
+                # Rename existing sysmeta document
                 os.rename(sysmeta_path, sysmeta_path_tmp)
         except Exception as err:
             print(f"Unexpected {err=}, {type(err)=}")

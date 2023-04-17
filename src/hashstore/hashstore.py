@@ -337,7 +337,7 @@ class HashFSExt(HashFS):
         """
 
         # Create temporary file in /metacat/tmp
-        tmp_root_path = self._get_store_path().parent / "tmp"
+        tmp_root_path = self._get_store_path() / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
             self.makepath(tmp_root_path)

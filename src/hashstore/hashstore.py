@@ -61,7 +61,8 @@ class HashStore:
         boolean and hex digest dictionary. The supported algorithms list is based on
         algorithms supported in hashlib for Python 3.9. If an algorithm is passed that
         is supported, the hex digest dictionary returned will include the additional
-        algorithm & hex digest.
+        algorithm & hex digest. A thread lock is utilized to ensure that a file is
+        written once and only once.
 
         Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512
 
@@ -123,7 +124,7 @@ class HashStore:
         return sysmeta_cid
 
     def retrieve_object(self, pid):
-        """Retrieve an object from HashStore.
+        """Retrieve an object from HashStore of a given persistent identifier (pid)
 
         Args:
             pid (string): authority-based identifier
@@ -328,8 +329,15 @@ class HashFSExt(HashFS):
     ]
 
     def clean_algorithm(self, algorithm_string):
-        """Return a string that is compatible with generating a new hashlib library
-        hashing object"""
+        """Format a string and ensure that it is supported and compatible with
+        the python hashlib library.
+
+        Args:
+            algorithm_string (string): algorithm to validate
+
+        Returns:
+            cleaned_string (string): hashlib supported algorithm string
+        """
         count = 0
         for char in algorithm_string:
             if char.isdigit():
@@ -348,14 +356,23 @@ class HashFSExt(HashFS):
 
     def computehash(self, stream, algorithm=None):
         """Compute hash of a file-like object using :attr:`algorithm` by default
-        or with optional algorithm supported."""
+        or with optional algorithm supported.
+
+        Args:
+            stream (io.BufferedReader): a buffered stream of an ab_id object
+            algorithm (string): algorithm of hex digest to generate
+
+        Returns:
+            hex_digest (string): hex digest
+        """
         if algorithm is None:
             hashobj = hashlib.new(self.algorithm)
         else:
             hashobj = hashlib.new(algorithm)
         for data in stream:
             hashobj.update(self._to_bytes(data))
-        return hashobj.hexdigest()
+        hex_digest = hashobj.hexdigest()
+        return hex_digest
 
     def put(
         self,
@@ -366,17 +383,18 @@ class HashFSExt(HashFS):
         checksum=None,
         checksum_algorithm=None,
     ):
-        """Store contents of `file` on disk using its content hash for the
-        address.
+        """Store contents of `file` on disk using the hash of the given pid
 
         Args:
+            pid (string): authority-based idenrifier
             file (mixed): Readable object or path to file.
             extension (str, optional): Optional extension to append to file
                 when saving.
-            algorithm (str, optional): Optional algorithm value to include
+            additional_algorithm (str, optional): Optional algorithm value to include
                 when returning hex digests.
             checksum (str, optional): Optional checksum to validate object
                 against hex digest before moving to permanent location.
+            checksum_algorithm (str, optional): Algorithm value of given checksum
 
         Returns:
             HashAddress: File's hash address.
@@ -398,7 +416,10 @@ class HashFSExt(HashFS):
         else:
             rel_path = None
 
-        return HashAddress(id, rel_path, filepath, is_duplicate, hex_digest_dict)
+        hash_address = HashAddress(
+            id, rel_path, filepath, is_duplicate, hex_digest_dict
+        )
+        return hash_address
 
     def _move_and_get_checksums(
         self,
@@ -416,6 +437,20 @@ class HashFSExt(HashFS):
         duplicate, it then moves that file to its final location. If an algorithm
         and checksum is provided, it will proceed to validate the object and
         delete the file if the hex digest stored does not match what is provided.
+
+        Args:
+            pid (string): authority-based idenrifier
+            stream (mixed): Readable object or path to file.
+            extension (str, optional): Optional extension to append to file
+                when saving.
+            additional_algorithm (str, optional): Optional algorithm value to include
+                when returning hex digests.
+            checksum (str, optional): Optional checksum to validate object
+                against hex digest before moving to permanent location.
+            checksum_algorithm (str, optional): Algorithm value of given checksum
+
+        Returns:
+            HashAddress: File's hash address.
         """
         id = self._get_sha256_hex_digest(pid)
         filepath = self.idpath(id, extension)
@@ -461,10 +496,19 @@ class HashFSExt(HashFS):
         return id, hex_digests, filepath, is_duplicate
 
     def _mktempfile(self, stream, algorithm=None):
-        """Create a named temporary file from a :class:`Stream` object and
+        """Create a named temporary file from a `Stream` object and
         return its filename and a dictionary of its algorithms and hex digests.
         If an algorithm is provided, it will add the respective hex digest to
         the dictionary.
+
+        Args:
+            stream: `Stream` object
+            algorithm (string): algorithm of additional hex digest to generate
+
+        Returns:
+            hex_digest_dict, tmp.name (tuple pack):
+                hex_digest_dict (dictionary): algorithms and their hex digests
+                tmp.name: Name of temporary file created and written into
         """
 
         # Create temporary file in /metacat/tmp
@@ -506,21 +550,28 @@ class HashFSExt(HashFS):
 
         return hex_digest_dict, tmp.name
 
+    def _get_sha256_hex_digest(self, input):
+        """Calculate the SHA-256 digest of a UTF-8 encoded string.
+
+        Args:
+            input (string)
+
+        Returns:
+            hex (string): hexadecimal string
+        """
+        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
+        return hex
+
     def _to_bytes(self, text):
-        """Convert text to sequence of bytes using utf-8 encoding"""
+        """Convert text to sequence of bytes using utf-8 encodin."""
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")
         return text
 
     def _get_store_path(self):
         """Return a path object of the root directory of the store."""
-        return Path(self.root)
-
-    def _get_sha256_hex_digest(self, input):
-        """Calculate the SHA-256 digest for a string, and return it in a base64 hex
-        encoded string."""
-        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
-        return hex
+        root_directory = Path(self.root)
+        return root_directory
 
 
 class HashAddress(

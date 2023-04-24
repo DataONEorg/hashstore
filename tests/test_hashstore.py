@@ -181,6 +181,10 @@ def test_store_duplicate_objects(store):
     # Store second blob
     hash_address_two = store.store_object(pid, path)
     assert hash_address_two.is_duplicate is True
+    assert hash_address_two.id is None
+    assert hash_address_two.relpath is None
+    assert hash_address_two.abspath is None
+    assert hash_address_two.hex_digests is None
     assert store.objects.count() == 1
     ab_id = store.objects._get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)

@@ -186,7 +186,6 @@ class HashStore:
             checksum=checksum,
             checksum_algorithm=checked_checksum_algorithm,
         )
-        # Caller to handle address.is_duplicate is true
         return address
 
     def _set_sysmeta(self, pid, sysmeta):
@@ -343,8 +342,13 @@ class HashFSExt(HashFS):
                 checksum_algorithm,
             )
 
+        if is_duplicate is not True:
+            rel_path = self.relpath(filepath)
+        else:
+            rel_path = None
+
         return HashAddress(
-            id, self.relpath(filepath), filepath, is_duplicate, hex_digest_dict
+            id, rel_path, filepath, is_duplicate, hex_digest_dict
         )
 
     def _move_and_get_checksums(
@@ -364,13 +368,19 @@ class HashFSExt(HashFS):
         and checksum is provided, it will proceed to validate the object and
         delete the file if the hex digest stored does not match what is provided.
         """
+        id = self._get_sha256_hex_digest(pid)
+        filepath = self.idpath(id, extension)
+        self.makepath(os.path.dirname(filepath))
+        # Only put file if it doesn't exist
+        if os.path.isfile(filepath):
+            id = None
+            hex_digests = None
+            filepath = None
+            is_duplicate = True
+            return id, hex_digests, filepath, is_duplicate
 
         # Create temporary file and calculate hex digests
         hex_digests, fname = self._mktempfile(stream, additional_algorithm)
-        id = self._get_sha256_hex_digest(pid)
-
-        filepath = self.idpath(id, extension)
-        self.makepath(os.path.dirname(filepath))
 
         # Only move file if it doesn't already exist.
         if not os.path.isfile(filepath):

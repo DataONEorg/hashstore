@@ -74,33 +74,23 @@ class HashStore:
             address (HashAddress): object that contains the permanent address, relative
             file path, absolute file path, duplicate file boolean and hex digest dictionary
         """
-        # If the algorithm supplied is the default, do not generate extra
-        checked_algorithm = self._clean_algorithm(additional_algorithm)
+        checked_algorithm = self.objects.clean_algorithm(additional_algorithm)
+        # If the additional algorithm supplied is the default, do not generate extra
         if checked_algorithm is self.objects.algorithm:
             checked_algorithm = None
-        else:
-            if (
-                checked_algorithm not in self.objects.default_algo_list
-                and checked_algorithm not in self.objects.other_algo_list
-            ):
-                raise ValueError(f"Algorithm not supported: {checked_algorithm}")
-        # If a checksum is supplied, ensure that a checksum_algorithm is present and supported
+            # If a checksum is supplied, ensure that a checksum_algorithm is present and supported
+        checked_checksum_algorithm = ""
         if checksum is not None and checksum != "":
-            checked_checksum_algorithm = self._clean_algorithm(checksum_algorithm)
-            if (
-                checked_checksum_algorithm not in self.objects.default_algo_list
-                and checked_checksum_algorithm not in self.objects.other_algo_list
-            ):
-                raise ValueError(
-                    f"Checksum algorithm not supported: {checked_checksum_algorithm}"
-                )
+            checked_checksum_algorithm = self.objects.clean_algorithm(
+                checksum_algorithm
+            )
 
         hash_address = self.objects.put(
             pid,
             data,
             additional_algorithm=checked_algorithm,
             checksum=checksum,
-            checksum_algorithm=checksum_algorithm,
+            checksum_algorithm=checked_checksum_algorithm,
         )
         return hash_address
 
@@ -159,7 +149,7 @@ class HashStore:
 
     def get_hex_digest(self, pid, algorithm):
         """Returns the hex digest based on the hash algorithm passed with a given pid"""
-        algorithm = self._clean_algorithm(algorithm)
+        algorithm = self.objects.clean_algorithm(algorithm)
         ab_id = self.sysmeta._get_sha256_hex_digest(pid)
         if not self.sysmeta.exists(ab_id):
             raise ValueError(f"No sysmeta found for pid: {pid}")
@@ -242,19 +232,6 @@ class HashStore:
                 chunks.append(hash)
         return "/".join(chunks)
 
-    def _clean_algorithm(self, algorithm_string):
-        """Return a string that is compatible with generating a new hashlib library
-        hashing object"""
-        count = 0
-        for char in algorithm_string:
-            if char.isdigit():
-                count += 1
-        if count > 3:
-            cleaned_string = algorithm_string.lower().replace("-", "_")
-        else:
-            cleaned_string = algorithm_string.lower().replace("-", "").replace("_", "")
-        return cleaned_string
-
 
 class HashFSExt(HashFS):
     """A subclass of HashFS with extended methods to support the returning of a
@@ -272,6 +249,25 @@ class HashFSExt(HashFS):
         "blake2b",
         "blake2s",
     ]
+
+    def clean_algorithm(self, algorithm_string):
+        """Return a string that is compatible with generating a new hashlib library
+        hashing object"""
+        count = 0
+        for char in algorithm_string:
+            if char.isdigit():
+                count += 1
+        if count > 3:
+            cleaned_string = algorithm_string.lower().replace("-", "_")
+        else:
+            cleaned_string = algorithm_string.lower().replace("-", "").replace("_", "")
+        # Validate string
+        if (
+            cleaned_string not in self.default_algo_list
+            and cleaned_string not in self.other_algo_list
+        ):
+            raise ValueError(f"Algorithm not supported: {cleaned_string}")
+        return cleaned_string
 
     def computehash(self, stream, algorithm=None):
         """Compute hash of a file-like object using :attr:`algorithm` by default

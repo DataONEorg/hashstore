@@ -97,10 +97,16 @@ class HashStore:
         return hash_address
 
     def store_sysmeta(self, pid, sysmeta):
-        """Add a system metadata object to the store. Returns the sysmeta content
-        identifier (pid sha256 hash) which is the address of the sysmeta document.
-        Multiple calls to this method are non-blocking and will be executed in parallel
-        using sysmeta_locked_pids for synchronization.
+        """Add a system metadata object to the store. Multiple calls to this method
+        are non-blocking and will be executed in parallel using sysmeta_locked_pids
+        for synchronization.
+
+        Args:
+            pid (string): authority-based identifier
+            sysmeta (mixed): sysmeta document
+
+        Returns:
+            sysmeta_cid (string): address of the sysmeta document
         """
         # Wait for the pid to release if it's in use
         while pid in self.sysmeta_locked_pids:
@@ -117,8 +123,14 @@ class HashStore:
         return sysmeta_cid
 
     def retrieve_object(self, pid):
-        """Returns a buffered stream of a ab_id (authority based identifier)
-        given a persistent identifier (pid)."""
+        """Retrieve an object from HashStore.
+
+        Args:
+            pid (string): authority-based identifier
+
+        Returns:
+            obj_stream (io.BufferedReader): a buffered stream of an ab_id object
+        """
         ab_id = self.objects._get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
@@ -128,7 +140,14 @@ class HashStore:
         return obj_stream
 
     def retrieve_sysmeta(self, pid):
-        """Returns the sysmeta of a given persistent identifier (pid)."""
+        """Returns the sysmeta of a given persistent identifier (pid).
+
+        Args:
+            pid (string): authority-based identifier
+
+        Returns:
+            sysmeta (string): sysmeta content
+        """
         ab_id = self.sysmeta._get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
@@ -138,28 +157,46 @@ class HashStore:
         return sysmeta
 
     def delete_object(self, pid):
-        """Deletes an object given the pid."""
+        """Deletes an object given the pid.
+
+        Args:
+            pid (string): authority-based identifier
+
+        Returns:
+            boolean
+        """
         ab_id = self.objects._get_sha256_hex_digest(pid)
         self.objects.delete(ab_id)
         return True
 
     def delete_sysmeta(self, pid):
-        """Deletes a sysmeta document given the pid."""
+        """Deletes a sysmeta document given the pid.
+
+        Args:
+            pid (string): authority-based identifier
+
+        Returns:
+            boolean
+        """
         ab_id = self.sysmeta._get_sha256_hex_digest(pid)
         self.sysmeta.delete(ab_id)
         return True
 
     def get_hex_digest(self, pid, algorithm):
-        """Returns the hex digest based on the hash algorithm passed with a given pid"""
+        """Returns the hex digest of an object based on the hash algorithm
+        passed with a given pid.
+
+        Args:
+            pid (string): authority-based identifier
+            algorithm (string): algorithm of hex digest to generate
+
+        Returns:
+            hex_digest (string): hex digest of the object
+        """
         algorithm = self.objects.clean_algorithm(algorithm)
-        ab_id = self.sysmeta._get_sha256_hex_digest(pid)
-        if not self.sysmeta.exists(ab_id):
-            raise ValueError(f"No sysmeta found for pid: {pid}")
-        if (
-            algorithm not in self.sysmeta.default_algo_list
-            and algorithm not in self.sysmeta.other_algo_list
-        ):
-            raise ValueError(f"Algorithm not supported: {algorithm}")
+        ab_id = self.objects._get_sha256_hex_digest(pid)
+        if not self.objects.exists(ab_id):
+            raise ValueError(f"No object found for pid: {pid}")
         c_stream = self.objects.open(ab_id)
         hex_digest = self.objects.computehash(c_stream, algorithm=algorithm)
         return hex_digest
@@ -167,7 +204,18 @@ class HashStore:
     def _add_object(
         self, pid, data, additional_algorithm, checksum, checksum_algorithm
     ):
-        """Add a data blob to the store."""
+        """Add a data blob to the store.
+
+        Args:
+            pid (string): authority-based identifier
+            data (mixed): file-like object
+            additional_algorithm (string): additional hex digest to include
+            checksum (string): checksum to validate against
+            checksum_algorithm (string): algorithm of supplied checksum
+        Return:
+            address (HashAddress): object that contains the permanent address, relative
+            file path, absolute file path, duplicate file boolean and hex digest dictionary
+        """
         checked_algorithm = self.objects.clean_algorithm(additional_algorithm)
         # If the additional algorithm supplied is the default, do not generate extra
         if checked_algorithm is self.objects.algorithm:
@@ -189,9 +237,17 @@ class HashStore:
         return address
 
     def _set_sysmeta(self, pid, sysmeta):
-        """Add a sysmeta document to the store."""
+        """Add a sysmeta document to the store.
+
+        Args:
+            pid (string): authority-based identifier
+            sysmeta (mixed): sysmeta document
+
+        Returns:
+            sysmeta_cid (string): address of the sysmeta document
+        """
         ab_id = self.sysmeta._get_sha256_hex_digest(pid)
-        rel_path = self._rel_path(ab_id)
+        rel_path = "/".join(self.objects.shard(ab_id))
         full_path = self.sysmeta._get_store_path() / rel_path
 
         # If sysmeta exists, it is an update request
@@ -239,24 +295,19 @@ class HashStore:
             raise
 
     def _get_sysmeta(self, pid):
-        """Returns a list containing the sysmeta header and content given a persistent
-        identifier (pid)."""
+        """Get the sysmeta content of a given pid (persistent identifer)
+
+        Args:
+            pid (string): authority-based identifier
+
+        Returns:
+            s_content (string): sysmeta content
+        """
         ab_id = self.sysmeta._get_sha256_hex_digest(pid)
         s_path = self.sysmeta.open(ab_id)
         s_content = s_path.read().decode("utf-8").split("\x00", 1)
         s_path.close()
         return s_content
-
-    def _rel_path(self, hash):
-        """Return the storage path for a given hash hexdigest."""
-        chunks = []
-        for i in range(self.dir_depth):
-            temp = hash[: self.dir_width]
-            hash = hash[self.dir_width :]
-            chunks.append(temp)
-            if i == self.dir_depth - 1:
-                chunks.append(hash)
-        return "/".join(chunks)
 
 
 class HashFSExt(HashFS):
@@ -347,9 +398,7 @@ class HashFSExt(HashFS):
         else:
             rel_path = None
 
-        return HashAddress(
-            id, rel_path, filepath, is_duplicate, hex_digest_dict
-        )
+        return HashAddress(id, rel_path, filepath, is_duplicate, hex_digest_dict)
 
     def _move_and_get_checksums(
         self,

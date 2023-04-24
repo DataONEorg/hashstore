@@ -383,13 +383,6 @@ def test_get_sha256_hex_digest(pids, store):
         assert hash_val == pids[pid]["ab_id"]
 
 
-def test_rel_path(pids, store):
-    path = store._rel_path(pids["doi:10.18739/A2901ZH2M"]["ab_id"])
-    assert len(path) == 67
-    assert path.startswith("0d/55/5e/d7")
-    assert path.endswith("7052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e")
-
-
 def test_computehash(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():

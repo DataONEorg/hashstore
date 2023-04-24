@@ -58,21 +58,6 @@ def test_init(store):
     assert value == importlib.metadata.version("hashstore")
 
 
-def test_store_files(pids, store):
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        sysmeta = syspath.read_bytes()
-        hash_address = store.store_object(pid, path)
-        ab_id = store.store_sysmeta(pid, sysmeta)
-        assert store.objects.exists(ab_id)
-        assert store.sysmeta.exists(ab_id)
-    assert store.objects.count() == 3
-    assert store.sysmeta.count() == 3
-
-
 def test_store_address_length(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -82,7 +67,57 @@ def test_store_address_length(pids, store):
         assert len(ab_id) == 64
 
 
-def test_store_hex_digests(pids, store):
+def test_store_object_files(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        sysmeta = syspath.read_bytes()
+        hash_address = store.store_object(pid, path)
+        ab_id = store.store_sysmeta(pid, sysmeta)
+        assert store.objects.exists(ab_id)
+    assert store.objects.count() == 3
+
+
+def test_store_object_id(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.store_object(pid, path)
+        assert hash_address.id == pids[pid]["ab_id"]
+
+
+def test_store_object_rel_path(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.store_object(pid, path)
+        ab_id = pids[pid]["ab_id"]
+        ab_id_rel_path = "/".join(store.objects.shard(ab_id))
+        assert hash_address.relpath == ab_id_rel_path
+
+
+def test_store_object_abs_path(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.store_object(pid, path)
+        ab_id = pids[pid]["ab_id"]
+        ab_id_rel_path = "/".join(store.objects.shard(ab_id))
+        ab_id_abs_path = store.objects.root + "/" + ab_id_rel_path
+        assert hash_address.abspath == ab_id_abs_path
+
+
+def test_store_object_is_duplicate(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.store_object(pid, path)
+        assert hash_address.is_duplicate is False
+
+
+def test_store_object_hex_digests(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -94,7 +129,7 @@ def test_store_hex_digests(pids, store):
         assert hash_address.hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
-def test_store_input_stream(pids, store):
+def test_store_object_via_input_stream(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -171,7 +206,53 @@ def test_store_object_algorithm_args_incorrect_checksum(store):
     assert store.objects.exists(ab_id) is False
 
 
-def test_store_duplicate_objects(store):
+def test_store_object_duplicates(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    # Store first blob
+    hash_address_one = store.store_object(pid, path)
+    # Store second blob
+    hash_address_two = store.store_object(pid, path)
+    assert store.objects.count() == 1
+    ab_id = store.objects._get_sha256_hex_digest(pid)
+    assert store.objects.exists(ab_id)
+
+
+def test_store_object_duplicates_id(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    # Store first blob
+    hash_address_one = store.store_object(pid, path)
+    # Store second blob
+    hash_address_two = store.store_object(pid, path)
+    assert hash_address_two.id is None
+
+
+def test_store_object_duplicates_relpath(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    # Store first blob
+    hash_address_one = store.store_object(pid, path)
+    # Store second blob
+    hash_address_two = store.store_object(pid, path)
+    assert hash_address_two.relpath is None
+
+
+def test_store_object_duplicates_abspath(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    # Store first blob
+    hash_address_one = store.store_object(pid, path)
+    # Store second blob
+    hash_address_two = store.store_object(pid, path)
+    assert hash_address_two.abspath is None
+
+
+def test_store_object_duplicates_is_duplicate(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -180,13 +261,17 @@ def test_store_duplicate_objects(store):
     # Store second blob
     hash_address_two = store.store_object(pid, path)
     assert hash_address_two.is_duplicate is True
-    assert hash_address_two.id is None
-    assert hash_address_two.relpath is None
-    assert hash_address_two.abspath is None
+
+
+def test_store_object_duplicates_hex_digests(store):
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    # Store first blob
+    hash_address_one = store.store_object(pid, path)
+    # Store second blob
+    hash_address_two = store.store_object(pid, path)
     assert hash_address_two.hex_digests is None
-    assert store.objects.count() == 1
-    ab_id = store.objects._get_sha256_hex_digest(pid)
-    assert store.objects.exists(ab_id)
 
 
 def test_store_duplicate_object_threads(store):
@@ -207,6 +292,19 @@ def test_store_duplicate_object_threads(store):
     assert store.objects.count() == 1
     ab_id = store.objects._get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
+
+
+def test_store_sysmeta_files(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        sysmeta = syspath.read_bytes()
+        hash_address = store.store_object(pid, path)
+        ab_id = store.store_sysmeta(pid, sysmeta)
+        assert store.sysmeta.exists(ab_id)
+    assert store.sysmeta.count() == 3
 
 
 def test_store_sysmeta_ab_id(pids, store):
@@ -324,7 +422,7 @@ def test_retrieve_sysmeta_invalid_pid(store):
         store.retrieve_sysmeta(pid_does_not_exist)
 
 
-def test_delete(pids, store):
+def test_delete_objects(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -334,8 +432,19 @@ def test_delete(pids, store):
         hash_address = store.store_object(pid, path)
         ab_id = store.store_sysmeta(pid, sysmeta)
         store.delete_object(pid)
-        store.delete_sysmeta(pid)
     assert store.objects.count() == 0
+
+
+def test_delete_sysmeta(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        sysmeta = syspath.read_bytes()
+        hash_address = store.store_object(pid, path)
+        ab_id = store.store_sysmeta(pid, sysmeta)
+        store.delete_sysmeta(pid)
     assert store.sysmeta.count() == 0
 
 

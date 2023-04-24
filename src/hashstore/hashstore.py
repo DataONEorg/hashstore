@@ -20,9 +20,11 @@ class HashStore:
     dir_depth = 3  # The number of directory levels for storing files
     dir_width = 2  # The width of the directory names, in characters
     SYSMETA_NS = "http://ns.dataone.org/service/types/v2.0"
-    sysmeta_lock = threading.Lock()
     time_out_sec = 1
-    locked_pids = []
+    object_lock = threading.Lock()
+    sysmeta_lock = threading.Lock()
+    object_locked_pids = []
+    sysmeta_locked_pids = []
 
     def version(self):
         """Return the version number"""
@@ -74,44 +76,44 @@ class HashStore:
             address (HashAddress): object that contains the permanent address, relative
             file path, absolute file path, duplicate file boolean and hex digest dictionary
         """
-        checked_algorithm = self.objects.clean_algorithm(additional_algorithm)
-        # If the additional algorithm supplied is the default, do not generate extra
-        if checked_algorithm is self.objects.algorithm:
-            checked_algorithm = None
-            # If a checksum is supplied, ensure that a checksum_algorithm is present and supported
-        checked_checksum_algorithm = ""
-        if checksum is not None and checksum != "":
-            checked_checksum_algorithm = self.objects.clean_algorithm(
-                checksum_algorithm
+        # Wait for the pid to release if it's in use
+        while pid in self.object_locked_pids:
+            time.sleep(self.time_out_sec)
+        # Modify sysmeta_locked_pids consecutively
+        with self.object_lock:
+            self.object_locked_pids.append(pid)
+        try:
+            hash_address = self._add_object(
+                pid,
+                data,
+                additional_algorithm=additional_algorithm,
+                checksum=checksum,
+                checksum_algorithm=checksum_algorithm,
             )
-
-        hash_address = self.objects.put(
-            pid,
-            data,
-            additional_algorithm=checked_algorithm,
-            checksum=checksum,
-            checksum_algorithm=checked_checksum_algorithm,
-        )
+        finally:
+            # Release pid
+            with self.object_lock:
+                self.object_locked_pids.remove(pid)
         return hash_address
 
     def store_sysmeta(self, pid, sysmeta):
         """Add a system metadata object to the store. Returns the sysmeta content
         identifier (pid sha256 hash) which is the address of the sysmeta document.
         Multiple calls to this method are non-blocking and will be executed in parallel
-        using locked_pids for synchronization.
+        using sysmeta_locked_pids for synchronization.
         """
         # Wait for the pid to release if it's in use
-        while pid in self.locked_pids:
+        while pid in self.sysmeta_locked_pids:
             time.sleep(self.time_out_sec)
-        # Modify locked_pids consecutively
+        # Modify sysmeta_locked_pids consecutively
         with self.sysmeta_lock:
-            self.locked_pids.append(pid)
+            self.sysmeta_locked_pids.append(pid)
         try:
             sysmeta_cid = self._set_sysmeta(pid, sysmeta)
         finally:
             # Release pid
             with self.sysmeta_lock:
-                self.locked_pids.remove(pid)
+                self.sysmeta_locked_pids.remove(pid)
         return sysmeta_cid
 
     def retrieve_object(self, pid):
@@ -161,6 +163,31 @@ class HashStore:
         c_stream = self.objects.open(ab_id)
         hex_digest = self.objects.computehash(c_stream, algorithm=algorithm)
         return hex_digest
+
+    def _add_object(
+        self, pid, data, additional_algorithm, checksum, checksum_algorithm
+    ):
+        """Add a data blob to the store."""
+        checked_algorithm = self.objects.clean_algorithm(additional_algorithm)
+        # If the additional algorithm supplied is the default, do not generate extra
+        if checked_algorithm is self.objects.algorithm:
+            checked_algorithm = None
+        # If a checksum is supplied, ensure that a checksum_algorithm is present and supported
+        checked_checksum_algorithm = ""
+        if checksum is not None and checksum != "":
+            checked_checksum_algorithm = self.objects.clean_algorithm(
+                checksum_algorithm
+            )
+
+        address = self.objects.put(
+            pid,
+            data,
+            additional_algorithm=checked_algorithm,
+            checksum=checksum,
+            checksum_algorithm=checked_checksum_algorithm,
+        )
+        # Caller to handle address.is_duplicate is true
+        return address
 
     def _set_sysmeta(self, pid, sysmeta):
         """Add a sysmeta document to the store."""

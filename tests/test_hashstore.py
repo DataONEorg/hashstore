@@ -436,7 +436,7 @@ def test_put_additional_algorithm(pids, store):
     for pid in pids.keys():
         algo = "sha224"
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.objects.put(pid, path, algorithm=algo)
+        hash_address = store.objects.put(pid, path, additional_algorithm=algo)
         hex_digests = hash_address.hex_digests
         sha224_hash = hex_digests.get(algo)
         assert sha224_hash == pids[pid][algo]
@@ -448,7 +448,7 @@ def test_put_with_correct_checksums(pids, store):
         algo = "sha224"
         algo_checksum = pids[pid][algo]
         path = test_dir + pid.replace("/", "_")
-        store.objects.put(pid, path, algorithm=algo, checksum=algo_checksum)
+        store.objects.put(pid, path, checksum=algo_checksum, checksum_algorithm=algo)
     assert store.objects.count() == 3
 
 
@@ -459,7 +459,7 @@ def test_put_with_incorrect_checksum(pids, store):
         algo_checksum = "badChecksumValue"
         path = test_dir + pid.replace("/", "_")
         with pytest.raises(ValueError):
-            store.objects.put(pid, path, algorithm=algo, checksum=algo_checksum)
+            store.objects.put(pid, path, checksum=algo_checksum, checksum_algorithm=algo)
     assert store.objects.count() == 0
 
 

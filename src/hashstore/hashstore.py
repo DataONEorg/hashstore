@@ -46,7 +46,14 @@ class HashStore:
         )
         return None
 
-    def store_object(self, pid, data, additional_algorithm="sha256", checksum=None):
+    def store_object(
+        self,
+        pid,
+        data,
+        additional_algorithm="sha256",
+        checksum=None,
+        checksum_algorithm=None,
+    ):
         """Add a data object to the store. Returns a HashAddress object that contains
         the permanent address, relative file path, absolute file path, duplicate file
         boolean and hex digest dictionary. The supported algorithms list is based on
@@ -55,15 +62,17 @@ class HashStore:
         algorithm & hex digest.
 
         Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512
-        
+
         Args:
             pid (string): authority-based identifier
             data (mixed): file-like object
             additional_algorithm (string): additional hex digest to include
             checksum (string): checksum to validate against
+            checksum_algorithm (string): algorithm of supplied checksum
 
         Returns:
-            address (HashAddress): dictionary of hex digests
+            address (HashAddress): object that contains the permanent address, relative
+            file path, absolute file path, duplicate file boolean and hex digest dictionary
         """
         # If the algorithm supplied is the default, do not generate extra
         checked_algorithm = self._clean_algorithm(additional_algorithm)
@@ -75,8 +84,24 @@ class HashStore:
                 and checked_algorithm not in self.objects.other_algo_list
             ):
                 raise ValueError(f"Algorithm not supported: {checked_algorithm}")
+        # If a checksum is supplied, ensure that a checksum_algorithm is present and supported
+        if checksum is not None and checksum != "":
+            checked_checksum_algorithm = self._clean_algorithm(checksum_algorithm)
+            if (
+                checked_checksum_algorithm not in self.objects.default_algo_list
+                and checked_checksum_algorithm not in self.objects.other_algo_list
+            ):
+                raise ValueError(
+                    f"Checksum algorithm not supported: {checked_checksum_algorithm}"
+                )
 
-        hash_address = self.objects.put(pid, data, algorithm=checked_algorithm, checksum=checksum)
+        hash_address = self.objects.put(
+            pid,
+            data,
+            additional_algorithm=checked_algorithm,
+            checksum=checksum,
+            checksum_algorithm=checksum_algorithm,
+        )
         return hash_address
 
     def store_sysmeta(self, pid, sysmeta):
@@ -259,7 +284,15 @@ class HashFSExt(HashFS):
             hashobj.update(self._to_bytes(data))
         return hashobj.hexdigest()
 
-    def put(self, pid, file, extension=None, algorithm=None, checksum=None):
+    def put(
+        self,
+        pid,
+        file,
+        extension=None,
+        additional_algorithm=None,
+        checksum=None,
+        checksum_algorithm=None,
+    ):
         """Store contents of `file` on disk using its content hash for the
         address.
 
@@ -279,7 +312,12 @@ class HashFSExt(HashFS):
 
         with closing(stream):
             id, hex_digest_dict, filepath, is_duplicate = self._move_and_get_checksums(
-                pid, stream, extension, algorithm, checksum
+                pid,
+                stream,
+                extension,
+                additional_algorithm,
+                checksum,
+                checksum_algorithm,
             )
 
         return HashAddress(
@@ -287,7 +325,13 @@ class HashFSExt(HashFS):
         )
 
     def _move_and_get_checksums(
-        self, pid, stream, extension=None, algorithm=None, checksum=None
+        self,
+        pid,
+        stream,
+        extension=None,
+        additional_algorithm=None,
+        checksum=None,
+        checksum_algorithm=None,
     ):
         """Copy the contents of `stream` onto disk with an optional file
         extension appended. The copy process uses a temporary file to store the
@@ -299,7 +343,7 @@ class HashFSExt(HashFS):
         """
 
         # Create temporary file and calculate hex digests
-        hex_digests, fname = self._mktempfile(stream, algorithm)
+        hex_digests, fname = self._mktempfile(stream, additional_algorithm)
         id = self._get_sha256_hex_digest(pid)
 
         filepath = self.idpath(id, extension)
@@ -307,12 +351,12 @@ class HashFSExt(HashFS):
 
         # Only move file if it doesn't already exist.
         if not os.path.isfile(filepath):
-            if algorithm is not None and checksum is not None:
-                hex_digest_stored = hex_digests[algorithm]
+            if checksum_algorithm is not None and checksum is not None:
+                hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum:
                     self.delete(fname)
                     raise ValueError(
-                        f"Hex digest and checksum do not match - file not stored. Algorithm: {algorithm}. Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
+                        f"Hex digest and checksum do not match - file not stored. Algorithm: {checksum_algorithm}. Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
                     )
             is_duplicate = False
             try:

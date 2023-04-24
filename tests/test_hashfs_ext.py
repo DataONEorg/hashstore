@@ -68,7 +68,7 @@ def test_computehash(pids, store):
         assert pids[pid]["sha256"] == obj_sha256_hash
 
 
-def test_put(pids, store):
+def test_put_id(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -79,11 +79,45 @@ def test_put(pids, store):
         hashaddress_is_duplicate = hashaddress.is_duplicate
         hashaddress_hex_digests = hashaddress.hex_digests
         assert hashaddress_id == pids[pid]["ab_id"]
+
+
+def test_put_relpath(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_id = hashaddress.id
+        hashaddress_relpath = hashaddress.relpath
         shard_id_path = "/".join(store.objects.shard(hashaddress_id))
         assert hashaddress_relpath == shard_id_path
+
+
+def test_put_abspath(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_id = hashaddress.id
+        hashaddress_abspath = hashaddress.abspath
         id_abs_path = store.objects.realpath(hashaddress_id)
         assert hashaddress_abspath == id_abs_path
+
+
+def test_put_is_duplicate(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_is_duplicate = hashaddress.is_duplicate
         assert hashaddress_is_duplicate is False
+
+
+def test_put_hex_digests(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_hex_digests = hashaddress.hex_digests
         assert hashaddress_hex_digests.get("md5") == pids[pid]["md5"]
         assert hashaddress_hex_digests.get("sha1") == pids[pid]["sha1"]
         assert hashaddress_hex_digests.get("sha256") == pids[pid]["sha256"]
@@ -119,11 +153,13 @@ def test_put_with_incorrect_checksum(pids, store):
         algo_checksum = "badChecksumValue"
         path = test_dir + pid.replace("/", "_")
         with pytest.raises(ValueError):
-            store.objects.put(pid, path, checksum=algo_checksum, checksum_algorithm=algo)
+            store.objects.put(
+                pid, path, checksum=algo_checksum, checksum_algorithm=algo
+            )
     assert store.objects.count() == 0
 
 
-def test_move_and_get_checksums(pids, store):
+def test_move_and_get_checksums_id(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -137,12 +173,56 @@ def test_move_and_get_checksums(pids, store):
         input_stream.close()
         ab_id = store.objects._get_sha256_hex_digest(pid)
         assert id == ab_id
+
+
+def test_move_and_get_checksums_hex_digests(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        (
+            id,
+            hex_digests,
+            file_path,
+            is_duplicate,
+        ) = store.objects._move_and_get_checksums(pid, input_stream)
+        input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
         assert hex_digests.get("sha256") == pids[pid]["sha256"]
         assert hex_digests.get("sha384") == pids[pid]["sha384"]
         assert hex_digests.get("sha512") == pids[pid]["sha512"]
+
+
+def test_move_and_get_checksums_abs_path(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        (
+            id,
+            hex_digests,
+            file_path,
+            is_duplicate,
+        ) = store.objects._move_and_get_checksums(pid, input_stream)
+        input_stream.close()
+        ab_id = store.objects._get_sha256_hex_digest(pid)
         assert os.path.isfile(file_path) is True
+
+
+def test_move_and_get_checksums_is_duplicate(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        (
+            id,
+            hex_digests,
+            file_path,
+            is_duplicate,
+        ) = store.objects._move_and_get_checksums(pid, input_stream)
+        input_stream.close()
+        ab_id = store.objects._get_sha256_hex_digest(pid)
         assert is_duplicate is False
 
 
@@ -167,7 +247,7 @@ def test_move_and_get_checksums_duplicates(pids, store):
         assert store.objects.count() == 3
 
 
-def test_mktempfile(pids, store):
+def test_mktempfile_hex_digests(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -179,6 +259,15 @@ def test_mktempfile(pids, store):
         assert hex_digests.get("sha256") == pids[pid]["sha256"]
         assert hex_digests.get("sha384") == pids[pid]["sha384"]
         assert hex_digests.get("sha512") == pids[pid]["sha512"]
+
+
+def test_mktempfile_object(pids, store):
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        hex_digests, tmp_file_name = store.objects._mktempfile(input_stream)
+        input_stream.close()
         assert os.path.isfile(tmp_file_name) is True
 
 
@@ -210,10 +299,13 @@ def test_to_bytes(store):
     assert isinstance(string_bytes, bytes)
 
 
-def test_get_store_path(store):
+def test_get_store_path_object(store):
     path_objects = store.objects._get_store_path()
     path_objects_string = str(path_objects)
     assert path_objects_string.endswith("/metacat/objects")
+
+
+def test_get_store_path_sysmeta(store):
     path_sysmeta = store.sysmeta._get_store_path()
     path_sysmeta_string = str(path_sysmeta)
     assert path_sysmeta_string.endswith("/metacat/sysmeta")

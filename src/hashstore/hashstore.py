@@ -46,7 +46,7 @@ class HashStore:
         )
         return None
 
-    def store_object(self, pid, data, algorithm="sha256", checksum=None):
+    def store_object(self, pid, data, additional_algorithm="sha256", checksum=None):
         """Add a data object to the store. Returns a HashAddress object that contains
         the permanent address, relative file path, absolute file path, duplicate file
         boolean and hex digest dictionary. The supported algorithms list is based on
@@ -55,17 +55,28 @@ class HashStore:
         algorithm & hex digest.
 
         Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512
+        
+        Args:
+            pid (string): authority-based identifier
+            data (mixed): file-like object
+            additional_algorithm (string): additional hex digest to include
+            checksum (string): checksum to validate against
+
+        Returns:
+            address (HashAddress): dictionary of hex digests
         """
-        algorithm = self._clean_algorithm(algorithm)
-        if (
-            algorithm not in self.objects.default_algo_list
-            and algorithm not in self.objects.other_algo_list
-        ):
-            raise ValueError(f"Algorithm not supported: {algorithm}")
+        # If the algorithm supplied is the default, do not generate extra
+        checked_algorithm = self._clean_algorithm(additional_algorithm)
+        if checked_algorithm is self.objects.algorithm:
+            checked_algorithm = None
         else:
-            hash_address = self._add_object(
-                pid, data, algorithm=algorithm, checksum=checksum
-            )
+            if (
+                checked_algorithm not in self.objects.default_algo_list
+                and checked_algorithm not in self.objects.other_algo_list
+            ):
+                raise ValueError(f"Algorithm not supported: {checked_algorithm}")
+
+        hash_address = self.objects.put(pid, data, algorithm=checked_algorithm, checksum=checksum)
         return hash_address
 
     def store_sysmeta(self, pid, sysmeta):
@@ -135,12 +146,6 @@ class HashStore:
         c_stream = self.objects.open(ab_id)
         hex_digest = self.objects.computehash(c_stream, algorithm=algorithm)
         return hex_digest
-
-    def _add_object(self, pid, data, algorithm, checksum):
-        """Add a data blob to the store."""
-        address = self.objects.put(pid, data, algorithm=algorithm, checksum=checksum)
-        # Caller to handle address.is_duplicate is true
-        return address
 
     def _set_sysmeta(self, pid, sysmeta):
         """Add a sysmeta document to the store."""

@@ -1,16 +1,16 @@
-# Core module for hashstore
-from hashfs import HashFS
-from hashfs.hashfs import Stream
-from pathlib import Path
-from contextlib import closing
-from tempfile import NamedTemporaryFile
-from collections import namedtuple
+"""Core module for hashstore"""
 import shutil
 import threading
 import time
 import hashlib
 import importlib.metadata
 import os
+from pathlib import Path
+from contextlib import closing
+from tempfile import NamedTemporaryFile
+from collections import namedtuple
+from hashfs import HashFS
+from hashfs.hashfs import Stream
 
 
 class HashStore:
@@ -357,7 +357,12 @@ class HashFSExt(HashFS):
         stream = Stream(file)
 
         with closing(stream):
-            ab_id, hex_digest_dict, filepath, is_duplicate = self._move_and_get_checksums(
+            (
+                ab_id,
+                hex_digest_dict,
+                filepath,
+                is_duplicate,
+            ) = self._move_and_get_checksums(
                 pid,
                 stream,
                 extension,
@@ -625,6 +630,7 @@ class HashAddress(
         hex_digests (dict, optional): A list of hex digests to validate objects (md5, sha1,
             sha256, sha384, sha512)
     """
+
     # Default value to prevent dangerous default value
     def __new__(cls, ab_id, relpath, abspath, is_duplicate=False, hex_digests=None):
         return super(HashAddress, cls).__new__(

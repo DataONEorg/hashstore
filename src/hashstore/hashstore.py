@@ -395,7 +395,7 @@ class HashFSExt(HashFS):
 
         Args:
             pid (string): authority-based idenrifier
-            stream (mixed): Readable object or path to file.
+            stream (io.BufferedReader): object stream
             extension (str, optional): Optional extension to append to file
                 when saving.
             additional_algorithm (str, optional): Optional algorithm value to include
@@ -457,7 +457,7 @@ class HashFSExt(HashFS):
         the dictionary.
 
         Args:
-            stream: `Stream` object
+            stream (io.BufferedReader): object stream
             algorithm (string): algorithm of additional hex digest to generate
 
         Returns:
@@ -516,15 +516,18 @@ class HashFSExt(HashFS):
         Returns:
             ab_id (string): address of the sysmeta document
         """
+
+        # Create tmp file and write to it
+        sysmeta_stream = Stream(sysmeta)
+        with closing(sysmeta_stream):
+            sysmeta_tmp = self._mktmpsysmeta(sysmeta_stream, namespace)
+
         # Target path (permanent location)
         ab_id = self._get_sha256_hex_digest(pid)
         rel_path = "/".join(self.shard(ab_id))
         full_path = self._get_store_path() / rel_path
 
-        # Create tmp file
-        sysmeta_tmp = self._mktmpsysmeta(sysmeta, namespace)
-
-        # Move sysmeta to permanent location
+        # Move sysmeta to target path
         if os.path.exists(sysmeta_tmp):
             try:
                 parent = full_path.parent
@@ -547,11 +550,11 @@ class HashFSExt(HashFS):
                 f"sysmeta_tmp file not found: {sysmeta_tmp}. Unable to move sysmeta `{ab_id}` for pid `{pid}`"
             )
 
-    def _mktmpsysmeta(self, sysmeta, namespace):
+    def _mktmpsysmeta(self, stream, namespace):
         """Create a named temporary file with `sysmeta` bytes and `namespace`
 
         Args:
-            sysmeta (mixed): string or path to sysmeta document
+            stream (io.BufferedReader): sysmeta stream
             namespace (string): format of sysmeta
 
         Returns:
@@ -576,11 +579,8 @@ class HashFSExt(HashFS):
         with tmp as tmp_file:
             tmp_file.write(namespace.encode("utf-8"))
             tmp_file.write(b"\x00")
-            stream = Stream(sysmeta)
             for data in stream:
                 tmp_file.write(self._to_bytes(data))
-            stream.close()
-            # tmp_file.write(sysmeta)
 
         return tmp.name
 

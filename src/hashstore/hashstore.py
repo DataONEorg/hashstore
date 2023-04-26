@@ -506,6 +506,16 @@ class HashFSExt(HashFS):
         return hex_digest_dict, tmp.name
 
     def put_sysmeta(self, pid, sysmeta, namespace):
+        """Store contents of `sysmeta` on disk using the hash of the given pid
+
+        Args:
+            pid (string): authority-based identifier
+            sysmeta (mixed): string or path to sysmeta document
+            namespace (string): sysmeta format
+
+        Returns:
+            ab_id (string): address of the sysmeta document
+        """
         # Target path (permanent location)
         ab_id = self._get_sha256_hex_digest(pid)
         rel_path = "/".join(self.shard(ab_id))

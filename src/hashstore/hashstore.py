@@ -584,17 +584,17 @@ class HashFSExt(HashFS):
 
         return tmp.name
 
-    def get_sha256_hex_digest(self, input):
+    def get_sha256_hex_digest(self, string):
         """Calculate the SHA-256 digest of a UTF-8 encoded string.
 
         Args:
-            input (string)
+            string (string)
 
         Returns:
             hex (string): hexadecimal string
         """
-        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
-        return hex
+        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
+        return hex_digest
 
     def _to_bytes(self, text):
         """Convert text to sequence of bytes using utf-8 encodin."""

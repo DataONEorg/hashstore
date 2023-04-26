@@ -8,10 +8,10 @@ from hashstore import HashStore
 
 
 
-@pytest.fixture
-def pids():
+@pytest.fixture(name="pids")
+def init_pids():
     """Generate test harness data"""
-    pids = {
+    test_pids = {
         "doi:10.18739/A2901ZH2M": {
             "ab_id": "0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e",
             "md5": "db91c910a3202478c8def1071c54aae5",
@@ -40,11 +40,11 @@ def pids():
             "sha512": "c7fac7e8aacde8546ddb44c640ad127df82830bba6794aea9952f737c13a81d69095865ab3018ed2a807bf9222f80657faf31cfde6c853d7b91e617e148fec76",
         },
     }
-    return pids
+    return test_pids
 
 
-@pytest.fixture
-def store(tmp_path):
+@pytest.fixture(name="store")
+def init_store(tmp_path):
     """Create store path for all tests"""
     d = tmp_path / "metacat"
     d.mkdir()

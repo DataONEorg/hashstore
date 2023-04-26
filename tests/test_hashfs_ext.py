@@ -6,8 +6,8 @@ import pytest
 from hashstore import HashStore
 
 
-@pytest.fixture
-def pids():
+@pytest.fixture(name="pids")
+def init_pids():
     """Generate test harness data"""
     test_harness = {
         "doi:10.18739/A2901ZH2M": {
@@ -41,8 +41,8 @@ def pids():
     return test_harness
 
 
-@pytest.fixture
-def store(tmp_path):
+@pytest.fixture(name="store")
+def init_store(tmp_path):
     """Create store path for all tests"""
     d = tmp_path / "metacat"
     d.mkdir()

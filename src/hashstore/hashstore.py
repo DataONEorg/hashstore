@@ -440,9 +440,9 @@ class HashFSExt(HashFS):
                 if os.path.isfile(filepath):
                     self.delete(filepath)
                 self.delete(fname)
-                raise Exception(
-                    f"Aborting Upload - an unexpected error has occurred when moving file: {id} - Error: {err}"
-                )
+                # TODO: Log exception
+                # f"Aborting Upload - an unexpected error has occurred when moving file: {ab_id} - Error: {err}"
+                raise
         else:
             # Else delete temporary file
             is_duplicate = True

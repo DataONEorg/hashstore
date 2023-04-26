@@ -1,15 +1,15 @@
-from hashstore import HashStore
-from pathlib import Path
-from threading import Thread
+"""Test module for HashFSExt"""
 import io
 import os
 import importlib.metadata
 import pytest
+from hashstore import HashStore
 
 
 @pytest.fixture
 def pids():
-    pids = {
+    """Generate test harness data"""
+    test_harness = {
         "doi:10.18739/A2901ZH2M": {
             "ab_id": "0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e",
             "md5": "db91c910a3202478c8def1071c54aae5",
@@ -38,11 +38,12 @@ def pids():
             "sha512": "c7fac7e8aacde8546ddb44c640ad127df82830bba6794aea9952f737c13a81d69095865ab3018ed2a807bf9222f80657faf31cfde6c853d7b91e617e148fec76",
         },
     }
-    return pids
+    return test_harness
 
 
 @pytest.fixture
 def store(tmp_path):
+    """Create store path for all tests"""
     d = tmp_path / "metacat"
     d.mkdir()
     store = HashStore(store_path=d.as_posix())
@@ -50,15 +51,18 @@ def store(tmp_path):
 
 
 def test_pids_length(pids):
+    """Ensure test harness pids are present"""
     assert len(pids) == 3
 
 
 def test_init(store):
+    """Check Hashstore initialization"""
     value = store.version()
     assert value == importlib.metadata.version("hashstore")
 
 
 def test_computehash(pids, store):
+    """Test to check computehash method"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -69,19 +73,17 @@ def test_computehash(pids, store):
 
 
 def test_put_id(pids, store):
+    """Check put returns correct id"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         hashaddress = store.objects.put(pid, path)
         hashaddress_id = hashaddress.id
-        hashaddress_relpath = hashaddress.relpath
-        hashaddress_abspath = hashaddress.abspath
-        hashaddress_is_duplicate = hashaddress.is_duplicate
-        hashaddress_hex_digests = hashaddress.hex_digests
         assert hashaddress_id == pids[pid]["ab_id"]
 
 
 def test_put_relpath(pids, store):
+    """Check put returns correct relative path"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -93,6 +95,7 @@ def test_put_relpath(pids, store):
 
 
 def test_put_abspath(pids, store):
+    """Check put returns correct absolute path"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -104,6 +107,7 @@ def test_put_abspath(pids, store):
 
 
 def test_put_is_duplicate(pids, store):
+    """Check put returns expected is_duplicate boolean value"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -113,6 +117,7 @@ def test_put_is_duplicate(pids, store):
 
 
 def test_put_hex_digests(pids, store):
+    """Check put successfully generates hex digests dictionary"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -126,6 +131,7 @@ def test_put_hex_digests(pids, store):
 
 
 def test_put_additional_algorithm(pids, store):
+    """Check put returns additional algorithm in hex digests"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -137,6 +143,7 @@ def test_put_additional_algorithm(pids, store):
 
 
 def test_put_with_correct_checksums(pids, store):
+    """Check put succeeds when good checksum supplied"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -147,6 +154,7 @@ def test_put_with_correct_checksums(pids, store):
 
 
 def test_put_with_incorrect_checksum(pids, store):
+    """Check put fails when bad checksum supplied"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -160,22 +168,24 @@ def test_put_with_incorrect_checksum(pids, store):
 
 
 def test_move_and_get_checksums_id(pids, store):
+    """Test move returns correct id"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         (
-            id,
+            move_id,
             hex_digests,
             file_path,
             is_duplicate,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         ab_id = store.objects.get_sha256_hex_digest(pid)
-        assert id == ab_id
+        assert move_id == ab_id
 
 
 def test_move_and_get_checksums_hex_digests(pids, store):
+    """Test move returns correct hex digests"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -195,6 +205,7 @@ def test_move_and_get_checksums_hex_digests(pids, store):
 
 
 def test_move_and_get_checksums_abs_path(pids, store):
+    """Test move returns correct absolute path"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -206,11 +217,12 @@ def test_move_and_get_checksums_abs_path(pids, store):
             is_duplicate,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-        ab_id = store.objects.get_sha256_hex_digest(pid)
+        store.objects.get_sha256_hex_digest(pid)
         assert os.path.isfile(file_path) is True
 
 
 def test_move_and_get_checksums_is_duplicate(pids, store):
+    """Test move returns expected is_duplicate boolean value"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -222,11 +234,12 @@ def test_move_and_get_checksums_is_duplicate(pids, store):
             is_duplicate,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-        ab_id = store.objects.get_sha256_hex_digest(pid)
+        store.objects.get_sha256_hex_digest(pid)
         assert is_duplicate is False
 
 
 def test_move_and_get_checksums_duplicates(pids, store):
+    """Test move does not store duplicate objects"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -248,6 +261,7 @@ def test_move_and_get_checksums_duplicates(pids, store):
 
 
 def test_mktempfile_hex_digests(pids, store):
+    """Test _mktempfile returns correct hex digests"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -262,6 +276,7 @@ def test_mktempfile_hex_digests(pids, store):
 
 
 def test_mktempfile_object(pids, store):
+    """Test _mktempfile creates file successfully"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -272,6 +287,7 @@ def test_mktempfile_object(pids, store):
 
 
 def test_mktempfile_with_algorithm(pids, store):
+    """Test _mktempfile returns additional hex digest when supplied"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -283,6 +299,7 @@ def test_mktempfile_with_algorithm(pids, store):
 
 
 def test_mktempfile_with_unsupported_algorithm(pids, store):
+    """Test _mktempfile raises error when bad algorithm supplied"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -294,24 +311,28 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
 
 
 def test_to_bytes(store):
+    """Test _to_bytes returns bytes"""
     string = "teststring"
     string_bytes = store.objects._to_bytes(string)
     assert isinstance(string_bytes, bytes)
 
 
 def test_get_store_path_object(store):
+    """Check get_store_path for object path"""
     path_objects = store.objects._get_store_path()
     path_objects_string = str(path_objects)
     assert path_objects_string.endswith("/metacat/objects")
 
 
 def test_get_store_path_sysmeta(store):
+    """Check get_store_path for sysmeta path"""
     path_sysmeta = store.sysmeta._get_store_path()
     path_sysmeta_string = str(path_sysmeta)
     assert path_sysmeta_string.endswith("/metacat/sysmeta")
 
 
 def test_clean_algorithm(store):
+    """Check that algorithm values get formatted as expected"""
     algorithm_underscore = "sha_256"
     algorithm_hyphen = "sha-256"
     algorithm_other_hyphen = "sha3-256"

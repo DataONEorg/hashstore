@@ -44,9 +44,9 @@ def init_pids():
 @pytest.fixture(name="store")
 def init_store(tmp_path):
     """Create store path for all tests"""
-    d = tmp_path / "metacat"
-    d.mkdir()
-    store = HashStore(store_path=d.as_posix())
+    directory = tmp_path / "metacat"
+    directory.mkdir()
+    store = HashStore(store_path=directory.as_posix())
     return store
 
 
@@ -191,7 +191,7 @@ def test_move_and_get_checksums_hex_digests(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         (
-            id,
+            ab_id,
             hex_digests,
             file_path,
             is_duplicate,
@@ -211,7 +211,7 @@ def test_move_and_get_checksums_abs_path(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         (
-            id,
+            ab_id,
             hex_digests,
             file_path,
             is_duplicate,
@@ -228,7 +228,7 @@ def test_move_and_get_checksums_is_duplicate(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         (
-            id,
+            ab_id,
             hex_digests,
             file_path,
             is_duplicate,
@@ -250,7 +250,7 @@ def test_move_and_get_checksums_duplicates(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         (
-            id,
+            ab_id,
             hex_digests,
             file_path,
             is_duplicate,

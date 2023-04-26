@@ -46,9 +46,9 @@ def init_pids():
 @pytest.fixture(name="store")
 def init_store(tmp_path):
     """Create store path for all tests"""
-    d = tmp_path / "metacat"
-    d.mkdir()
-    store = HashStore(store_path=d.as_posix())
+    directory = tmp_path / "metacat"
+    directory.mkdir()
+    store = HashStore(store_path=directory.as_posix())
     return store
 
 

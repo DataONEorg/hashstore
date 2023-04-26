@@ -329,6 +329,18 @@ class HashFSExt(HashFS):
         hex_digest = hashobj.hexdigest()
         return hex_digest
 
+    def get_sha256_hex_digest(self, string):
+        """Calculate the SHA-256 digest of a UTF-8 encoded string.
+
+        Args:
+            string (string)
+
+        Returns:
+            hex (string): hexadecimal string
+        """
+        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
+        return hex_digest
+
     def put(
         self,
         pid,
@@ -589,20 +601,8 @@ class HashFSExt(HashFS):
 
         return tmp.name
 
-    def get_sha256_hex_digest(self, string):
-        """Calculate the SHA-256 digest of a UTF-8 encoded string.
-
-        Args:
-            string (string)
-
-        Returns:
-            hex (string): hexadecimal string
-        """
-        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
-        return hex_digest
-
     def _to_bytes(self, text):
-        """Convert text to sequence of bytes using utf-8 encodin."""
+        """Convert text to sequence of bytes using utf-8 encoding."""
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")
         return text

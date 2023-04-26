@@ -147,7 +147,7 @@ def test_store_object_via_input_stream(pids, store):
         input_stream = io.open(path, "rb")
         hash_address = store.store_object(pid, input_stream)
         input_stream.close()
-        ab_id = store.objects._get_sha256_hex_digest(pid)
+        ab_id = store.objects.get_sha256_hex_digest(pid)
         assert store.objects.exists(ab_id)
 
 
@@ -168,7 +168,7 @@ def test_store_object_algorithm_args_hyphen(pids, store):
     hash_address = store.store_object(pid, path, algorithm_with_hyphen_and_upper)
     sha256_cid = hash_address.hex_digests.get("sha256")
     assert sha256_cid == pids[pid]["sha256"]
-    ab_id = store.objects._get_sha256_hex_digest(pid)
+    ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
 
 
@@ -183,7 +183,7 @@ def test_store_object_algorithm_args_other(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     assert additional_sha3_256_hex_digest == sha3_256_checksum
-    pid_hash = store.objects._get_sha256_hex_digest(pid)
+    pid_hash = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(pid_hash)
 
 
@@ -198,7 +198,7 @@ def test_store_object_algorithm_args_other_hyphen(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     assert additional_sha3_256_hex_digest == sha3_256_checksum
-    ab_id = store.objects._get_sha256_hex_digest(pid)
+    ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
 
 
@@ -213,7 +213,7 @@ def test_store_object_algorithm_args_incorrect_checksum(store):
     with pytest.raises(ValueError):
         store.store_object(path, algorithm_other, checksum_incorrect)
     assert store.objects.count() == 0
-    ab_id = store.objects._get_sha256_hex_digest(pid)
+    ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id) is False
 
 
@@ -226,7 +226,7 @@ def test_store_object_duplicates(store):
     # Store second blob
     hash_address_two = store.store_object(pid, path)
     assert store.objects.count() == 1
-    ab_id = store.objects._get_sha256_hex_digest(pid)
+    ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
 
 
@@ -301,7 +301,7 @@ def test_store_duplicate_object_threads(store):
     thread3.join()
     # File count must be 1
     assert store.objects.count() == 1
-    ab_id = store.objects._get_sha256_hex_digest(pid)
+    ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
 
 
@@ -465,7 +465,7 @@ def test_get_hex_digest_pid_unsupported_algorithm(store):
         store.get_hex_digest(pid, algorithm)
 
 
-def test_get_sha256_hex_digest(pids, store):
+def testget_sha256_hex_digest(pids, store):
     for pid in pids:
-        hash_val = store.objects._get_sha256_hex_digest(pid)
+        hash_val = store.objects.get_sha256_hex_digest(pid)
         assert hash_val == pids[pid]["ab_id"]

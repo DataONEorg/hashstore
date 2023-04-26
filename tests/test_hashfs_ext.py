@@ -171,7 +171,7 @@ def test_move_and_get_checksums_id(pids, store):
             is_duplicate,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-        ab_id = store.objects._get_sha256_hex_digest(pid)
+        ab_id = store.objects.get_sha256_hex_digest(pid)
         assert id == ab_id
 
 
@@ -206,7 +206,7 @@ def test_move_and_get_checksums_abs_path(pids, store):
             is_duplicate,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-        ab_id = store.objects._get_sha256_hex_digest(pid)
+        ab_id = store.objects.get_sha256_hex_digest(pid)
         assert os.path.isfile(file_path) is True
 
 
@@ -222,7 +222,7 @@ def test_move_and_get_checksums_is_duplicate(pids, store):
             is_duplicate,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-        ab_id = store.objects._get_sha256_hex_digest(pid)
+        ab_id = store.objects.get_sha256_hex_digest(pid)
         assert is_duplicate is False
 
 

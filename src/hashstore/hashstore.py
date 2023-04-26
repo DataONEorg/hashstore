@@ -132,7 +132,7 @@ class HashStore:
         Returns:
             obj_stream (io.BufferedReader): a buffered stream of an ab_id object
         """
-        ab_id = self.objects._get_sha256_hex_digest(pid)
+        ab_id = self.objects.get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
             obj_stream = self.objects.open(ab_id)
@@ -149,7 +149,7 @@ class HashStore:
         Returns:
             sysmeta (string): sysmeta content
         """
-        ab_id = self.sysmeta._get_sha256_hex_digest(pid)
+        ab_id = self.sysmeta.get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
             sysmeta = self._get_sysmeta(pid)[1]
@@ -166,7 +166,7 @@ class HashStore:
         Returns:
             boolean
         """
-        ab_id = self.objects._get_sha256_hex_digest(pid)
+        ab_id = self.objects.get_sha256_hex_digest(pid)
         self.objects.delete(ab_id)
         return True
 
@@ -179,7 +179,7 @@ class HashStore:
         Returns:
             boolean
         """
-        ab_id = self.sysmeta._get_sha256_hex_digest(pid)
+        ab_id = self.sysmeta.get_sha256_hex_digest(pid)
         self.sysmeta.delete(ab_id)
         return True
 
@@ -195,7 +195,7 @@ class HashStore:
             hex_digest (string): hex digest of the object
         """
         algorithm = self.objects.clean_algorithm(algorithm)
-        ab_id = self.objects._get_sha256_hex_digest(pid)
+        ab_id = self.objects.get_sha256_hex_digest(pid)
         if not self.objects.exists(ab_id):
             raise ValueError(f"No object found for pid: {pid}")
         c_stream = self.objects.open(ab_id)
@@ -259,7 +259,7 @@ class HashStore:
         Returns:
             s_content (string): sysmeta content
         """
-        ab_id = self.sysmeta._get_sha256_hex_digest(pid)
+        ab_id = self.sysmeta.get_sha256_hex_digest(pid)
         s_path = self.sysmeta.open(ab_id)
         s_content = s_path.read().decode("utf-8").split("\x00", 1)
         s_path.close()
@@ -407,7 +407,7 @@ class HashFSExt(HashFS):
         Returns:
             HashAddress: File's hash address.
         """
-        id = self._get_sha256_hex_digest(pid)
+        id = self.get_sha256_hex_digest(pid)
         filepath = self.idpath(id, extension)
         self.makepath(os.path.dirname(filepath))
         # Only put file if it doesn't exist
@@ -523,7 +523,7 @@ class HashFSExt(HashFS):
             sysmeta_tmp = self._mktmpsysmeta(sysmeta_stream, namespace)
 
         # Target path (permanent location)
-        ab_id = self._get_sha256_hex_digest(pid)
+        ab_id = self.get_sha256_hex_digest(pid)
         rel_path = "/".join(self.shard(ab_id))
         full_path = self._get_store_path() / rel_path
 
@@ -584,7 +584,7 @@ class HashFSExt(HashFS):
 
         return tmp.name
 
-    def _get_sha256_hex_digest(self, input):
+    def get_sha256_hex_digest(self, input):
         """Calculate the SHA-256 digest of a UTF-8 encoded string.
 
         Args:

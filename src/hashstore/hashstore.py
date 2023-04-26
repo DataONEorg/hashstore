@@ -19,7 +19,7 @@ class HashStore:
     # Class variables
     dir_depth = 3  # The number of directory levels for storing files
     dir_width = 2  # The width of the directory names, in characters
-    SYSMETA_NS = "http://ns.dataone.org/service/types/v2.0"
+    sysmeta_ns = "http://ns.dataone.org/service/types/v2.0"
     time_out_sec = 1
     object_lock = threading.Lock()
     sysmeta_lock = threading.Lock()
@@ -68,7 +68,7 @@ class HashStore:
 
         Args:
             pid (string): authority-based identifier
-            data (mixed): file-like object
+            data (mixed): string or path to object
             additional_algorithm (string): additional hex digest to include
             checksum (string): checksum to validate against
             checksum_algorithm (string): algorithm of supplied checksum
@@ -104,7 +104,7 @@ class HashStore:
 
         Args:
             pid (string): authority-based identifier
-            sysmeta (mixed): sysmeta document
+            sysmeta (mixed): string or path to sysmeta document
 
         Returns:
             sysmeta_cid (string): address of the sysmeta document
@@ -242,58 +242,13 @@ class HashStore:
 
         Args:
             pid (string): authority-based identifier
-            sysmeta (mixed): sysmeta document
+            sysmeta (mixed): string or path to sysmeta document
 
         Returns:
             sysmeta_cid (string): address of the sysmeta document
         """
-        ab_id = self.sysmeta._get_sha256_hex_digest(pid)
-        rel_path = "/".join(self.objects.shard(ab_id))
-        full_path = self.sysmeta._get_store_path() / rel_path
-
-        # If sysmeta exists, it is an update request
-        sysmeta_path_tmp = ""
-        sysmeta_path = ""
-        sysmeta_path_tmp = ""
-        try:
-            if self.sysmeta.exists(ab_id):
-                sysmeta_path = self.sysmeta.realpath(ab_id)
-                sysmeta_path_tmp = sysmeta_path + ".tmp"
-                # Delete .tmp file if it already exists
-                if self.sysmeta.exists(sysmeta_path_tmp):
-                    self.sysmeta.delete(sysmeta_path_tmp)
-                # Rename existing sysmeta document
-                os.rename(sysmeta_path, sysmeta_path_tmp)
-        except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
-            if not self.sysmeta.exists(ab_id) and self.sysmeta.exists(sysmeta_path_tmp):
-                os.rename(sysmeta_path_tmp, sysmeta_path)
-            raise
-
-        # Write new sysmeta
-        try:
-            parent = full_path.parent
-            parent.mkdir(parents=True, exist_ok=True)
-            with full_path.open(mode="wb") as file:
-                file.write(ab_id.encode("utf-8"))
-                format_id = " " + self.SYSMETA_NS
-                file.write(format_id.encode("utf-8"))
-                file.write(b"\x00")
-                file.write(sysmeta)
-            if self.sysmeta.exists(sysmeta_path_tmp):
-                self.sysmeta.delete(sysmeta_path_tmp)
-            return ab_id
-        except Exception as err:
-            print(f"Unexpected {err=}, {type(err)=}")
-            # Abort process for any exception and restore existing sysmeta object
-            if self.sysmeta.exists(sysmeta_path_tmp):
-                if self.sysmeta.exists(ab_id):
-                    self.sysmeta.delete(ab_id)
-                os.rename(sysmeta_path_tmp, sysmeta_path)
-            else:
-                if self.sysmeta.exists(ab_id):
-                    self.sysmeta.delete(ab_id)
-            raise
+        ab_id = self.sysmeta.put_sysmeta(pid, sysmeta, self.sysmeta_ns)
+        return ab_id
 
     def _get_sysmeta(self, pid):
         """Get the sysmeta content of a given pid (persistent identifer)
@@ -440,7 +395,7 @@ class HashFSExt(HashFS):
 
         Args:
             pid (string): authority-based idenrifier
-            stream (mixed): Readable object or path to file.
+            stream (io.BufferedReader): object stream
             extension (str, optional): Optional extension to append to file
                 when saving.
             additional_algorithm (str, optional): Optional algorithm value to include
@@ -502,7 +457,7 @@ class HashFSExt(HashFS):
         the dictionary.
 
         Args:
-            stream: `Stream` object
+            stream (io.BufferedReader): object stream
             algorithm (string): algorithm of additional hex digest to generate
 
         Returns:
@@ -511,7 +466,7 @@ class HashFSExt(HashFS):
                 tmp.name: Name of temporary file created and written into
         """
 
-        # Create temporary file in /metacat/tmp
+        # Create temporary file in .../{store_path}/tmp
         tmp_root_path = self._get_store_path() / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
@@ -549,6 +504,85 @@ class HashFSExt(HashFS):
         hex_digest_dict = dict(zip(self.default_algo_list, hex_digest_list))
 
         return hex_digest_dict, tmp.name
+
+    def put_sysmeta(self, pid, sysmeta, namespace):
+        """Store contents of `sysmeta` on disk using the hash of the given pid
+
+        Args:
+            pid (string): authority-based identifier
+            sysmeta (mixed): string or path to sysmeta document
+            namespace (string): sysmeta format
+
+        Returns:
+            ab_id (string): address of the sysmeta document
+        """
+
+        # Create tmp file and write to it
+        sysmeta_stream = Stream(sysmeta)
+        with closing(sysmeta_stream):
+            sysmeta_tmp = self._mktmpsysmeta(sysmeta_stream, namespace)
+
+        # Target path (permanent location)
+        ab_id = self._get_sha256_hex_digest(pid)
+        rel_path = "/".join(self.shard(ab_id))
+        full_path = self._get_store_path() / rel_path
+
+        # Move sysmeta to target path
+        if os.path.exists(sysmeta_tmp):
+            try:
+                parent = full_path.parent
+                parent.mkdir(parents=True, exist_ok=True)
+                # Sysmeta will be replaced if it exists
+                shutil.move(sysmeta_tmp, full_path)
+                return ab_id
+            except Exception as err:
+                # TODO: Discuss specific error handling
+                # isADirectoryError/notADirectoryError - if src/dst are directories, cannot move
+                # OSError - if dst is a non-empty directory and insufficient permissions
+                # TODO: Log error - err
+                # Delete tmp file if it exists
+                if os.path.exists(sysmeta_tmp):
+                    self.sysmeta.delete(sysmeta_tmp)
+                print(f"Unexpected {err=}, {type(err)=}")
+                raise
+        else:
+            raise FileNotFoundError(
+                f"sysmeta_tmp file not found: {sysmeta_tmp}. Unable to move sysmeta `{ab_id}` for pid `{pid}`"
+            )
+
+    def _mktmpsysmeta(self, stream, namespace):
+        """Create a named temporary file with `sysmeta` bytes and `namespace`
+
+        Args:
+            stream (io.BufferedReader): sysmeta stream
+            namespace (string): format of sysmeta
+
+        Returns:
+            tmp.name (string): Name of temporary file created and written into
+        """
+        # Create temporary file in .../{store_path}/tmp
+        tmp_root_path = self._get_store_path() / "tmp"
+        # Physically create directory if it doesn't exist
+        if os.path.exists(tmp_root_path) is False:
+            self.makepath(tmp_root_path)
+
+        tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
+        # Ensure tmp file is created with desired permissions
+        if self.fmode is not None:
+            oldmask = os.umask(0)
+            try:
+                os.chmod(tmp.name, self.fmode)
+            finally:
+                os.umask(oldmask)
+
+        # tmp is a file-like object that is already opened for writing by default
+        with tmp as tmp_file:
+            tmp_file.write(namespace.encode("utf-8"))
+            tmp_file.write(b"\x00")
+            for data in stream:
+                tmp_file.write(self._to_bytes(data))
+
+        return tmp.name
 
     def _get_sha256_hex_digest(self, input):
         """Calculate the SHA-256 digest of a UTF-8 encoded string.

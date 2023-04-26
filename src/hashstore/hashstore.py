@@ -625,8 +625,8 @@ class HashAddress(
         hex_digests (dict, optional): A list of hex digests to validate objects (md5, sha1,
             sha256, sha384, sha512)
     """
-
-    def __new__(cls, id, relpath, abspath, is_duplicate=False, hex_digests={}):
+    # Default value to prevent dangerous default value
+    def __new__(cls, ab_id, relpath, abspath, is_duplicate=False, hex_digests=None):
         return super(HashAddress, cls).__new__(
-            cls, id, relpath, abspath, is_duplicate, hex_digests
+            cls, ab_id, relpath, abspath, is_duplicate, hex_digests
         )

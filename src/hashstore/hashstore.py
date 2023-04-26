@@ -357,7 +357,7 @@ class HashFSExt(HashFS):
         stream = Stream(file)
 
         with closing(stream):
-            id, hex_digest_dict, filepath, is_duplicate = self._move_and_get_checksums(
+            ab_id, hex_digest_dict, filepath, is_duplicate = self._move_and_get_checksums(
                 pid,
                 stream,
                 extension,
@@ -372,7 +372,7 @@ class HashFSExt(HashFS):
             rel_path = None
 
         hash_address = HashAddress(
-            id, rel_path, filepath, is_duplicate, hex_digest_dict
+            ab_id, rel_path, filepath, is_duplicate, hex_digest_dict
         )
         return hash_address
 
@@ -407,16 +407,16 @@ class HashFSExt(HashFS):
         Returns:
             HashAddress: File's hash address.
         """
-        id = self.get_sha256_hex_digest(pid)
-        filepath = self.idpath(id, extension)
+        ab_id = self.get_sha256_hex_digest(pid)
+        filepath = self.idpath(ab_id, extension)
         self.makepath(os.path.dirname(filepath))
         # Only put file if it doesn't exist
         if os.path.isfile(filepath):
-            id = None
+            ab_id = None
             hex_digests = None
             filepath = None
             is_duplicate = True
-            return id, hex_digests, filepath, is_duplicate
+            return ab_id, hex_digests, filepath, is_duplicate
 
         # Create temporary file and calculate hex digests
         hex_digests, fname = self._mktempfile(stream, additional_algorithm)
@@ -448,7 +448,7 @@ class HashFSExt(HashFS):
             is_duplicate = True
             self.delete(fname)
 
-        return id, hex_digests, filepath, is_duplicate
+        return ab_id, hex_digests, filepath, is_duplicate
 
     def _mktempfile(self, stream, algorithm=None):
         """Create a named temporary file from a `Stream` object and

@@ -173,11 +173,13 @@ def test_move_and_get_checksums_id(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
+        # pylint: disable=W0212
         (
             move_id,
-            hex_digests,
-            file_path,
-            is_duplicate,
+            _,
+            _,
+            _,
+            _,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         ab_id = store.objects.get_sha256_hex_digest(pid)
@@ -190,11 +192,13 @@ def test_move_and_get_checksums_hex_digests(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
+        # pylint: disable=W0212
         (
-            ab_id,
+            _,
+            _,
+            _,
+            _,
             hex_digests,
-            file_path,
-            is_duplicate,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
@@ -210,15 +214,17 @@ def test_move_and_get_checksums_abs_path(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
+        # pylint: disable=W0212
         (
-            ab_id,
-            hex_digests,
-            file_path,
-            is_duplicate,
+            _,
+            _,
+            abs_path,
+            _,
+            _,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         store.objects.get_sha256_hex_digest(pid)
-        assert os.path.isfile(file_path) is True
+        assert os.path.isfile(abs_path) is True
 
 
 def test_move_and_get_checksums_is_duplicate(pids, store):
@@ -227,11 +233,13 @@ def test_move_and_get_checksums_is_duplicate(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
+        # pylint: disable=W0212
         (
-            ab_id,
-            hex_digests,
-            file_path,
+            _,
+            _,
+            _,
             is_duplicate,
+            _,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         store.objects.get_sha256_hex_digest(pid)
@@ -244,16 +252,19 @@ def test_move_and_get_checksums_duplicates(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
+        # pylint: disable=W0212
         store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
+        # pylint: disable=W0212
         (
-            ab_id,
-            hex_digests,
-            file_path,
+            _,
+            _,
+            _,
             is_duplicate,
+            _,
         ) = store.objects._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         assert is_duplicate is True
@@ -266,7 +277,8 @@ def test_mktempfile_hex_digests(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        hex_digests, tmp_file_name = store.objects._mktempfile(input_stream)
+        # pylint: disable=W0212
+        hex_digests, _ = store.objects._mktempfile(input_stream)
         input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
@@ -281,7 +293,8 @@ def test_mktempfile_object(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        hex_digests, tmp_file_name = store.objects._mktempfile(input_stream)
+        # pylint: disable=W0212
+        _, tmp_file_name = store.objects._mktempfile(input_stream)
         input_stream.close()
         assert os.path.isfile(tmp_file_name) is True
 
@@ -293,7 +306,8 @@ def test_mktempfile_with_algorithm(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         algo = "sha224"
-        hex_digests, tmp_file_name = store.objects._mktempfile(input_stream, algo)
+        # pylint: disable=W0212
+        hex_digests, _ = store.objects._mktempfile(input_stream, algo)
         input_stream.close()
         assert hex_digests.get("sha224") == pids[pid]["sha224"]
 
@@ -306,19 +320,22 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         input_stream = io.open(path, "rb")
         algo = "md2"
         with pytest.raises(ValueError):
-            hex_digests, tmp_file_name = store.objects._mktempfile(input_stream, algo)
+            # pylint: disable=W0212
+            _, _ = store.objects._mktempfile(input_stream, algo)
         input_stream.close()
 
 
 def test_to_bytes(store):
     """Test _to_bytes returns bytes"""
     string = "teststring"
+    # pylint: disable=W0212
     string_bytes = store.objects._to_bytes(string)
     assert isinstance(string_bytes, bytes)
 
 
 def test_get_store_path_object(store):
     """Check get_store_path for object path"""
+    # pylint: disable=W0212
     path_objects = store.objects._get_store_path()
     path_objects_string = str(path_objects)
     assert path_objects_string.endswith("/metacat/objects")
@@ -326,6 +343,7 @@ def test_get_store_path_object(store):
 
 def test_get_store_path_sysmeta(store):
     """Check get_store_path for sysmeta path"""
+    # pylint: disable=W0212
     path_sysmeta = store.sysmeta._get_store_path()
     path_sysmeta_string = str(path_sysmeta)
     assert path_sysmeta_string.endswith("/metacat/sysmeta")

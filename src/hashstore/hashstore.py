@@ -164,7 +164,7 @@ class HashStore:
             pid (string): authority-based identifier
 
         Returns:
-            boolean
+            boolean: True upon successful deletion
         """
         ab_id = self.objects.get_sha256_hex_digest(pid)
         self.objects.delete(ab_id)
@@ -177,7 +177,7 @@ class HashStore:
             pid (string): authority-based identifier
 
         Returns:
-            boolean
+            boolean: True upon successful deletion
         """
         ab_id = self.sysmeta.get_sha256_hex_digest(pid)
         self.sysmeta.delete(ab_id)
@@ -209,7 +209,7 @@ class HashStore:
 
         Args:
             pid (string): authority-based identifier
-            data (mixed): file-like object
+            data (mixed): string or path to object
             additional_algorithm (string): additional hex digest to include
             checksum (string): checksum to validate against
             checksum_algorithm (string): algorithm of supplied checksum
@@ -272,6 +272,7 @@ class HashFSExt(HashFS):
     currently used in Metacat) and their respective hex digests."""
 
     # Class variables
+    # Algorithm values supported by python hashlib 3.9.0+
     default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
     other_algo_list = [
         "sha224",
@@ -323,7 +324,8 @@ class HashFSExt(HashFS):
         if algorithm is None:
             hashobj = hashlib.new(self.algorithm)
         else:
-            hashobj = hashlib.new(algorithm)
+            check_algorithm = self.clean_algorithm(algorithm)
+            hashobj = hashlib.new(check_algorithm)
         for data in stream:
             hashobj.update(self._to_bytes(data))
         hex_digest = hashobj.hexdigest()
@@ -340,7 +342,9 @@ class HashFSExt(HashFS):
         """
         hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
         return hex_digest
-
+    
+    # pylint: disable=W0237
+    # Intentional override for `file` and `extension` to adjust signature values
     def put(
         self,
         pid,
@@ -364,16 +368,19 @@ class HashFSExt(HashFS):
             checksum_algorithm (str, optional): Algorithm value of given checksum
 
         Returns:
-            HashAddress: File's hash address.
+            hash_address (HashAddress): object that contains the permanent address,
+            relative file path, absolute file path, duplicate file boolean and hex
+            digest dictionary
         """
         stream = Stream(file)
 
         with closing(stream):
             (
                 ab_id,
-                hex_digest_dict,
-                filepath,
+                rel_path,
+                abs_path,
                 is_duplicate,
+                hex_digest_dict,
             ) = self._move_and_get_checksums(
                 pid,
                 stream,
@@ -383,13 +390,8 @@ class HashFSExt(HashFS):
                 checksum_algorithm,
             )
 
-        if is_duplicate is not True:
-            rel_path = self.relpath(filepath)
-        else:
-            rel_path = None
-
         hash_address = HashAddress(
-            ab_id, rel_path, filepath, is_duplicate, hex_digest_dict
+            ab_id, rel_path, abs_path, is_duplicate, hex_digest_dict
         )
         return hash_address
 
@@ -405,10 +407,11 @@ class HashFSExt(HashFS):
         """Copy the contents of `stream` onto disk with an optional file
         extension appended. The copy process uses a temporary file to store the
         initial contents and returns a dictionary of algorithms and their
-        hex digest values. Once the file has been determined not to exist/be a
-        duplicate, it then moves that file to its final location. If an algorithm
-        and checksum is provided, it will proceed to validate the object and
-        delete the file if the hex digest stored does not match what is provided.
+        hex digest values. If the file already exists, the method will immediately
+        return with is_duplicate: True and "None" for the remaining HashAddress
+        attributes. If an algorithm and checksum is provided, it will proceed to
+        validate the object (and delete the tmpFile if the hex digest stored does
+        not match what is provided).
 
         Args:
             pid (string): authority-based idenrifier
@@ -422,50 +425,56 @@ class HashFSExt(HashFS):
             checksum_algorithm (str, optional): Algorithm value of given checksum
 
         Returns:
-            HashAddress: File's hash address.
+            hash_address (HashAddress): object that contains the permanent address,
+            relative file path, absolute file path, duplicate file boolean and hex
+            digest dictionary
         """
         ab_id = self.get_sha256_hex_digest(pid)
-        filepath = self.idpath(ab_id, extension)
-        self.makepath(os.path.dirname(filepath))
+        abs_file_path = self.idpath(ab_id, extension)
+        self.makepath(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
-        if os.path.isfile(filepath):
+        if os.path.isfile(abs_file_path):
             ab_id = None
-            hex_digests = None
-            filepath = None
+            rel_file_path = None
+            abs_file_path = None
             is_duplicate = True
-            return ab_id, hex_digests, filepath, is_duplicate
+            hex_digests = None
+            return ab_id, rel_file_path, abs_file_path, is_duplicate, hex_digests
+        else:
+            rel_file_path = self.relpath(abs_file_path)
 
         # Create temporary file and calculate hex digests
-        hex_digests, fname = self._mktempfile(stream, additional_algorithm)
+        hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
 
-        # Only move file if it doesn't already exist.
-        if not os.path.isfile(filepath):
+        # Only move file if it doesn't exist.
+        # Files are stored once and only once
+        if not os.path.isfile(abs_file_path):
             if checksum_algorithm is not None and checksum is not None:
                 hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum:
-                    self.delete(fname)
+                    self.delete(tmp_file_name)
                     raise ValueError(
                         f"Hex digest and checksum do not match - file not stored. Algorithm: {checksum_algorithm}. Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
                     )
             is_duplicate = False
             try:
-                shutil.move(fname, filepath)
+                shutil.move(tmp_file_name, abs_file_path)
             except Exception as err:
                 # Revert storage process for the time being for any failure
                 # TODO: Discuss handling of permissions, memory and storage exceptions
                 print(f"Unexpected {err=}, {type(err)=}")
-                if os.path.isfile(filepath):
-                    self.delete(filepath)
-                self.delete(fname)
+                if os.path.isfile(abs_file_path):
+                    self.delete(abs_file_path)
+                self.delete(tmp_file_name)
                 # TODO: Log exception
                 # f"Aborting Upload - an unexpected error has occurred when moving file: {ab_id} - Error: {err}"
                 raise
         else:
             # Else delete temporary file
             is_duplicate = True
-            self.delete(fname)
+            self.delete(tmp_file_name)
 
-        return ab_id, hex_digests, filepath, is_duplicate
+        return ab_id, rel_file_path, abs_file_path, is_duplicate, hex_digests
 
     def _mktempfile(self, stream, algorithm=None):
         """Create a named temporary file from a `Stream` object and

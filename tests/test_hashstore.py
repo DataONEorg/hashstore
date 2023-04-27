@@ -80,7 +80,7 @@ def test_store_object_files_path(pids, store):
         path = Path(test_dir + pid.replace("/", "_"))
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        hash_address = store.store_object(pid, path)
+        _hash_address = store.store_object(pid, path)
         ab_id = store.store_sysmeta(pid, syspath)
         assert store.objects.exists(ab_id)
     assert store.objects.count() == 3
@@ -93,7 +93,7 @@ def test_store_object_files_string(pids, store):
         path_string = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        hash_address = store.store_object(pid, path_string)
+        _hash_address = store.store_object(pid, path_string)
         ab_id = store.store_sysmeta(pid, syspath)
         assert store.objects.exists(ab_id)
     assert store.objects.count() == 3
@@ -159,7 +159,7 @@ def test_store_object_via_input_stream(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        hash_address = store.store_object(pid, input_stream)
+        _hash_address = store.store_object(pid, input_stream)
         input_stream.close()
         ab_id = store.objects.get_sha256_hex_digest(pid)
         assert store.objects.exists(ab_id)
@@ -242,9 +242,9 @@ def test_store_object_duplicates(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     # Store first blob
-    hash_address_one = store.store_object(pid, path)
+    _hash_address_one = store.store_object(pid, path)
     # Store second blob
-    hash_address_two = store.store_object(pid, path)
+    _hash_address_two = store.store_object(pid, path)
     assert store.objects.count() == 1
     ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
@@ -256,7 +256,7 @@ def test_store_object_duplicates_id(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     # Store first blob
-    hash_address_one = store.store_object(pid, path)
+    _hash_address_one = store.store_object(pid, path)
     # Store second blob
     hash_address_two = store.store_object(pid, path)
     assert hash_address_two.id is None
@@ -268,7 +268,7 @@ def test_store_object_duplicates_relpath(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     # Store first blob
-    hash_address_one = store.store_object(pid, path)
+    _hash_address_one = store.store_object(pid, path)
     # Store second blob
     hash_address_two = store.store_object(pid, path)
     assert hash_address_two.relpath is None
@@ -280,7 +280,7 @@ def test_store_object_duplicates_abspath(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     # Store first blob
-    hash_address_one = store.store_object(pid, path)
+    _hash_address_one = store.store_object(pid, path)
     # Store second blob
     hash_address_two = store.store_object(pid, path)
     assert hash_address_two.abspath is None
@@ -292,7 +292,7 @@ def test_store_object_duplicates_is_duplicate(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     # Store first blob
-    hash_address_one = store.store_object(pid, path)
+    _hash_address_one = store.store_object(pid, path)
     # Store second blob
     hash_address_two = store.store_object(pid, path)
     assert hash_address_two.is_duplicate is True
@@ -304,7 +304,7 @@ def test_store_object_duplicates_hex_digests(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     # Store first blob
-    hash_address_one = store.store_object(pid, path)
+    _hash_address_one = store.store_object(pid, path)
     # Store second blob
     hash_address_two = store.store_object(pid, path)
     assert hash_address_two.hex_digests is None
@@ -337,7 +337,7 @@ def test_store_sysmeta_files_path(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        hash_address = store.store_object(pid, path)
+        _hash_address = store.store_object(pid, path)
         ab_id = store.store_sysmeta(pid, syspath)
         assert store.sysmeta.exists(ab_id)
     assert store.sysmeta.count() == 3
@@ -350,7 +350,7 @@ def test_store_sysmeta_files_string(pids, store):
         path_string = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
-        hash_address = store.store_object(pid, path_string)
+        _hash_address = store.store_object(pid, path_string)
         ab_id = store.store_sysmeta(pid, syspath_string)
         assert store.sysmeta.exists(ab_id)
     assert store.sysmeta.count() == 3
@@ -363,7 +363,7 @@ def test_store_sysmeta_ab_id(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        hash_address = store.store_object(pid, path)
+        _hash_address = store.store_object(pid, path)
         ab_id = store.store_sysmeta(pid, syspath)
         assert ab_id == pids[pid]["ab_id"]
 
@@ -375,7 +375,7 @@ def test_store_sysmeta_thread_lock(store):
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    hash_address = store.store_object(pid, path)
+    _hash_address = store.store_object(pid, path)
     store.store_sysmeta(pid, syspath)
     # Start threads
     thread1 = Thread(target=store.store_sysmeta, args=(pid, syspath))
@@ -423,8 +423,8 @@ def test_retrieve_sysmeta(store):
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    hash_address = store.store_object(pid, path)
-    ab_id = store.store_sysmeta(pid, syspath)
+    _hash_address = store.store_object(pid, path)
+    _ab_id = store.store_sysmeta(pid, syspath)
     sysmeta_ret = store.retrieve_sysmeta(pid)
     sysmeta = syspath.read_bytes()
     assert sysmeta.decode("utf-8") == sysmeta_ret
@@ -445,8 +445,8 @@ def test_delete_objects(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        hash_address = store.store_object(pid, path)
-        ab_id = store.store_sysmeta(pid, syspath)
+        _hash_address = store.store_object(pid, path)
+        _ab_id = store.store_sysmeta(pid, syspath)
         store.delete_object(pid)
     assert store.objects.count() == 0
 
@@ -458,8 +458,8 @@ def test_delete_sysmeta(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        hash_address = store.store_object(pid, path)
-        ab_id = store.store_sysmeta(pid, syspath)
+        _hash_address = store.store_object(pid, path)
+        _ab_id = store.store_sysmeta(pid, syspath)
         store.delete_sysmeta(pid)
     assert store.sysmeta.count() == 0
 
@@ -471,8 +471,8 @@ def test_get_hex_digest(store):
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    hash_address = store.store_object(pid, path)
-    ab_id = store.store_sysmeta(pid, syspath)
+    _hash_address = store.store_object(pid, path)
+    _ab_id = store.store_sysmeta(pid, syspath)
     sha3_256_hex_digest = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
@@ -497,7 +497,7 @@ def test_get_hex_digest_pid_unsupported_algorithm(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     syspath.read_bytes()
-    hash_address = store.store_object(pid, path)
+    _hash_address = store.store_object(pid, path)
     algorithm = "sm3"
     with pytest.raises(ValueError):
         store.get_hex_digest(pid, algorithm)

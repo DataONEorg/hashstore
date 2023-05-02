@@ -470,6 +470,20 @@ def test_store_sysmeta_files_string(pids, store):
     assert store.sysmeta.count() == 3
 
 
+def test_store_sysmeta_files_input_stream(pids, store):
+    """Test store sysmeta with an input stream to sysmeta"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        _hash_address = store.store_object(pid, path)
+        filename = pid.replace("/", "_") + ".xml"
+        syspath_string = str(Path(test_dir) / filename)
+        syspath_stream = io.open(syspath_string, "rb")
+        _ab_id = store.store_sysmeta(pid, syspath_stream)
+        syspath_stream.close()
+    assert store.sysmeta.count() == 3
+
+
 def test_store_sysmeta_pid_empty(store):
     """Test store sysmeta raises error with empty string"""
     test_dir = "tests/testdata/"

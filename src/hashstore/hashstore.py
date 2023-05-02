@@ -141,6 +141,7 @@ class HashStore:
         if (
             not isinstance(sysmeta, str)
             and not isinstance(sysmeta, Path)
+            and not isinstance(sysmeta, io.BufferedIOBase)
         ):
             raise TypeError(
                 f"Sysmeta must be a path or string object, data type supplied: {type(sysmeta)}"

@@ -7,7 +7,6 @@ import pytest
 from hashstore import HashStore
 
 
-
 @pytest.fixture(name="pids")
 def init_pids():
     """Generate test harness data"""
@@ -165,7 +164,58 @@ def test_store_object_via_input_stream(pids, store):
         assert store.objects.exists(ab_id)
 
 
-def test_store_object_algorithm_args_invalid(store):
+def test_store_object_pid_empty(store):
+    """Test store object raises error when supplied with empty pid string"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    with pytest.raises(ValueError):
+        store.store_object("", path)
+
+
+def test_store_object_pid_empty_spaces(store):
+    """Test store object raises error when supplied with empty space character"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    with pytest.raises(ValueError):
+        store.store_object(" ", path)
+
+
+def test_store_object_pid_none(store):
+    """Test store object raises error when supplied with None pid"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    with pytest.raises(ValueError):
+        store.store_object(None, path)
+
+
+def test_store_object_data_incorrect_type_none(store):
+    """Test store object raises error when data is None"""
+    pid = "jtao.1700.1"
+    path = None
+    with pytest.raises(TypeError):
+        store.store_object(pid, path)
+
+
+def test_store_object_data_incorrect_type_empty(store):
+    """Test store object raises error when data is an empty string"""
+    pid = "jtao.1700.1"
+    path = ""
+    with pytest.raises(TypeError):
+        store.store_object(pid, path)
+
+
+def test_store_object_data_incorrect_type_empty_spaces(store):
+    """Test store object raises error when data is an empty string with spaces"""
+    pid = "jtao.1700.1"
+    path = "   "
+    with pytest.raises(TypeError):
+        store.store_object(pid, path)
+
+
+def test_store_object_additional_algorithm_invalid(store):
     """Test store object raises error when supplied with unsupported algorithm"""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -175,37 +225,21 @@ def test_store_object_algorithm_args_invalid(store):
         store.store_object(pid, path, algorithm_not_in_list)
 
 
-def test_store_object_algorithm_args_hyphen(pids, store):
-    """Test store object formats algorithm"""
+def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
+    """Test store object formats algorithm in uppercase"""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    algorithm_with_hyphen_and_upper = "SHA-256"
+    algorithm_with_hyphen_and_upper = "SHA-384"
     hash_address = store.store_object(pid, path, algorithm_with_hyphen_and_upper)
-    sha256_cid = hash_address.hex_digests.get("sha256")
-    assert sha256_cid == pids[pid]["sha256"]
+    sha256_cid = hash_address.hex_digests.get("sha384")
+    assert sha256_cid == pids[pid]["sha384"]
     ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
 
 
-def test_store_object_algorithm_args_other(store):
-    """Test store object with additional algorithm"""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    algorithm_other = "sha3_256"
-    hash_address = store.store_object(pid, path, algorithm_other)
-    additional_sha3_256_hex_digest = hash_address.hex_digests.get("sha3_256")
-    sha3_256_checksum = (
-        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
-    )
-    assert additional_sha3_256_hex_digest == sha3_256_checksum
-    pid_hash = store.objects.get_sha256_hex_digest(pid)
-    assert store.objects.exists(pid_hash)
-
-
-def test_store_object_algorithm_args_other_hyphen(store):
-    """Test store object with additional unformatted algorithm"""
+def test_store_object_additional_algorithm_hyphen_lowercase(store):
+    """Test store object with additional algorithm in lowercase"""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -220,7 +254,88 @@ def test_store_object_algorithm_args_other_hyphen(store):
     assert store.objects.exists(ab_id)
 
 
-def test_store_object_algorithm_args_incorrect_checksum(store):
+def test_store_object_additional_algorithm_underscore(store):
+    """Test store object with additional algorithm with underscore"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    algorithm_other = "sha3_256"
+    hash_address = store.store_object(pid, path, algorithm_other)
+    additional_sha3_256_hex_digest = hash_address.hex_digests.get("sha3_256")
+    sha3_256_checksum = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    assert additional_sha3_256_hex_digest == sha3_256_checksum
+    pid_hash = store.objects.get_sha256_hex_digest(pid)
+    assert store.objects.exists(pid_hash)
+
+
+def test_store_object_checksum_correct(store):
+    """Test store object successfully stores with good checksum"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    algorithm_other = "sha3_256"
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    _hash_address = store.store_object(
+        pid, path, checksum=checksum_correct, checksum_algorithm=algorithm_other
+    )
+    assert store.objects.count() == 1
+
+
+def test_store_object_checksum_algorithm_empty(store):
+    """Test store object raises error when checksum supplied with no checksum_algorithm"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    with pytest.raises(ValueError):
+        store.store_object(pid, path, checksum=checksum_correct, checksum_algorithm="")
+
+
+def test_store_object_checksum_empty(store):
+    """Test store object raises error when checksum_algorithm supplied and checksum is empty"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    checksum_algorithm = "sha3_256"
+    with pytest.raises(ValueError):
+        store.store_object(
+            pid, path, checksum="", checksum_algorithm=checksum_algorithm
+        )
+
+
+def test_store_object_checksum_empty_spaces(store):
+    """Test store object raises error when checksum_algorithm supplied and checksum is empty with spaces"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    checksum_algorithm = "sha3_256"
+    with pytest.raises(ValueError):
+        store.store_object(
+            pid, path, checksum="  ", checksum_algorithm=checksum_algorithm
+        )
+
+
+def test_store_object_checksum_algorithm_empty_spaces(store):
+    """Test store object raises error when checksum supplied with no checksum_algorithm"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    with pytest.raises(ValueError):
+        store.store_object(
+            pid, path, checksum=checksum_correct, checksum_algorithm="   "
+        )
+
+
+def test_store_object_checksum_incorrect_checksum(store):
     """Test store object raises error when supplied with bad checksum"""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -230,10 +345,9 @@ def test_store_object_algorithm_args_incorrect_checksum(store):
         "bbbb069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     with pytest.raises(ValueError):
-        store.store_object(path, algorithm_other, checksum_incorrect)
-    assert store.objects.count() == 0
-    ab_id = store.objects.get_sha256_hex_digest(pid)
-    assert store.objects.exists(ab_id) is False
+        store.store_object(
+            pid, path, checksum=algorithm_other, checksum_algorithm=checksum_incorrect
+        )
 
 
 def test_store_object_duplicates(store):
@@ -310,7 +424,7 @@ def test_store_object_duplicates_hex_digests(store):
     assert hash_address_two.hex_digests is None
 
 
-def test_store_duplicate_object_threads(store):
+def test_store_object_duplicates_threads(store):
     """Test store object thread lock"""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"

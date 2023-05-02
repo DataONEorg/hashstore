@@ -81,17 +81,27 @@ class HashStore:
         # Validate input parameters
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
-        if not isinstance(data, str) and not isinstance(data, Path) and not isinstance(data, io.BufferedIOBase):
-            raise TypeError(f"Data must be a path, string or buffered stream, data type supplied: {type(data)}")
+        if (
+            not isinstance(data, str)
+            and not isinstance(data, Path)
+            and not isinstance(data, io.BufferedIOBase)
+        ):
+            raise TypeError(
+                f"Data must be a path, string or buffered stream, data type supplied: {type(data)}"
+            )
         if isinstance(data, str):
             if data.replace(" ", "") == "":
                 raise TypeError("Data string cannot be empty")
         if checksum is not None:
             if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
-                raise ValueError("checksum_algorithm cannot be None or empty if checksum is supplied.")
+                raise ValueError(
+                    "checksum_algorithm cannot be None or empty if checksum is supplied."
+                )
         if checksum_algorithm is not None:
             if checksum is None or checksum.replace(" ", "") == "":
-                raise ValueError("checksum cannot be None or empty if checksum_algorithm is supplied.")
+                raise ValueError(
+                    "checksum cannot be None or empty if checksum_algorithm is supplied."
+                )
 
         # Wait for the pid to release if it's in use
         while pid in self.object_locked_pids:
@@ -358,7 +368,7 @@ class HashFSExt(HashFS):
         """
         hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
         return hex_digest
-    
+
     # pylint: disable=W0237
     # Intentional override for `file` and `extension` to adjust signature values
     def put(

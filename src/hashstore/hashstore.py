@@ -135,6 +135,20 @@ class HashStore:
         Returns:
             sysmeta_cid (string): address of the sysmeta document
         """
+        # Validate input parameters
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+        if (
+            not isinstance(sysmeta, str)
+            and not isinstance(sysmeta, Path)
+        ):
+            raise TypeError(
+                f"Sysmeta must be a path or string object, data type supplied: {type(sysmeta)}"
+            )
+        if isinstance(sysmeta, str):
+            if sysmeta.replace(" ", "") == "":
+                raise TypeError("Data string cannot be empty")
+
         # Wait for the pid to release if it's in use
         while pid in self.sysmeta_locked_pids:
             time.sleep(self.time_out_sec)

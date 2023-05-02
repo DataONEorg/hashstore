@@ -470,6 +470,42 @@ def test_store_sysmeta_files_string(pids, store):
     assert store.sysmeta.count() == 3
 
 
+def test_store_sysmeta_pid_empty(store):
+    """Test store sysmeta raises error with empty string"""
+    test_dir = "tests/testdata/"
+    pid = ""
+    filename = pid.replace("/", "_") + ".xml"
+    syspath_string = str(Path(test_dir) / filename)
+    with pytest.raises(ValueError):
+        store.store_sysmeta(pid, syspath_string)
+
+
+def test_store_sysmeta_pid_empty_spaces(store):
+    """Test store sysmeta raises error with empty string"""
+    test_dir = "tests/testdata/"
+    pid = "   "
+    filename = pid.replace("/", "_") + ".xml"
+    syspath_string = str(Path(test_dir) / filename)
+    with pytest.raises(ValueError):
+        store.store_sysmeta(pid, syspath_string)
+
+
+def test_store_sysmeta_sysmeta_empty(store):
+    """Test store sysmeta raises error with empty sysmeta string"""
+    pid = "jtao.1700.1"
+    syspath_string = "   "
+    with pytest.raises(TypeError):
+        store.store_sysmeta(pid, syspath_string)
+
+
+def test_store_sysmeta_sysmeta_none(store):
+    """Test store sysmeta raises error with empty sysmeta string"""
+    pid = "jtao.1700.1"
+    syspath_string = None
+    with pytest.raises(TypeError):
+        store.store_sysmeta(pid, syspath_string)
+
+
 def test_store_sysmeta_ab_id(pids, store):
     """Test store sysmeta returns expected ab_id"""
     test_dir = "tests/testdata/"

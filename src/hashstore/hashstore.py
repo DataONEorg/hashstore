@@ -524,10 +524,11 @@ class HashFSExt(HashFS):
                 os.umask(oldmask)
 
         # Additional hash object to digest
-        if algorithm is not None and algorithm in self.other_algo_list:
-            self.default_algo_list.append(algorithm)
-        if algorithm is not None and algorithm not in self.default_algo_list:
-            raise ValueError(f"Algorithm not supported: {algorithm}")
+        if algorithm is not None:
+            if algorithm in self.other_algo_list:
+                self.default_algo_list.append(algorithm)
+            elif algorithm not in self.default_algo_list:
+                raise ValueError(f"Algorithm not supported: {algorithm}")
 
         hash_algorithms = [
             hashlib.new(algorithm) for algorithm in self.default_algo_list

@@ -2,6 +2,7 @@
 import io
 import os
 import importlib.metadata
+from pathlib import Path
 import pytest
 from hashstore import HashStore
 
@@ -98,7 +99,7 @@ def test_put_files_stream(pids, store):
     """Test put objects with stream"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")        
+        path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         hash_address = store.store_object(pid, input_stream)
         input_stream.close()
@@ -358,6 +359,41 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
             # pylint: disable=W0212
             _, _ = store.objects._mktempfile(input_stream, algo)
         input_stream.close()
+
+
+def test_put_sysmeta(pids, store):
+    """Test put sysmeta"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        ab_id = store.store_sysmeta(pid, syspath)
+        assert store.sysmeta.exists(ab_id)
+    assert store.sysmeta.count() == 3
+
+
+def test_put_sysmeta_ab_id(pids, store):
+    """Test put sysmeta"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        ab_id = store.store_sysmeta(pid, syspath)
+        assert ab_id == pids[pid]["ab_id"]
+
+
+def test_mktmpsysmeta(pids, store):
+    """Test mktmpsysmeta creates tmpFile"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        sys_stream = io.open(syspath, "rb")
+        namespace = "http://ns.dataone.org/service/types/v2.0"
+        # pylint: disable=W0212
+        tmp_name = store.sysmeta._mktmpsysmeta(sys_stream, namespace)
+        sys_stream.close()
+        assert store.sysmeta.exists(tmp_name)
 
 
 def test_to_bytes(store):

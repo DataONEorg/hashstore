@@ -72,6 +72,41 @@ def test_computehash(pids, store):
         assert pids[pid]["sha256"] == obj_sha256_hash
 
 
+def test_put_files_path(pids, store):
+    """Test put objects with path object"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.objects.put(pid, path)
+        hashaddress_id = hash_address.id
+        assert store.objects.exists(hashaddress_id)
+    assert store.objects.count() == 3
+
+
+def test_put_files_string(pids, store):
+    """Test put objects with string"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path_string = test_dir + pid.replace("/", "_")
+        hash_address = store.objects.put(pid, path_string)
+        hashaddress_id = hash_address.id
+        assert store.objects.exists(hashaddress_id)
+    assert store.objects.count() == 3
+
+
+def test_put_files_stream(pids, store):
+    """Test put objects with stream"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")        
+        input_stream = io.open(path, "rb")
+        hash_address = store.store_object(pid, input_stream)
+        input_stream.close()
+        hashaddress_id = hash_address.id
+        assert store.objects.exists(hashaddress_id)
+    assert store.objects.count() == 3
+
+
 def test_put_id(pids, store):
     """Check put returns correct id"""
     test_dir = "tests/testdata/"

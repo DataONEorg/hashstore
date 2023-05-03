@@ -98,6 +98,19 @@ def test_store_object_files_string(pids, store):
     assert store.objects.count() == 3
 
 
+def test_store_object_files_input_stream(pids, store):
+    """Test store object given an input stream"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        _hash_address = store.store_object(pid, input_stream)
+        input_stream.close()
+        ab_id = store.objects.get_sha256_hex_digest(pid)
+        assert store.objects.exists(ab_id)
+    assert store.objects.count() == 3
+
+
 def test_store_object_id(pids, store):
     """Test store object returns expected id (ab_id)"""
     test_dir = "tests/testdata/"
@@ -150,18 +163,6 @@ def test_store_object_hex_digests(pids, store):
         assert hash_address.hex_digests.get("sha256") == pids[pid]["sha256"]
         assert hash_address.hex_digests.get("sha384") == pids[pid]["sha384"]
         assert hash_address.hex_digests.get("sha512") == pids[pid]["sha512"]
-
-
-def test_store_object_via_input_stream(pids, store):
-    """Test store object given an input stream"""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        _hash_address = store.store_object(pid, input_stream)
-        input_stream.close()
-        ab_id = store.objects.get_sha256_hex_digest(pid)
-        assert store.objects.exists(ab_id)
 
 
 def test_store_object_pid_empty(store):

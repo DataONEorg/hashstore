@@ -15,7 +15,9 @@ from hashfs.hashfs import Stream
 
 
 class HashStore:
-    """Class representing the object store using hashes as keys"""
+    """HashStore is a content-addressable file management system that
+    utilizes a persistent identifier (PID) in the form of a hex digest
+    value to address files."""
 
     # Class variables
     dir_depth = 3  # The number of directory levels for storing files
@@ -33,7 +35,7 @@ class HashStore:
         return __version__
 
     def __init__(self, store_path):
-        """initialize the hashstore"""
+        """Initialize the hashstore"""
         self.store_path = store_path
         self.objects = HashFSExt(
             self.store_path + "/objects",
@@ -173,6 +175,9 @@ class HashStore:
         Returns:
             obj_stream (io.BufferedReader): a buffered stream of an ab_id object
         """
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+        
         ab_id = self.objects.get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
@@ -190,6 +195,9 @@ class HashStore:
         Returns:
             sysmeta (string): sysmeta content
         """
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+
         ab_id = self.sysmeta.get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
@@ -207,6 +215,9 @@ class HashStore:
         Returns:
             boolean: True upon successful deletion
         """
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+
         ab_id = self.objects.get_sha256_hex_digest(pid)
         self.objects.delete(ab_id)
         return True
@@ -220,6 +231,9 @@ class HashStore:
         Returns:
             boolean: True upon successful deletion
         """
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+
         ab_id = self.sysmeta.get_sha256_hex_digest(pid)
         self.sysmeta.delete(ab_id)
         return True
@@ -235,6 +249,11 @@ class HashStore:
         Returns:
             hex_digest (string): hex digest of the object
         """
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+        if algorithm is None or algorithm.replace(" ", "") == "":
+            raise ValueError(f"Algorithm cannot be None or empty, pid: {pid}")
+        
         algorithm = self.objects.clean_algorithm(algorithm)
         ab_id = self.objects.get_sha256_hex_digest(pid)
         if not self.objects.exists(ab_id):

@@ -572,7 +572,14 @@ def test_retrieve_object(pids, store):
         assert sha256_hex == hash_address.hex_digests.get("sha256")
 
 
-def test_retrieve_object_invalid_pid(store):
+def test_retrieve_object_pid_empty(store):
+    """Test retrieve_object raises error when supplied with empty pid"""
+    pid = "   "
+    with pytest.raises(ValueError):
+        store.retrieve_object(pid)
+
+
+def test_retrieve_object_pid_invalid(store):
     """Test retrieve_object raises error when supplied with bad pid"""
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
@@ -594,12 +601,19 @@ def test_retrieve_sysmeta(store):
     assert sysmeta.decode("utf-8") == sysmeta_ret
 
 
-def test_retrieve_sysmeta_invalid_pid(store):
+def test_retrieve_sysmeta_pid_invalid(store):
     """Test retrieve_sysmeta raises error when supplied with bad pid"""
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
     with pytest.raises(ValueError):
         store.retrieve_sysmeta(pid_does_not_exist)
+
+
+def test_retrieve_sysmeta_pid_empty(store):
+    """Test retrieve_sysmeta raises error when supplied with empty pid"""
+    pid = "    "
+    with pytest.raises(ValueError):
+        store.retrieve_sysmeta(pid)
 
 
 def test_delete_objects(pids, store):
@@ -615,6 +629,20 @@ def test_delete_objects(pids, store):
     assert store.objects.count() == 0
 
 
+def test_delete_object_pid_empty(store):
+    """Test delete_object raises error when empty pid supplied"""
+    pid = "    "
+    with pytest.raises(ValueError):
+        store.delete_object(pid)
+
+
+def test_delete_object_pid_none(store):
+    """Test delete_object raises error when pid is none"""
+    pid = None
+    with pytest.raises(ValueError):
+        store.delete_object(pid)
+
+
 def test_delete_sysmeta(pids, store):
     """Test delete_sysmeta successfully deletes sysmeta"""
     test_dir = "tests/testdata/"
@@ -626,6 +654,20 @@ def test_delete_sysmeta(pids, store):
         _ab_id = store.store_sysmeta(pid, syspath)
         store.delete_sysmeta(pid)
     assert store.sysmeta.count() == 0
+
+
+def test_delete_sysmeta_pid_empty(store):
+    """Test delete_object raises error when empty pid supplied"""
+    pid = "    "
+    with pytest.raises(ValueError):
+        store.delete_sysmeta(pid)
+
+
+def test_delete_sysmeta_pid_none(store):
+    """Test delete_object raises error when pid is none"""
+    pid = None
+    with pytest.raises(ValueError):
+        store.delete_sysmeta(pid)
 
 
 def test_get_hex_digest(store):
@@ -667,8 +709,33 @@ def test_get_hex_digest_pid_unsupported_algorithm(store):
         store.get_hex_digest(pid, algorithm)
 
 
-def test_get_sha256_hex_digest(pids, store):
-    """Test for correct sha256 return value"""
-    for pid in pids:
-        hash_val = store.objects.get_sha256_hex_digest(pid)
-        assert hash_val == pids[pid]["ab_id"]
+def test_get_hex_digest_pid_empty(store):
+    """Test get_hex_digest raises error when supplied pid is empty"""
+    pid = "    "
+    algorithm = "sm3"
+    with pytest.raises(ValueError):
+        store.get_hex_digest(pid, algorithm)
+
+
+def test_get_hex_digest_pid_none(store):
+    """Test get_hex_digest raises error when supplied pid is None"""
+    pid = None
+    algorithm = "sm3"
+    with pytest.raises(ValueError):
+        store.get_hex_digest(pid, algorithm)
+
+
+def test_get_hex_digest_algorithm_empty(store):
+    """Test get_hex_digest raises error when supplied algorithm is empty"""
+    pid = "jtao.1700.1"
+    algorithm = "     "
+    with pytest.raises(ValueError):
+        store.get_hex_digest(pid, algorithm)
+
+
+def test_get_hex_digest_algorithm_none(store):
+    """Test get_hex_digest raises error when supplied algorithm is None"""
+    pid = "jtao.1700.1"
+    algorithm = None
+    with pytest.raises(ValueError):
+        store.get_hex_digest(pid, algorithm)

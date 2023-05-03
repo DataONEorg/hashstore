@@ -360,3 +360,10 @@ def test_clean_algorithm(store):
     assert cleaned_algo_underscore == "sha256"
     assert cleaned_algo_hyphen == "sha256"
     assert cleaned_algo_other_hyphen == "sha3_256"
+
+
+def test_get_sha256_hex_digest(pids, store):
+    """Test for correct sha256 return value"""
+    for pid in pids:
+        hash_val = store.objects.get_sha256_hex_digest(pid)
+        assert hash_val == pids[pid]["ab_id"]

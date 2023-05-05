@@ -1,6 +1,6 @@
 ## HashStore: hash-based object storage for DataONE data packages
 
-- **Author**: Matthew B. Jones
+- **Author**: Matthew B. Jones, Dou Mok, Jing Tao, Matthew Brooke
 - **License**: [Apache 2](http://opensource.org/licenses/Apache-2.0)
 - [Package source code on Github](https://github.com/DataONEorg/hashstore)
 - [**Submit Bugs and feature requests**](https://github.com/DataONEorg/hashstore/issues)

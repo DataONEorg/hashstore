@@ -1,20 +1,23 @@
-# Core module for hashstore
-from hashfs import HashFS
-from hashfs.hashfs import Stream
-from pathlib import Path
-from contextlib import closing
-from tempfile import NamedTemporaryFile
-from collections import namedtuple
+"""Core module for hashstore"""
+import io
 import shutil
 import threading
 import time
 import hashlib
 import importlib.metadata
 import os
+from pathlib import Path
+from contextlib import closing
+from tempfile import NamedTemporaryFile
+from collections import namedtuple
+from hashfs import HashFS
+from hashfs.hashfs import Stream
 
 
 class HashStore:
-    """Class representing the object store using hashes as keys"""
+    """HashStore is a content-addressable file management system that
+    utilizes a persistent identifier (PID) in the form of a hex digest
+    value to address files."""
 
     # Class variables
     dir_depth = 3  # The number of directory levels for storing files
@@ -32,7 +35,7 @@ class HashStore:
         return __version__
 
     def __init__(self, store_path):
-        """initialize the hashstore"""
+        """Initialize the hashstore"""
         self.store_path = store_path
         self.objects = HashFSExt(
             self.store_path + "/objects",
@@ -77,6 +80,31 @@ class HashStore:
             address (HashAddress): object that contains the permanent address, relative
             file path, absolute file path, duplicate file boolean and hex digest dictionary
         """
+        # Validate input parameters
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+        if (
+            not isinstance(data, str)
+            and not isinstance(data, Path)
+            and not isinstance(data, io.BufferedIOBase)
+        ):
+            raise TypeError(
+                f"Data must be a path, string or buffered stream, data type supplied: {type(data)}"
+            )
+        if isinstance(data, str):
+            if data.replace(" ", "") == "":
+                raise TypeError("Data string cannot be empty")
+        if checksum is not None:
+            if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
+                raise ValueError(
+                    "checksum_algorithm cannot be None or empty if checksum is supplied."
+                )
+        if checksum_algorithm is not None:
+            if checksum is None or checksum.replace(" ", "") == "":
+                raise ValueError(
+                    "checksum cannot be None or empty if checksum_algorithm is supplied."
+                )
+
         # Wait for the pid to release if it's in use
         while pid in self.object_locked_pids:
             time.sleep(self.time_out_sec)
@@ -109,6 +137,21 @@ class HashStore:
         Returns:
             sysmeta_cid (string): address of the sysmeta document
         """
+        # Validate input parameters
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+        if (
+            not isinstance(sysmeta, str)
+            and not isinstance(sysmeta, Path)
+            and not isinstance(sysmeta, io.BufferedIOBase)
+        ):
+            raise TypeError(
+                f"Sysmeta must be a path or string object, data type supplied: {type(sysmeta)}"
+            )
+        if isinstance(sysmeta, str):
+            if sysmeta.replace(" ", "") == "":
+                raise TypeError("Data string cannot be empty")
+
         # Wait for the pid to release if it's in use
         while pid in self.sysmeta_locked_pids:
             time.sleep(self.time_out_sec)
@@ -132,7 +175,10 @@ class HashStore:
         Returns:
             obj_stream (io.BufferedReader): a buffered stream of an ab_id object
         """
-        ab_id = self.objects._get_sha256_hex_digest(pid)
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+        
+        ab_id = self.objects.get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
             obj_stream = self.objects.open(ab_id)
@@ -149,7 +195,10 @@ class HashStore:
         Returns:
             sysmeta (string): sysmeta content
         """
-        ab_id = self.sysmeta._get_sha256_hex_digest(pid)
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+
+        ab_id = self.sysmeta.get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
             sysmeta = self._get_sysmeta(pid)[1]
@@ -164,9 +213,12 @@ class HashStore:
             pid (string): authority-based identifier
 
         Returns:
-            boolean
+            boolean: True upon successful deletion
         """
-        ab_id = self.objects._get_sha256_hex_digest(pid)
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+
+        ab_id = self.objects.get_sha256_hex_digest(pid)
         self.objects.delete(ab_id)
         return True
 
@@ -177,9 +229,12 @@ class HashStore:
             pid (string): authority-based identifier
 
         Returns:
-            boolean
+            boolean: True upon successful deletion
         """
-        ab_id = self.sysmeta._get_sha256_hex_digest(pid)
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+
+        ab_id = self.sysmeta.get_sha256_hex_digest(pid)
         self.sysmeta.delete(ab_id)
         return True
 
@@ -194,8 +249,13 @@ class HashStore:
         Returns:
             hex_digest (string): hex digest of the object
         """
+        if pid is None or pid.replace(" ", "") == "":
+            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+        if algorithm is None or algorithm.replace(" ", "") == "":
+            raise ValueError(f"Algorithm cannot be None or empty, pid: {pid}")
+        
         algorithm = self.objects.clean_algorithm(algorithm)
-        ab_id = self.objects._get_sha256_hex_digest(pid)
+        ab_id = self.objects.get_sha256_hex_digest(pid)
         if not self.objects.exists(ab_id):
             raise ValueError(f"No object found for pid: {pid}")
         c_stream = self.objects.open(ab_id)
@@ -209,7 +269,7 @@ class HashStore:
 
         Args:
             pid (string): authority-based identifier
-            data (mixed): file-like object
+            data (mixed): string or path to object
             additional_algorithm (string): additional hex digest to include
             checksum (string): checksum to validate against
             checksum_algorithm (string): algorithm of supplied checksum
@@ -259,7 +319,7 @@ class HashStore:
         Returns:
             s_content (string): sysmeta content
         """
-        ab_id = self.sysmeta._get_sha256_hex_digest(pid)
+        ab_id = self.sysmeta.get_sha256_hex_digest(pid)
         s_path = self.sysmeta.open(ab_id)
         s_content = s_path.read().decode("utf-8").split("\x00", 1)
         s_path.close()
@@ -272,6 +332,7 @@ class HashFSExt(HashFS):
     currently used in Metacat) and their respective hex digests."""
 
     # Class variables
+    # Algorithm values supported by python hashlib 3.9.0+
     default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
     other_algo_list = [
         "sha224",
@@ -323,12 +384,27 @@ class HashFSExt(HashFS):
         if algorithm is None:
             hashobj = hashlib.new(self.algorithm)
         else:
-            hashobj = hashlib.new(algorithm)
+            check_algorithm = self.clean_algorithm(algorithm)
+            hashobj = hashlib.new(check_algorithm)
         for data in stream:
             hashobj.update(self._to_bytes(data))
         hex_digest = hashobj.hexdigest()
         return hex_digest
 
+    def get_sha256_hex_digest(self, string):
+        """Calculate the SHA-256 digest of a UTF-8 encoded string.
+
+        Args:
+            string (string)
+
+        Returns:
+            hex (string): hexadecimal string
+        """
+        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
+        return hex_digest
+
+    # pylint: disable=W0237
+    # Intentional override for `file` and `extension` to adjust signature values
     def put(
         self,
         pid,
@@ -352,12 +428,20 @@ class HashFSExt(HashFS):
             checksum_algorithm (str, optional): Algorithm value of given checksum
 
         Returns:
-            HashAddress: File's hash address.
+            hash_address (HashAddress): object that contains the permanent address,
+            relative file path, absolute file path, duplicate file boolean and hex
+            digest dictionary
         """
         stream = Stream(file)
 
         with closing(stream):
-            id, hex_digest_dict, filepath, is_duplicate = self._move_and_get_checksums(
+            (
+                ab_id,
+                rel_path,
+                abs_path,
+                is_duplicate,
+                hex_digest_dict,
+            ) = self._move_and_get_checksums(
                 pid,
                 stream,
                 extension,
@@ -366,13 +450,8 @@ class HashFSExt(HashFS):
                 checksum_algorithm,
             )
 
-        if is_duplicate is not True:
-            rel_path = self.relpath(filepath)
-        else:
-            rel_path = None
-
         hash_address = HashAddress(
-            id, rel_path, filepath, is_duplicate, hex_digest_dict
+            ab_id, rel_path, abs_path, is_duplicate, hex_digest_dict
         )
         return hash_address
 
@@ -388,10 +467,11 @@ class HashFSExt(HashFS):
         """Copy the contents of `stream` onto disk with an optional file
         extension appended. The copy process uses a temporary file to store the
         initial contents and returns a dictionary of algorithms and their
-        hex digest values. Once the file has been determined not to exist/be a
-        duplicate, it then moves that file to its final location. If an algorithm
-        and checksum is provided, it will proceed to validate the object and
-        delete the file if the hex digest stored does not match what is provided.
+        hex digest values. If the file already exists, the method will immediately
+        return with is_duplicate: True and "None" for the remaining HashAddress
+        attributes. If an algorithm and checksum is provided, it will proceed to
+        validate the object (and delete the tmpFile if the hex digest stored does
+        not match what is provided).
 
         Args:
             pid (string): authority-based idenrifier
@@ -405,50 +485,56 @@ class HashFSExt(HashFS):
             checksum_algorithm (str, optional): Algorithm value of given checksum
 
         Returns:
-            HashAddress: File's hash address.
+            hash_address (HashAddress): object that contains the permanent address,
+            relative file path, absolute file path, duplicate file boolean and hex
+            digest dictionary
         """
-        id = self._get_sha256_hex_digest(pid)
-        filepath = self.idpath(id, extension)
-        self.makepath(os.path.dirname(filepath))
+        ab_id = self.get_sha256_hex_digest(pid)
+        abs_file_path = self.idpath(ab_id, extension)
+        self.makepath(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
-        if os.path.isfile(filepath):
-            id = None
-            hex_digests = None
-            filepath = None
+        if os.path.isfile(abs_file_path):
+            ab_id = None
+            rel_file_path = None
+            abs_file_path = None
             is_duplicate = True
-            return id, hex_digests, filepath, is_duplicate
+            hex_digests = None
+            return ab_id, rel_file_path, abs_file_path, is_duplicate, hex_digests
+        else:
+            rel_file_path = self.relpath(abs_file_path)
 
         # Create temporary file and calculate hex digests
-        hex_digests, fname = self._mktempfile(stream, additional_algorithm)
+        hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
 
-        # Only move file if it doesn't already exist.
-        if not os.path.isfile(filepath):
+        # Only move file if it doesn't exist.
+        # Files are stored once and only once
+        if not os.path.isfile(abs_file_path):
             if checksum_algorithm is not None and checksum is not None:
                 hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum:
-                    self.delete(fname)
+                    self.delete(tmp_file_name)
                     raise ValueError(
                         f"Hex digest and checksum do not match - file not stored. Algorithm: {checksum_algorithm}. Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
                     )
             is_duplicate = False
             try:
-                shutil.move(fname, filepath)
+                shutil.move(tmp_file_name, abs_file_path)
             except Exception as err:
                 # Revert storage process for the time being for any failure
                 # TODO: Discuss handling of permissions, memory and storage exceptions
                 print(f"Unexpected {err=}, {type(err)=}")
-                if os.path.isfile(filepath):
-                    self.delete(filepath)
-                self.delete(fname)
-                raise Exception(
-                    f"Aborting Upload - an unexpected error has occurred when moving file: {id} - Error: {err}"
-                )
+                if os.path.isfile(abs_file_path):
+                    self.delete(abs_file_path)
+                self.delete(tmp_file_name)
+                # TODO: Log exception
+                # f"Aborting Upload - an unexpected error has occurred when moving file: {ab_id} - Error: {err}"
+                raise
         else:
             # Else delete temporary file
             is_duplicate = True
-            self.delete(fname)
+            self.delete(tmp_file_name)
 
-        return id, hex_digests, filepath, is_duplicate
+        return ab_id, rel_file_path, abs_file_path, is_duplicate, hex_digests
 
     def _mktempfile(self, stream, algorithm=None):
         """Create a named temporary file from a `Stream` object and
@@ -482,10 +568,11 @@ class HashFSExt(HashFS):
                 os.umask(oldmask)
 
         # Additional hash object to digest
-        if algorithm is not None and algorithm in self.other_algo_list:
-            self.default_algo_list.append(algorithm)
-        if algorithm is not None and algorithm not in self.default_algo_list:
-            raise ValueError(f"Algorithm not supported: {algorithm}")
+        if algorithm is not None:
+            if algorithm in self.other_algo_list:
+                self.default_algo_list.append(algorithm)
+            elif algorithm not in self.default_algo_list:
+                raise ValueError(f"Algorithm not supported: {algorithm}")
 
         hash_algorithms = [
             hashlib.new(algorithm) for algorithm in self.default_algo_list
@@ -523,7 +610,7 @@ class HashFSExt(HashFS):
             sysmeta_tmp = self._mktmpsysmeta(sysmeta_stream, namespace)
 
         # Target path (permanent location)
-        ab_id = self._get_sha256_hex_digest(pid)
+        ab_id = self.get_sha256_hex_digest(pid)
         rel_path = "/".join(self.shard(ab_id))
         full_path = self._get_store_path() / rel_path
 
@@ -584,20 +671,8 @@ class HashFSExt(HashFS):
 
         return tmp.name
 
-    def _get_sha256_hex_digest(self, input):
-        """Calculate the SHA-256 digest of a UTF-8 encoded string.
-
-        Args:
-            input (string)
-
-        Returns:
-            hex (string): hexadecimal string
-        """
-        hex = hashlib.sha256(input.encode("utf-8")).hexdigest()
-        return hex
-
     def _to_bytes(self, text):
-        """Convert text to sequence of bytes using utf-8 encodin."""
+        """Convert text to sequence of bytes using utf-8 encoding."""
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")
         return text
@@ -626,7 +701,8 @@ class HashAddress(
             sha256, sha384, sha512)
     """
 
-    def __new__(cls, id, relpath, abspath, is_duplicate=False, hex_digests={}):
+    # Default value to prevent dangerous default value
+    def __new__(cls, ab_id, relpath, abspath, is_duplicate=False, hex_digests=None):
         return super(HashAddress, cls).__new__(
-            cls, id, relpath, abspath, is_duplicate, hex_digests
+            cls, ab_id, relpath, abspath, is_duplicate, hex_digests
         )

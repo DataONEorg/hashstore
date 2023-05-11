@@ -391,7 +391,8 @@ class HashFSExt(HashFS):
         hex_digest = hashobj.hexdigest()
         return hex_digest
 
-    def get_sha256_hex_digest(self, string):
+    @staticmethod
+    def get_sha256_hex_digest(string):
         """Calculate the SHA-256 digest of a UTF-8 encoded string.
 
         Args:

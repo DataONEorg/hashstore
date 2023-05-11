@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hashstore"
-version = "0.7.0"
+version = "0.8.0"
 description = "HashStore, a hash-based object store for data packages."
 authors = ["Matt Jones <gitcode@magisa.org>"]
 readme = "README.md"

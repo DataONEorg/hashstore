@@ -49,7 +49,6 @@ class HashStore:
             width=self.dir_width,
             algorithm="sha256",
         )
-        return None
 
     def store_object(
         self,
@@ -311,7 +310,7 @@ class HashStore:
         return ab_id
 
     def _get_sysmeta(self, pid):
-        """Get the sysmeta content of a given pid (persistent identifer)
+        """Get the sysmeta content of a given pid (persistent identifier)
 
         Args:
             pid (string): authority-based identifier
@@ -417,7 +416,7 @@ class HashFSExt(HashFS):
         """Store contents of `file` on disk using the hash of the given pid
 
         Args:
-            pid (string): authority-based idenrifier
+            pid (string): authority-based identifier
             file (mixed): Readable object or path to file.
             extension (str, optional): Optional extension to append to file
                 when saving.
@@ -474,7 +473,7 @@ class HashFSExt(HashFS):
         not match what is provided).
 
         Args:
-            pid (string): authority-based idenrifier
+            pid (string): authority-based identifier
             stream (io.BufferedReader): object stream
             extension (str, optional): Optional extension to append to file
                 when saving.
@@ -690,15 +689,15 @@ class HashAddress(
 ):
     """File address containing file's path on disk and its content hash ID.
 
-    Attributes:
-        id (str): Hash ID (hexdigest) of file contents.
+    Args:
+        ab_id (str): Hash ID (hexdigest) of file contents.
         relpath (str): Relative path location to :attr:`HashFS.root`.
-        abspath (str): Absoluate path location of file on disk.
+        abspath (str): Absolute path location of file on disk.
         is_duplicate (boolean, optional): Whether the hash address created was
             a duplicate of a previously existing file. Can only be ``True``
             after a put operation. Defaults to ``False``.
-        hex_digests (dict, optional): A list of hex digests to validate objects (md5, sha1,
-            sha256, sha384, sha512)
+        hex_digests (dict, optional): A list of hex digests to validate objects
+            (md5, sha1, sha256, sha384, sha512)
     """
 
     # Default value to prevent dangerous default value

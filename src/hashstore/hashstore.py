@@ -515,7 +515,9 @@ class HashFSExt(HashFS):
                 if hex_digest_stored != checksum:
                     self.delete(tmp_file_name)
                     raise ValueError(
-                        f"Hex digest and checksum do not match - file not stored. Algorithm: {checksum_algorithm}. Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
+                        "Hex digest and checksum do not match - file not stored. "
+                        f"Algorithm: {checksum_algorithm}. "
+                        f"Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
                     )
             is_duplicate = False
             try:

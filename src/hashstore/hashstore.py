@@ -672,7 +672,8 @@ class HashFSExt(HashFS):
 
         return tmp.name
 
-    def _to_bytes(self, text):
+    @staticmethod
+    def _to_bytes(text):
         """Convert text to sequence of bytes using utf-8 encoding."""
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")

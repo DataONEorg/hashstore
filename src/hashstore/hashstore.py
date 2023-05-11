@@ -29,7 +29,8 @@ class HashStore:
     object_locked_pids = []
     sysmeta_locked_pids = []
 
-    def version(self):
+    @staticmethod
+    def version():
         """Return the version number"""
         __version__ = importlib.metadata.version("hashstore")
         return __version__

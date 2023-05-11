@@ -8,7 +8,6 @@
 - [Release process](#release-process)
 - [Testing](#testing)
 - [Code style](#code-style)
-- [Documentation](#documentation)
 - [Contributor license agreement](#contributor-license-agreement)
 
 ## Types of contributions
@@ -48,42 +47,73 @@ In short:
 
 Development is managed through the git repository at https://github.com/DataONEorg/hashstore.  The repository is organized into several branches, each with a specific purpose.  
 
-**main**. The `main` branch represents the stable branch that is constantly maintained with the current release.  It should generally be safe to install and use the `main` branch the same way as binary releases. The version number in all configuration files and the README on the main branch follows [semantic versioning](https://semver.org/) and should always be set to the current stable release.
-
-
-- the current release version, if the HEAD of `main` still matches the HEAD of `releases`. For example, `2.8.5`.
-- the planned next release number with a `beta` designator or release candidate `rc` designator appended as appropriate.  For example, `2.8.6-beta1` or `2.9.0-rc1`.
+**main**. The `main` branch represents the stable branch that is constantly maintained with the current release.  It should generally be safe to install and use the `main` branch the same way as binary releases. The version number in all configuration files and the README on the `main` branch follows [semantic versioning](https://semver.org/) and should always be set to the current stable release, for example `2.8.5`.
 
 **develop**. Development takes place on a single branch for integrated development and testing of the set of features
 targeting the next release. Commits should only be pushed to this branch once they are ready to be deployed to
-production immediately after being pushed. This keeps the develop branch in a state of readiness for the next release.
-Any unreleased code changes on the develop branch represent changes that have been tested and staged for the next release. 
-When a set of features are mature and tested together on develop, they are then merged onto the `main` branch as the next release.  
-The tip of the develop branch always represents the set of features that are awaiting the next release. 
+production immediately after being pushed. This keeps the `develop` branch in a state of readiness for the next release.
+Any unreleased code changes on the `develop` branch represent changes that have been tested and staged for the next 
+release. 
+The tip of the `develop` branch always represents the set of features that are awaiting the next release. The develop
+branch represents the opportunity to integrate changes from multiple features for integrated testing before release.
 
-**feature**. to isolate development on a specific set of capabilities, especially if it may be disruptive to other developers working on the main `develop` branch, feature branches should be created.
+Version numbers on the `develop` branch represent either the planned next release number (e.g., `2.9.0`), or the planned next release number with a `beta` designator or release candidate `rc` designator appended as appropriate.  For example, `2.8.6-beta1` or `2.9.0-rc1`.
 
-Feature branches are named as `feature-` + `{issue}` +  `-{short-description}`, with `{issue}` being the Github issue number related to that new feature. e.g. `feature-23-refactor-storage`.
+**feature**. To isolate development on a specific set of capabilities, especially if it may be disruptive to other 
+developers working on the `develop` branch, feature branches should be created.
+
+Feature branches are named as `feature-` + `{issue}` +  `-{short-description}`, with `{issue}` being the GitHub issue number related to that new feature. e.g. `feature-23-refactor-storage`.
 
 All `feature-*` branches should be frequently merged with changes from `develop` to
 ensure that the branch stays up to date with other features that have
-been tested and are awaiting release.  Thus, each `feature-*` branch represents an opportunity
-for integration testing of the set of features intended to work together for a
-particular release. Once a feature is complete and ready for full integration testing, it 
-is generally merged into the `develop` branch after review through a pull request.
+been tested and are awaiting release.  Thus, each `feature-*` branch can be tested on its own before it is merged with other features on develop, and afterwards as well. Once a feature is complete and ready for full integration testing, it is generally merged into the `develop` branch after review through a pull request.
+
+**bugfix**. A final branch type are `bugfix` branches, which work the same as feature branches, but fix bugs rather than adding new functionality. Sometimes it is hard to distinguish features from bug fixes, so some repositories may choose to use `feature` branches for both types of change. Bugfix branches are named similarly, following the pattern: `bugfix-` + `{issue}` +  `-{short-description}`, with `{issue}` being the GitHub issue number related to that bug. e.g. `bugfix-83-fix-name-display`.
 
 ### Development flow overview
-![](https://github.com/NCEAS/metacat/raw/dev-2.14/docs/dev/images/nceas-dev-flow.png)
+
+```mermaid
+%%{init: {  'theme': 'base', 
+            'gitGraph': {
+                'rotateCommitLabel': false,
+                'showCommitLabel': false
+            },            
+            'themeVariables': {
+              'commitLabelColor': '#ffffffff',
+              'commitLabelBackground': '#000000'
+            }
+}}%%
+gitGraph
+    commit id: "1" tag: "v1.0.0"
+    branch develop
+    checkout develop
+    commit id: "2"
+    branch feature-A
+    commit id: "3"
+    commit id: "4"
+    checkout develop
+    merge feature-A id: "5"
+    commit id: "6"
+    commit id: "7"
+    branch feature-B
+    commit id: "8"
+    commit id: "9"
+    checkout develop
+    merge feature-B  id: "10" type: NORMAL
+    checkout main
+    merge develop id: "11" tag: "v1.1.0"
+```
 
 ## Release process
 
 1. Our release process starts with integration testing in a `develop` branch. Once all
 changes that are desired in a release are merged into the `develop` branch, we run
 the full set of tests on a clean checkout of the `develop` branch.
-2. After testing, the `develop` branch is merged to main, and the main branch is tagged with
+2. After testing, the `develop` branch is merged to main, and the `main` branch is tagged with
 the new version number (e.g. `2.11.2`). At this point, the tip of the `main` branch will 
-reflect the new release and the `develop` branch is ready for work on the next release.
-4. Releases can be downloaded from the [Github releases page](https://github.com/DataONEorg/hashstore/releases).
+reflect the new release and the `develop` branch can be fast-forwarded to sync with `main` to 
+start work on the next release.
+3. Releases can be downloaded from the [GitHub releases page](https://github.com/DataONEorg/hashstore/releases).
 
 ## Testing
 
@@ -91,7 +121,7 @@ reflect the new release and the `develop` branch is ready for work on the next r
 Any new code developed should include a robust set of tests for each public
 method, as well as integration tests from new feature sets.  Tests should fully
 exercise the feature to ensure that it responds correctly to both good data inputs
-as well as various classes of corrupt or bad data.  All tests should pass before submitting a PR
+and various classes of corrupt or bad data.  All tests should pass before submitting a PR
 or merging to `develop`.
 
 Tests are automatically run via GitHub Actions. Check the root `README.md` file
@@ -100,7 +130,7 @@ for this GitHub Actions status badge and make sure it says "Passing":
 ## Code style
 
 Code should be written to professional standards to enable clean, well-documented,
-readable, and maintainable software.  While there has been significant variablility
+readable, and maintainable software.  While there has been significant variability
 in the coding styles applied historically, new contributions should strive for
 clean code formatting.  We generally follow PEP8 guidelines for Python code formatting,
 typically enforced through the `black` code formatting package.

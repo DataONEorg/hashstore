@@ -1,10 +1,11 @@
 ## HashStore: hash-based object storage for DataONE data packages
 
-- **Author**: Matthew B. Jones
+- **Author**: Matthew B. Jones, Dou Mok, Jing Tao, Matthew Brooke
 - **License**: [Apache 2](http://opensource.org/licenses/Apache-2.0)
-- [Package source code on Github](https://github.com/DataONEorg/hashstore)
+- [Package source code on GitHub](https://github.com/DataONEorg/hashstore)
 - [**Submit Bugs and feature requests**](https://github.com/DataONEorg/hashstore/issues)
 - Contact us: support@dataone.org
+- [DataONE discussions](https://github.com/DataONEorg/dataone/discussions)
 
 HashStore is a server-side python package implementing a content-based identifier file system for storing and accessing data and metadata for DataONE services.  The package is used in DataONE system components that need direct, filesystem-based access to data objects, their system metadata, and extended metadata about the objects. This package is a core component of the [DataONE federation](https://dataone.org), and supports large-scale object storage for a variety of repositories, including the [KNB Data Repository](http://knb.ecoinformatics.org), the [NSF Arctic Data Center](https://arcticdata.io/catalog/), the [DataONE search service](https://search.dataone.org), and other repositories.
 
@@ -13,19 +14,14 @@ DataONE in general, and HashStore in particular, are open source, community proj
 
 ## Documentation
 
-Documentation is a work in progress, and can be found on the [Metacat repository](https://github.com/NCEAS/metacat/blob/feature-1436-storage-and-indexing/docs/user/metacat/source/storage-subsystem.rst#physical-file-layout) as part of the storage redesign planning. Furture updates will include documentation here as the package matures.
+Documentation is a work in progress, and can be found on the [Metacat repository](https://github.com/NCEAS/metacat/blob/feature-1436-storage-and-indexing/docs/user/metacat/source/storage-subsystem.rst#physical-file-layout) as part of the storage redesign planning. Future updates will include documentation here as the package matures.
 
 ## Development build
 
 HashStore is a python package, and built using the [Python Poetry](https://python-poetry.org) build tool.
 
 To install `hashstore` locally, create a virtual environment for python 3.9+, 
-install poetry, and then build or install the package with:
-
-```
-$ poetry install
-$ poetry build
-```
+install poetry, and then install or build the package with `poetry install` or `poetry build`, respectively.
 
 ## License
 ```

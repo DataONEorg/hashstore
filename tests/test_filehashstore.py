@@ -438,3 +438,120 @@ def test_get_sha256_hex_digest(pids, store):
     for pid in pids:
         hash_val = store.objects.get_sha256_hex_digest(pid)
         assert hash_val == pids[pid]["ab_id"]
+
+
+def test_makepath(pids, store):
+    """Test makepath creates folder successfully"""
+    for pid in pids:
+        root_directory = store.objects.root
+        pid_hex_digest_directory = pids[pid]["ab_id"][:2]
+        pid_directory = root_directory + pid_hex_digest_directory
+        store.objects.makepath(pid_directory)
+        assert os.path.isdir(pid_directory)
+
+
+def test_relpath(pids, store):
+    """Test relpath returns the path relative to the root directory"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_abspath = hashaddress.abspath
+        rel_path = store.objects.relpath(hashaddress_abspath)
+        assert rel_path.startswith(pids[pid]["ab_id"][:2])
+
+
+def test_exists_with_absolute_path(pids, store):
+    """Test exists method with an absolute file path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_abspath = hashaddress.abspath
+        assert store.objects.exists(hashaddress_abspath)
+
+
+def test_exists_with_relative_path(pids, store):
+    """Test exists method with an absolute file path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_relpath = hashaddress.relpath
+        assert store.objects.exists(hashaddress_relpath)
+
+
+def test_exists_with_sharded_path(pids, store):
+    """Test exists method with an absolute file path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_shard = store.objects.shard(hashaddress.id)
+        hashaddress_shard_path = "/".join(hashaddress_shard)
+        assert store.objects.exists(hashaddress_shard_path)
+
+
+def test_exists_with_nonexistent_file(store):
+    """Test exists method with a nonexistent file"""
+    non_existent_file = "tests/testdata/filedoesnotexist"
+    does_not_exist = store.objects.exists(non_existent_file)
+    assert does_not_exist is False
+
+
+def test_realpath_file_does_not_exist(store):
+    """Test realpath returns None when object does not exist"""
+    test_path = "tests/testdata/helloworld.txt"
+    real_path_exists = store.objects.realpath(test_path)
+    assert real_path_exists is None
+
+
+def test_realpath_absolute_path(store, pids):
+    """Test realpath returns True when absolute path exists"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_abspath = hashaddress.abspath
+        abs_path = store.objects.realpath(hashaddress_abspath)
+        assert abs_path
+
+
+def test_realpath_relative_path(store, pids):
+    """Test realpath returns True when rel path exists"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_relpath = hashaddress.relpath
+        rel_path = store.objects.realpath(hashaddress_relpath)
+        assert rel_path
+
+
+def test_realpath_hex_digest_path(store, pids):
+    """Test realpath returns True when rel path exists"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put(pid, path)
+        hashaddress_id = hashaddress.id
+        hex_digest = store.objects.realpath(hashaddress_id)
+        assert hex_digest
+
+
+def test_idpath(store, pids):
+    """Test idpath builds the absolute file path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        _ = store.objects.put(pid, path)
+        id_path = store.objects.idpath(pids[pid]["ab_id"])
+        assert id_path
+
+
+def test_shard(store):
+    """Test shard creates list"""
+    hash_id = "0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e"
+    predefined_list = ['0d', '55', '5e', 'd77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e']
+    sharded_list = store.objects.shard(hash_id)
+    assert predefined_list == sharded_list

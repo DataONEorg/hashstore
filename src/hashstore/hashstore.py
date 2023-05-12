@@ -1,4 +1,5 @@
 """Core module for hashstore"""
+import glob
 import io
 import shutil
 import threading
@@ -690,6 +691,122 @@ class FileHashStore:
                 tmp_file.write(self._to_bytes(data))
 
         return tmp.name
+
+    def makepath(self, path):
+        """Physically create the folder path on disk.
+
+        Args:
+            path (str): The path to create.
+
+        Raises:
+            AssertionError (exception): If the path already exists but is not a directory.
+        """
+        try:
+            os.makedirs(path, self.dmode)
+        except FileExistsError:
+            assert os.path.isdir(path), f"expected {path} to be a directory"
+
+    def relpath(self, path):
+        """Return `path` relative to the `root` directory.
+
+        Args:
+            path (str): The relative path to calculate
+
+        Returns:
+            relative_path (str): The relative path of the given `path` with respect to
+            the `root` directory.
+        """
+        relative_path = os.path.relpath(path, self.root)
+        return relative_path
+
+    def exists(self, file):
+        """Check whether a given file id or path exists on disk.
+
+        Args:
+            file (str): The name of the file to check.
+
+        Returns:
+            file_exists (bool): True if the file exists
+
+        """
+        file_exists = bool(self.realpath(file))
+        return file_exists
+
+    def realpath(self, file):
+        """Attempt to determine the real path of a file id or path through
+        successive checking of candidate paths. If the real path is stored with
+        an extension, the path is considered a match if the basename matches
+        the expected file path of the id.
+
+        Args:
+            file (string): Name of file
+
+        Returns:
+            exists (boolean): Whether file is found or not
+        """
+        # Check for absolute path.
+        if os.path.isfile(file):
+            return file
+
+        # Check for relative path.
+        relpath = os.path.join(self.root, file)
+        if os.path.isfile(relpath):
+            return relpath
+
+        # Check for sharded path.
+        filepath = self.idpath(file)
+        if os.path.isfile(filepath):
+            return filepath
+
+        # Could not determine a match.
+        return None
+
+    def idpath(self, ab_id, extension=""):
+        """Build the absolute file path for a given hash id with an optional file extension.
+
+        Args:
+            ab_id (str): A hash id to build a file path for
+            extension (str): An optional file extension to append to the file path.
+
+        Returns:
+            absolute_path (str): An absolute file path for the specified hash id
+        """
+        paths = self.shard(ab_id)
+
+        if extension and not extension.startswith(os.extsep):
+            extension = os.extsep + extension
+        elif not extension:
+            extension = ""
+
+        absolute_path = os.path.join(self.root, *paths) + extension
+        return absolute_path
+
+    def shard(self, digest):
+        """Generates a list given a digest of `self.depth` number of tokens with width
+            `self.width` from the first part of the digest plus the remainder.
+
+        Example:
+            ['0d', '55', '5e', 'd77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e']
+
+        Args:
+            digest (str): The string to be divided into tokens.
+
+        Returns:
+            hierarchical_list (list): A list containing the tokens of fixed width
+        """
+
+        def compact(items):
+            """Return only truthy elements of `items`."""
+            return [item for item in items if item]
+
+        # This creates a list of `depth` number of tokens with width
+        # `width` from the first part of the id plus the remainder.
+        hierarchical_list = compact(
+            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
+            + [digest[self.depth * self.width :]]
+        )
+
+        return hierarchical_list
 
     @staticmethod
     def _to_bytes(text):

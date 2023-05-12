@@ -1,5 +1,4 @@
 """Core module for hashstore"""
-import glob
 import io
 import shutil
 import threading

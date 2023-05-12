@@ -79,18 +79,6 @@ files = [
 test = ["pytest (>=6)"]
 
 [[package]]
-name = "hashfs"
-version = "0.7.2"
-description = "A content-addressable file management system."
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "hashfs-0.7.2-py2.py3-none-any.whl", hash = "sha256:3014a9b8dfafd1989cb9727c8b44c871f5b040bc144ec26aed3282ce519349b1"},
-    {file = "hashfs-0.7.2.tar.gz", hash = "sha256:b0986e66eb8500a7e963c0555731fec6b723e6a08e4ad228d29ad3dbf9428bf5"},
-]
-
-[[package]]
 name = "iniconfig"
 version = "2.0.0"
 description = "brain-dead simple config-ini parsing"
@@ -152,18 +140,18 @@ files = [
 
 [[package]]
 name = "platformdirs"
-version = "3.5.0"
+version = "3.5.1"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "platformdirs-3.5.0-py3-none-any.whl", hash = "sha256:47692bc24c1958e8b0f13dd727307cff1db103fca36399f457da8e05f222fdc4"},
-    {file = "platformdirs-3.5.0.tar.gz", hash = "sha256:7954a68d0ba23558d753f73437c55f89027cf8f5108c19844d4b82e5af396335"},
+    {file = "platformdirs-3.5.1-py3-none-any.whl", hash = "sha256:e2378146f1964972c03c085bb5662ae80b2b8c06226c54b2ff4aa9483e8a13a5"},
+    {file = "platformdirs-3.5.1.tar.gz", hash = "sha256:412dae91f52a6f84830f39a8078cecd0e866cb72294a5c66808e74d5e88d251f"},
 ]
 
 [package.extras]
-docs = ["furo (>=2023.3.27)", "proselint (>=0.13)", "sphinx (>=6.1.3)", "sphinx-autodoc-typehints (>=1.23,!=1.23.4)"]
+docs = ["furo (>=2023.3.27)", "proselint (>=0.13)", "sphinx (>=6.2.1)", "sphinx-autodoc-typehints (>=1.23,!=1.23.4)"]
 test = ["appdirs (==1.4.4)", "covdefaults (>=2.3)", "pytest (>=7.3.1)", "pytest-cov (>=4)", "pytest-mock (>=3.10)"]
 
 [[package]]
@@ -232,4 +220,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "44472fd32e75d9dcb4f56c77a3fc9084e539fb99c1084438577e9570d1fdb196"
+content-hash = "9db56b89ea7f8dc94c51f8b48bb2dbcac67bde64586e30a8a9ba16a5e5a658ee"

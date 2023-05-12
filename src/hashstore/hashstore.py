@@ -10,8 +10,6 @@ from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
 from collections import namedtuple
-from hashfs import HashFS
-from hashfs.hashfs import Stream
 
 
 class HashStore:
@@ -38,13 +36,13 @@ class HashStore:
     def __init__(self, store_path):
         """Initialize the hashstore"""
         self.store_path = store_path
-        self.objects = HashFSExt(
+        self.objects = FileHashStore(
             self.store_path + "/objects",
             depth=self.dir_depth,
             width=self.dir_width,
             algorithm="sha256",
         )
-        self.sysmeta = HashFSExt(
+        self.sysmeta = FileHashStore(
             self.store_path + "/sysmeta",
             depth=self.dir_depth,
             width=self.dir_width,
@@ -177,7 +175,7 @@ class HashStore:
         """
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
-        
+
         ab_id = self.objects.get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
@@ -253,7 +251,7 @@ class HashStore:
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
         if algorithm is None or algorithm.replace(" ", "") == "":
             raise ValueError(f"Algorithm cannot be None or empty, pid: {pid}")
-        
+
         algorithm = self.objects.clean_algorithm(algorithm)
         ab_id = self.objects.get_sha256_hex_digest(pid)
         if not self.objects.exists(ab_id):
@@ -326,10 +324,37 @@ class HashStore:
         return s_content
 
 
-class HashFSExt(HashFS):
-    """A subclass of HashFS with extended methods to support the returning of a
-    dictionary consisting of algorithms (based on the most common algorithm types
-    currently used in Metacat) and their respective hex digests."""
+class FileHashStore:
+    """FileHashStore is a content addressable file manager based on Derrick
+    Gilland's 'hashfs' library. It supports the storage of objects on disk using
+    an authority-based identifier's hex digest with a given hash algorithm.
+
+    Args:
+        root (str): Directory path used as root of storage space.
+        depth (int, optional): Depth of subfolders to create when saving a
+            file.
+        width (int, optional): Width of each subfolder to create when saving a
+            file.
+        algorithm (str): Hash algorithm to use when computing file hash.
+            Algorithm should be available in ``hashlib`` module. Defaults to
+            ``'sha256'``.
+        fmode (int, optional): File mode permission to set when adding files to
+            directory. Defaults to ``0o664`` which allows owner/group to
+            read/write and everyone else to read.
+        dmode (int, optional): Directory mode permission to set for
+            subdirectories. Defaults to ``0o755`` which allows owner/group to
+            read/write and everyone else to read and everyone to execute.
+    """
+
+    def __init__(
+        self, root, depth=4, width=1, algorithm="sha256", fmode=0o664, dmode=0o755
+    ):
+        self.root = os.path.realpath(root)
+        self.depth = depth
+        self.width = width
+        self.algorithm = algorithm
+        self.fmode = fmode
+        self.dmode = dmode
 
     # Class variables
     # Algorithm values supported by python hashlib 3.9.0+
@@ -343,6 +368,11 @@ class HashFSExt(HashFS):
         "blake2b",
         "blake2s",
     ]
+
+    def _get_store_path(self):
+        """Return a path object of the root directory of the store."""
+        root_directory = Path(self.root)
+        return root_directory
 
     def clean_algorithm(self, algorithm_string):
         """Format a string and ensure that it is supported and compatible with
@@ -389,19 +419,6 @@ class HashFSExt(HashFS):
         for data in stream:
             hashobj.update(self._to_bytes(data))
         hex_digest = hashobj.hexdigest()
-        return hex_digest
-
-    @staticmethod
-    def get_sha256_hex_digest(string):
-        """Calculate the SHA-256 digest of a UTF-8 encoded string.
-
-        Args:
-            string (string)
-
-        Returns:
-            hex (string): hexadecimal string
-        """
-        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
         return hex_digest
 
     # pylint: disable=W0237
@@ -681,10 +698,18 @@ class HashFSExt(HashFS):
             text = bytes(text, "utf8")
         return text
 
-    def _get_store_path(self):
-        """Return a path object of the root directory of the store."""
-        root_directory = Path(self.root)
-        return root_directory
+    @staticmethod
+    def get_sha256_hex_digest(string):
+        """Calculate the SHA-256 digest of a UTF-8 encoded string.
+
+        Args:
+            string (string)
+
+        Returns:
+            hex (string): hexadecimal string
+        """
+        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
+        return hex_digest
 
 
 class HashAddress(
@@ -710,3 +735,63 @@ class HashAddress(
         return super(HashAddress, cls).__new__(
             cls, ab_id, relpath, abspath, is_duplicate, hex_digests
         )
+
+
+class Stream(object):
+    """Common interface for file-like objects.
+
+    The input `obj` can be a file-like object or a path to a file. If `obj` is
+    a path to a file, then it will be opened until :meth:`close` is called.
+    If `obj` is a file-like object, then it's original position will be
+    restored when :meth:`close` is called instead of closing the object
+    automatically. Closing of the stream is deferred to whatever process passed
+    the stream in.
+
+    Successive readings of the stream is supported without having to manually
+    set it's position back to ``0``.
+    """
+
+    def __init__(self, obj):
+        if hasattr(obj, "read"):
+            pos = obj.tell()
+        elif os.path.isfile(obj):
+            obj = io.open(obj, "rb")
+            pos = None
+        else:
+            raise ValueError("Object must be a valid file path or a readable object")
+
+        try:
+            file_stat = os.stat(obj.name)
+            buffer_size = file_stat.st_blksize
+        except (FileNotFoundError, PermissionError, OSError):
+            buffer_size = 8192
+
+        self._obj = obj
+        self._pos = pos
+        self._buffer_size = buffer_size
+
+    def __iter__(self):
+        """Read underlying IO object and yield results. Return object to
+        original position if we didn't open it originally.
+        """
+        self._obj.seek(0)
+
+        while True:
+            data = self._obj.read(self._buffer_size)
+
+            if not data:
+                break
+
+            yield data
+
+        if self._pos is not None:
+            self._obj.seek(self._pos)
+
+    def close(self):
+        """Close underlying IO object if we opened it, else return it to
+        original position.
+        """
+        if self._pos is None:
+            self._obj.close()
+        else:
+            self._obj.seek(self._pos)

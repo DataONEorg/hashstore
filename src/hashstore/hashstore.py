@@ -692,6 +692,27 @@ class FileHashStore:
 
         return tmp.name
 
+    def open(self, file, mode="rb"):
+        """Return open buffer object from given id or path. Caller is responsible
+        for closing the stream.
+
+        Args:
+            file (str): Address ID or path of file.
+            mode (str, optional): Mode to open file in. Defaults to 'rb'.
+
+        Returns:
+            buffer (io.BufferedReader): An `io` stream dependent on the `mode`.
+        """
+        realpath = self.realpath(file)
+        if realpath is None:
+            raise IOError(f"Could not locate file: {file}")
+        
+        # pylint: disable=W1514
+        # mode defaults to "rb"
+        buffer = io.open(realpath, mode)
+        return buffer
+
+
     def makepath(self, path):
         """Physically create the folder path on disk.
 

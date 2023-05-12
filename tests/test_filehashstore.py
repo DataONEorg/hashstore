@@ -440,6 +440,16 @@ def test_get_sha256_hex_digest(pids, store):
         assert hash_val == pids[pid]["ab_id"]
 
 
+def test_open(pids, store):
+    """Test open returns a stream"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        io_buffer = store.objects.open(path)
+        assert isinstance(io_buffer, io.BufferedReader)
+        io_buffer.close()
+
+
 def test_makepath(pids, store):
     """Test makepath creates folder successfully"""
     for pid in pids:

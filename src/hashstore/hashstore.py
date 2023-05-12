@@ -706,12 +706,57 @@ class FileHashStore:
         realpath = self.realpath(file)
         if realpath is None:
             raise IOError(f"Could not locate file: {file}")
-        
+
         # pylint: disable=W1514
         # mode defaults to "rb"
         buffer = io.open(realpath, mode)
         return buffer
 
+    def delete(self, file):
+        """Delete file using id or path. Remove any empty directories after
+        deleting. No exception is raised if file doesn't exist.
+
+        Args:
+            file (str): Address ID or path of file.
+        """
+        realpath = self.realpath(file)
+        if realpath is None:
+            return
+
+        try:
+            os.remove(realpath)
+        except OSError:
+            pass
+        else:
+            self.remove_empty(os.path.dirname(realpath))
+
+    def remove_empty(self, subpath):
+        """Successively remove all empty folders starting with `subpath` and
+        proceeding "up" through directory tree until reaching the `root`
+        folder.
+        """
+        # Don't attempt to remove any folders if subpath is not a
+        # subdirectory of the root directory.
+        if not self.haspath(subpath):
+            return
+
+        while subpath != self.root:
+            if len(os.listdir(subpath)) > 0 or os.path.islink(subpath):
+                break
+            os.rmdir(subpath)
+            subpath = os.path.dirname(subpath)
+
+    def haspath(self, path):
+        """Return whether `path` is a subdirectory of the `root` directory.
+        """
+        def issubdir(subpath, path):
+            """Return whether `subpath` is a sub-directory of `path`."""
+            # Append os.sep so that paths like /usr/var2/log doesn't match /usr/var.
+            path = os.path.realpath(path) + os.sep
+            subpath = os.path.realpath(subpath)
+            return subpath.startswith(path)
+    
+        return issubdir(path, self.root)
 
     def makepath(self, path):
         """Physically create the folder path on disk.
@@ -828,6 +873,18 @@ class FileHashStore:
         )
 
         return hierarchical_list
+
+    def count(self):
+        """Return count of the number of files in the `root` directory.
+
+        Returns:
+            count (int): Number of files in the directory.
+        """
+        count = 0
+        for _, _, files in os.walk(self.root):
+            for _ in files:
+                count += 1
+        return count
 
     @staticmethod
     def _to_bytes(text):

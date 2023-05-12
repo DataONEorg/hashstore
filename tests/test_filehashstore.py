@@ -450,6 +450,11 @@ def test_open(pids, store):
         io_buffer.close()
 
 
+# TODO: Test delete(), remove_empty(), haspath()
+
+# TODO: Test count()
+
+
 def test_makepath(pids, store):
     """Test makepath creates folder successfully"""
     for pid in pids:

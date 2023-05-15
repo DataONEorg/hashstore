@@ -450,7 +450,48 @@ def test_open(pids, store):
         io_buffer.close()
 
 
-# TODO: Test delete(), remove_empty(), haspath()
+def test_delete_by_id(pids, store):
+    """Check objects are deleted after calling delete with id"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.objects.put(pid, path)
+        hashaddress_id = hash_address.id
+        store.objects.delete(hashaddress_id)
+    assert store.objects.count() == 0
+
+
+def test_delete_by_path(pids, store):
+    """Check objects are deleted after calling delete with path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.objects.put(pid, path)
+        hashaddress_relpath = hash_address.relpath
+        store.objects.delete(hashaddress_relpath)
+    assert store.objects.count() == 0
+
+
+def test_remove_empty_removes_empty_folders(store):
+    """Test empty folders are removed"""
+    three_dirs = "dir1/dir2/dir3"
+    two_dirs = "dir1/dir4"
+    one_dir = "dir5"
+    os.makedirs(os.path.join(store.objects.root, three_dirs))
+    os.makedirs(os.path.join(store.objects.root, two_dirs))
+    os.makedirs(os.path.join(store.objects.root, one_dir))
+    assert os.path.exists(os.path.join(store.objects.root, three_dirs))
+    assert os.path.exists(os.path.join(store.objects.root, two_dirs))
+    assert os.path.exists(os.path.join(store.objects.root, one_dir))
+    store.objects.remove_empty(os.path.join(store.objects.root, three_dirs))
+    store.objects.remove_empty(os.path.join(store.objects.root, two_dirs))
+    store.objects.remove_empty(os.path.join(store.objects.root, one_dir))
+    assert not os.path.exists(os.path.join(store.objects.root, three_dirs))
+    assert not os.path.exists(os.path.join(store.objects.root, two_dirs))
+    assert not os.path.exists(os.path.join(store.objects.root, one_dir))
+
+
+# TODO: haspath()
 
 # TODO: Test count()
 
@@ -567,6 +608,11 @@ def test_idpath(store, pids):
 def test_shard(store):
     """Test shard creates list"""
     hash_id = "0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e"
-    predefined_list = ['0d', '55', '5e', 'd77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e']
+    predefined_list = [
+        "0d",
+        "55",
+        "5e",
+        "d77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e",
+    ]
     sharded_list = store.objects.shard(hash_id)
     assert predefined_list == sharded_list

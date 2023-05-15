@@ -531,17 +531,6 @@ def test_makepath(pids, store):
         assert os.path.isdir(pid_directory)
 
 
-def test_relpath(pids, store):
-    """Test relpath returns the path relative to the root directory"""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        hashaddress = store.objects.put_object(pid, path)
-        hashaddress_abspath = hashaddress.abspath
-        rel_path = store.objects.relpath(hashaddress_abspath)
-        assert rel_path.startswith(pids[pid]["ab_id"][:2])
-
-
 def test_exists_with_absolute_path(pids, store):
     """Test exists method with an absolute file path"""
     test_dir = "tests/testdata/"

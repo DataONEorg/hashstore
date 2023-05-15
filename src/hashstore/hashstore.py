@@ -350,6 +350,8 @@ class FileHashStore:
         self, root, depth=4, width=1, algorithm="sha256", fmode=0o664, dmode=0o755
     ):
         self.root = os.path.realpath(root)
+        self.objects = self.root + "/objects"
+        self.sysmeta = self.root + "/sysmeta"
         self.depth = depth
         self.width = width
         self.algorithm = algorithm
@@ -509,13 +511,14 @@ class FileHashStore:
         """
         ab_id = self.get_sha256_hex_digest(pid)
         abs_file_path = self.idpath(ab_id, extension)
-        print(abs_file_path)
         self.makepath(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
         if os.path.isfile(abs_file_path):
-            raise FileExistsError(f"File already exists for pid: {pid} at {abs_file_path}")
+            raise FileExistsError(
+                f"File already exists for pid: {pid} at {abs_file_path}"
+            )
         else:
-            rel_file_path = self.relpath(abs_file_path)
+            rel_file_path = os.path.relpath(abs_file_path, self.root)
 
         # Create temporary file and calculate hex digests
         hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
@@ -773,19 +776,6 @@ class FileHashStore:
             os.makedirs(path, self.dmode)
         except FileExistsError:
             assert os.path.isdir(path), f"expected {path} to be a directory"
-
-    def relpath(self, path):
-        """Return `path` relative to the `root` directory.
-
-        Args:
-            path (str): The relative path to calculate
-
-        Returns:
-            relative_path (str): The relative path of the given `path` with respect to
-            the `root` directory.
-        """
-        relative_path = os.path.relpath(path, self.root)
-        return relative_path
 
     def exists(self, file):
         """Check whether a given file id or path exists on disk.

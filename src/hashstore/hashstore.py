@@ -286,7 +286,7 @@ class HashStore:
                 checksum_algorithm
             )
 
-        address = self.objects.put(
+        address = self.objects.put_object(
             pid,
             data,
             additional_algorithm=checked_algorithm,
@@ -423,7 +423,7 @@ class FileHashStore:
 
     # pylint: disable=W0237
     # Intentional override for `file` and `extension` to adjust signature values
-    def put(
+    def put_object(
         self,
         pid,
         file,
@@ -509,6 +509,7 @@ class FileHashStore:
         """
         ab_id = self.get_sha256_hex_digest(pid)
         abs_file_path = self.idpath(ab_id, extension)
+        print(abs_file_path)
         self.makepath(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
         if os.path.isfile(abs_file_path):

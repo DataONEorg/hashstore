@@ -733,6 +733,9 @@ class FileHashStore:
         """Successively remove all empty folders starting with `subpath` and
         proceeding "up" through directory tree until reaching the `root`
         folder.
+
+        Args:
+            subpath (str, path): name of directory
         """
         # Don't attempt to remove any folders if subpath is not a
         # subdirectory of the root directory.
@@ -747,14 +750,18 @@ class FileHashStore:
 
     def haspath(self, path):
         """Return whether `path` is a subdirectory of the `root` directory.
+
+        Args:
+            path (str, path): name of path
         """
+
         def issubdir(subpath, path):
             """Return whether `subpath` is a sub-directory of `path`."""
             # Append os.sep so that paths like /usr/var2/log doesn't match /usr/var.
             path = os.path.realpath(path) + os.sep
             subpath = os.path.realpath(subpath)
             return subpath.startswith(path)
-    
+
         return issubdir(path, self.root)
 
     def makepath(self, path):

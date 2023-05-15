@@ -81,7 +81,6 @@ def test_put_files_path(pids, store):
         hash_address = store.objects.put(pid, path)
         hashaddress_id = hash_address.id
         assert store.objects.exists(hashaddress_id)
-    assert store.objects.count() == 3
 
 
 def test_put_files_string(pids, store):
@@ -92,7 +91,6 @@ def test_put_files_string(pids, store):
         hash_address = store.objects.put(pid, path_string)
         hashaddress_id = hash_address.id
         assert store.objects.exists(hashaddress_id)
-    assert store.objects.count() == 3
 
 
 def test_put_files_stream(pids, store):
@@ -472,8 +470,8 @@ def test_delete_by_path(pids, store):
     assert store.objects.count() == 0
 
 
-def test_remove_empty_removes_empty_folders(store):
-    """Test empty folders are removed"""
+def test_remove_empty_removes_empty_folders_string(store):
+    """Test empty folders (via string) are removed"""
     three_dirs = "dir1/dir2/dir3"
     two_dirs = "dir1/dir4"
     one_dir = "dir5"
@@ -491,6 +489,25 @@ def test_remove_empty_removes_empty_folders(store):
     assert not os.path.exists(os.path.join(store.objects.root, one_dir))
 
 
+def test_remove_empty_removes_empty_folders_path(store):
+    """Test empty folders (via Path object) are removed"""
+    three_dirs = Path("dir1/dir2/dir3")
+    two_dirs = Path("dir1/dir4")
+    one_dir = Path("dir5")
+    (store.objects.root / three_dirs).mkdir(parents=True)
+    (store.objects.root / two_dirs).mkdir(parents=True)
+    (store.objects.root / one_dir).mkdir(parents=True)
+    assert (store.objects.root / three_dirs).exists()
+    assert (store.objects.root / two_dirs).exists()
+    assert (store.objects.root / one_dir).exists()
+    store.objects.remove_empty(store.objects.root / three_dirs)
+    store.objects.remove_empty(store.objects.root / two_dirs)
+    store.objects.remove_empty(store.objects.root / one_dir)
+    assert not (store.objects.root / three_dirs).exists()
+    assert not (store.objects.root / two_dirs).exists()
+    assert not (store.objects.root / one_dir).exists()
+
+
 def test_remove_empty_does_not_remove_nonempty_folders(pids, store):
     """Test non-empty folders are not removed"""
     test_dir = "tests/testdata/"
@@ -504,10 +521,18 @@ def test_remove_empty_does_not_remove_nonempty_folders(pids, store):
         assert os.path.exists(abs_parent_dir)
 
 
-def test_haspath_subdirectory(store):
+def test_haspath_subdirectory_string(store):
     """Test that subdirectory is recognized"""
     sub_dir = store.objects.root + "/filehashstore/test"
     os.makedirs(sub_dir)
+    is_sub_dir = store.objects.haspath(sub_dir)
+    assert is_sub_dir
+
+
+def test_haspath_subdirectory_path(store):
+    """Test that subdirectory is recognized"""
+    sub_dir = Path(store.objects.root) / "filehashstore" / "test"
+    sub_dir.mkdir(parents=True)
     is_sub_dir = store.objects.haspath(sub_dir)
     assert is_sub_dir
 
@@ -644,3 +669,12 @@ def test_shard(store):
     ]
     sharded_list = store.objects.shard(hash_id)
     assert predefined_list == sharded_list
+
+
+def test_count(pids, store):
+    """Check that count returns expected number of objects"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path_string = test_dir + pid.replace("/", "_")
+        store.objects.put(pid, path_string)
+    assert store.objects.count() == 3

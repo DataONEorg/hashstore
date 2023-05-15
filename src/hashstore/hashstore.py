@@ -512,12 +512,7 @@ class FileHashStore:
         self.makepath(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
         if os.path.isfile(abs_file_path):
-            ab_id = None
-            rel_file_path = None
-            abs_file_path = None
-            is_duplicate = True
-            hex_digests = None
-            return ab_id, rel_file_path, abs_file_path, is_duplicate, hex_digests
+            raise FileExistsError(f"File already exists for pid: {pid} at {abs_file_path}")
         else:
             rel_file_path = self.relpath(abs_file_path)
 

@@ -261,27 +261,8 @@ def test_move_and_get_checksums_abs_path(pids, store):
         assert os.path.isfile(abs_path) is True
 
 
-def test_move_and_get_checksums_is_duplicate(pids, store):
-    """Test move returns expected is_duplicate boolean value"""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
-        (
-            _,
-            _,
-            _,
-            is_duplicate,
-            _,
-        ) = store.objects._move_and_get_checksums(pid, input_stream)
-        input_stream.close()
-        store.objects.get_sha256_hex_digest(pid)
-        assert is_duplicate is False
-
-
-def test_move_and_get_checksums_duplicates(pids, store):
-    """Test move does not store duplicate objects"""
+def test_move_and_get_checksums_duplicates_raises_error(pids, store):
+    """Test move does not store duplicate objects and raises error"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -292,17 +273,11 @@ def test_move_and_get_checksums_duplicates(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
-        (
-            _,
-            _,
-            _,
-            is_duplicate,
-            _,
-        ) = store.objects._move_and_get_checksums(pid, input_stream)
-        input_stream.close()
-        assert is_duplicate is True
-        assert store.objects.count() == 3
+        with pytest.raises(FileExistsError):
+            # pylint: disable=W0212
+            store.objects._move_and_get_checksums(pid, input_stream)
+            input_stream.close()
+    assert store.objects.count() == 3
 
 
 def test_mktempfile_hex_digests(pids, store):
@@ -544,9 +519,6 @@ def test_haspath_non_subdirectory(store):
     os.makedirs(non_sub_dir)
     is_sub_dir = store.objects.haspath(non_sub_dir)
     assert not is_sub_dir
-
-
-# TODO: Test count()
 
 
 def test_makepath(pids, store):

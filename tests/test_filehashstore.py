@@ -491,7 +491,35 @@ def test_remove_empty_removes_empty_folders(store):
     assert not os.path.exists(os.path.join(store.objects.root, one_dir))
 
 
-# TODO: haspath()
+def test_remove_empty_does_not_remove_nonempty_folders(pids, store):
+    """Test non-empty folders are not removed"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.objects.put(pid, path)
+        hashaddress_relpath = hash_address.relpath
+        parent_dir = os.path.dirname(hashaddress_relpath)
+        abs_parent_dir = store.objects.root + "/" + parent_dir
+        store.objects.remove_empty(abs_parent_dir)
+        assert os.path.exists(abs_parent_dir)
+
+
+def test_haspath_subdirectory(store):
+    """Test that subdirectory is recognized"""
+    sub_dir = store.objects.root + "/filehashstore/test"
+    os.makedirs(sub_dir)
+    is_sub_dir = store.objects.haspath(sub_dir)
+    assert is_sub_dir
+
+
+def test_haspath_non_subdirectory(store):
+    """Test that non-subdirectory is not recognized"""
+    parent_dir = os.path.dirname(store.objects.root)
+    non_sub_dir = parent_dir + "/filehashstore/test"
+    os.makedirs(non_sub_dir)
+    is_sub_dir = store.objects.haspath(non_sub_dir)
+    assert not is_sub_dir
+
 
 # TODO: Test count()
 

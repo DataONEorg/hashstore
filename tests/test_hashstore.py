@@ -373,13 +373,14 @@ def test_store_object_duplicates_threads(store):
     path = test_dir + pid
 
     file_exists_error_flag = False
+
     def store_object_wrapper(pid, path):
         nonlocal file_exists_error_flag
         try:
             store.store_object(pid, path)  # Call store_object inside the thread
         except FileExistsError:
             file_exists_error_flag = True
-    
+
     thread1 = Thread(target=store_object_wrapper, args=(pid, path))
     thread2 = Thread(target=store_object_wrapper, args=(pid, path))
     thread3 = Thread(target=store_object_wrapper, args=(pid, path))

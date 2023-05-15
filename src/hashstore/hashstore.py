@@ -350,8 +350,6 @@ class FileHashStore:
         self, root, depth=4, width=1, algorithm="sha256", fmode=0o664, dmode=0o755
     ):
         self.root = os.path.realpath(root)
-        self.objects = self.root + "/objects"
-        self.sysmeta = self.root + "/sysmeta"
         self.depth = depth
         self.width = width
         self.algorithm = algorithm

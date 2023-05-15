@@ -183,7 +183,9 @@ def test_put_with_correct_checksums(pids, store):
         algo = "sha224"
         algo_checksum = pids[pid][algo]
         path = test_dir + pid.replace("/", "_")
-        store.objects.put_object(pid, path, checksum=algo_checksum, checksum_algorithm=algo)
+        store.objects.put_object(
+            pid, path, checksum=algo_checksum, checksum_algorithm=algo
+        )
     assert store.objects.count() == 3
 
 

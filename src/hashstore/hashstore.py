@@ -10,8 +10,6 @@ from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
 from collections import namedtuple
-from hashfs import HashFS
-from hashfs.hashfs import Stream
 
 
 class HashStore:
@@ -38,13 +36,13 @@ class HashStore:
     def __init__(self, store_path):
         """Initialize the hashstore"""
         self.store_path = store_path
-        self.objects = HashFSExt(
+        self.objects = FileHashStore(
             self.store_path + "/objects",
             depth=self.dir_depth,
             width=self.dir_width,
             algorithm="sha256",
         )
-        self.sysmeta = HashFSExt(
+        self.sysmeta = FileHashStore(
             self.store_path + "/sysmeta",
             depth=self.dir_depth,
             width=self.dir_width,
@@ -177,7 +175,7 @@ class HashStore:
         """
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
-        
+
         ab_id = self.objects.get_sha256_hex_digest(pid)
         sysmeta_exists = self.sysmeta.exists(ab_id)
         if sysmeta_exists:
@@ -253,7 +251,7 @@ class HashStore:
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
         if algorithm is None or algorithm.replace(" ", "") == "":
             raise ValueError(f"Algorithm cannot be None or empty, pid: {pid}")
-        
+
         algorithm = self.objects.clean_algorithm(algorithm)
         ab_id = self.objects.get_sha256_hex_digest(pid)
         if not self.objects.exists(ab_id):
@@ -288,7 +286,7 @@ class HashStore:
                 checksum_algorithm
             )
 
-        address = self.objects.put(
+        address = self.objects.put_object(
             pid,
             data,
             additional_algorithm=checked_algorithm,
@@ -326,10 +324,37 @@ class HashStore:
         return s_content
 
 
-class HashFSExt(HashFS):
-    """A subclass of HashFS with extended methods to support the returning of a
-    dictionary consisting of algorithms (based on the most common algorithm types
-    currently used in Metacat) and their respective hex digests."""
+class FileHashStore:
+    """FileHashStore is a content addressable file manager based on Derrick
+    Gilland's 'hashfs' library. It supports the storage of objects on disk using
+    an authority-based identifier's hex digest with a given hash algorithm.
+
+    Args:
+        root (str): Directory path used as root of storage space.
+        depth (int, optional): Depth of subfolders to create when saving a
+            file.
+        width (int, optional): Width of each subfolder to create when saving a
+            file.
+        algorithm (str): Hash algorithm to use when computing file hash.
+            Algorithm should be available in ``hashlib`` module. Defaults to
+            ``'sha256'``.
+        fmode (int, optional): File mode permission to set when adding files to
+            directory. Defaults to ``0o664`` which allows owner/group to
+            read/write and everyone else to read.
+        dmode (int, optional): Directory mode permission to set for
+            subdirectories. Defaults to ``0o755`` which allows owner/group to
+            read/write and everyone else to read and everyone to execute.
+    """
+
+    def __init__(
+        self, root, depth=4, width=1, algorithm="sha256", fmode=0o664, dmode=0o755
+    ):
+        self.root = os.path.realpath(root)
+        self.depth = depth
+        self.width = width
+        self.algorithm = algorithm
+        self.fmode = fmode
+        self.dmode = dmode
 
     # Class variables
     # Algorithm values supported by python hashlib 3.9.0+
@@ -343,6 +368,11 @@ class HashFSExt(HashFS):
         "blake2b",
         "blake2s",
     ]
+
+    def _get_store_path(self):
+        """Return a path object of the root directory of the store."""
+        root_directory = Path(self.root)
+        return root_directory
 
     def clean_algorithm(self, algorithm_string):
         """Format a string and ensure that it is supported and compatible with
@@ -391,22 +421,9 @@ class HashFSExt(HashFS):
         hex_digest = hashobj.hexdigest()
         return hex_digest
 
-    @staticmethod
-    def get_sha256_hex_digest(string):
-        """Calculate the SHA-256 digest of a UTF-8 encoded string.
-
-        Args:
-            string (string)
-
-        Returns:
-            hex (string): hexadecimal string
-        """
-        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
-        return hex_digest
-
     # pylint: disable=W0237
     # Intentional override for `file` and `extension` to adjust signature values
-    def put(
+    def put_object(
         self,
         pid,
         file,
@@ -495,14 +512,11 @@ class HashFSExt(HashFS):
         self.makepath(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
         if os.path.isfile(abs_file_path):
-            ab_id = None
-            rel_file_path = None
-            abs_file_path = None
-            is_duplicate = True
-            hex_digests = None
-            return ab_id, rel_file_path, abs_file_path, is_duplicate, hex_digests
+            raise FileExistsError(
+                f"File already exists for pid: {pid} at {abs_file_path}"
+            )
         else:
-            rel_file_path = self.relpath(abs_file_path)
+            rel_file_path = os.path.relpath(abs_file_path, self.root)
 
         # Create temporary file and calculate hex digests
         hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
@@ -674,6 +688,194 @@ class HashFSExt(HashFS):
 
         return tmp.name
 
+    def open(self, file, mode="rb"):
+        """Return open buffer object from given id or path. Caller is responsible
+        for closing the stream.
+
+        Args:
+            file (str): Address ID or path of file.
+            mode (str, optional): Mode to open file in. Defaults to 'rb'.
+
+        Returns:
+            buffer (io.BufferedReader): An `io` stream dependent on the `mode`.
+        """
+        realpath = self.realpath(file)
+        if realpath is None:
+            raise IOError(f"Could not locate file: {file}")
+
+        # pylint: disable=W1514
+        # mode defaults to "rb"
+        buffer = io.open(realpath, mode)
+        return buffer
+
+    def delete(self, file):
+        """Delete file using id or path. Remove any empty directories after
+        deleting. No exception is raised if file doesn't exist.
+
+        Args:
+            file (str): Address ID or path of file.
+        """
+        realpath = self.realpath(file)
+        if realpath is None:
+            return
+
+        try:
+            os.remove(realpath)
+        except OSError:
+            pass
+        else:
+            self.remove_empty(os.path.dirname(realpath))
+
+    def remove_empty(self, subpath):
+        """Successively remove all empty folders starting with `subpath` and
+        proceeding "up" through directory tree until reaching the `root`
+        folder.
+
+        Args:
+            subpath (str, path): name of directory
+        """
+        # Don't attempt to remove any folders if subpath is not a
+        # subdirectory of the root directory.
+        if not self.haspath(subpath):
+            return
+
+        while subpath != self.root:
+            if len(os.listdir(subpath)) > 0 or os.path.islink(subpath):
+                break
+            os.rmdir(subpath)
+            subpath = os.path.dirname(subpath)
+
+    def haspath(self, path):
+        """Return whether `path` is a subdirectory of the `root` directory.
+
+        Args:
+            path (str, path): name of path
+        """
+
+        def issubdir(subpath, path):
+            """Return whether `subpath` is a sub-directory of `path`."""
+            # Append os.sep so that paths like /usr/var2/log doesn't match /usr/var.
+            path = os.path.realpath(path) + os.sep
+            subpath = os.path.realpath(subpath)
+            return subpath.startswith(path)
+
+        return issubdir(path, self.root)
+
+    def makepath(self, path):
+        """Physically create the folder path on disk.
+
+        Args:
+            path (str): The path to create.
+
+        Raises:
+            AssertionError (exception): If the path already exists but is not a directory.
+        """
+        try:
+            os.makedirs(path, self.dmode)
+        except FileExistsError:
+            assert os.path.isdir(path), f"expected {path} to be a directory"
+
+    def exists(self, file):
+        """Check whether a given file id or path exists on disk.
+
+        Args:
+            file (str): The name of the file to check.
+
+        Returns:
+            file_exists (bool): True if the file exists
+
+        """
+        file_exists = bool(self.realpath(file))
+        return file_exists
+
+    def realpath(self, file):
+        """Attempt to determine the real path of a file id or path through
+        successive checking of candidate paths. If the real path is stored with
+        an extension, the path is considered a match if the basename matches
+        the expected file path of the id.
+
+        Args:
+            file (string): Name of file
+
+        Returns:
+            exists (boolean): Whether file is found or not
+        """
+        # Check for absolute path.
+        if os.path.isfile(file):
+            return file
+
+        # Check for relative path.
+        relpath = os.path.join(self.root, file)
+        if os.path.isfile(relpath):
+            return relpath
+
+        # Check for sharded path.
+        filepath = self.idpath(file)
+        if os.path.isfile(filepath):
+            return filepath
+
+        # Could not determine a match.
+        return None
+
+    def idpath(self, ab_id, extension=""):
+        """Build the absolute file path for a given hash id with an optional file extension.
+
+        Args:
+            ab_id (str): A hash id to build a file path for
+            extension (str): An optional file extension to append to the file path.
+
+        Returns:
+            absolute_path (str): An absolute file path for the specified hash id
+        """
+        paths = self.shard(ab_id)
+
+        if extension and not extension.startswith(os.extsep):
+            extension = os.extsep + extension
+        elif not extension:
+            extension = ""
+
+        absolute_path = os.path.join(self.root, *paths) + extension
+        return absolute_path
+
+    def shard(self, digest):
+        """Generates a list given a digest of `self.depth` number of tokens with width
+            `self.width` from the first part of the digest plus the remainder.
+
+        Example:
+            ['0d', '55', '5e', 'd77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e']
+
+        Args:
+            digest (str): The string to be divided into tokens.
+
+        Returns:
+            hierarchical_list (list): A list containing the tokens of fixed width
+        """
+
+        def compact(items):
+            """Return only truthy elements of `items`."""
+            return [item for item in items if item]
+
+        # This creates a list of `depth` number of tokens with width
+        # `width` from the first part of the id plus the remainder.
+        hierarchical_list = compact(
+            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
+            + [digest[self.depth * self.width :]]
+        )
+
+        return hierarchical_list
+
+    def count(self):
+        """Return count of the number of files in the `root` directory.
+
+        Returns:
+            count (int): Number of files in the directory.
+        """
+        count = 0
+        for _, _, files in os.walk(self.root):
+            for _ in files:
+                count += 1
+        return count
+
     @staticmethod
     def _to_bytes(text):
         """Convert text to sequence of bytes using utf-8 encoding."""
@@ -681,10 +883,18 @@ class HashFSExt(HashFS):
             text = bytes(text, "utf8")
         return text
 
-    def _get_store_path(self):
-        """Return a path object of the root directory of the store."""
-        root_directory = Path(self.root)
-        return root_directory
+    @staticmethod
+    def get_sha256_hex_digest(string):
+        """Calculate the SHA-256 digest of a UTF-8 encoded string.
+
+        Args:
+            string (string)
+
+        Returns:
+            hex (string): hexadecimal string
+        """
+        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
+        return hex_digest
 
 
 class HashAddress(
@@ -710,3 +920,63 @@ class HashAddress(
         return super(HashAddress, cls).__new__(
             cls, ab_id, relpath, abspath, is_duplicate, hex_digests
         )
+
+
+class Stream(object):
+    """Common interface for file-like objects.
+
+    The input `obj` can be a file-like object or a path to a file. If `obj` is
+    a path to a file, then it will be opened until :meth:`close` is called.
+    If `obj` is a file-like object, then it's original position will be
+    restored when :meth:`close` is called instead of closing the object
+    automatically. Closing of the stream is deferred to whatever process passed
+    the stream in.
+
+    Successive readings of the stream is supported without having to manually
+    set it's position back to ``0``.
+    """
+
+    def __init__(self, obj):
+        if hasattr(obj, "read"):
+            pos = obj.tell()
+        elif os.path.isfile(obj):
+            obj = io.open(obj, "rb")
+            pos = None
+        else:
+            raise ValueError("Object must be a valid file path or a readable object")
+
+        try:
+            file_stat = os.stat(obj.name)
+            buffer_size = file_stat.st_blksize
+        except (FileNotFoundError, PermissionError, OSError):
+            buffer_size = 8192
+
+        self._obj = obj
+        self._pos = pos
+        self._buffer_size = buffer_size
+
+    def __iter__(self):
+        """Read underlying IO object and yield results. Return object to
+        original position if we didn't open it originally.
+        """
+        self._obj.seek(0)
+
+        while True:
+            data = self._obj.read(self._buffer_size)
+
+            if not data:
+                break
+
+            yield data
+
+        if self._pos is not None:
+            self._obj.seek(self._pos)
+
+    def close(self):
+        """Close underlying IO object if we opened it, else return it to
+        original position.
+        """
+        if self._pos is None:
+            self._obj.close()
+        else:
+            self._obj.seek(self._pos)

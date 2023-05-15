@@ -78,10 +78,9 @@ def test_put_files_path(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.objects.put(pid, path)
+        hash_address = store.objects.put_object(pid, path)
         hashaddress_id = hash_address.id
         assert store.objects.exists(hashaddress_id)
-    assert store.objects.count() == 3
 
 
 def test_put_files_string(pids, store):
@@ -89,10 +88,9 @@ def test_put_files_string(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path_string = test_dir + pid.replace("/", "_")
-        hash_address = store.objects.put(pid, path_string)
+        hash_address = store.objects.put_object(pid, path_string)
         hashaddress_id = hash_address.id
         assert store.objects.exists(hashaddress_id)
-    assert store.objects.count() == 3
 
 
 def test_put_files_stream(pids, store):
@@ -113,7 +111,7 @@ def test_put_id(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hashaddress = store.objects.put(pid, path)
+        hashaddress = store.objects.put_object(pid, path)
         hashaddress_id = hashaddress.id
         assert hashaddress_id == pids[pid]["ab_id"]
 
@@ -123,7 +121,7 @@ def test_put_relpath(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hashaddress = store.objects.put(pid, path)
+        hashaddress = store.objects.put_object(pid, path)
         hashaddress_id = hashaddress.id
         hashaddress_relpath = hashaddress.relpath
         shard_id_path = "/".join(store.objects.shard(hashaddress_id))
@@ -135,7 +133,7 @@ def test_put_abspath(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hashaddress = store.objects.put(pid, path)
+        hashaddress = store.objects.put_object(pid, path)
         hashaddress_id = hashaddress.id
         hashaddress_abspath = hashaddress.abspath
         id_abs_path = store.objects.realpath(hashaddress_id)
@@ -147,7 +145,7 @@ def test_put_is_duplicate(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hashaddress = store.objects.put(pid, path)
+        hashaddress = store.objects.put_object(pid, path)
         hashaddress_is_duplicate = hashaddress.is_duplicate
         assert hashaddress_is_duplicate is False
 
@@ -157,7 +155,7 @@ def test_put_hex_digests(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hashaddress = store.objects.put(pid, path)
+        hashaddress = store.objects.put_object(pid, path)
         hashaddress_hex_digests = hashaddress.hex_digests
         assert hashaddress_hex_digests.get("md5") == pids[pid]["md5"]
         assert hashaddress_hex_digests.get("sha1") == pids[pid]["sha1"]
@@ -172,7 +170,7 @@ def test_put_additional_algorithm(pids, store):
     for pid in pids.keys():
         algo = "sha224"
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.objects.put(pid, path, additional_algorithm=algo)
+        hash_address = store.objects.put_object(pid, path, additional_algorithm=algo)
         hex_digests = hash_address.hex_digests
         sha224_hash = hex_digests.get(algo)
         assert sha224_hash == pids[pid][algo]
@@ -185,7 +183,9 @@ def test_put_with_correct_checksums(pids, store):
         algo = "sha224"
         algo_checksum = pids[pid][algo]
         path = test_dir + pid.replace("/", "_")
-        store.objects.put(pid, path, checksum=algo_checksum, checksum_algorithm=algo)
+        store.objects.put_object(
+            pid, path, checksum=algo_checksum, checksum_algorithm=algo
+        )
     assert store.objects.count() == 3
 
 
@@ -197,7 +197,7 @@ def test_put_with_incorrect_checksum(pids, store):
         algo_checksum = "badChecksumValue"
         path = test_dir + pid.replace("/", "_")
         with pytest.raises(ValueError):
-            store.objects.put(
+            store.objects.put_object(
                 pid, path, checksum=algo_checksum, checksum_algorithm=algo
             )
     assert store.objects.count() == 0
@@ -263,27 +263,8 @@ def test_move_and_get_checksums_abs_path(pids, store):
         assert os.path.isfile(abs_path) is True
 
 
-def test_move_and_get_checksums_is_duplicate(pids, store):
-    """Test move returns expected is_duplicate boolean value"""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
-        (
-            _,
-            _,
-            _,
-            is_duplicate,
-            _,
-        ) = store.objects._move_and_get_checksums(pid, input_stream)
-        input_stream.close()
-        store.objects.get_sha256_hex_digest(pid)
-        assert is_duplicate is False
-
-
-def test_move_and_get_checksums_duplicates(pids, store):
-    """Test move does not store duplicate objects"""
+def test_move_and_get_checksums_duplicates_raises_error(pids, store):
+    """Test move does not store duplicate objects and raises error"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -294,17 +275,11 @@ def test_move_and_get_checksums_duplicates(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
-        (
-            _,
-            _,
-            _,
-            is_duplicate,
-            _,
-        ) = store.objects._move_and_get_checksums(pid, input_stream)
-        input_stream.close()
-        assert is_duplicate is True
-        assert store.objects.count() == 3
+        with pytest.raises(FileExistsError):
+            # pylint: disable=W0212
+            store.objects._move_and_get_checksums(pid, input_stream)
+            input_stream.close()
+    assert store.objects.count() == 3
 
 
 def test_mktempfile_hex_digests(pids, store):
@@ -438,3 +413,231 @@ def test_get_sha256_hex_digest(pids, store):
     for pid in pids:
         hash_val = store.objects.get_sha256_hex_digest(pid)
         assert hash_val == pids[pid]["ab_id"]
+
+
+def test_open(pids, store):
+    """Test open returns a stream"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        io_buffer = store.objects.open(path)
+        assert isinstance(io_buffer, io.BufferedReader)
+        io_buffer.close()
+
+
+def test_delete_by_id(pids, store):
+    """Check objects are deleted after calling delete with id"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.objects.put_object(pid, path)
+        hashaddress_id = hash_address.id
+        store.objects.delete(hashaddress_id)
+    assert store.objects.count() == 0
+
+
+def test_delete_by_path(pids, store):
+    """Check objects are deleted after calling delete with path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.objects.put_object(pid, path)
+        hashaddress_relpath = hash_address.relpath
+        store.objects.delete(hashaddress_relpath)
+    assert store.objects.count() == 0
+
+
+def test_remove_empty_removes_empty_folders_string(store):
+    """Test empty folders (via string) are removed"""
+    three_dirs = "dir1/dir2/dir3"
+    two_dirs = "dir1/dir4"
+    one_dir = "dir5"
+    os.makedirs(os.path.join(store.objects.root, three_dirs))
+    os.makedirs(os.path.join(store.objects.root, two_dirs))
+    os.makedirs(os.path.join(store.objects.root, one_dir))
+    assert os.path.exists(os.path.join(store.objects.root, three_dirs))
+    assert os.path.exists(os.path.join(store.objects.root, two_dirs))
+    assert os.path.exists(os.path.join(store.objects.root, one_dir))
+    store.objects.remove_empty(os.path.join(store.objects.root, three_dirs))
+    store.objects.remove_empty(os.path.join(store.objects.root, two_dirs))
+    store.objects.remove_empty(os.path.join(store.objects.root, one_dir))
+    assert not os.path.exists(os.path.join(store.objects.root, three_dirs))
+    assert not os.path.exists(os.path.join(store.objects.root, two_dirs))
+    assert not os.path.exists(os.path.join(store.objects.root, one_dir))
+
+
+def test_remove_empty_removes_empty_folders_path(store):
+    """Test empty folders (via Path object) are removed"""
+    three_dirs = Path("dir1/dir2/dir3")
+    two_dirs = Path("dir1/dir4")
+    one_dir = Path("dir5")
+    (store.objects.root / three_dirs).mkdir(parents=True)
+    (store.objects.root / two_dirs).mkdir(parents=True)
+    (store.objects.root / one_dir).mkdir(parents=True)
+    assert (store.objects.root / three_dirs).exists()
+    assert (store.objects.root / two_dirs).exists()
+    assert (store.objects.root / one_dir).exists()
+    store.objects.remove_empty(store.objects.root / three_dirs)
+    store.objects.remove_empty(store.objects.root / two_dirs)
+    store.objects.remove_empty(store.objects.root / one_dir)
+    assert not (store.objects.root / three_dirs).exists()
+    assert not (store.objects.root / two_dirs).exists()
+    assert not (store.objects.root / one_dir).exists()
+
+
+def test_remove_empty_does_not_remove_nonempty_folders(pids, store):
+    """Test non-empty folders are not removed"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hash_address = store.objects.put_object(pid, path)
+        hashaddress_relpath = hash_address.relpath
+        parent_dir = os.path.dirname(hashaddress_relpath)
+        abs_parent_dir = store.objects.root + "/" + parent_dir
+        store.objects.remove_empty(abs_parent_dir)
+        assert os.path.exists(abs_parent_dir)
+
+
+def test_haspath_subdirectory_string(store):
+    """Test that subdirectory is recognized"""
+    sub_dir = store.objects.root + "/filehashstore/test"
+    os.makedirs(sub_dir)
+    is_sub_dir = store.objects.haspath(sub_dir)
+    assert is_sub_dir
+
+
+def test_haspath_subdirectory_path(store):
+    """Test that subdirectory is recognized"""
+    sub_dir = Path(store.objects.root) / "filehashstore" / "test"
+    sub_dir.mkdir(parents=True)
+    is_sub_dir = store.objects.haspath(sub_dir)
+    assert is_sub_dir
+
+
+def test_haspath_non_subdirectory(store):
+    """Test that non-subdirectory is not recognized"""
+    parent_dir = os.path.dirname(store.objects.root)
+    non_sub_dir = parent_dir + "/filehashstore/test"
+    os.makedirs(non_sub_dir)
+    is_sub_dir = store.objects.haspath(non_sub_dir)
+    assert not is_sub_dir
+
+
+def test_makepath(pids, store):
+    """Test makepath creates folder successfully"""
+    for pid in pids:
+        root_directory = store.objects.root
+        pid_hex_digest_directory = pids[pid]["ab_id"][:2]
+        pid_directory = root_directory + pid_hex_digest_directory
+        store.objects.makepath(pid_directory)
+        assert os.path.isdir(pid_directory)
+
+
+def test_exists_with_absolute_path(pids, store):
+    """Test exists method with an absolute file path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put_object(pid, path)
+        hashaddress_abspath = hashaddress.abspath
+        assert store.objects.exists(hashaddress_abspath)
+
+
+def test_exists_with_relative_path(pids, store):
+    """Test exists method with an absolute file path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put_object(pid, path)
+        hashaddress_relpath = hashaddress.relpath
+        assert store.objects.exists(hashaddress_relpath)
+
+
+def test_exists_with_sharded_path(pids, store):
+    """Test exists method with an absolute file path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put_object(pid, path)
+        hashaddress_shard = store.objects.shard(hashaddress.id)
+        hashaddress_shard_path = "/".join(hashaddress_shard)
+        assert store.objects.exists(hashaddress_shard_path)
+
+
+def test_exists_with_nonexistent_file(store):
+    """Test exists method with a nonexistent file"""
+    non_existent_file = "tests/testdata/filedoesnotexist"
+    does_not_exist = store.objects.exists(non_existent_file)
+    assert does_not_exist is False
+
+
+def test_realpath_file_does_not_exist(store):
+    """Test realpath returns None when object does not exist"""
+    test_path = "tests/testdata/helloworld.txt"
+    real_path_exists = store.objects.realpath(test_path)
+    assert real_path_exists is None
+
+
+def test_realpath_absolute_path(store, pids):
+    """Test realpath returns True when absolute path exists"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put_object(pid, path)
+        hashaddress_abspath = hashaddress.abspath
+        abs_path = store.objects.realpath(hashaddress_abspath)
+        assert abs_path
+
+
+def test_realpath_relative_path(store, pids):
+    """Test realpath returns True when rel path exists"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put_object(pid, path)
+        hashaddress_relpath = hashaddress.relpath
+        rel_path = store.objects.realpath(hashaddress_relpath)
+        assert rel_path
+
+
+def test_realpath_hex_digest_path(store, pids):
+    """Test realpath returns True when rel path exists"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        hashaddress = store.objects.put_object(pid, path)
+        hashaddress_id = hashaddress.id
+        hex_digest = store.objects.realpath(hashaddress_id)
+        assert hex_digest
+
+
+def test_idpath(store, pids):
+    """Test idpath builds the absolute file path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        _ = store.objects.put_object(pid, path)
+        id_path = store.objects.idpath(pids[pid]["ab_id"])
+        assert id_path
+
+
+def test_shard(store):
+    """Test shard creates list"""
+    hash_id = "0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e"
+    predefined_list = [
+        "0d",
+        "55",
+        "5e",
+        "d77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e",
+    ]
+    sharded_list = store.objects.shard(hash_id)
+    assert predefined_list == sharded_list
+
+
+def test_count(pids, store):
+    """Check that count returns expected number of objects"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path_string = test_dir + pid.replace("/", "_")
+        store.objects.put_object(pid, path_string)
+    assert store.objects.count() == 3

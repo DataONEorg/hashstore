@@ -351,78 +351,19 @@ def test_store_object_checksum_incorrect_checksum(store):
         )
 
 
-def test_store_object_duplicates(store):
-    """Test store object does not store duplicate object"""
+def test_store_object_duplicate_raises_error(store):
+    """Test store duplicate object throws FileExistsError"""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
     # Store first blob
     _hash_address_one = store.store_object(pid, path)
     # Store second blob
-    _hash_address_two = store.store_object(pid, path)
+    with pytest.raises(FileExistsError):
+        _hash_address_two = store.store_object(pid, path)
     assert store.objects.count() == 1
     ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
-
-
-def test_store_object_duplicates_id(store):
-    """Test store object returns `None` id when storing duplicate object"""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    # Store first blob
-    _hash_address_one = store.store_object(pid, path)
-    # Store second blob
-    hash_address_two = store.store_object(pid, path)
-    assert hash_address_two.id is None
-
-
-def test_store_object_duplicates_relpath(store):
-    """Test store object returns `None` relpath when storing duplicate object"""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    # Store first blob
-    _hash_address_one = store.store_object(pid, path)
-    # Store second blob
-    hash_address_two = store.store_object(pid, path)
-    assert hash_address_two.relpath is None
-
-
-def test_store_object_duplicates_abspath(store):
-    """Test store object returns `None` abspath when storing duplicate object"""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    # Store first blob
-    _hash_address_one = store.store_object(pid, path)
-    # Store second blob
-    hash_address_two = store.store_object(pid, path)
-    assert hash_address_two.abspath is None
-
-
-def test_store_object_duplicates_is_duplicate(store):
-    """Test store object returns `True` for is_duplicate when storing duplicate object"""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    # Store first blob
-    _hash_address_one = store.store_object(pid, path)
-    # Store second blob
-    hash_address_two = store.store_object(pid, path)
-    assert hash_address_two.is_duplicate is True
-
-
-def test_store_object_duplicates_hex_digests(store):
-    """Test store object returns `None` hex_digests when storing duplicate object"""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    # Store first blob
-    _hash_address_one = store.store_object(pid, path)
-    # Store second blob
-    hash_address_two = store.store_object(pid, path)
-    assert hash_address_two.hex_digests is None
 
 
 def test_store_object_duplicates_threads(store):
@@ -430,19 +371,30 @@ def test_store_object_duplicates_threads(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    thread1 = Thread(target=store.store_object, args=(pid, path))
-    thread2 = Thread(target=store.store_object, args=(pid, path))
-    thread3 = Thread(target=store.store_object, args=(pid, path))
+
+    file_exists_error_flag = False
+
+    def store_object_wrapper(pid, path):
+        nonlocal file_exists_error_flag
+        try:
+            store.store_object(pid, path)  # Call store_object inside the thread
+        except FileExistsError:
+            file_exists_error_flag = True
+
+    thread1 = Thread(target=store_object_wrapper, args=(pid, path))
+    thread2 = Thread(target=store_object_wrapper, args=(pid, path))
+    thread3 = Thread(target=store_object_wrapper, args=(pid, path))
     thread1.start()
     thread2.start()
     thread3.start()
     thread1.join()
     thread2.join()
     thread3.join()
-    # File count must be 1
+    # One thread will succeed, file count must still be 1
     assert store.objects.count() == 1
     ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
+    assert file_exists_error_flag
 
 
 def test_store_sysmeta_files_path(pids, store):

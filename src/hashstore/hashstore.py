@@ -10,9 +10,11 @@ from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
 from collections import namedtuple
+from hashstore.hashstore_interface import HashStoreInterface
 
 
-class HashStore:
+
+class HashStore(HashStoreInterface):
     """HashStore is a content-addressable file management system that
     utilizes a persistent identifier (PID) in the form of a hex digest
     value to address files."""
@@ -57,27 +59,6 @@ class HashStore:
         checksum=None,
         checksum_algorithm=None,
     ):
-        """Add a data object to the store. Returns a HashAddress object that contains
-        the permanent address, relative file path, absolute file path, duplicate file
-        boolean and hex digest dictionary. The supported algorithms list is based on
-        algorithms supported in hashlib for Python 3.9. If an algorithm is passed that
-        is supported, the hex digest dictionary returned will include the additional
-        algorithm & hex digest. A thread lock is utilized to ensure that a file is
-        written once and only once.
-
-        Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512
-
-        Args:
-            pid (string): authority-based identifier
-            data (mixed): string or path to object
-            additional_algorithm (string): additional hex digest to include
-            checksum (string): checksum to validate against
-            checksum_algorithm (string): algorithm of supplied checksum
-
-        Returns:
-            address (HashAddress): object that contains the permanent address, relative
-            file path, absolute file path, duplicate file boolean and hex digest dictionary
-        """
         # Validate input parameters
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
@@ -124,17 +105,6 @@ class HashStore:
         return hash_address
 
     def store_sysmeta(self, pid, sysmeta):
-        """Add a system metadata object to the store. Multiple calls to this method
-        are non-blocking and will be executed in parallel using sysmeta_locked_pids
-        for synchronization.
-
-        Args:
-            pid (string): authority-based identifier
-            sysmeta (mixed): string or path to sysmeta document
-
-        Returns:
-            sysmeta_cid (string): address of the sysmeta document
-        """
         # Validate input parameters
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
@@ -165,14 +135,6 @@ class HashStore:
         return sysmeta_cid
 
     def retrieve_object(self, pid):
-        """Retrieve an object from HashStore of a given persistent identifier (pid)
-
-        Args:
-            pid (string): authority-based identifier
-
-        Returns:
-            obj_stream (io.BufferedReader): a buffered stream of an ab_id object
-        """
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
@@ -185,14 +147,6 @@ class HashStore:
         return obj_stream
 
     def retrieve_sysmeta(self, pid):
-        """Returns the sysmeta of a given persistent identifier (pid).
-
-        Args:
-            pid (string): authority-based identifier
-
-        Returns:
-            sysmeta (string): sysmeta content
-        """
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
@@ -205,14 +159,6 @@ class HashStore:
         return sysmeta
 
     def delete_object(self, pid):
-        """Deletes an object given the pid.
-
-        Args:
-            pid (string): authority-based identifier
-
-        Returns:
-            boolean: True upon successful deletion
-        """
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
@@ -221,14 +167,6 @@ class HashStore:
         return True
 
     def delete_sysmeta(self, pid):
-        """Deletes a sysmeta document given the pid.
-
-        Args:
-            pid (string): authority-based identifier
-
-        Returns:
-            boolean: True upon successful deletion
-        """
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
@@ -237,16 +175,6 @@ class HashStore:
         return True
 
     def get_hex_digest(self, pid, algorithm):
-        """Returns the hex digest of an object based on the hash algorithm
-        passed with a given pid.
-
-        Args:
-            pid (string): authority-based identifier
-            algorithm (string): algorithm of hex digest to generate
-
-        Returns:
-            hex_digest (string): hex digest of the object
-        """
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
         if algorithm is None or algorithm.replace(" ", "") == "":

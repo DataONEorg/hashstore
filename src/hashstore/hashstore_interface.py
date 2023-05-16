@@ -28,7 +28,7 @@ class HashStoreInterface(ABC):
         provided pid, which is also used as the permanent address of the file. The
         file's identifier is then sharded using a depth of 3 and width of 2,
         delimited by '/' and concatenated to produce the final permanent address
-        and is stored in the `/[...storeDirectory]/objects/` directory.
+        and is stored in the `/store_directory/objects/` directory.
 
         By default, the hex digest map includes the following hash algorithms:
         Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512,
@@ -67,7 +67,7 @@ class HashStoreInterface(ABC):
         represents the file's permanent address, and similarly to 'store_object', this
         permanent address is determined by calculating the SHA-256 hex digest of the
         provided pid. Finally, sysmeta are stored in parallel to objects in the
-        `/[...storeDirectory]/sysmeta/` directory.
+        `/store_directory/sysmeta/` directory.
 
         Args:
             pid (string): authority-based identifier

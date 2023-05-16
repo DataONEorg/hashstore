@@ -13,6 +13,33 @@ from collections import namedtuple
 from hashstore.hashstore_interface import HashStoreInterface
 
 
+class HashStoreFactory:
+    """A factory class for creating `hashstore` objects based on a given store type.
+
+    This factory class provides a method to retrieve a `hashstore` object based on
+    the specified store type (ex. FileHashStore). It supports the creation of different types of hash
+    stores by mapping store types to specific implementations.
+    """
+
+    def get_hashstore(self, root, store_type):
+        """Get a hash store object based on the specified store type.
+
+        Args:
+            root (str): The root directory for the hash store.
+            store_type (str): The type of hash store to retrieve.
+
+        Returns:
+            HashStore: A hash store object based on the given store type.
+
+        Raises:
+            ValueError: If the given store_type is not supported.
+        """
+        store_type.lower()
+        if store_type == "filehashstore":
+            return FileHashStore(root)
+        else:
+            raise ValueError(f"store_type: {store_type} is not supported.")
+
 
 class HashStore(HashStoreInterface):
     """HashStore is a content-addressable file management system that

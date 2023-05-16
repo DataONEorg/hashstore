@@ -508,8 +508,8 @@ class FileHashStore:
             digest dictionary
         """
         ab_id = self.get_sha256_hex_digest(pid)
-        abs_file_path = self.idpath(ab_id, extension)
-        self.makepath(os.path.dirname(abs_file_path))
+        abs_file_path = self.build_abs_path(ab_id, extension)
+        self.create_path(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
         if os.path.isfile(abs_file_path):
             raise FileExistsError(
@@ -573,7 +573,7 @@ class FileHashStore:
         tmp_root_path = self._get_store_path() / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
-            self.makepath(tmp_root_path)
+            self.create_path(tmp_root_path)
         tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
 
         # Ensure tmp file is created with desired permissions
@@ -668,7 +668,7 @@ class FileHashStore:
         tmp_root_path = self._get_store_path() / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
-            self.makepath(tmp_root_path)
+            self.create_path(tmp_root_path)
 
         tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
         # Ensure tmp file is created with desired permissions
@@ -699,7 +699,7 @@ class FileHashStore:
         Returns:
             buffer (io.BufferedReader): An `io` stream dependent on the `mode`.
         """
-        realpath = self.realpath(file)
+        realpath = self.get_real_path(file)
         if realpath is None:
             raise IOError(f"Could not locate file: {file}")
 
@@ -715,7 +715,7 @@ class FileHashStore:
         Args:
             file (str): Address ID or path of file.
         """
-        realpath = self.realpath(file)
+        realpath = self.get_real_path(file)
         if realpath is None:
             return
 
@@ -736,7 +736,7 @@ class FileHashStore:
         """
         # Don't attempt to remove any folders if subpath is not a
         # subdirectory of the root directory.
-        if not self.haspath(subpath):
+        if not self._has_subdir(subpath):
             return
 
         while subpath != self.root:
@@ -745,23 +745,22 @@ class FileHashStore:
             os.rmdir(subpath)
             subpath = os.path.dirname(subpath)
 
-    def haspath(self, path):
+    def _has_subdir(self, path):
         """Return whether `path` is a subdirectory of the `root` directory.
 
         Args:
             path (str, path): name of path
+
+        Returns:
+            is_subdir (boolean): true if subdirectory
         """
+        # Append os.sep so that paths like /usr/var2/log doesn't match /usr/var.
+        root_path = os.path.realpath(self.root) + os.sep
+        subpath = os.path.realpath(path)
+        is_subdir = subpath.startswith(root_path)
+        return is_subdir
 
-        def issubdir(subpath, path):
-            """Return whether `subpath` is a sub-directory of `path`."""
-            # Append os.sep so that paths like /usr/var2/log doesn't match /usr/var.
-            path = os.path.realpath(path) + os.sep
-            subpath = os.path.realpath(subpath)
-            return subpath.startswith(path)
-
-        return issubdir(path, self.root)
-
-    def makepath(self, path):
+    def create_path(self, path):
         """Physically create the folder path on disk.
 
         Args:
@@ -785,10 +784,10 @@ class FileHashStore:
             file_exists (bool): True if the file exists
 
         """
-        file_exists = bool(self.realpath(file))
+        file_exists = bool(self.get_real_path(file))
         return file_exists
 
-    def realpath(self, file):
+    def get_real_path(self, file):
         """Attempt to determine the real path of a file id or path through
         successive checking of candidate paths. If the real path is stored with
         an extension, the path is considered a match if the basename matches
@@ -810,14 +809,14 @@ class FileHashStore:
             return relpath
 
         # Check for sharded path.
-        filepath = self.idpath(file)
+        filepath = self.build_abs_path(file)
         if os.path.isfile(filepath):
             return filepath
 
         # Could not determine a match.
         return None
 
-    def idpath(self, ab_id, extension=""):
+    def build_abs_path(self, ab_id, extension=""):
         """Build the absolute file path for a given hash id with an optional file extension.
 
         Args:

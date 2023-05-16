@@ -136,7 +136,7 @@ def test_put_abspath(pids, store):
         hashaddress = store.objects.put_object(pid, path)
         hashaddress_id = hashaddress.id
         hashaddress_abspath = hashaddress.abspath
-        id_abs_path = store.objects.realpath(hashaddress_id)
+        id_abs_path = store.objects.get_real_path(hashaddress_id)
         assert hashaddress_abspath == id_abs_path
 
 
@@ -498,38 +498,41 @@ def test_remove_empty_does_not_remove_nonempty_folders(pids, store):
         assert os.path.exists(abs_parent_dir)
 
 
-def test_haspath_subdirectory_string(store):
+def test_has_subdir_subdirectory_string(store):
     """Test that subdirectory is recognized"""
     sub_dir = store.objects.root + "/filehashstore/test"
     os.makedirs(sub_dir)
-    is_sub_dir = store.objects.haspath(sub_dir)
+    # pylint: disable=W0212
+    is_sub_dir = store.objects._has_subdir(sub_dir)
     assert is_sub_dir
 
 
-def test_haspath_subdirectory_path(store):
+def test_has_subdir_subdirectory_path(store):
     """Test that subdirectory is recognized"""
     sub_dir = Path(store.objects.root) / "filehashstore" / "test"
     sub_dir.mkdir(parents=True)
-    is_sub_dir = store.objects.haspath(sub_dir)
+    # pylint: disable=W0212
+    is_sub_dir = store.objects._has_subdir(sub_dir)
     assert is_sub_dir
 
 
-def test_haspath_non_subdirectory(store):
+def test_has_subdir_non_subdirectory(store):
     """Test that non-subdirectory is not recognized"""
     parent_dir = os.path.dirname(store.objects.root)
     non_sub_dir = parent_dir + "/filehashstore/test"
     os.makedirs(non_sub_dir)
-    is_sub_dir = store.objects.haspath(non_sub_dir)
+    # pylint: disable=W0212
+    is_sub_dir = store.objects._has_subdir(non_sub_dir)
     assert not is_sub_dir
 
 
-def test_makepath(pids, store):
+def test_create_path(pids, store):
     """Test makepath creates folder successfully"""
     for pid in pids:
         root_directory = store.objects.root
         pid_hex_digest_directory = pids[pid]["ab_id"][:2]
         pid_directory = root_directory + pid_hex_digest_directory
-        store.objects.makepath(pid_directory)
+        store.objects.create_path(pid_directory)
         assert os.path.isdir(pid_directory)
 
 
@@ -571,53 +574,54 @@ def test_exists_with_nonexistent_file(store):
     assert does_not_exist is False
 
 
-def test_realpath_file_does_not_exist(store):
-    """Test realpath returns None when object does not exist"""
+def test_get_real_path_file_does_not_exist(store):
+    """Test get_real_path returns None when object does not exist"""
     test_path = "tests/testdata/helloworld.txt"
-    real_path_exists = store.objects.realpath(test_path)
+    real_path_exists = store.objects.get_real_path(test_path)
     assert real_path_exists is None
 
 
-def test_realpath_absolute_path(store, pids):
-    """Test realpath returns True when absolute path exists"""
+def test_get_real_path_absolute_path(store, pids):
+    """Test get_real_path returns True when absolute path exists"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         hashaddress = store.objects.put_object(pid, path)
         hashaddress_abspath = hashaddress.abspath
-        abs_path = store.objects.realpath(hashaddress_abspath)
+        abs_path = store.objects.get_real_path(hashaddress_abspath)
         assert abs_path
 
 
-def test_realpath_relative_path(store, pids):
-    """Test realpath returns True when rel path exists"""
+def test_get_real_path_relative_path(store, pids):
+    """Test get_real_path returns True when rel path exists"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         hashaddress = store.objects.put_object(pid, path)
         hashaddress_relpath = hashaddress.relpath
-        rel_path = store.objects.realpath(hashaddress_relpath)
+        rel_path = store.objects.get_real_path(hashaddress_relpath)
         assert rel_path
 
 
-def test_realpath_hex_digest_path(store, pids):
-    """Test realpath returns True when rel path exists"""
+def test_get_real_path_hex_digest_path(store, pids):
+    """Test get_real_path returns True when rel path exists"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         hashaddress = store.objects.put_object(pid, path)
         hashaddress_id = hashaddress.id
-        hex_digest = store.objects.realpath(hashaddress_id)
+        hex_digest = store.objects.get_real_path(hashaddress_id)
         assert hex_digest
 
 
-def test_idpath(store, pids):
+def test_build_abs_path(store, pids):
     """Test idpath builds the absolute file path"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         _ = store.objects.put_object(pid, path)
-        id_path = store.objects.idpath(pids[pid]["ab_id"])
+        # pylint: disable=W0212
+        id_path = store.objects.build_abs_path(pids[pid]["ab_id"])
         assert id_path
 
 

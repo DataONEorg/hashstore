@@ -43,10 +43,10 @@ class HashStoreInterface(ABC):
         before moving the file to its permanent address.
 
         Args:
-            pid (string): authority-based identifier
-            data (mixed): string or path to object
-            additional_algorithm (string): additional hex digest to include
-            checksum (string): checksum to validate against
+            pid (string): authority-based identifier \n
+            data (mixed): string or path to object \n
+            additional_algorithm (string): additional hex digest to include \n
+            checksum (string): checksum to validate against \n
             checksum_algorithm (string): algorithm of supplied checksum
 
         Returns:
@@ -70,7 +70,7 @@ class HashStoreInterface(ABC):
         `/store_directory/sysmeta/` directory.
 
         Args:
-            pid (string): authority-based identifier
+            pid (string): authority-based identifier \n
             sysmeta (mixed): string or path to sysmeta document
 
         Returns:
@@ -138,7 +138,7 @@ class HashStoreInterface(ABC):
         in HashStore using a given persistent identifier and hash algorithm.
 
         Args:
-            pid (string): authority-based identifier
+            pid (string): authority-based identifier \n
             algorithm (string): algorithm of hex digest to generate
 
         Returns:

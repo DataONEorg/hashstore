@@ -340,7 +340,7 @@ def test_put_sysmeta_with_path(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        ab_id = store.store_sysmeta(pid, syspath)
+        ab_id = store.filehashstore.store_sysmeta(pid, syspath)
         assert store.filehashstore.exists(entity, ab_id)
     assert store.filehashstore.count(entity) == 3
 
@@ -352,7 +352,7 @@ def test_put_sysmeta_with_string(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = str(Path(test_dir) / filename)
-        ab_id = store.store_sysmeta(pid, syspath)
+        ab_id = store.filehashstore.store_sysmeta(pid, syspath)
         assert store.filehashstore.exists(entity, ab_id)
     assert store.filehashstore.count(entity) == 3
 
@@ -363,7 +363,7 @@ def test_put_sysmeta_ab_id(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        ab_id = store.store_sysmeta(pid, syspath)
+        ab_id = store.filehashstore.store_sysmeta(pid, syspath)
         assert ab_id == pids[pid]["ab_id"]
 
 

@@ -41,7 +41,7 @@ class HashStoreFactory:
             raise ValueError(f"store_type: {store_type} is not supported.")
 
 
-class HashStore(HashStoreInterface):
+class HashStore():
     """HashStore is a content-addressable file management system that
     utilizes a persistent identifier (PID) in the form of a hex digest
     value to address files."""
@@ -72,6 +72,62 @@ class HashStore(HashStoreInterface):
             algorithm="sha256",
         )
 
+
+class FileHashStore(HashStoreInterface):
+    """FileHashStore is a content addressable file manager based on Derrick
+    Gilland's 'hashfs' library. It supports the storage of objects on disk using
+    an authority-based identifier's hex digest with a given hash algorithm.
+
+    Args:
+        root (str): Directory path used as root of storage space.
+        depth (int, optional): Depth of subfolders to create when saving a
+            file.
+        width (int, optional): Width of each subfolder to create when saving a
+            file.
+        algorithm (str): Hash algorithm to use when computing file hash.
+            Algorithm should be available in ``hashlib`` module. Defaults to
+            ``'sha256'``.
+        fmode (int, optional): File mode permission to set when adding files to
+            directory. Defaults to ``0o664`` which allows owner/group to
+            read/write and everyone else to read.
+        dmode (int, optional): Directory mode permission to set for
+            subdirectories. Defaults to ``0o755`` which allows owner/group to
+            read/write and everyone else to read and everyone to execute.
+    """
+
+    def __init__(
+        self, root, depth=3, width=2, algorithm="sha256", fmode=0o664, dmode=0o755
+    ):
+        self.root = os.path.realpath(root)
+        self.objects = self.root + "/objects"
+        self.sysmeta = self.root + "/sysmeta"
+        self.depth = depth
+        self.width = width
+        self.algorithm = algorithm
+        self.fmode = fmode
+        self.dmode = dmode
+
+    # Class variables
+    sysmeta_ns = "http://ns.dataone.org/service/types/v2.0"
+    time_out_sec = 1
+    object_lock = threading.Lock()
+    sysmeta_lock = threading.Lock()
+    object_locked_pids = []
+    sysmeta_locked_pids = []
+    # Algorithm values supported by python hashlib 3.9.0+
+    default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
+    other_algo_list = [
+        "sha224",
+        "sha3_224",
+        "sha3_256",
+        "sha3_384",
+        "sha3_512",
+        "blake2b",
+        "blake2s",
+    ]
+
+    # Public API / HashStore Interface Methods
+
     def store_object(
         self,
         pid,
@@ -94,12 +150,19 @@ class HashStore(HashStoreInterface):
         if isinstance(data, str):
             if data.replace(" ", "") == "":
                 raise TypeError("Data string cannot be empty")
+        # Format additional algorithm if supplied
+        additional_algorithm_checked = None
+        if additional_algorithm != self.algorithm and additional_algorithm is not None:
+            additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
+        # Checksum and checksum_algorithm must both be supplied
         if checksum is not None:
             if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
                 raise ValueError(
                     "checksum_algorithm cannot be None or empty if checksum is supplied."
                 )
+        checksum_algorithm_checked = None
         if checksum_algorithm is not None:
+            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
             if checksum is None or checksum.replace(" ", "") == "":
                 raise ValueError(
                     "checksum cannot be None or empty if checksum_algorithm is supplied."
@@ -108,16 +171,16 @@ class HashStore(HashStoreInterface):
         # Wait for the pid to release if it's in use
         while pid in self.object_locked_pids:
             time.sleep(self.time_out_sec)
-        # Modify sysmeta_locked_pids consecutively
+        # Modify object_locked_pids consecutively
         with self.object_lock:
             self.object_locked_pids.append(pid)
         try:
-            hash_address = self._add_object(
+            hash_address = self.put_object(
                 pid,
                 data,
-                additional_algorithm=additional_algorithm,
+                additional_algorithm=additional_algorithm_checked,
                 checksum=checksum,
-                checksum_algorithm=checksum_algorithm,
+                checksum_algorithm=checksum_algorithm_checked,
             )
         finally:
             # Release pid
@@ -148,7 +211,7 @@ class HashStore(HashStoreInterface):
         with self.sysmeta_lock:
             self.sysmeta_locked_pids.append(pid)
         try:
-            sysmeta_cid = self._set_sysmeta(pid, sysmeta)
+            sysmeta_cid = self.put_sysmeta(pid, sysmeta, self.sysmeta_ns)
         finally:
             # Release pid
             with self.sysmeta_lock:
@@ -160,10 +223,10 @@ class HashStore(HashStoreInterface):
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
         entity = "objects"
-        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
-        sysmeta_exists = self.filehashstore.exists(entity, ab_id)
+        ab_id = self.get_sha256_hex_digest(pid)
+        sysmeta_exists = self.exists(entity, ab_id)
         if sysmeta_exists:
-            obj_stream = self.filehashstore.open(entity, ab_id)
+            obj_stream = self.open(entity, ab_id)
         else:
             raise ValueError(f"No sysmeta found for pid: {pid}")
         return obj_stream
@@ -173,10 +236,14 @@ class HashStore(HashStoreInterface):
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
         entity = "sysmeta"
-        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
-        sysmeta_exists = self.filehashstore.exists(entity, ab_id)
+        ab_id = self.get_sha256_hex_digest(pid)
+        sysmeta_exists = self.exists(entity, ab_id)
         if sysmeta_exists:
-            sysmeta = self._get_sysmeta(pid)[1]
+            ab_id = self.get_sha256_hex_digest(pid)
+            s_path = self.open(entity, ab_id)
+            s_content = s_path.read().decode("utf-8").split("\x00", 1)
+            s_path.close()
+            sysmeta = s_content[1]
         else:
             raise ValueError(f"No sysmeta found for pid: {pid}")
         return sysmeta
@@ -186,8 +253,8 @@ class HashStore(HashStoreInterface):
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
         entity = "objects"
-        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
-        self.filehashstore.delete(entity, ab_id)
+        ab_id = self.get_sha256_hex_digest(pid)
+        self.delete(entity, ab_id)
         return True
 
     def delete_sysmeta(self, pid):
@@ -195,8 +262,8 @@ class HashStore(HashStoreInterface):
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
         entity = "sysmeta"
-        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
-        self.filehashstore.delete(entity, ab_id)
+        ab_id = self.get_sha256_hex_digest(pid)
+        self.delete(entity, ab_id)
         return True
 
     def get_hex_digest(self, pid, algorithm):
@@ -206,125 +273,13 @@ class HashStore(HashStoreInterface):
             raise ValueError(f"Algorithm cannot be None or empty, pid: {pid}")
 
         entity = "objects"
-        algorithm = self.filehashstore.clean_algorithm(algorithm)
-        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
-        if not self.filehashstore.exists(entity, ab_id):
+        algorithm = self.clean_algorithm(algorithm)
+        ab_id = self.get_sha256_hex_digest(pid)
+        if not self.exists(entity, ab_id):
             raise ValueError(f"No object found for pid: {pid}")
-        c_stream = self.filehashstore.open(entity, ab_id)
-        hex_digest = self.filehashstore.computehash(c_stream, algorithm=algorithm)
+        c_stream = self.open(entity, ab_id)
+        hex_digest = self.computehash(c_stream, algorithm=algorithm)
         return hex_digest
-
-    def _add_object(
-        self, pid, data, additional_algorithm, checksum, checksum_algorithm
-    ):
-        """Add a data blob to the store.
-
-        Args:
-            pid (string): authority-based identifier
-            data (mixed): string or path to object
-            additional_algorithm (string): additional hex digest to include
-            checksum (string): checksum to validate against
-            checksum_algorithm (string): algorithm of supplied checksum
-        Return:
-            address (HashAddress): object that contains the permanent address, relative
-            file path, absolute file path, duplicate file boolean and hex digest dictionary
-        """
-        checked_algorithm = self.filehashstore.clean_algorithm(additional_algorithm)
-        # If the additional algorithm supplied is the default, do not generate extra
-        if checked_algorithm is self.filehashstore.algorithm:
-            checked_algorithm = None
-        # If a checksum is supplied, ensure that a checksum_algorithm is present and supported
-        checked_checksum_algorithm = ""
-        if checksum is not None and checksum != "":
-            checked_checksum_algorithm = self.filehashstore.clean_algorithm(
-                checksum_algorithm
-            )
-
-        address = self.filehashstore.put_object(
-            pid,
-            data,
-            additional_algorithm=checked_algorithm,
-            checksum=checksum,
-            checksum_algorithm=checked_checksum_algorithm,
-        )
-        return address
-
-    def _set_sysmeta(self, pid, sysmeta):
-        """Add a sysmeta document to the store.
-
-        Args:
-            pid (string): authority-based identifier
-            sysmeta (mixed): string or path to sysmeta document
-
-        Returns:
-            sysmeta_cid (string): address of the sysmeta document
-        """
-        ab_id = self.filehashstore.put_sysmeta(pid, sysmeta, self.sysmeta_ns)
-        return ab_id
-
-    def _get_sysmeta(self, pid):
-        """Get the sysmeta content of a given pid (persistent identifier)
-
-        Args:
-            pid (string): authority-based identifier
-
-        Returns:
-            s_content (string): sysmeta content
-        """
-        entity = "sysmeta"
-        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
-        s_path = self.filehashstore.open(entity, ab_id)
-        s_content = s_path.read().decode("utf-8").split("\x00", 1)
-        s_path.close()
-        return s_content
-
-
-class FileHashStore:
-    """FileHashStore is a content addressable file manager based on Derrick
-    Gilland's 'hashfs' library. It supports the storage of objects on disk using
-    an authority-based identifier's hex digest with a given hash algorithm.
-
-    Args:
-        root (str): Directory path used as root of storage space.
-        depth (int, optional): Depth of subfolders to create when saving a
-            file.
-        width (int, optional): Width of each subfolder to create when saving a
-            file.
-        algorithm (str): Hash algorithm to use when computing file hash.
-            Algorithm should be available in ``hashlib`` module. Defaults to
-            ``'sha256'``.
-        fmode (int, optional): File mode permission to set when adding files to
-            directory. Defaults to ``0o664`` which allows owner/group to
-            read/write and everyone else to read.
-        dmode (int, optional): Directory mode permission to set for
-            subdirectories. Defaults to ``0o755`` which allows owner/group to
-            read/write and everyone else to read and everyone to execute.
-    """
-
-    def __init__(
-        self, root, depth=4, width=1, algorithm="sha256", fmode=0o664, dmode=0o755
-    ):
-        self.root = os.path.realpath(root)
-        self.objects = self.root + "/objects"
-        self.sysmeta = self.root + "/sysmeta"
-        self.depth = depth
-        self.width = width
-        self.algorithm = algorithm
-        self.fmode = fmode
-        self.dmode = dmode
-
-    # Class variables
-    # Algorithm values supported by python hashlib 3.9.0+
-    default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
-    other_algo_list = [
-        "sha224",
-        "sha3_224",
-        "sha3_256",
-        "sha3_384",
-        "sha3_512",
-        "blake2b",
-        "blake2s",
-    ]
 
     # FileHashStore Core Methods
 

@@ -65,14 +65,8 @@ class HashStore(HashStoreInterface):
     def __init__(self, store_path):
         """Initialize the hashstore"""
         self.store_path = store_path
-        self.objects = FileHashStore(
-            self.store_path + "/objects",
-            depth=self.dir_depth,
-            width=self.dir_width,
-            algorithm="sha256",
-        )
-        self.sysmeta = FileHashStore(
-            self.store_path + "/sysmeta",
+        self.filehashstore = FileHashStore(
+            self.store_path,
             depth=self.dir_depth,
             width=self.dir_width,
             algorithm="sha256",
@@ -165,10 +159,11 @@ class HashStore(HashStoreInterface):
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
-        ab_id = self.objects.get_sha256_hex_digest(pid)
-        sysmeta_exists = self.sysmeta.exists(ab_id)
+        entity = "objects"
+        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
+        sysmeta_exists = self.filehashstore.exists(entity, ab_id)
         if sysmeta_exists:
-            obj_stream = self.objects.open(ab_id)
+            obj_stream = self.filehashstore.open(entity, ab_id)
         else:
             raise ValueError(f"No sysmeta found for pid: {pid}")
         return obj_stream
@@ -177,8 +172,9 @@ class HashStore(HashStoreInterface):
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
-        ab_id = self.sysmeta.get_sha256_hex_digest(pid)
-        sysmeta_exists = self.sysmeta.exists(ab_id)
+        entity = "sysmeta"
+        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
+        sysmeta_exists = self.filehashstore.exists(entity, ab_id)
         if sysmeta_exists:
             sysmeta = self._get_sysmeta(pid)[1]
         else:
@@ -189,16 +185,18 @@ class HashStore(HashStoreInterface):
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
-        ab_id = self.objects.get_sha256_hex_digest(pid)
-        self.objects.delete(ab_id)
+        entity = "objects"
+        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
+        self.filehashstore.delete(entity, ab_id)
         return True
 
     def delete_sysmeta(self, pid):
         if pid is None or pid.replace(" ", "") == "":
             raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
 
-        ab_id = self.sysmeta.get_sha256_hex_digest(pid)
-        self.sysmeta.delete(ab_id)
+        entity = "sysmeta"
+        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
+        self.filehashstore.delete(entity, ab_id)
         return True
 
     def get_hex_digest(self, pid, algorithm):
@@ -207,12 +205,13 @@ class HashStore(HashStoreInterface):
         if algorithm is None or algorithm.replace(" ", "") == "":
             raise ValueError(f"Algorithm cannot be None or empty, pid: {pid}")
 
-        algorithm = self.objects.clean_algorithm(algorithm)
-        ab_id = self.objects.get_sha256_hex_digest(pid)
-        if not self.objects.exists(ab_id):
+        entity = "objects"
+        algorithm = self.filehashstore.clean_algorithm(algorithm)
+        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
+        if not self.filehashstore.exists(entity, ab_id):
             raise ValueError(f"No object found for pid: {pid}")
-        c_stream = self.objects.open(ab_id)
-        hex_digest = self.objects.computehash(c_stream, algorithm=algorithm)
+        c_stream = self.filehashstore.open(entity, ab_id)
+        hex_digest = self.filehashstore.computehash(c_stream, algorithm=algorithm)
         return hex_digest
 
     def _add_object(
@@ -230,18 +229,18 @@ class HashStore(HashStoreInterface):
             address (HashAddress): object that contains the permanent address, relative
             file path, absolute file path, duplicate file boolean and hex digest dictionary
         """
-        checked_algorithm = self.objects.clean_algorithm(additional_algorithm)
+        checked_algorithm = self.filehashstore.clean_algorithm(additional_algorithm)
         # If the additional algorithm supplied is the default, do not generate extra
-        if checked_algorithm is self.objects.algorithm:
+        if checked_algorithm is self.filehashstore.algorithm:
             checked_algorithm = None
         # If a checksum is supplied, ensure that a checksum_algorithm is present and supported
         checked_checksum_algorithm = ""
         if checksum is not None and checksum != "":
-            checked_checksum_algorithm = self.objects.clean_algorithm(
+            checked_checksum_algorithm = self.filehashstore.clean_algorithm(
                 checksum_algorithm
             )
 
-        address = self.objects.put_object(
+        address = self.filehashstore.put_object(
             pid,
             data,
             additional_algorithm=checked_algorithm,
@@ -260,7 +259,7 @@ class HashStore(HashStoreInterface):
         Returns:
             sysmeta_cid (string): address of the sysmeta document
         """
-        ab_id = self.sysmeta.put_sysmeta(pid, sysmeta, self.sysmeta_ns)
+        ab_id = self.filehashstore.put_sysmeta(pid, sysmeta, self.sysmeta_ns)
         return ab_id
 
     def _get_sysmeta(self, pid):
@@ -272,8 +271,9 @@ class HashStore(HashStoreInterface):
         Returns:
             s_content (string): sysmeta content
         """
-        ab_id = self.sysmeta.get_sha256_hex_digest(pid)
-        s_path = self.sysmeta.open(ab_id)
+        entity = "sysmeta"
+        ab_id = self.filehashstore.get_sha256_hex_digest(pid)
+        s_path = self.filehashstore.open(entity, ab_id)
         s_content = s_path.read().decode("utf-8").split("\x00", 1)
         s_path.close()
         return s_content
@@ -472,8 +472,9 @@ class FileHashStore:
             relative file path, absolute file path, duplicate file boolean and hex
             digest dictionary
         """
+        entity = "objects"
         ab_id = self.get_sha256_hex_digest(pid)
-        abs_file_path = self.build_abs_path(ab_id, extension)
+        abs_file_path = self.build_abs_path(entity, ab_id, extension)
         self.create_path(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
         if os.path.isfile(abs_file_path):
@@ -481,7 +482,7 @@ class FileHashStore:
                 f"File already exists for pid: {pid} at {abs_file_path}"
             )
         else:
-            rel_file_path = os.path.relpath(abs_file_path, self.root)
+            rel_file_path = os.path.relpath(abs_file_path, self.objects)
 
         # Create temporary file and calculate hex digests
         hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
@@ -492,7 +493,7 @@ class FileHashStore:
             if checksum_algorithm is not None and checksum is not None:
                 hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum:
-                    self.delete(tmp_file_name)
+                    self.delete(entity, tmp_file_name)
                     raise ValueError(
                         "Hex digest and checksum do not match - file not stored. "
                         f"Algorithm: {checksum_algorithm}. "
@@ -506,15 +507,15 @@ class FileHashStore:
                 # TODO: Discuss handling of permissions, memory and storage exceptions
                 print(f"Unexpected {err=}, {type(err)=}")
                 if os.path.isfile(abs_file_path):
-                    self.delete(abs_file_path)
-                self.delete(tmp_file_name)
+                    self.delete(entity, abs_file_path)
+                self.delete(entity, tmp_file_name)
                 # TODO: Log exception
                 # f"Aborting Upload - an unexpected error has occurred when moving file: {ab_id} - Error: {err}"
                 raise
         else:
             # Else delete temporary file
             is_duplicate = True
-            self.delete(tmp_file_name)
+            self.delete(entity, tmp_file_name)
 
         return ab_id, rel_file_path, abs_file_path, is_duplicate, hex_digests
 
@@ -653,18 +654,19 @@ class FileHashStore:
 
         return tmp.name
 
-    def open(self, file, mode="rb"):
+    def open(self, entity, file, mode="rb"):
         """Return open buffer object from given id or path. Caller is responsible
         for closing the stream.
 
         Args:
+            entity (str): desired entity type (ex. "objects", "sysmeta")
             file (str): Address ID or path of file.
             mode (str, optional): Mode to open file in. Defaults to 'rb'.
 
         Returns:
             buffer (io.BufferedReader): An `io` stream dependent on the `mode`.
         """
-        realpath = self.get_real_path(file)
+        realpath = self.get_real_path(entity, file)
         if realpath is None:
             raise IOError(f"Could not locate file: {file}")
 
@@ -673,16 +675,17 @@ class FileHashStore:
         buffer = io.open(realpath, mode)
         return buffer
 
-    def delete(self, file):
+    def delete(self, entity, file):
         """Delete file using id or path. Remove any empty directories after
         deleting. No exception is raised if file doesn't exist.
 
         Args:
+            entity (str): desired entity type (ex. "objects", "sysmeta")
             file (str): Address ID or path of file.
         """
-        realpath = self.get_real_path(file)
+        realpath = self.get_real_path(entity, file)
         if realpath is None:
-            return
+            return None
 
         try:
             os.remove(realpath)
@@ -739,26 +742,28 @@ class FileHashStore:
         except FileExistsError:
             assert os.path.isdir(path), f"expected {path} to be a directory"
 
-    def exists(self, file):
+    def exists(self, entity, file):
         """Check whether a given file id or path exists on disk.
 
         Args:
+            entity (str): desired entity type (ex. "objects", "sysmeta")
             file (str): The name of the file to check.
 
         Returns:
             file_exists (bool): True if the file exists
 
         """
-        file_exists = bool(self.get_real_path(file))
+        file_exists = bool(self.get_real_path(entity, file))
         return file_exists
 
-    def get_real_path(self, file):
+    def get_real_path(self, entity, file):
         """Attempt to determine the real path of a file id or path through
         successive checking of candidate paths. If the real path is stored with
         an extension, the path is considered a match if the basename matches
         the expected file path of the id.
 
         Args:
+            entity (str): desired entity type (ex. "objects", "sysmeta")
             file (string): Name of file
 
         Returns:
@@ -769,22 +774,30 @@ class FileHashStore:
             return file
 
         # Check for relative path.
-        relpath = os.path.join(self.root, file)
+        rel_root = ""
+        if entity == "objects":
+            rel_root = self.objects
+        elif entity == "sysmeta":
+            rel_root = self.sysmeta
+        else:
+            raise ValueError(f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?")
+        relpath = os.path.join(rel_root, file)
         if os.path.isfile(relpath):
             return relpath
 
         # Check for sharded path.
-        filepath = self.build_abs_path(file)
-        if os.path.isfile(filepath):
-            return filepath
+        abspath = self.build_abs_path(entity, file)
+        if os.path.isfile(abspath):
+            return abspath
 
         # Could not determine a match.
         return None
 
-    def build_abs_path(self, ab_id, extension=""):
+    def build_abs_path(self, entity, ab_id, extension=""):
         """Build the absolute file path for a given hash id with an optional file extension.
 
         Args:
+            entity (str): desired entity type (ex. "objects", "sysmeta")
             ab_id (str): A hash id to build a file path for
             extension (str): An optional file extension to append to the file path.
 
@@ -792,13 +805,14 @@ class FileHashStore:
             absolute_path (str): An absolute file path for the specified hash id
         """
         paths = self.shard(ab_id)
+        root_dir = self._get_store_path(entity)
 
         if extension and not extension.startswith(os.extsep):
             extension = os.extsep + extension
         elif not extension:
             extension = ""
 
-        absolute_path = os.path.join(self.root, *paths) + extension
+        absolute_path = os.path.join(root_dir, *paths) + extension
         return absolute_path
 
     def shard(self, digest):

@@ -11,22 +11,39 @@ from contextlib import closing
 from tempfile import NamedTemporaryFile
 from collections import namedtuple
 from hashstore.hashstore_interface import HashStoreInterface
+from hashstore.hashstore_config import (
+    DIR_DEPTH,
+    DIR_WIDTH,
+    SYSMETA_NS,
+    DEFAULT_ALGO_LIST,
+    OTHER_ALGO_LIST,
+)
 
 
 class HashStoreFactory:
-    """A factory class for creating `hashstore` objects based on a given store type.
+    """A factory class for creating `HashStore`-like objects (classes
+    that implement the 'hashstore_interface' abstract methods)
 
-    This factory class provides a method to retrieve a `hashstore` object based on
-    the specified store type (ex. FileHashStore). It supports the creation of different types of hash
-    stores by mapping store types to specific implementations.
+    This factory class provides a method to retrieve a `hashstore` object
+    based on the specified store type (ex. FileHashStore). It supports the
+    creation of different types of hash stores by mapping store types to
+    specific implementations.
     """
 
-    def get_hashstore(self, store_path, store_type):
-        """Get a hash store object based on the specified store type.
+    def __init__(self):
+        """Initialize the HashStoreFactory with default config values"""
+        self.dir_depth = DIR_DEPTH
+        self.dir_width = DIR_WIDTH
+        self.sysmeta_ns = SYSMETA_NS
+        self.default_algo_list = DEFAULT_ALGO_LIST
+        self.other_algo_list = OTHER_ALGO_LIST
+
+    def get_hashstore(self, store_path, hashstore_type):
+        """Get a `HashStore`-like object based on the specified store type.
 
         Args:
             root (str): The root directory for the hash store.
-            store_type (str): The type of hash store to retrieve.
+            hashstore_type (str): The type of `HashStore` to retrieve.
 
         Returns:
             HashStore: A hash store object based on the given store type.
@@ -34,11 +51,18 @@ class HashStoreFactory:
         Raises:
             ValueError: If the given store_type is not supported.
         """
-        store_type.lower()
-        if store_type == "filehashstore":
-            return FileHashStore(store_path)
+        hashstore_type.lower()
+        if hashstore_type == "filehashstore":
+            return FileHashStore(
+                root=store_path,
+                depth=self.dir_depth,
+                width=self.dir_width,
+                sysmeta_ns=self.sysmeta_ns,
+                default_algo_list=self.default_algo_list,
+                other_algo_list=self.other_algo_list,
+            )
         else:
-            raise ValueError(f"store_type: {store_type} is not supported.")
+            raise ValueError(f"hashstore_type: {hashstore_type} is not supported.")
 
 
 class HashStore:
@@ -46,26 +70,13 @@ class HashStore:
     utilizes a persistent identifier (PID) in the form of a hex digest
     value to address files."""
 
-    # Class variables
-    dir_depth = 3  # The number of directory levels for storing files
-    dir_width = 2  # The width of the directory names, in characters
-    sysmeta_ns = "http://ns.dataone.org/service/types/v2.0"
-
     @staticmethod
     def version():
         """Return the version number"""
         __version__ = importlib.metadata.version("hashstore")
         return __version__
 
-    def __init__(self, store_path):
-        """Initialize the hashstore"""
-        self.store_path = store_path
-        self.filehashstore = FileHashStore(
-            self.store_path,
-            depth=self.dir_depth,
-            width=self.dir_width,
-            algorithm="sha256",
-        )
+    hashstore_factory = HashStoreFactory()
 
 
 class FileHashStore(HashStoreInterface):
@@ -92,35 +103,35 @@ class FileHashStore(HashStoreInterface):
     """
 
     def __init__(
-        self, root, depth=3, width=2, algorithm="sha256", fmode=0o664, dmode=0o755
+        self,
+        root,
+        depth=3,
+        width=2,
+        algorithm="sha256",
+        sysmeta_ns=None,
+        default_algo_list=None,
+        other_algo_list=None,
+        fmode=0o664,
+        dmode=0o755,
     ):
         self.root = os.path.realpath(root)
         self.objects = self.root + "/objects"
         self.sysmeta = self.root + "/sysmeta"
+        self.sysmeta_ns = sysmeta_ns
         self.depth = depth
         self.width = width
         self.algorithm = algorithm
+        self.default_algo_list = default_algo_list
+        self.other_algo_list = other_algo_list
         self.fmode = fmode
         self.dmode = dmode
 
     # Class variables
-    sysmeta_ns = "http://ns.dataone.org/service/types/v2.0"
     time_out_sec = 1
     object_lock = threading.Lock()
     sysmeta_lock = threading.Lock()
     object_locked_pids = []
     sysmeta_locked_pids = []
-    # Algorithm values supported by python hashlib 3.9.0+
-    default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
-    other_algo_list = [
-        "sha224",
-        "sha3_224",
-        "sha3_256",
-        "sha3_384",
-        "sha3_512",
-        "blake2b",
-        "blake2s",
-    ]
 
     # Public API / HashStore Interface Methods
 

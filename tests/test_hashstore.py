@@ -82,7 +82,7 @@ def test_store_object_files_path(pids, store):
         _hash_address = store.store_object(pid, path)
         ab_id = store.store_sysmeta(pid, syspath)
         assert store.objects.exists(ab_id)
-    assert store.objects.count() == 3
+    assert store.objects.count("objects") == 3
 
 
 def test_store_object_files_string(pids, store):
@@ -95,7 +95,7 @@ def test_store_object_files_string(pids, store):
         _hash_address = store.store_object(pid, path_string)
         ab_id = store.store_sysmeta(pid, syspath)
         assert store.objects.exists(ab_id)
-    assert store.objects.count() == 3
+    assert store.objects.count("objects") == 3
 
 
 def test_store_object_files_input_stream(pids, store):
@@ -108,7 +108,7 @@ def test_store_object_files_input_stream(pids, store):
         input_stream.close()
         ab_id = store.objects.get_sha256_hex_digest(pid)
         assert store.objects.exists(ab_id)
-    assert store.objects.count() == 3
+    assert store.objects.count("objects") == 3
 
 
 def test_store_object_id(pids, store):
@@ -283,7 +283,7 @@ def test_store_object_checksum_correct(store):
     _hash_address = store.store_object(
         pid, path, checksum=checksum_correct, checksum_algorithm=algorithm_other
     )
-    assert store.objects.count() == 1
+    assert store.objects.count("objects") == 1
 
 
 def test_store_object_checksum_algorithm_empty(store):
@@ -361,7 +361,7 @@ def test_store_object_duplicate_raises_error(store):
     # Store second blob
     with pytest.raises(FileExistsError):
         _hash_address_two = store.store_object(pid, path)
-    assert store.objects.count() == 1
+    assert store.objects.count("objects") == 1
     ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
 
@@ -391,7 +391,7 @@ def test_store_object_duplicates_threads(store):
     thread2.join()
     thread3.join()
     # One thread will succeed, file count must still be 1
-    assert store.objects.count() == 1
+    assert store.objects.count("objects") == 1
     ab_id = store.objects.get_sha256_hex_digest(pid)
     assert store.objects.exists(ab_id)
     assert file_exists_error_flag
@@ -407,7 +407,7 @@ def test_store_sysmeta_files_path(pids, store):
         _hash_address = store.store_object(pid, path)
         ab_id = store.store_sysmeta(pid, syspath)
         assert store.sysmeta.exists(ab_id)
-    assert store.sysmeta.count() == 3
+    assert store.sysmeta.count("objects") == 3
 
 
 def test_store_sysmeta_files_string(pids, store):
@@ -420,7 +420,7 @@ def test_store_sysmeta_files_string(pids, store):
         _hash_address = store.store_object(pid, path_string)
         ab_id = store.store_sysmeta(pid, syspath_string)
         assert store.sysmeta.exists(ab_id)
-    assert store.sysmeta.count() == 3
+    assert store.sysmeta.count("objects") == 3
 
 
 def test_store_sysmeta_files_input_stream(pids, store):
@@ -434,7 +434,7 @@ def test_store_sysmeta_files_input_stream(pids, store):
         syspath_stream = io.open(syspath_string, "rb")
         _ab_id = store.store_sysmeta(pid, syspath_stream)
         syspath_stream.close()
-    assert store.sysmeta.count() == 3
+    assert store.sysmeta.count("objects") == 3
 
 
 def test_store_sysmeta_pid_empty(store):
@@ -507,7 +507,7 @@ def test_store_sysmeta_thread_lock(store):
     thread2.join()
     thread3.join()
     thread4.join()
-    assert store.sysmeta.count() == 1
+    assert store.sysmeta.count("objects") == 1
 
 
 def test_retrieve_object(pids, store):
@@ -579,7 +579,7 @@ def test_delete_objects(pids, store):
         _hash_address = store.store_object(pid, path)
         _ab_id = store.store_sysmeta(pid, syspath)
         store.delete_object(pid)
-    assert store.objects.count() == 0
+    assert store.objects.count("objects") == 0
 
 
 def test_delete_object_pid_empty(store):
@@ -606,7 +606,7 @@ def test_delete_sysmeta(pids, store):
         _hash_address = store.store_object(pid, path)
         _ab_id = store.store_sysmeta(pid, syspath)
         store.delete_sysmeta(pid)
-    assert store.sysmeta.count() == 0
+    assert store.sysmeta.count("objects") == 0
 
 
 def test_delete_sysmeta_pid_empty(store):

@@ -305,7 +305,8 @@ class FileHashStore:
         self, root, depth=4, width=1, algorithm="sha256", fmode=0o664, dmode=0o755
     ):
         self.root = os.path.realpath(root)
-
+        self.objects = self.root + "/objects"
+        self.sysmeta = self.root + "/sysmeta"
         self.depth = depth
         self.width = width
         self.algorithm = algorithm
@@ -325,10 +326,18 @@ class FileHashStore:
         "blake2s",
     ]
 
-    def _get_store_path(self):
-        """Return a path object of the root directory of the store."""
-        root_directory = Path(self.root)
-        return root_directory
+    def _get_store_path(self, entity):
+        """Return a path object of the root directory of the store.
+
+        Args:
+            entity (str): desired entity type (ex. "objects", "sysmeta")
+        """
+        if entity == "objects":
+            return Path(self.objects)
+        elif entity == "sysmeta":
+            return Path(self.sysmeta)
+        else:
+            raise ValueError(f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?")
 
     def clean_algorithm(self, algorithm_string):
         """Format a string and ensure that it is supported and compatible with
@@ -526,7 +535,7 @@ class FileHashStore:
         """
 
         # Create temporary file in .../{store_path}/tmp
-        tmp_root_path = self._get_store_path() / "tmp"
+        tmp_root_path = self._get_store_path("objects") / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
@@ -585,7 +594,7 @@ class FileHashStore:
         # Target path (permanent location)
         ab_id = self.get_sha256_hex_digest(pid)
         rel_path = "/".join(self.shard(ab_id))
-        full_path = self._get_store_path() / rel_path
+        full_path = self._get_store_path("sysmeta") / rel_path
 
         # Move sysmeta to target path
         if os.path.exists(sysmeta_tmp):
@@ -621,7 +630,7 @@ class FileHashStore:
             tmp.name (string): Name of temporary file created and written into
         """
         # Create temporary file in .../{store_path}/tmp
-        tmp_root_path = self._get_store_path() / "tmp"
+        tmp_root_path = self._get_store_path("sysmeta") / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
@@ -819,14 +828,25 @@ class FileHashStore:
 
         return hierarchical_list
 
-    def count(self):
+    def count(self, entity):
         """Return count of the number of files in the `root` directory.
+
+        Args:
+            entity (str): 
 
         Returns:
             count (int): Number of files in the directory.
         """
         count = 0
-        for _, _, files in os.walk(self.root):
+        directory_to_count = ""
+        if entity == "objects":
+            directory_to_count = self.objects
+        elif entity == "sysmeta":
+            directory_to_count = self.sysmeta
+        else:
+            raise ValueError(f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?")
+
+        for _, _, files in os.walk(directory_to_count):
             for _ in files:
                 count += 1
         return count

@@ -103,7 +103,7 @@ def test_put_files_stream(pids, store):
         input_stream.close()
         hashaddress_id = hash_address.id
         assert store.objects.exists(hashaddress_id)
-    assert store.objects.count() == 3
+    assert store.objects.count("objects") == 3
 
 
 def test_put_id(pids, store):
@@ -186,7 +186,7 @@ def test_put_with_correct_checksums(pids, store):
         store.objects.put_object(
             pid, path, checksum=algo_checksum, checksum_algorithm=algo
         )
-    assert store.objects.count() == 3
+    assert store.objects.count("objects") == 3
 
 
 def test_put_with_incorrect_checksum(pids, store):
@@ -200,7 +200,7 @@ def test_put_with_incorrect_checksum(pids, store):
             store.objects.put_object(
                 pid, path, checksum=algo_checksum, checksum_algorithm=algo
             )
-    assert store.objects.count() == 0
+    assert store.objects.count("objects") == 0
 
 
 def test_move_and_get_checksums_id(pids, store):
@@ -279,7 +279,7 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
             # pylint: disable=W0212
             store.objects._move_and_get_checksums(pid, input_stream)
             input_stream.close()
-    assert store.objects.count() == 3
+    assert store.objects.count("objects") == 3
 
 
 def test_mktempfile_hex_digests(pids, store):
@@ -382,7 +382,7 @@ def test_to_bytes(store):
 def test_get_store_path_object(store):
     """Check get_store_path for object path"""
     # pylint: disable=W0212
-    path_objects = store.objects._get_store_path()
+    path_objects = store.objects._get_store_path("objects")
     path_objects_string = str(path_objects)
     assert path_objects_string.endswith("/metacat/objects")
 
@@ -390,7 +390,7 @@ def test_get_store_path_object(store):
 def test_get_store_path_sysmeta(store):
     """Check get_store_path for sysmeta path"""
     # pylint: disable=W0212
-    path_sysmeta = store.sysmeta._get_store_path()
+    path_sysmeta = store.sysmeta._get_store_path("sysmeta")
     path_sysmeta_string = str(path_sysmeta)
     assert path_sysmeta_string.endswith("/metacat/sysmeta")
 
@@ -433,7 +433,7 @@ def test_delete_by_id(pids, store):
         hash_address = store.objects.put_object(pid, path)
         hashaddress_id = hash_address.id
         store.objects.delete(hashaddress_id)
-    assert store.objects.count() == 0
+    assert store.objects.count("objects") == 0
 
 
 def test_delete_by_path(pids, store):
@@ -444,7 +444,7 @@ def test_delete_by_path(pids, store):
         hash_address = store.objects.put_object(pid, path)
         hashaddress_relpath = hash_address.relpath
         store.objects.delete(hashaddress_relpath)
-    assert store.objects.count() == 0
+    assert store.objects.count("objects") == 0
 
 
 def test_remove_empty_removes_empty_folders_string(store):
@@ -644,4 +644,4 @@ def test_count(pids, store):
     for pid in pids.keys():
         path_string = test_dir + pid.replace("/", "_")
         store.objects.put_object(pid, path_string)
-    assert store.objects.count() == 3
+    assert store.objects.count("objects") == 3

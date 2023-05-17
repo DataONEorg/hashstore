@@ -41,7 +41,7 @@ class HashStoreFactory:
             raise ValueError(f"store_type: {store_type} is not supported.")
 
 
-class HashStore():
+class HashStore:
     """HashStore is a content-addressable file management system that
     utilizes a persistent identifier (PID) in the form of a hex digest
     value to address files."""
@@ -50,11 +50,6 @@ class HashStore():
     dir_depth = 3  # The number of directory levels for storing files
     dir_width = 2  # The width of the directory names, in characters
     sysmeta_ns = "http://ns.dataone.org/service/types/v2.0"
-    time_out_sec = 1
-    object_lock = threading.Lock()
-    sysmeta_lock = threading.Lock()
-    object_locked_pids = []
-    sysmeta_locked_pids = []
 
     @staticmethod
     def version():
@@ -76,7 +71,8 @@ class HashStore():
 class FileHashStore(HashStoreInterface):
     """FileHashStore is a content addressable file manager based on Derrick
     Gilland's 'hashfs' library. It supports the storage of objects on disk using
-    an authority-based identifier's hex digest with a given hash algorithm.
+    an authority-based identifier's hex digest with a given hash algorithm value
+    to address files.
 
     Args:
         root (str): Directory path used as root of storage space.

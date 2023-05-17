@@ -326,68 +326,8 @@ class FileHashStore:
         "blake2s",
     ]
 
-    def _get_store_path(self, entity):
-        """Return a path object of the root directory of the store.
+    # FileHashStore Core Methods
 
-        Args:
-            entity (str): desired entity type (ex. "objects", "sysmeta")
-        """
-        if entity == "objects":
-            return Path(self.objects)
-        elif entity == "sysmeta":
-            return Path(self.sysmeta)
-        else:
-            raise ValueError(f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?")
-
-    def clean_algorithm(self, algorithm_string):
-        """Format a string and ensure that it is supported and compatible with
-        the python hashlib library.
-
-        Args:
-            algorithm_string (string): algorithm to validate
-
-        Returns:
-            cleaned_string (string): hashlib supported algorithm string
-        """
-        count = 0
-        for char in algorithm_string:
-            if char.isdigit():
-                count += 1
-        if count > 3:
-            cleaned_string = algorithm_string.lower().replace("-", "_")
-        else:
-            cleaned_string = algorithm_string.lower().replace("-", "").replace("_", "")
-        # Validate string
-        if (
-            cleaned_string not in self.default_algo_list
-            and cleaned_string not in self.other_algo_list
-        ):
-            raise ValueError(f"Algorithm not supported: {cleaned_string}")
-        return cleaned_string
-
-    def computehash(self, stream, algorithm=None):
-        """Compute hash of a file-like object using :attr:`algorithm` by default
-        or with optional algorithm supported.
-
-        Args:
-            stream (io.BufferedReader): a buffered stream of an ab_id object
-            algorithm (string): algorithm of hex digest to generate
-
-        Returns:
-            hex_digest (string): hex digest
-        """
-        if algorithm is None:
-            hashobj = hashlib.new(self.algorithm)
-        else:
-            check_algorithm = self.clean_algorithm(algorithm)
-            hashobj = hashlib.new(check_algorithm)
-        for data in stream:
-            hashobj.update(self._to_bytes(data))
-        hex_digest = hashobj.hexdigest()
-        return hex_digest
-
-    # pylint: disable=W0237
-    # Intentional override for `file` and `extension` to adjust signature values
     def put_object(
         self,
         pid,
@@ -536,7 +476,7 @@ class FileHashStore:
         """
 
         # Create temporary file in .../{store_path}/tmp
-        tmp_root_path = self._get_store_path("objects") / "tmp"
+        tmp_root_path = self.get_store_path("objects") / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
@@ -595,7 +535,7 @@ class FileHashStore:
         # Target path (permanent location)
         ab_id = self.get_sha256_hex_digest(pid)
         rel_path = "/".join(self.shard(ab_id))
-        full_path = self._get_store_path("sysmeta") / rel_path
+        full_path = self.get_store_path("sysmeta") / rel_path
 
         # Move sysmeta to target path
         if os.path.exists(sysmeta_tmp):
@@ -631,7 +571,7 @@ class FileHashStore:
             tmp.name (string): Name of temporary file created and written into
         """
         # Create temporary file in .../{store_path}/tmp
-        tmp_root_path = self._get_store_path("sysmeta") / "tmp"
+        tmp_root_path = self.get_store_path("sysmeta") / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
@@ -653,6 +593,111 @@ class FileHashStore:
                 tmp_file.write(self._to_bytes(data))
 
         return tmp.name
+
+    # FileHashStore Utility & Supporting Methods
+
+    def clean_algorithm(self, algorithm_string):
+        """Format a string and ensure that it is supported and compatible with
+        the python hashlib library.
+
+        Args:
+            algorithm_string (string): algorithm to validate
+
+        Returns:
+            cleaned_string (string): hashlib supported algorithm string
+        """
+        count = 0
+        for char in algorithm_string:
+            if char.isdigit():
+                count += 1
+        if count > 3:
+            cleaned_string = algorithm_string.lower().replace("-", "_")
+        else:
+            cleaned_string = algorithm_string.lower().replace("-", "").replace("_", "")
+        # Validate string
+        if (
+            cleaned_string not in self.default_algo_list
+            and cleaned_string not in self.other_algo_list
+        ):
+            raise ValueError(f"Algorithm not supported: {cleaned_string}")
+        return cleaned_string
+
+    def computehash(self, stream, algorithm=None):
+        """Compute hash of a file-like object using :attr:`algorithm` by default
+        or with optional algorithm supported.
+
+        Args:
+            stream (io.BufferedReader): a buffered stream of an ab_id object
+            algorithm (string): algorithm of hex digest to generate
+
+        Returns:
+            hex_digest (string): hex digest
+        """
+        if algorithm is None:
+            hashobj = hashlib.new(self.algorithm)
+        else:
+            check_algorithm = self.clean_algorithm(algorithm)
+            hashobj = hashlib.new(check_algorithm)
+        for data in stream:
+            hashobj.update(self._to_bytes(data))
+        hex_digest = hashobj.hexdigest()
+        return hex_digest
+
+    def get_store_path(self, entity):
+        """Return a path object of the root directory of the store.
+
+        Args:
+            entity (str): desired entity type (ex. "objects", "sysmeta")
+        """
+        if entity == "objects":
+            return Path(self.objects)
+        elif entity == "sysmeta":
+            return Path(self.sysmeta)
+        else:
+            raise ValueError(
+                f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?"
+            )
+
+    def exists(self, entity, file):
+        """Check whether a given file id or path exists on disk.
+
+        Args:
+            entity (str): desired entity type (ex. "objects", "sysmeta")
+            file (str): The name of the file to check.
+
+        Returns:
+            file_exists (bool): True if the file exists
+
+        """
+        file_exists = bool(self.get_real_path(entity, file))
+        return file_exists
+
+    def shard(self, digest):
+        """Generates a list given a digest of `self.depth` number of tokens with width
+            `self.width` from the first part of the digest plus the remainder.
+
+        Example:
+            ['0d', '55', '5e', 'd77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e']
+
+        Args:
+            digest (str): The string to be divided into tokens.
+
+        Returns:
+            hierarchical_list (list): A list containing the tokens of fixed width
+        """
+
+        def compact(items):
+            """Return only truthy elements of `items`."""
+            return [item for item in items if item]
+
+        # This creates a list of `depth` number of tokens with width
+        # `width` from the first part of the id plus the remainder.
+        hierarchical_list = compact(
+            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
+            + [digest[self.depth * self.width :]]
+        )
+
+        return hierarchical_list
 
     def open(self, entity, file, mode="rb"):
         """Return open buffer object from given id or path. Caller is responsible
@@ -742,20 +787,6 @@ class FileHashStore:
         except FileExistsError:
             assert os.path.isdir(path), f"expected {path} to be a directory"
 
-    def exists(self, entity, file):
-        """Check whether a given file id or path exists on disk.
-
-        Args:
-            entity (str): desired entity type (ex. "objects", "sysmeta")
-            file (str): The name of the file to check.
-
-        Returns:
-            file_exists (bool): True if the file exists
-
-        """
-        file_exists = bool(self.get_real_path(entity, file))
-        return file_exists
-
     def get_real_path(self, entity, file):
         """Attempt to determine the real path of a file id or path through
         successive checking of candidate paths. If the real path is stored with
@@ -780,7 +811,9 @@ class FileHashStore:
         elif entity == "sysmeta":
             rel_root = self.sysmeta
         else:
-            raise ValueError(f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?")
+            raise ValueError(
+                f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?"
+            )
         relpath = os.path.join(rel_root, file)
         if os.path.isfile(relpath):
             return relpath
@@ -805,7 +838,7 @@ class FileHashStore:
             absolute_path (str): An absolute file path for the specified hash id
         """
         paths = self.shard(ab_id)
-        root_dir = self._get_store_path(entity)
+        root_dir = self.get_store_path(entity)
 
         if extension and not extension.startswith(os.extsep):
             extension = os.extsep + extension
@@ -815,38 +848,11 @@ class FileHashStore:
         absolute_path = os.path.join(root_dir, *paths) + extension
         return absolute_path
 
-    def shard(self, digest):
-        """Generates a list given a digest of `self.depth` number of tokens with width
-            `self.width` from the first part of the digest plus the remainder.
-
-        Example:
-            ['0d', '55', '5e', 'd77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e']
-
-        Args:
-            digest (str): The string to be divided into tokens.
-
-        Returns:
-            hierarchical_list (list): A list containing the tokens of fixed width
-        """
-
-        def compact(items):
-            """Return only truthy elements of `items`."""
-            return [item for item in items if item]
-
-        # This creates a list of `depth` number of tokens with width
-        # `width` from the first part of the id plus the remainder.
-        hierarchical_list = compact(
-            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
-            + [digest[self.depth * self.width :]]
-        )
-
-        return hierarchical_list
-
     def count(self, entity):
         """Return count of the number of files in the `root` directory.
 
         Args:
-            entity (str): 
+            entity (str):
 
         Returns:
             count (int): Number of files in the directory.
@@ -858,12 +864,16 @@ class FileHashStore:
         elif entity == "sysmeta":
             directory_to_count = self.sysmeta
         else:
-            raise ValueError(f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?")
+            raise ValueError(
+                f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?"
+            )
 
         for _, _, files in os.walk(directory_to_count):
             for _ in files:
                 count += 1
         return count
+
+    # Static Methods
 
     @staticmethod
     def _to_bytes(text):

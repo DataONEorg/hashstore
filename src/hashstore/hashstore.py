@@ -21,7 +21,7 @@ class HashStoreFactory:
     stores by mapping store types to specific implementations.
     """
 
-    def get_hashstore(self, root, store_type):
+    def get_hashstore(self, store_path, store_type):
         """Get a hash store object based on the specified store type.
 
         Args:
@@ -36,7 +36,7 @@ class HashStoreFactory:
         """
         store_type.lower()
         if store_type == "filehashstore":
-            return FileHashStore(root)
+            return FileHashStore(store_path)
         else:
             raise ValueError(f"store_type: {store_type} is not supported.")
 
@@ -305,6 +305,7 @@ class FileHashStore:
         self, root, depth=4, width=1, algorithm="sha256", fmode=0o664, dmode=0o755
     ):
         self.root = os.path.realpath(root)
+
         self.depth = depth
         self.width = width
         self.algorithm = algorithm

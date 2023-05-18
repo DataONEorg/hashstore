@@ -125,13 +125,11 @@ class FileHashStore(HashStoreInterface):
         self.other_algo_list = other_algo_list
         self.fmode = fmode
         self.dmode = dmode
-
-    # Class variables
-    time_out_sec = 1
-    object_lock = threading.Lock()
-    sysmeta_lock = threading.Lock()
-    object_locked_pids = []
-    sysmeta_locked_pids = []
+        self.time_out_sec = 1
+        self.object_lock = threading.Lock()
+        self.sysmeta_lock = threading.Lock()
+        self.object_locked_pids = []
+        self.sysmeta_locked_pids = []
 
     # Public API / HashStore Interface Methods
 

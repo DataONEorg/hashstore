@@ -94,6 +94,11 @@ class FileHashStore(HashStoreInterface):
         algorithm (str): Hash algorithm to use when computing file hash.
             Algorithm should be available in ``hashlib`` module. Defaults to
             ``'sha256'``.
+        sysmeta_ns (str): Format of the metadata.
+        default_algo_list (list): The default hash algorithms to include in the
+            dictionary returned when storing objects to disk.
+        other_algo_list (list): The additional hash algorithms that are supported
+            when storing objects to disk.
         fmode (int, optional): File mode permission to set when adding files to
             directory. Defaults to ``0o664`` which allows owner/group to
             read/write and everyone else to read.

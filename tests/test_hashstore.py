@@ -1,4 +1,4 @@
-"""Test module for HashStore"""
+"""Test module for HashStore (and HashStoreFactory)"""
 import importlib.metadata
 import pytest
 from hashstore import HashStore

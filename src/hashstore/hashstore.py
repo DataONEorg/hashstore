@@ -86,22 +86,20 @@ class FileHashStore(HashStoreInterface):
     to address files.
 
     Args:
-        root (str): Directory path used as root of storage space.
-        depth (int, optional): Depth of subfolders to create when saving a
-            file.
-        width (int, optional): Width of each subfolder to create when saving a
-            file.
+        root (str): Directory path used as root of storage space. \n
+        depth (int, optional): Depth of subfolders to create when saving a file. \n
+        width (int, optional): Width of each subfolder to create when saving a file. \n
         algorithm (str): Hash algorithm to use when computing file hash.
             Algorithm should be available in ``hashlib`` module. Defaults to
-            ``'sha256'``.
-        sysmeta_ns (str): Format of the metadata.
+            ``'sha256'``. \n
+        sysmeta_ns (str): Format of the metadata. \n
         default_algo_list (list): The default hash algorithms to include in the
-            dictionary returned when storing objects to disk.
+            dictionary returned when storing objects to disk. \n
         other_algo_list (list): The additional hash algorithms that are supported
-            when storing objects to disk.
+            when storing objects to disk. \n
         fmode (int, optional): File mode permission to set when adding files to
-            directory. Defaults to ``0o664`` which allows owner/group to
-            read/write and everyone else to read.
+            directory. Defaults to ``0o664`` which allows owner/group to read/write
+            and everyone else to read. \n
         dmode (int, optional): Directory mode permission to set for
             subdirectories. Defaults to ``0o755`` which allows owner/group to
             read/write and everyone else to read and everyone to execute.
@@ -221,7 +219,7 @@ class FileHashStore(HashStoreInterface):
         with self.sysmeta_lock:
             self.sysmeta_locked_pids.append(pid)
         try:
-            sysmeta_cid = self.put_sysmeta(pid, sysmeta, self.sysmeta_ns)
+            sysmeta_cid = self.put_sysmeta(pid, sysmeta)
         finally:
             # Release pid
             with self.sysmeta_lock:
@@ -305,20 +303,20 @@ class FileHashStore(HashStoreInterface):
         """Store contents of `file` on disk using the hash of the given pid
 
         Args:
-            pid (string): authority-based identifier
-            file (mixed): Readable object or path to file.
+            pid (string): Authority-based identifier. \n
+            file (mixed): Readable object or path to file. \n
             extension (str, optional): Optional extension to append to file
-                when saving.
+                when saving. \n
             additional_algorithm (str, optional): Optional algorithm value to include
-                when returning hex digests.
+                when returning hex digests. \n
             checksum (str, optional): Optional checksum to validate object
-                against hex digest before moving to permanent location.
-            checksum_algorithm (str, optional): Algorithm value of given checksum
+                against hex digest before moving to permanent location. \n
+            checksum_algorithm (str, optional): Algorithm value of given checksum.
 
         Returns:
             hash_address (HashAddress): object that contains the permanent address,
             relative file path, absolute file path, duplicate file boolean and hex
-            digest dictionary
+            digest dictionary.
         """
         stream = Stream(file)
 
@@ -362,20 +360,20 @@ class FileHashStore(HashStoreInterface):
         not match what is provided).
 
         Args:
-            pid (string): authority-based identifier
-            stream (io.BufferedReader): object stream
+            pid (string): authority-based identifier. \n
+            stream (io.BufferedReader): object stream. \n
             extension (str, optional): Optional extension to append to file
-                when saving.
+                when saving. \n
             additional_algorithm (str, optional): Optional algorithm value to include
-                when returning hex digests.
+                when returning hex digests. \n
             checksum (str, optional): Optional checksum to validate object
-                against hex digest before moving to permanent location.
-            checksum_algorithm (str, optional): Algorithm value of given checksum
+                against hex digest before moving to permanent location. \n
+            checksum_algorithm (str, optional): Algorithm value of given checksum. \n
 
         Returns:
             hash_address (HashAddress): object that contains the permanent address,
             relative file path, absolute file path, duplicate file boolean and hex
-            digest dictionary
+            digest dictionary.
         """
         entity = "objects"
         ab_id = self.get_sha256_hex_digest(pid)
@@ -431,13 +429,13 @@ class FileHashStore(HashStoreInterface):
         the dictionary.
 
         Args:
-            stream (io.BufferedReader): object stream
-            algorithm (string): algorithm of additional hex digest to generate
+            stream (io.BufferedReader): Object stream.
+            algorithm (string): Algorithm of additional hex digest to generate.
 
         Returns:
             hex_digest_dict, tmp.name (tuple pack):
-                hex_digest_dict (dictionary): algorithms and their hex digests
-                tmp.name: Name of temporary file created and written into
+                hex_digest_dict (dictionary): Algorithms and their hex digests.
+                tmp.name: Name of temporary file created and written into.
         """
 
         # Create temporary file in .../{store_path}/tmp
@@ -480,22 +478,22 @@ class FileHashStore(HashStoreInterface):
 
         return hex_digest_dict, tmp.name
 
-    def put_sysmeta(self, pid, sysmeta, namespace):
+    def put_sysmeta(self, pid, sysmeta):
         """Store contents of `sysmeta` on disk using the hash of the given pid
 
         Args:
-            pid (string): authority-based identifier
-            sysmeta (mixed): string or path to sysmeta document
-            namespace (string): sysmeta format
+            pid (string): Authority-based identifier.
+            sysmeta (mixed): String or path to sysmeta document.
+            namespace (string): Sysmeta format.
 
         Returns:
-            ab_id (string): address of the sysmeta document
+            ab_id (string): Address of the sysmeta document.
         """
 
         # Create tmp file and write to it
         sysmeta_stream = Stream(sysmeta)
         with closing(sysmeta_stream):
-            sysmeta_tmp = self._mktmpsysmeta(sysmeta_stream, namespace)
+            sysmeta_tmp = self._mktmpsysmeta(sysmeta_stream, self.sysmeta_ns)
 
         # Target path (permanent location)
         ab_id = self.get_sha256_hex_digest(pid)
@@ -526,14 +524,14 @@ class FileHashStore(HashStoreInterface):
             )
 
     def _mktmpsysmeta(self, stream, namespace):
-        """Create a named temporary file with `sysmeta` bytes and `namespace`
+        """Create a named temporary file with `sysmeta` bytes and `namespace`.
 
         Args:
-            stream (io.BufferedReader): sysmeta stream
-            namespace (string): format of sysmeta
+            stream (io.BufferedReader): Sysmeta stream.
+            namespace (string): Format of sysmeta.
 
         Returns:
-            tmp.name (string): Name of temporary file created and written into
+            tmp.name (string): Name of temporary file created and written into.
         """
         # Create temporary file in .../{store_path}/tmp
         tmp_root_path = self.get_store_path("sysmeta") / "tmp"
@@ -566,10 +564,10 @@ class FileHashStore(HashStoreInterface):
         the python hashlib library.
 
         Args:
-            algorithm_string (string): algorithm to validate
+            algorithm_string (string): Algorithm to validate.
 
         Returns:
-            cleaned_string (string): hashlib supported algorithm string
+            cleaned_string (string): `hashlib` supported algorithm string.
         """
         count = 0
         for char in algorithm_string:
@@ -592,11 +590,11 @@ class FileHashStore(HashStoreInterface):
         or with optional algorithm supported.
 
         Args:
-            stream (io.BufferedReader): a buffered stream of an ab_id object
-            algorithm (string): algorithm of hex digest to generate
+            stream (io.BufferedReader): A buffered stream of an ab_id object. \n
+            algorithm (string): Algorithm of hex digest to generate.
 
         Returns:
-            hex_digest (string): hex digest
+            hex_digest (string): Hex digest.
         """
         if algorithm is None:
             hashobj = hashlib.new(self.algorithm)
@@ -612,7 +610,7 @@ class FileHashStore(HashStoreInterface):
         """Return a path object of the root directory of the store.
 
         Args:
-            entity (str): desired entity type (ex. "objects", "sysmeta")
+            entity (str): Desired entity type (ex. "objects", "sysmeta").
         """
         if entity == "objects":
             return Path(self.objects)
@@ -627,11 +625,11 @@ class FileHashStore(HashStoreInterface):
         """Check whether a given file id or path exists on disk.
 
         Args:
-            entity (str): desired entity type (ex. "objects", "sysmeta")
+            entity (str): Desired entity type (ex. "objects", "sysmeta"). \n
             file (str): The name of the file to check.
 
         Returns:
-            file_exists (bool): True if the file exists
+            file_exists (bool): True if the file exists.
 
         """
         file_exists = bool(self.get_real_path(entity, file))
@@ -648,7 +646,7 @@ class FileHashStore(HashStoreInterface):
             digest (str): The string to be divided into tokens.
 
         Returns:
-            hierarchical_list (list): A list containing the tokens of fixed width
+            hierarchical_list (list): A list containing the tokens of fixed width.
         """
 
         def compact(items):
@@ -669,8 +667,8 @@ class FileHashStore(HashStoreInterface):
         for closing the stream.
 
         Args:
-            entity (str): desired entity type (ex. "objects", "sysmeta")
-            file (str): Address ID or path of file.
+            entity (str): Desired entity type (ex. "objects", "sysmeta"). \n
+            file (str): Address ID or path of file. \n
             mode (str, optional): Mode to open file in. Defaults to 'rb'.
 
         Returns:
@@ -690,7 +688,7 @@ class FileHashStore(HashStoreInterface):
         deleting. No exception is raised if file doesn't exist.
 
         Args:
-            entity (str): desired entity type (ex. "objects", "sysmeta")
+            entity (str): Desired entity type (ex. "objects", "sysmeta"). \n
             file (str): Address ID or path of file.
         """
         realpath = self.get_real_path(entity, file)
@@ -710,7 +708,7 @@ class FileHashStore(HashStoreInterface):
         folder.
 
         Args:
-            subpath (str, path): name of directory
+            subpath (str, path): Name of directory.
         """
         # Don't attempt to remove any folders if subpath is not a
         # subdirectory of the root directory.
@@ -727,10 +725,10 @@ class FileHashStore(HashStoreInterface):
         """Return whether `path` is a subdirectory of the `root` directory.
 
         Args:
-            path (str, path): name of path
+            path (str, path): Name of path.
 
         Returns:
-            is_subdir (boolean): true if subdirectory
+            is_subdir (boolean): `True` if subdirectory.
         """
         # Append os.sep so that paths like /usr/var2/log doesn't match /usr/var.
         root_path = os.path.realpath(self.root) + os.sep
@@ -759,11 +757,11 @@ class FileHashStore(HashStoreInterface):
         the expected file path of the id.
 
         Args:
-            entity (str): desired entity type (ex. "objects", "sysmeta")
-            file (string): Name of file
+            entity (str): desired entity type (ex. "objects", "sysmeta"). \n
+            file (string): Name of file.
 
         Returns:
-            exists (boolean): Whether file is found or not
+            exists (boolean): Whether file is found or not.
         """
         # Check for absolute path.
         if os.path.isfile(file):
@@ -795,12 +793,12 @@ class FileHashStore(HashStoreInterface):
         """Build the absolute file path for a given hash id with an optional file extension.
 
         Args:
-            entity (str): desired entity type (ex. "objects", "sysmeta")
-            ab_id (str): A hash id to build a file path for
+            entity (str): Desired entity type (ex. "objects", "sysmeta"). \n
+            ab_id (str): A hash id to build a file path for. \n
             extension (str): An optional file extension to append to the file path.
 
         Returns:
-            absolute_path (str): An absolute file path for the specified hash id
+            absolute_path (str): An absolute file path for the specified hash id.
         """
         paths = self.shard(ab_id)
         root_dir = self.get_store_path(entity)
@@ -817,7 +815,7 @@ class FileHashStore(HashStoreInterface):
         """Return count of the number of files in the `root` directory.
 
         Args:
-            entity (str):
+            entity (str): Desired entity type (ex. "objects", "sysmeta").
 
         Returns:
             count (int): Number of files in the directory.
@@ -842,7 +840,14 @@ class FileHashStore(HashStoreInterface):
 
     @staticmethod
     def _to_bytes(text):
-        """Convert text to sequence of bytes using utf-8 encoding."""
+        """Convert text to sequence of bytes using utf-8 encoding.
+        
+        Args:
+            text (str): String to convert.
+
+        Returns:
+            text (bytes): Bytes with utf-8 encoding.
+        """
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")
         return text
@@ -852,10 +857,10 @@ class FileHashStore(HashStoreInterface):
         """Calculate the SHA-256 digest of a UTF-8 encoded string.
 
         Args:
-            string (string)
+            string (string): String to convert.
 
         Returns:
-            hex (string): hexadecimal string
+            hex (string): Hexadecimal string.
         """
         hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
         return hex_digest

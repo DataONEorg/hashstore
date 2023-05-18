@@ -43,15 +43,15 @@ class HashStoreInterface(ABC):
         before moving the file to its permanent address.
 
         Args:
-            pid (string): authority-based identifier \n
-            data (mixed): string or path to object \n
-            additional_algorithm (string): additional hex digest to include \n
-            checksum (string): checksum to validate against \n
-            checksum_algorithm (string): algorithm of supplied checksum
+            pid (string): Authority-based identifier. \n
+            data (mixed): String or path to object. \n
+            additional_algorithm (string): Additional hex digest to include. \n
+            checksum (string): Checksum to validate against. \n
+            checksum_algorithm (string): Algorithm of supplied checksum.
 
         Returns:
-            address (HashAddress): object that contains the permanent address, relative
-            file path, absolute file path, duplicate file boolean and hex digest dictionary
+            address (HashAddress): Object that contains the permanent address, relative
+            file path, absolute file path, duplicate file boolean and hex digest dictionary.
         """
         raise NotImplementedError()
 
@@ -70,11 +70,11 @@ class HashStoreInterface(ABC):
         `/store_directory/sysmeta/` directory.
 
         Args:
-            pid (string): authority-based identifier \n
-            sysmeta (mixed): string or path to sysmeta document
+            pid (string): Authority-based identifier. \n
+            sysmeta (mixed): String or path to sysmeta document.
 
         Returns:
-            sysmeta_cid (string): address of the sysmeta document
+            sysmeta_cid (string): Address of the sysmeta document.
         """
         raise NotImplementedError()
 
@@ -86,10 +86,10 @@ class HashStoreInterface(ABC):
         method will open and return a buffered object stream ready to read from.
 
         Args:
-            pid (string): authority-based identifier
+            pid (string): Authority-based identifier.
 
         Returns:
-            obj_stream (io.BufferedReader): a buffered stream of an ab_id object
+            obj_stream (io.BufferedReader): A buffered stream of an ab_id object.
         """
         raise NotImplementedError()
 
@@ -99,10 +99,10 @@ class HashStoreInterface(ABC):
         returns it in the form of a String using a given persistent identifier.
 
         Args:
-            pid (string): authority-based identifier
+            pid (string): Authority-based identifier.
 
         Returns:
-            sysmeta (string): sysmeta content
+            sysmeta (string): Sysmeta content.
         """
         raise NotImplementedError()
 
@@ -112,10 +112,10 @@ class HashStoreInterface(ABC):
         given persistent identifier.
 
         Args:
-            pid (string): authority-based identifier
+            pid (string): Authority-based identifier.
 
         Returns:
-            boolean: True upon successful deletion
+            boolean: `True` upon successful deletion.
         """
         raise NotImplementedError()
 
@@ -125,10 +125,10 @@ class HashStoreInterface(ABC):
         from disk using a given persistent identifier.
 
         Args:
-            pid (string): authority-based identifier
+            pid (string): Authority-based identifier.
 
         Returns:
-            boolean: True upon successful deletion
+            boolean: `True` upon successful deletion.
         """
         raise NotImplementedError()
 
@@ -138,10 +138,10 @@ class HashStoreInterface(ABC):
         in HashStore using a given persistent identifier and hash algorithm.
 
         Args:
-            pid (string): authority-based identifier \n
-            algorithm (string): algorithm of hex digest to generate
+            pid (string): Authority-based identifier. \n
+            algorithm (string): Algorithm of hex digest to generate.
 
         Returns:
-            hex_digest (string): hex digest of the object
+            hex_digest (string): Hex digest of the object.
         """
         raise NotImplementedError()

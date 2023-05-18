@@ -4,6 +4,7 @@ from pathlib import Path
 from threading import Thread
 import pytest
 from hashstore import HashStore
+import random
 
 
 @pytest.fixture(name="pids")
@@ -401,6 +402,33 @@ def test_store_object_duplicates_threads(store):
     ab_id = store.get_sha256_hex_digest(pid)
     assert store.exists(entity, ab_id)
     assert file_exists_error_flag
+
+
+def test_store_object_large_file(store):
+    """Test storing a large object (1GB). This test has also been checked
+    for a 4GB file and the test classes succeeded locally in 296.85s (0:04:56)
+    """
+    # file_size = 4 * 1024 * 1024 * 1024  # 4GB
+    file_size = 1024 * 1024 * 1024  # 1GB
+    file_path = store.root + "random_file.bin"
+    # Generate a random file with the specified size
+    with open(file_path, "wb") as file:
+        remaining_bytes = file_size
+        buffer_size = 1024 * 1024  # 1MB buffer size (adjust as needed)
+
+        while remaining_bytes > 0:
+            # Generate random data for the buffer
+            buffer = bytearray(random.getrandbits(8) for _ in range(buffer_size))
+            # Write the buffer to the file
+            bytes_to_write = min(buffer_size, remaining_bytes)
+            file.write(buffer[:bytes_to_write])
+            remaining_bytes -= bytes_to_write
+    # Store object
+    pid = "testfile_filehashstore"
+    hash_address = store.store_object(pid, file_path)
+    hash_address_id = hash_address.id
+    pid_sha256_hex_digest = store.get_sha256_hex_digest(pid)
+    assert hash_address_id == pid_sha256_hex_digest
 
 
 def test_store_sysmeta_files_path(pids, store):

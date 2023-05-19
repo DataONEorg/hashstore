@@ -48,6 +48,8 @@ def init_store(tmp_path):
     directory = tmp_path / "metacat"
     directory.mkdir()
     hashstore_path = directory.as_posix()
+    # Note, objects generated via tests are placed in a temporary folder
+    # with the 'directory' parameter above appended
     store = FileHashStore(hashstore_path)
     return store
 

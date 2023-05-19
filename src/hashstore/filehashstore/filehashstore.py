@@ -8,8 +8,8 @@ import os
 from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
-from collections import namedtuple
-from hashstore.hashstore import HashStore
+from hashstore import HashStore
+from hashstore.hashaddress import HashAddress
 from hashstore.filehashstore.filehashstore_config import (
     STORE_PATH,
     DIR_DEPTH,
@@ -31,9 +31,7 @@ class FileHashStore(HashStore):
         "/var/filehashstore/" if no path supplied.
     """
 
-    def __init__(
-        self, root=None
-    ):
+    def __init__(self, root=None):
         if root is None:
             self.root = os.path.realpath(STORE_PATH)
         else:
@@ -784,31 +782,6 @@ class FileHashStore(HashStore):
         """
         hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
         return hex_digest
-
-
-class HashAddress(
-    namedtuple(
-        "HashAddress", ["id", "relpath", "abspath", "is_duplicate", "hex_digests"]
-    )
-):
-    """File address containing file's path on disk and its content hash ID.
-
-    Args:
-        ab_id (str): Hash ID (hexdigest) of file contents.
-        relpath (str): Relative path location to :attr:`HashFS.root`.
-        abspath (str): Absolute path location of file on disk.
-        is_duplicate (boolean, optional): Whether the hash address created was
-            a duplicate of a previously existing file. Can only be ``True``
-            after a put operation. Defaults to ``False``.
-        hex_digests (dict, optional): A list of hex digests to validate objects
-            (md5, sha1, sha256, sha384, sha512)
-    """
-
-    # Default value to prevent dangerous default value
-    def __new__(cls, ab_id, relpath, abspath, is_duplicate=False, hex_digests=None):
-        return super(HashAddress, cls).__new__(
-            cls, ab_id, relpath, abspath, is_duplicate, hex_digests
-        )
 
 
 class Stream(object):

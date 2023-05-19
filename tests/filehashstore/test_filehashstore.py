@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import pytest
 from hashstore.filehashstore.filehashstore import FileHashStore
-from hashstore.hashstore_config import (
+from hashstore.filehashstore.filehashstore_config import (
     DIR_DEPTH,
     DIR_WIDTH,
     SYSMETA_NS,

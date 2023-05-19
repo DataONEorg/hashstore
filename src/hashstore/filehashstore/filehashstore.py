@@ -10,7 +10,7 @@ from contextlib import closing
 from tempfile import NamedTemporaryFile
 from collections import namedtuple
 from hashstore.hashstore import HashStore
-from hashstore.hashstore_config import (
+from hashstore.filehashstore.filehashstore_config import (
     STORE_PATH,
     DIR_DEPTH,
     DIR_WIDTH,

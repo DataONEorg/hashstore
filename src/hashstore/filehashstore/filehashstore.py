@@ -27,23 +27,8 @@ class FileHashStore(HashStore):
     to address files.
 
     Args:
-        root (str): Directory path used as root of storage space. \n
-        depth (int, optional): Depth of subfolders to create when saving a file. \n
-        width (int, optional): Width of each subfolder to create when saving a file. \n
-        algorithm (str): Hash algorithm to use when computing file hash.
-            Algorithm should be available in ``hashlib`` module. Defaults to
-            ``'sha256'``. \n
-        sysmeta_ns (str): Format of the metadata. \n
-        default_algo_list (list): The default hash algorithms to include in the
-            dictionary returned when storing objects to disk. \n
-        other_algo_list (list): The additional hash algorithms that are supported
-            when storing objects to disk. \n
-        fmode (int, optional): File mode permission to set when adding files to
-            directory. Defaults to ``0o664`` which allows owner/group to read/write
-            and everyone else to read. \n
-        dmode (int, optional): Directory mode permission to set for
-            subdirectories. Defaults to ``0o755`` which allows owner/group to
-            read/write and everyone else to read and everyone to execute.
+        root (str): Directory path used as root of storage space. Defaults to
+        "/var/filehashstore/" if no path supplied.
     """
 
     def __init__(

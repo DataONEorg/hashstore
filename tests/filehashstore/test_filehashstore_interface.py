@@ -2,9 +2,9 @@
 import io
 from pathlib import Path
 from threading import Thread
-import pytest
-from hashstore import HashStore
 import random
+import pytest
+from hashstore.filehashstore.filehashstore import FileHashStore
 
 
 @pytest.fixture(name="pids")
@@ -48,10 +48,7 @@ def init_store(tmp_path):
     directory = tmp_path / "metacat"
     directory.mkdir()
     hashstore_path = directory.as_posix()
-    hashstore_type = "filehashstore"
-    # Get factory and hashstore
-    factory = HashStore.hashstore_factory
-    store = factory.get_hashstore(hashstore_path, hashstore_type)
+    store = FileHashStore(hashstore_path)
     return store
 
 

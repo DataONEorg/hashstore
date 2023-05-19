@@ -4,7 +4,6 @@ import shutil
 import threading
 import time
 import hashlib
-import importlib.metadata
 import os
 from pathlib import Path
 from contextlib import closing
@@ -12,71 +11,13 @@ from tempfile import NamedTemporaryFile
 from collections import namedtuple
 from hashstore.hashstore_interface import HashStoreInterface
 from hashstore.hashstore_config import (
+    STORE_PATH,
     DIR_DEPTH,
     DIR_WIDTH,
     SYSMETA_NS,
     DEFAULT_ALGO_LIST,
     OTHER_ALGO_LIST,
 )
-
-
-class HashStoreFactory:
-    """A factory class for creating `HashStore`-like objects (classes
-    that implement the 'hashstore_interface' abstract methods)
-
-    This factory class provides a method to retrieve a `hashstore` object
-    based on the specified store type (ex. FileHashStore). It supports the
-    creation of different types of hash stores by mapping store types to
-    specific implementations.
-    """
-
-    def __init__(self):
-        """Initialize the HashStoreFactory with default config values"""
-        self.dir_depth = DIR_DEPTH
-        self.dir_width = DIR_WIDTH
-        self.sysmeta_ns = SYSMETA_NS
-        self.default_algo_list = DEFAULT_ALGO_LIST
-        self.other_algo_list = OTHER_ALGO_LIST
-
-    def get_hashstore(self, store_path, hashstore_type):
-        """Get a `HashStore`-like object based on the specified store type.
-
-        Args:
-            store_path (str): The root directory for the hash store.
-            hashstore_type (str): The type of `HashStore` to retrieve.
-
-        Returns:
-            HashStore: A hash store object based on the given store type.
-
-        Raises:
-            ValueError: If the given store_type is not supported.
-        """
-        hashstore_type.lower()
-        if hashstore_type == "filehashstore":
-            return FileHashStore(
-                root=store_path,
-                depth=self.dir_depth,
-                width=self.dir_width,
-                sysmeta_ns=self.sysmeta_ns,
-                default_algo_list=self.default_algo_list,
-                other_algo_list=self.other_algo_list,
-            )
-        else:
-            raise ValueError(f"hashstore_type: {hashstore_type} is not supported.")
-
-
-class HashStore:
-    """HashStore is a content-addressable file management system that
-    utilizes a persistent identifier (PID) in the form of a hex digest
-    value to address files."""
-
-    @staticmethod
-    def version():
-        """Return the version number"""
-        __version__ = importlib.metadata.version("hashstore")
-        return __version__
-
-    hashstore_factory = HashStoreFactory()
 
 
 class FileHashStore(HashStoreInterface):
@@ -106,28 +47,22 @@ class FileHashStore(HashStoreInterface):
     """
 
     def __init__(
-        self,
-        root,
-        depth=3,
-        width=2,
-        algorithm="sha256",
-        sysmeta_ns=None,
-        default_algo_list=None,
-        other_algo_list=None,
-        fmode=0o664,
-        dmode=0o755,
+        self, root=None
     ):
-        self.root = os.path.realpath(root)
+        if root is None:
+            self.root = os.path.realpath(STORE_PATH)
+        else:
+            self.root = os.path.realpath(root)
         self.objects = self.root + "/objects"
         self.sysmeta = self.root + "/sysmeta"
-        self.sysmeta_ns = sysmeta_ns
-        self.depth = depth
-        self.width = width
-        self.algorithm = algorithm
-        self.default_algo_list = default_algo_list
-        self.other_algo_list = other_algo_list
-        self.fmode = fmode
-        self.dmode = dmode
+        self.sysmeta_ns = SYSMETA_NS
+        self.depth = DIR_DEPTH
+        self.width = DIR_WIDTH
+        self.algorithm = "sha256"
+        self.default_algo_list = DEFAULT_ALGO_LIST
+        self.other_algo_list = OTHER_ALGO_LIST
+        self.fmode = 0o664
+        self.dmode = 0o755
         self.time_out_sec = 1
         self.object_lock = threading.Lock()
         self.sysmeta_lock = threading.Lock()
@@ -841,7 +776,7 @@ class FileHashStore(HashStoreInterface):
     @staticmethod
     def _to_bytes(text):
         """Convert text to sequence of bytes using utf-8 encoding.
-        
+
         Args:
             text (str): String to convert.
 

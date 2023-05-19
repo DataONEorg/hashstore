@@ -36,7 +36,7 @@ class HashStoreInterface(ABC):
         and the Arctic Data Center. If an additional algorithm is provided, the
         `store_object` method checks if it is supported and adds it to the map along
         with its corresponding hex digest. An algorithm is considered "supported" if it
-        is recognized as a valid hash algorithm in the `hashlib` libary.
+        is recognized as a valid hash algorithm in the `hashlib` library.
 
         Similarly, if a checksum and a checksumAlgorithm value are provided,
         `store_object` validates the object to ensure it matches what is provided
@@ -121,7 +121,7 @@ class HashStoreInterface(ABC):
 
     @abstractmethod
     def delete_sysmeta(self, pid):
-        """The 'delete_sysmeta' method deletes an metadata document (sysmeta) permanently
+        """The 'delete_sysmeta' method deletes a metadata document (sysmeta) permanently
         from disk using a given persistent identifier.
 
         Args:

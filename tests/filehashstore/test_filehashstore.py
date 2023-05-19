@@ -3,7 +3,7 @@ import io
 import os
 from pathlib import Path
 import pytest
-from hashstore import HashStore
+from hashstore.filehashstore.filehashstore import FileHashStore
 from hashstore.hashstore_config import (
     DIR_DEPTH,
     DIR_WIDTH,
@@ -54,10 +54,7 @@ def init_store(tmp_path):
     directory = tmp_path / "metacat"
     directory.mkdir()
     hashstore_path = directory.as_posix()
-    hashstore_type = "filehashstore"
-    # Get factory and hashstore
-    factory = HashStore.hashstore_factory
-    store = factory.get_hashstore(hashstore_path, hashstore_type)
+    store = FileHashStore(hashstore_path)
     return store
 
 

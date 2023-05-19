@@ -1,4 +1,4 @@
-"""Core module for hashstore"""
+"""Core module for FileHashStore"""
 import io
 import shutil
 import threading
@@ -9,7 +9,7 @@ from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
 from collections import namedtuple
-from hashstore.hashstore_interface import HashStoreInterface
+from hashstore.hashstore import HashStore
 from hashstore.hashstore_config import (
     STORE_PATH,
     DIR_DEPTH,
@@ -20,7 +20,7 @@ from hashstore.hashstore_config import (
 )
 
 
-class FileHashStore(HashStoreInterface):
+class FileHashStore(HashStore):
     """FileHashStore is a content addressable file manager based on Derrick
     Gilland's 'hashfs' library. It supports the storage of objects on disk using
     an authority-based identifier's hex digest with a given hash algorithm value

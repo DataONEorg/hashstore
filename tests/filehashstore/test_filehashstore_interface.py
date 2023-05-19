@@ -1,4 +1,4 @@
-"""Test module for FileHashStore hashstore_interface methods"""
+"""Test module for FileHashStore HashStore interface methods"""
 import io
 from pathlib import Path
 from threading import Thread

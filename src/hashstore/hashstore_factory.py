@@ -1,5 +1,5 @@
 """Core module for HashStore Factory"""
-from hashstore.filehashstore.filehashstore import FileHashStore
+import importlib
 
 
 class HashStoreFactory:
@@ -29,8 +29,12 @@ class HashStoreFactory:
         Raises:
             ValueError: If the given store_type is not supported.
         """
-        hashstore_type.lower()
-        if hashstore_type == "filehashstore":
-            return FileHashStore()
+
+        if hashstore_type.lower() == "filehashstore":
+            module_name = "hashstore.filehashstore.filehashstore"
+            class_name = "FileHashStore"
+            imported_module = importlib.import_module(module_name)
+            hashstore_class = getattr(imported_module, class_name)
+            return hashstore_class()
         else:
             raise ValueError(f"hashstore_type: {hashstore_type} is not supported.")

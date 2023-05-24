@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 import importlib.metadata
 
+
 class HashStore(ABC):
     """HashStore is a content-addressable file management system that
     utilizes a persistent identifier (PID) in the form of a hex digest
@@ -49,10 +50,10 @@ class HashStore(ABC):
         before moving the file to its permanent address.
 
         Args:
-            pid (string): Authority-based identifier. \n
-            data (mixed): String or path to object. \n
-            additional_algorithm (string): Additional hex digest to include. \n
-            checksum (string): Checksum to validate against. \n
+            pid (string): Authority-based identifier.
+            data (mixed): String or path to object.
+            additional_algorithm (string): Additional hex digest to include.
+            checksum (string): Checksum to validate against.
             checksum_algorithm (string): Algorithm of supplied checksum.
 
         Returns:
@@ -76,7 +77,7 @@ class HashStore(ABC):
         `/store_directory/sysmeta/` directory.
 
         Args:
-            pid (string): Authority-based identifier. \n
+            pid (string): Authority-based identifier.
             sysmeta (mixed): String or path to sysmeta document.
 
         Returns:
@@ -144,7 +145,7 @@ class HashStore(ABC):
         in HashStore using a given persistent identifier and hash algorithm.
 
         Args:
-            pid (string): Authority-based identifier. \n
+            pid (string): Authority-based identifier.
             algorithm (string): Algorithm of hex digest to generate.
 
         Returns:

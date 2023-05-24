@@ -403,7 +403,6 @@ class FileHashStore(HashStore):
         Args:
             pid (string): Authority-based identifier.
             sysmeta (mixed): String or path to sysmeta document.
-            namespace (string): Sysmeta format.
 
         Returns:
             ab_id (string): Address of the sysmeta document.
@@ -790,7 +789,7 @@ class Stream(object):
 
     The input `obj` can be a file-like object or a path to a file. If `obj` is
     a path to a file, then it will be opened until :meth:`close` is called.
-    If `obj` is a file-like object, then it's original position will be
+    If `obj` is a file-like object, then its original position will be
     restored when :meth:`close` is called instead of closing the object
     automatically. Closing of the stream is deferred to whatever process passed
     the stream in.

@@ -4,10 +4,10 @@ from hashstore.filehashstore.filehashstore import FileHashStore
 
 class HashStoreFactory:
     """A factory class for creating `HashStore`-like objects (classes
-    that implement the 'hashstore' abstract methods)
+    that implement the 'HashStore' abstract methods)
 
-    This factory class provides a method to retrieve a `hashstore` object
-    based on the specified store type (ex. "filehashstore"). It supports the
+    This factory class provides a method to retrieve a `HashStore` object
+    based on the specified store type (ex. "FileHashStore"). It supports the
     creation of different types of hash stores by mapping store types to
     specific implementations.
     """
@@ -16,7 +16,8 @@ class HashStoreFactory:
         """Initialize the HashStoreFactory with default config values"""
         # TODO: Add logging
 
-    def get_hashstore(self, hashstore_type):
+    @staticmethod
+    def get_hashstore(hashstore_type):
         """Get a `HashStore`-like object based on the specified store type.
 
         Args:

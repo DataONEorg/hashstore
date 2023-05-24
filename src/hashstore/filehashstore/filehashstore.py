@@ -12,6 +12,7 @@ from hashstore import HashStore
 from hashstore.hashaddress import HashAddress
 from hashstore.filehashstore.filehashstore_config import (
     STORE_PATH,
+    ALGORITHM,
     DIR_DEPTH,
     DIR_WIDTH,
     SYSMETA_NS,
@@ -41,7 +42,7 @@ class FileHashStore(HashStore):
         self.sysmeta_ns = SYSMETA_NS
         self.depth = DIR_DEPTH
         self.width = DIR_WIDTH
-        self.algorithm = "sha256"
+        self.algorithm = ALGORITHM
         self.default_algo_list = DEFAULT_ALGO_LIST
         self.other_algo_list = OTHER_ALGO_LIST
         self.fmode = 0o664

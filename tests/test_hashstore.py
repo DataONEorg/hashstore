@@ -38,7 +38,7 @@ def test_factory_get_hashstore_filehashstore():
 
 
 def test_factory_get_hashstore_unsupported_class():
-    """Check that AttributeError is raised when provided with unsupported store type"""
+    """Check that AttributeError is raised when provided with unsupported class"""
     factory = HashStoreFactory()
     with pytest.raises(AttributeError):
         module_name = "hashstore.filehashstore.filehashstore"
@@ -47,9 +47,9 @@ def test_factory_get_hashstore_unsupported_class():
 
 
 def test_factory_get_hashstore_unsupported_module():
-    """Check that ModuleNotFoundError is raised when provided with unsupported store type"""
+    """Check that ModuleNotFoundError is raised when provided with unsupported module"""
     factory = HashStoreFactory()
     with pytest.raises(ModuleNotFoundError):
-        module_name = "hashstore.s3hashstore.s3hashstore"
+        module_name = "hashstore.s3filestore.s3filestore"
         class_name = "FileHashStore"
         factory.get_hashstore(module_name, class_name)

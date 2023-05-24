@@ -17,14 +17,14 @@ class HashStoreFactory:
 
     @staticmethod
     def get_hashstore(module_name, class_name):
-        """Get a `HashStore`-like object based on the specified store type.
+        """Get a `HashStore`-like object based on the specified `module_name` and `class_name`.
 
         Args:
             module_name (str): Name of module/package (ex. "hashstore.filehashstore.filehashstore")
             class_name (str): Name of class in the given module (ex. "FileHashStore")
 
         Returns:
-            HashStore: A hash store object based on the given store type.
+            HashStore: A hash store object based on the given `module_name` and `class_name`
 
         Raises:
             ModuleNotFoundError: If module is not found

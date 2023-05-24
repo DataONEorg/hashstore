@@ -11,7 +11,7 @@ DIR_DEPTH = 3  # WARNING: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
 DIR_WIDTH = 2  # WARNING: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
 # Example:
 # Below, objects are shown listed in directories that are 3 levels deep (DIR_DEPTH=3),
-# with each directory consisting of 2 characters (DIR_DEPTH=2).
+# with each directory consisting of 2 characters (DIR_WIDTH=2).
 #    /var/filehashstore/objects
 #    ├── 7f
 #    │   └── 5c

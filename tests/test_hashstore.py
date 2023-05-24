@@ -8,6 +8,7 @@ from hashstore.hashstore_factory import HashStoreFactory
 @pytest.fixture(name="store")
 def init_store():
     """Create store path for all tests"""
+    # TODO: Replace with relevant test after updating factory __init__
     store = FileHashStore()
     return store
 
@@ -29,15 +30,26 @@ def test_factory():
 
 def test_factory_get_hashstore_filehashstore():
     """Check factory creates instance of FileHashStore"""
-    hashstore_type = "filehashstore"
     factory = HashStoreFactory()
-    store = factory.get_hashstore(hashstore_type)
+    module_name = "hashstore.filehashstore.filehashstore"
+    class_name = "FileHashStore"
+    store = factory.get_hashstore(module_name, class_name)
     assert isinstance(store, FileHashStore)
 
 
-def test_factory_get_hashstore_unsupported_fs():
-    """Check that ValueError is raised when provided with unsupported store type"""
-    hashstore_type = "s3hashstore"
+def test_factory_get_hashstore_unsupported_class():
+    """Check that AttributeError is raised when provided with unsupported store type"""
     factory = HashStoreFactory()
-    with pytest.raises(ValueError):
-        factory.get_hashstore(hashstore_type)
+    with pytest.raises(AttributeError):
+        module_name = "hashstore.filehashstore.filehashstore"
+        class_name = "S3HashStore"
+        factory.get_hashstore(module_name, class_name)
+
+
+def test_factory_get_hashstore_unsupported_module():
+    """Check that ModuleNotFoundError is raised when provided with unsupported store type"""
+    factory = HashStoreFactory()
+    with pytest.raises(ModuleNotFoundError):
+        module_name = "hashstore.s3hashstore.s3hashstore"
+        class_name = "FileHashStore"
+        factory.get_hashstore(module_name, class_name)

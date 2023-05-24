@@ -41,7 +41,6 @@ class HashStoreFactory:
         if hasattr(imported_module, class_name):
             hashstore_class = getattr(imported_module, class_name)
             return hashstore_class()
-        else:
-            raise AttributeError(
-                f"Class name '{class_name}' is not an attribute of module '{module_name}'"
-            )
+        raise AttributeError(
+            f"Class name '{class_name}' is not an attribute of module '{module_name}'"
+        )

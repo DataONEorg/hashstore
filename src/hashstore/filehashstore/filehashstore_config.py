@@ -1,4 +1,4 @@
-"""Default configuration variables for HashStore"""
+"""Default configuration variables for FileHashStore if no properties are supplied."""
 
 ############### Store Path ###############
 # Default path for `FileHashStore` if no path is provided

@@ -32,7 +32,7 @@ class FileHashStore(HashStore):
         "/var/filehashstore/" if no path supplied.
     """
 
-    def __init__(self, root=None):
+    def __init__(self, root=None, properties=None):
         if root is None:
             self.root = os.path.realpath(STORE_PATH)
         else:

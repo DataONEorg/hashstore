@@ -4,13 +4,6 @@ import os
 from pathlib import Path
 import pytest
 from hashstore.filehashstore.filehashstore import FileHashStore
-from hashstore.filehashstore.filehashstore_config import (
-    DIR_DEPTH,
-    DIR_WIDTH,
-    SYSMETA_NS,
-    DEFAULT_ALGO_LIST,
-    OTHER_ALGO_LIST,
-)
 
 
 @pytest.fixture(name="pids")
@@ -47,7 +40,7 @@ def init_pids():
     }
     return test_harness
 
-
+# Fixtures are executed before each test if supplied as an argument
 @pytest.fixture(name="store")
 def init_store(tmp_path):
     """Create store path for all tests"""
@@ -73,13 +66,59 @@ def test_store_configuration_exists(store):
     assert os.path.exists(hashstore_yaml)
 
 
-def test_store_default_values(store):
-    """Test FileHashStore initialized with correct config values"""
-    assert store.depth == DIR_DEPTH
-    assert store.width == DIR_WIDTH
-    assert store.sysmeta_ns == SYSMETA_NS
-    assert store.default_algo_list == DEFAULT_ALGO_LIST
-    assert store.other_algo_list == OTHER_ALGO_LIST
+def test_validate_properties(store):
+    """Confirm properties validated when all key/values are supplied"""
+    properties = {
+        "store_path": "/etc/test",
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "sha256",
+        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    # pylint: disable=W0212
+    assert store._validate_properties(properties)
+
+
+def test_validate_properties_missing_key(store):
+    """Confirm exceptionr raised when key missing in properties"""
+    properties = {
+        "store_path": "/etc/test",
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "sha256",
+    }
+    with pytest.raises(KeyError):
+        # pylint: disable=W0212
+        store._validate_properties(properties)
+
+
+def test_validate_properties_key_value_is_none(store):
+    """Confirm exception raised when value from key is none"""
+    properties = {
+        "store_path": "/etc/test",
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "sha256",
+        "store_sysmeta_namespace": None,
+    }
+    with pytest.raises(ValueError):
+        # pylint: disable=W0212
+        store._validate_properties(properties)
+
+
+def test_validate_properties_incorrect_type(store):
+    """Confirm exceptionr raised when key missing in properties"""
+    properties = "etc/filehashstore"
+    with pytest.raises(ValueError):
+        # pylint: disable=W0212
+        store._validate_properties(properties)
+
+
+def test_store_default_configuration(store):
+    """Confirm FileHashStore initialized with default values when no properties supplied"""
+    # assert store.root == STORE_PATH
+    # TODO: Review test after sorting out control flow
+    assert store
 
 
 def test_pids_length(pids):

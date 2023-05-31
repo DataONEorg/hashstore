@@ -27,9 +27,10 @@ class HashStoreFactory:
                 Example Properties Dictionary:
                 {
                     "store_path": "var/metacat",
-                    "depth": 3,
-                    "width": 2,
-                    "algorithm": "sha256"
+                    "store_depth": 3,
+                    "store_width": 2,
+                    "store_algorithm": "sha256",
+                    "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0"
                 }
 
         Returns:

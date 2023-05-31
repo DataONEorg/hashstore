@@ -56,7 +56,14 @@ def init_store(tmp_path):
     hashstore_path = directory.as_posix()
     # Note, objects generated via tests are placed in a temporary folder
     # with the 'directory' parameter above appended
-    store = FileHashStore(hashstore_path)
+    properties = {
+        "store_path": hashstore_path,
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "sha256",
+        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    store = FileHashStore(properties)
     return store
 
 

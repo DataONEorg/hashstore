@@ -32,7 +32,7 @@ class FileHashStore(HashStore):
         "/var/filehashstore/" if no path supplied.
     """
 
-    def __init__(self, root=None, properties=None):
+    def __init__(self, properties=None):
         # Verify properties and configuration
         cwd_hashstore_yaml = os.getcwd() + "/hashstore.yaml"
         if properties is None:
@@ -50,53 +50,71 @@ class FileHashStore(HashStore):
                     if any(default_dir_files_iter):
                         # Config file is missing, but HashStore exists
                         # Administrator/calling app must handle carefully
-                        raise FileExistsError("HashStore found but missing 'hashstore.yaml' file.")
+                        raise FileExistsError(
+                            "HashStore found but missing 'hashstore.yaml' file."
+                        )
+
             # If no properties supplied, default values will be used
-            self.sysmeta_ns = SYSMETA_NS
+            self.root = os.path.realpath(STORE_PATH)
             self.depth = DIR_DEPTH
             self.width = DIR_WIDTH
             self.algorithm = ALGORITHM
-            self.default_algo_list = DEFAULT_ALGO_LIST
-            self.other_algo_list = OTHER_ALGO_LIST
-            self._write_hashstore_config_yaml(properties)
+            self.sysmeta_ns = SYSMETA_NS
+            default_properties = {
+                "store_path": self.root,
+                "store_depth": self.depth,
+                "store_width": self.width,
+                "store_algorithm": self.algorithm,
+                "store_sysmeta_namespace": self.sysmeta_ns,
+            }
+            self.put_properties(default_properties)
         else:
             # Validate properties against existing configuration if present
+            prop_store_path = properties.get("store_path")
+            prop_store_depth = properties.get("store_depth")
+            prop_store_width = properties.get("store_width")
+            prop_store_algorithm = properties.get("store_algorithm")
+            prop_store_sysmeta_namespace = properties.get("store_sysmeta_namespace")
+
             if os.path.exists(cwd_hashstore_yaml):
                 # TODO: Read values from file and compare to properties supplied
                 # Throw exception if any properties value do not match what is configured
                 # Else instantiate with relevant values
                 pass
-            else:
-                # Check to see if HashStore exists
-                # Configure HashStore with given properties
-                self._write_hashstore_config_yaml(properties)
-        # Directory properties/attributes
-        if root is None:
-            self.root = os.path.realpath(STORE_PATH)
-        else:
-            self.root = os.path.realpath(root)
+
+            self.root = prop_store_path
+            self.depth = prop_store_depth
+            self.width = prop_store_width
+            self.algorithm = prop_store_algorithm
+            self.sysmeta_ns = prop_store_sysmeta_namespace
+            # Check to see if HashStore exists
+            # Configure HashStore with given properties
+            self.put_properties(properties)
+
+        # Set additional directory properties/attributes
         self.objects = self.root + "/objects"
         self.sysmeta = self.root + "/sysmeta"
         self.fmode = 0o664
         self.dmode = 0o755
-        # Variables to orchestrate thread locking
+        # Set supported algorithms list
+        self.default_algo_list = DEFAULT_ALGO_LIST
+        self.other_algo_list = OTHER_ALGO_LIST
+        # Set variables to orchestrate thread locking
         self.time_out_sec = 1
         self.object_lock = threading.Lock()
         self.sysmeta_lock = threading.Lock()
         self.object_locked_pids = []
         self.sysmeta_locked_pids = []
 
-
     # Configuration Methods
-    def _write_hashstore_config_yaml(self, properties=None):
+    def put_properties(self, properties=None):
         """Writes 'hashstore.yaml' to working directory with properties supplied"""
         # Validate properties
-
-        store_path = "test"
-        store_depth = 3
-        store_width = 2
-        store_algorithm = "sha256"
-        store_sysmeta_namespace = "http://ns.dataone.org/service/types/v2.0"
+        store_path = properties.get("store_path")
+        store_depth = properties.get("store_depth")
+        store_width = properties.get("store_width")
+        store_algorithm = properties.get("store_algorithm")
+        store_sysmeta_namespace = properties.get("store_sysmeta_namespace")
 
         hashstore_configuration_yaml = f"""
         # Default configuration variables for HashStore
@@ -145,7 +163,8 @@ class FileHashStore(HashStore):
         - "blake2b"
         - "blake2s"
         """
-        cwd_hashstore_yaml_path = os.getcwd() + "/hashstore.yaml"
+        # cwd_hashstore_yaml_path = os.getcwd() + "/hashstore.yaml"
+        cwd_hashstore_yaml_path = self.root + "/hashstore.yaml"
         with open(cwd_hashstore_yaml_path, "w", encoding="utf-8") as hashstore_yaml:
             hashstore_yaml.write(hashstore_configuration_yaml)
         return

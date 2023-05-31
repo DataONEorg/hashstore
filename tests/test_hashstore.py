@@ -3,6 +3,23 @@ import pytest
 from hashstore.filehashstore.filehashstore import FileHashStore
 from hashstore.hashstore_factory import HashStoreFactory
 
+@pytest.fixture(name="props")
+def init_props(tmp_path):
+    """Create store path for all tests"""
+    directory = tmp_path / "metacat"
+    directory.mkdir()
+    hashstore_path = directory.as_posix()
+    # Note, objects generated via tests are placed in a temporary folder
+    # with the 'directory' parameter above appended
+    properties = {
+        "store_path": hashstore_path,
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "sha256",
+        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    return properties
+
 
 @pytest.fixture(name="factory")
 def init_factory():
@@ -16,11 +33,11 @@ def test_init(factory):
     assert isinstance(factory, HashStoreFactory)
 
 
-def test_factory_get_hashstore_filehashstore(factory):
+def test_factory_get_hashstore_filehashstore(factory, props):
     """Check factory creates instance of FileHashStore"""
     module_name = "hashstore.filehashstore.filehashstore"
     class_name = "FileHashStore"
-    store = factory.get_hashstore(module_name, class_name)
+    store = factory.get_hashstore(module_name, class_name, props)
     assert isinstance(store, FileHashStore)
 
 

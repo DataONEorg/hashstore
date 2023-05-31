@@ -34,9 +34,12 @@ class FileHashStore(HashStore):
 
     def __init__(self, properties=None):
         # Verify properties and configuration
-        cwd_hashstore_yaml = os.getcwd() + "/hashstore.yaml"
         if properties is None:
             # Begin by checking for existence of config file (hashstore.yaml)
+            # TODO: Review the process to initially locate properties file and how
+            # that persists throughout this if statement
+            # HashStore.yaml doesn't exist in working directory, but in store path root
+            cwd_hashstore_yaml = os.getcwd() + "/hashstore.yaml"
             if os.path.exists(cwd_hashstore_yaml):
                 # Hashstore is configured, instantiate with configured values
                 # TODO: Read hashstore.yaml file and instantiate with relevant values

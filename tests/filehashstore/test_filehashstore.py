@@ -67,6 +67,12 @@ def init_store(tmp_path):
     return store
 
 
+def test_store_configuration_exists(store):
+    """Verify properties file present in store root directory"""
+    hashstore_yaml = store.root + "/hashstore.yaml"
+    assert os.path.exists(hashstore_yaml)
+
+
 def test_store_default_values(store):
     """Test FileHashStore initialized with correct config values"""
     assert store.depth == DIR_DEPTH

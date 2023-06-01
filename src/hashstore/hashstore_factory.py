@@ -11,10 +11,6 @@ class HashStoreFactory:
     and class name (ex. "FileHashStore").
     """
 
-    def __init__(self):
-        """Initialize the HashStoreFactory with default config values"""
-        # TODO: Add logging
-
     @staticmethod
     def get_hashstore(module_name, class_name, properties=None):
         """Get a `HashStore`-like object based on the specified `module_name` and `class_name`.

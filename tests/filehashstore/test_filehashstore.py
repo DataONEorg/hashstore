@@ -40,6 +40,7 @@ def init_pids():
     }
     return test_harness
 
+
 # Fixtures are executed before each test if supplied as an argument
 @pytest.fixture(name="store")
 def init_store(tmp_path):
@@ -60,10 +61,61 @@ def init_store(tmp_path):
     return store
 
 
-def test_store_configuration_exists(store):
+def test_init_put_properties_hashstore_yaml_exists(store):
     """Verify properties file present in store root directory"""
-    hashstore_yaml = store.root + "/hashstore.yaml"
-    assert os.path.exists(hashstore_yaml)
+    assert os.path.exists(store.hashstore_configuration_yaml)
+
+
+def test_init_with_existing_hashstore_mismatched_config(store):
+    """Test init with existing HashStore raises ValueError with mismatching properties"""
+    properties = {
+        "store_path": store.root,
+        "store_depth": 1,
+        "store_width": 2,
+        "store_algorithm": "sha256",
+        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    with pytest.raises(ValueError):
+        FileHashStore(properties)
+
+
+def test_init_with_existing_hashstore_missing_yaml(store, pids):
+    """Test init with existing store raises FileNotFoundError when hashstore.yaml
+    not found but objects exist"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        store.put_object(pid, path)
+    os.remove(store.hashstore_configuration_yaml)
+    properties = {
+        "store_path": store.root,
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "sha256",
+        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    with pytest.raises(FileNotFoundError):
+        FileHashStore(properties)
+
+
+def test_get_properties(store):
+    """Verify dictionary returned from get_properties matches initialization"""
+    hashstore_yaml_dict = store.get_properties()
+    assert hashstore_yaml_dict.get("store_path") == store.root
+    assert hashstore_yaml_dict.get("store_depth") == 3
+    assert hashstore_yaml_dict.get("store_width") == 2
+    assert hashstore_yaml_dict.get("store_algorithm") == "sha256"
+    assert (
+        hashstore_yaml_dict.get("store_sysmeta_namespace")
+        == "http://ns.dataone.org/service/types/v2.0"
+    )
+
+
+def test_get_properties_hashstore_yaml_missing(store):
+    """Confirm FileNotFoundError is raised when hashstore.yaml does not exist"""
+    os.remove(store.hashstore_configuration_yaml)
+    with pytest.raises(FileNotFoundError):
+        store.get_properties()
 
 
 def test_validate_properties(store):
@@ -80,7 +132,7 @@ def test_validate_properties(store):
 
 
 def test_validate_properties_missing_key(store):
-    """Confirm exceptionr raised when key missing in properties"""
+    """Confirm exception raised when key missing in properties"""
     properties = {
         "store_path": "/etc/test",
         "store_depth": 3,
@@ -112,13 +164,6 @@ def test_validate_properties_incorrect_type(store):
     with pytest.raises(ValueError):
         # pylint: disable=W0212
         store._validate_properties(properties)
-
-
-def test_store_default_configuration(store):
-    """Confirm FileHashStore initialized with default values when no properties supplied"""
-    # assert store.root == STORE_PATH
-    # TODO: Review test after sorting out control flow
-    assert store
 
 
 def test_pids_length(pids):

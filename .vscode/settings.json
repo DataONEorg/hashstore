@@ -1,6 +1,5 @@
 {
     "python.terminal.activateEnvInCurrentTerminal": true,
-    "python.defaultInterpreterPath": "~/.virtualenvs/hashfs/bin/python",
     "python.formatting.provider": "black",
     "python.testing.pytestArgs": [
         "tests"

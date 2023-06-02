@@ -19,15 +19,19 @@ class FileHashStore(HashStore):
     an authority-based identifier's hex digest with a given hash algorithm value
     to address files.
 
-    FileHashStore upon initialization will write a configuration file 'hashstore.yaml'
-    to the store path directory. If no properties are supplied, default values will be
-    used from 'filehashstore_config'. Instantiation of FileHashStore will always
-    require 'hashstore.yaml' and raise an exception if it is missing.
+    FileHashStore initializes by providing a properties dictionary containing the
+    required keys (see Args). Upon initialization, FileHashStore verifies the provided
+    properties and attempts to write a configuration file 'hashstore.yaml' to the given
+    store path directory. Properties must always be supplied to ensure consistent
+    usage of FileHashStore once configured.
 
     Args:
-        properties (dict): A python dictionary with the following keys and values:
-        "store_path", "store_depth", "store_width", "store_algorithm",
-        "store_sysmeta_namespace" to initialize FileHashStore.
+        properties (dict): A python dictionary with the following keys (and values):
+            store_path (str): Path to the HashStore directory.
+            store_depth (int): Depth when sharding an object's hex digest.
+            store_width (int): Width of directories when sharding an object's hex digest.
+            store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+            store_sysmeta_namespace (str): Namespace for the HashStore's system metadata.
     """
 
     # Property (hashstore configuration) requirements
@@ -175,11 +179,11 @@ class FileHashStore(HashStore):
         """Build a YAML string representing the configuration for a HashStore.
 
         Args:
-            store_path (str): The path to the HashStore directory.
-            store_depth (int): The desired directory depth when sharding an object.
-            store_width (int): The width of directories created when sharding an object.
-            store_algorithm (str): The hash algorithm used for calculating the object's digest.
-            store_sysmeta_namespace (str): The namespace for the HashStore's system metadata.
+            store_path (str): Path to the HashStore directory.
+            store_depth (int): Depth when sharding an object's hex digest.
+            store_width (int): Width of directories when sharding an object's hex digest.
+            store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+            store_sysmeta_namespace (str): Namespace for the HashStore's system metadata.
 
         Returns:
             hashstore_configuration_yaml (str): A YAML string representing the configuration for

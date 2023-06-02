@@ -1,6 +1,7 @@
 """HashAddress must be returned for all HashStore implementations"""
 from collections import namedtuple
 
+
 class HashAddress(
     namedtuple(
         "HashAddress", ["id", "relpath", "abspath", "is_duplicate", "hex_digests"]

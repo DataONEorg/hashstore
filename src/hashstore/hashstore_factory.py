@@ -11,17 +11,23 @@ class HashStoreFactory:
     and class name (ex. "FileHashStore").
     """
 
-    def __init__(self):
-        """Initialize the HashStoreFactory with default config values"""
-        # TODO: Add logging
-
     @staticmethod
-    def get_hashstore(module_name, class_name):
+    def get_hashstore(module_name, class_name, properties=None):
         """Get a `HashStore`-like object based on the specified `module_name` and `class_name`.
 
         Args:
-            module_name (str): Name of module/package (ex. "hashstore.filehashstore.filehashstore")
-            class_name (str): Name of class in the given module (ex. "FileHashStore")
+            module_name (str): Name of module/package (ex. "hashstore.filehashstore.filehashstore") \n
+            class_name (str): Name of class in the given module (ex. "FileHashStore") \n
+            properties (dict, optional): Desired HashStore properties, if 'None', default values
+            will be used. \n
+                Example Properties Dictionary:
+                {
+                    "store_path": "var/metacat",
+                    "store_depth": 3,
+                    "store_width": 2,
+                    "store_algorithm": "sha256",
+                    "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0"
+                }
 
         Returns:
             HashStore: A hash store object based on the given `module_name` and `class_name`
@@ -40,7 +46,7 @@ class HashStoreFactory:
         # If class is not part of module, raise error
         if hasattr(imported_module, class_name):
             hashstore_class = getattr(imported_module, class_name)
-            return hashstore_class()
+            return hashstore_class(properties=properties)
         raise AttributeError(
             f"Class name '{class_name}' is not an attribute of module '{module_name}'"
         )

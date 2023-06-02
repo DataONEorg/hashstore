@@ -8,17 +8,9 @@ import os
 from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
+import yaml
 from hashstore import HashStore
 from hashstore.hashaddress import HashAddress
-from hashstore.filehashstore.filehashstore_config import (
-    STORE_PATH,
-    ALGORITHM,
-    DIR_DEPTH,
-    DIR_WIDTH,
-    SYSMETA_NS,
-    DEFAULT_ALGO_LIST,
-    OTHER_ALGO_LIST,
-)
 
 
 class FileHashStore(HashStore):
@@ -27,31 +19,252 @@ class FileHashStore(HashStore):
     an authority-based identifier's hex digest with a given hash algorithm value
     to address files.
 
+    FileHashStore initializes by providing a properties dictionary containing the
+    required keys (see Args). Upon initialization, FileHashStore verifies the provided
+    properties and attempts to write a configuration file 'hashstore.yaml' to the given
+    store path directory. Properties must always be supplied to ensure consistent
+    usage of FileHashStore once configured.
+
     Args:
-        root (str): Directory path used as root of storage space. Defaults to
-        "/var/filehashstore/" if no path supplied.
+        properties (dict): A python dictionary with the following keys (and values):
+            store_path (str): Path to the HashStore directory.
+            store_depth (int): Depth when sharding an object's hex digest.
+            store_width (int): Width of directories when sharding an object's hex digest.
+            store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+            store_sysmeta_namespace (str): Namespace for the HashStore's system metadata.
     """
 
-    def __init__(self, root=None):
-        if root is None:
-            self.root = os.path.realpath(STORE_PATH)
+    # Property (hashstore configuration) requirements
+    property_required_keys = [
+        "store_path",
+        "store_depth",
+        "store_width",
+        "store_algorithm",
+        "store_sysmeta_namespace",
+    ]
+    # Permissions settings for writing files and creating directories
+    fmode = 0o664
+    dmode = 0o755
+    # Default and other algorithm list for FileHashStore
+    # The default algorithm list includes the hash algorithms calculated when
+    # storing an object to disk and returned to the caller after successful storage.
+    default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
+    # The other algorithm list consists of additional algorithms that can be included
+    # for calculating when storing objects, in addition to the default list.
+    other_algo_list = [
+        "sha224",
+        "sha3_224",
+        "sha3_256",
+        "sha3_384",
+        "sha3_512",
+        "blake2b",
+        "blake2s",
+    ]
+    # Variables to orchestrate thread locking and object store synchronization
+    time_out_sec = 1
+    object_lock = threading.Lock()
+    sysmeta_lock = threading.Lock()
+    object_locked_pids = []
+    sysmeta_locked_pids = []
+
+    def __init__(self, properties=None):
+        # Verify properties and configuration
+        if properties:
+            # Validate properties against existing configuration if present
+            checked_properties = self._validate_properties(properties)
+            prop_store_path = checked_properties.get("store_path")
+            prop_store_depth = checked_properties.get("store_depth")
+            prop_store_width = checked_properties.get("store_width")
+            prop_store_algorithm = checked_properties.get("store_algorithm")
+            prop_store_sysmeta_namespace = checked_properties.get(
+                "store_sysmeta_namespace"
+            )
+
+            # Check to see if a configuration is present in the given store path
+            self.hashstore_configuration_yaml = prop_store_path + "/hashstore.yaml"
+            if os.path.exists(self.hashstore_configuration_yaml):
+                # If 'hashstore.yaml' is found, verify given properties before init
+                hashstore_yaml_dict = self.get_properties()
+                for key in self.property_required_keys:
+                    if hashstore_yaml_dict[key] != properties[key]:
+                        exception_string = (
+                            f"Given properties ({key}: {properties[key]}) does not match "
+                            + f"HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
+                            + f"found at: {self.hashstore_configuration_yaml}"
+                        )
+                        raise ValueError(exception_string)
+            else:
+                # Check if HashStore exists and throw exception if found
+                if any(Path(prop_store_path).iterdir()):
+                    raise FileNotFoundError(
+                        f"HashStore directories and/or objects found at: {prop_store_path} but"
+                        + f" missing configuration file at: {self.hashstore_configuration_yaml}."
+                    )
+
+            self.root = prop_store_path
+            self.depth = prop_store_depth
+            self.width = prop_store_width
+            self.algorithm = prop_store_algorithm
+            self.sysmeta_ns = prop_store_sysmeta_namespace
+            # Write 'hashstore.yaml' to store path
+            if not os.path.exists(self.hashstore_configuration_yaml):
+                self.put_properties(properties)
+            # Complete initialization/instantiation by setting store directories
+            self.objects = self.root + "/objects"
+            self.sysmeta = self.root + "/sysmeta"
         else:
-            self.root = os.path.realpath(root)
-        self.objects = self.root + "/objects"
-        self.sysmeta = self.root + "/sysmeta"
-        self.sysmeta_ns = SYSMETA_NS
-        self.depth = DIR_DEPTH
-        self.width = DIR_WIDTH
-        self.algorithm = ALGORITHM
-        self.default_algo_list = DEFAULT_ALGO_LIST
-        self.other_algo_list = OTHER_ALGO_LIST
-        self.fmode = 0o664
-        self.dmode = 0o755
-        self.time_out_sec = 1
-        self.object_lock = threading.Lock()
-        self.sysmeta_lock = threading.Lock()
-        self.object_locked_pids = []
-        self.sysmeta_locked_pids = []
+            # Cannot instantiate or initialize FileHashStore without config
+            raise ValueError(f"HashStore properties must be supplied. Properties: {properties}")
+
+    # Configuration Methods
+
+    def get_properties(self):
+        """Get and return the contents of the current HashStore configuration.
+
+        Returns:
+            hashstore_yaml_dict (dict): HashStore properties with the following keys/values:
+            "store_path", "store_depth", "store_width", "store_algorithm","store_sysmeta_namespace".
+        """
+        if not os.path.exists(self.hashstore_configuration_yaml):
+            raise FileNotFoundError("hashstore.yaml not found in store root path")
+        # Open file
+        with open(self.hashstore_configuration_yaml, "r", encoding="utf-8") as file:
+            yaml_data = yaml.safe_load(file)
+        # Get hashstore properties
+        hashstore_yaml_dict = {}
+        for key in self.property_required_keys:
+            hashstore_yaml_dict[key] = yaml_data[key]
+        return hashstore_yaml_dict
+
+    def put_properties(self, properties):
+        """Writes 'hashstore.yaml' to FileHashStore's root directory with the respective
+        properties object supplied.
+
+        Args:
+            properties (dict): A python dictionary with the following keys (and values):
+                store_path (str): Path to the HashStore directory.
+                store_depth (int): Depth when sharding an object's hex digest.
+                store_width (int): Width of directories when sharding an object's hex digest.
+                store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+                store_sysmeta_namespace (str): Namespace for the HashStore's system metadata.
+        """
+        # If hashstore.yaml already exists, must throw exception and proceed with caution
+        if os.path.exists(self.hashstore_configuration_yaml):
+            raise FileExistsError(
+                "FileHashStore configuration file 'hashstore.yaml' already exists."
+            )
+        # Validate properties
+        checked_properties = self._validate_properties(properties)
+
+        # Collect configuration properties from validated & supplied dictionary
+        store_path = checked_properties.get("store_path")
+        store_depth = checked_properties.get("store_depth")
+        store_width = checked_properties.get("store_width")
+        store_algorithm = checked_properties.get("store_algorithm")
+        store_sysmeta_namespace = checked_properties.get("store_sysmeta_namespace")
+        # .yaml file to write
+        hashstore_configuration_yaml = self._build_hashstore_yaml_string(
+            store_path,
+            store_depth,
+            store_width,
+            store_algorithm,
+            store_sysmeta_namespace,
+        )
+        # Write 'hashstore.yaml'
+        with open(
+            self.hashstore_configuration_yaml, "w", encoding="utf-8"
+        ) as hashstore_yaml:
+            hashstore_yaml.write(hashstore_configuration_yaml)
+        return
+
+    @staticmethod
+    def _build_hashstore_yaml_string(
+        store_path, store_depth, store_width, store_algorithm, store_sysmeta_namespace
+    ):
+        """Build a YAML string representing the configuration for a HashStore.
+
+        Args:
+            store_path (str): Path to the HashStore directory.
+            store_depth (int): Depth when sharding an object's hex digest.
+            store_width (int): Width of directories when sharding an object's hex digest.
+            store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+            store_sysmeta_namespace (str): Namespace for the HashStore's system metadata.
+
+        Returns:
+            hashstore_configuration_yaml (str): A YAML string representing the configuration for
+            a HashStore.
+        """
+        hashstore_configuration_yaml = f"""
+        # Default configuration variables for HashStore
+
+        ############### Store Path ###############
+        # Default path for `FileHashStore` if no path is provided
+        store_path: "{store_path}"
+
+        ############### Directory Structure ###############
+        # Desired amount of directories when sharding an object to form the permanent address
+        store_depth: {store_depth}  # WARNING: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
+        # Width of directories created when sharding an object to form the permanent address
+        store_width: {store_width}  # WARNING: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
+        # Example:
+        # Below, objects are shown listed in directories that are 3 levels deep (DIR_DEPTH=3),
+        # with each directory consisting of 2 characters (DIR_WIDTH=2).
+        #    /var/filehashstore/objects
+        #    ├── 7f
+        #    │   └── 5c
+        #    │       └── c1
+        #    │           └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
+
+        ############### Format of the Metadata ###############
+        store_sysmeta_namespace: "{store_sysmeta_namespace}"
+
+        ############### Hash Algorithms ###############
+        # Hash algorithm to use when calculating object's hex digest for the permanent address
+        store_algorithm: "{store_algorithm}"
+        # Algorithm values supported by python hashlib 3.9.0+ for File Hash Store (FHS)
+        # The default algorithm list includes the hash algorithms calculated when storing an
+        # object to disk and returned to the caller after successful storage.
+        filehashstore_default_algo_list:
+        - "sha1"
+        - "sha256"
+        - "sha384"
+        - "sha512"
+        - "md5"
+        # The other algorithm list consists of additional algorithms that can be included for
+        # calculating when storing objects, in addition to the default list.
+        filehashstore_other_algo_list:
+        - "sha224"
+        - "sha3_224"
+        - "sha3_256"
+        - "sha3_384"
+        - "sha3_512"
+        - "blake2b"
+        - "blake2s"
+        """
+        return hashstore_configuration_yaml
+
+    def _validate_properties(self, properties):
+        """Validate a properties dictionary by checking if it contains all the
+        required keys and non-None values.
+
+        Args:
+            properties (dict): Dictionary containing filehashstore properties.
+
+        Raises:
+            KeyError: If key is missing from the required keys.
+            ValueError: If value is missing for a required key.
+
+        Returns:
+            properties (dict): The given properties object (that has been validated).
+        """
+        if not isinstance(properties, dict):
+            raise ValueError("Invalid argument - expected a dictionary.")
+        for key in self.property_required_keys:
+            if key not in properties:
+                raise KeyError(f"Missing required key: {key}.")
+            if properties.get(key) is None:
+                raise ValueError(f"Value for key: {key} is none.")
+        return properties
 
     # Public API / HashStore Interface Methods
 
@@ -438,7 +651,8 @@ class FileHashStore(HashStore):
                 raise
         else:
             raise FileNotFoundError(
-                f"sysmeta_tmp file not found: {sysmeta_tmp}. Unable to move sysmeta `{ab_id}` for pid `{pid}`"
+                f"sysmeta_tmp file not found: {sysmeta_tmp}."
+                + " Unable to move sysmeta `{ab_id}` for pid `{pid}`"
             )
 
     def _mktmpsysmeta(self, stream, namespace):
@@ -754,7 +968,7 @@ class FileHashStore(HashStore):
                 count += 1
         return count
 
-    # Static Methods
+    # Other Static Methods
 
     @staticmethod
     def _to_bytes(text):

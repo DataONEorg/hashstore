@@ -3,7 +3,7 @@ from hashstore.hashaddress import HashAddress
 
 
 def test_hashaddress():
-    """Test class returns correct values via dot notation"""
+    """Test class returns correct values via dot notation."""
     ab_id = "hashstoretest"
     rel_path = "rel/path/to/object"
     abs_path = "abs/path/to/object"

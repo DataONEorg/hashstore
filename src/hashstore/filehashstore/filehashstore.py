@@ -114,7 +114,7 @@ class FileHashStore(HashStore):
             self.sysmeta = self.root + "/sysmeta"
         else:
             # Cannot instantiate or initialize FileHashStore without config
-            raise ValueError(f"Properties must be supplied. Properties: {properties}")
+            raise ValueError(f"HashStore properties must be supplied. Properties: {properties}")
 
     # Configuration Methods
 
@@ -122,8 +122,8 @@ class FileHashStore(HashStore):
         """Get and return the contents of the current HashStore configuration.
 
         Returns:
-            hashstore_yaml_dict (dict): A python dictionary with the following keys and values:
-            "store_path", "store_depth", "store_width", "store_algorithm","store_sysmeta_namespace"
+            hashstore_yaml_dict (dict): HashStore properties with the following keys/values:
+            "store_path", "store_depth", "store_width", "store_algorithm","store_sysmeta_namespace".
         """
         if not os.path.exists(self.hashstore_configuration_yaml):
             raise FileNotFoundError("hashstore.yaml not found in store root path")
@@ -141,7 +141,12 @@ class FileHashStore(HashStore):
         properties object supplied.
 
         Args:
-            properties (dict): HashStore properties to write to 'hashstore.yaml'
+            properties (dict): A python dictionary with the following keys (and values):
+                store_path (str): Path to the HashStore directory.
+                store_depth (int): Depth when sharding an object's hex digest.
+                store_width (int): Width of directories when sharding an object's hex digest.
+                store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+                store_sysmeta_namespace (str): Namespace for the HashStore's system metadata.
         """
         # If hashstore.yaml already exists, must throw exception and proceed with caution
         if os.path.exists(self.hashstore_configuration_yaml):
@@ -240,17 +245,17 @@ class FileHashStore(HashStore):
 
     def _validate_properties(self, properties):
         """Validate a properties dictionary by checking if it contains all the
-        required keys and non-None values
+        required keys and non-None values.
 
         Args:
-            properties (dict): Dictionary containing filehashstore properties
+            properties (dict): Dictionary containing filehashstore properties.
 
         Raises:
-            KeyError: If key is missing from the required keys
-            ValueError: If value is missing for a required key
+            KeyError: If key is missing from the required keys.
+            ValueError: If value is missing for a required key.
 
         Returns:
-            properties (dict): The given properties object (that has been validated)
+            properties (dict): The given properties object (that has been validated).
         """
         if not isinstance(properties, dict):
             raise ValueError("Invalid argument - expected a dictionary.")

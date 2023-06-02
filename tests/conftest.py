@@ -1,4 +1,4 @@
-"""pytest overall configuration file for fixtures"""
+"""Pytest overall configuration file for fixtures"""
 
 
 def pytest_addoption(parser):

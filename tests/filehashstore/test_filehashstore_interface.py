@@ -6,6 +6,12 @@ import random
 import pytest
 from hashstore.filehashstore.filehashstore import FileHashStore
 
+# Define a mark to be used to label slow tests
+slow_test = pytest.mark.skipif(
+    "not config.getoption('--run-slow')",
+    reason="Only run when --run-slow is given",
+)
+
 
 @pytest.fixture(name="pids")
 def init_pids():
@@ -410,6 +416,7 @@ def test_store_object_duplicates_threads(store):
     assert file_exists_error_flag
 
 
+@slow_test
 def test_store_object_large_file(store):
     """Test storing a large object (1GB). This test has also been checked
     for a 4GB file and the test classes succeeded locally in 296.85s (0:04:56)

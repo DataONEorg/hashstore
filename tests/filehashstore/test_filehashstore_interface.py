@@ -13,12 +13,12 @@ slow_test = pytest.mark.skipif(
 
 
 def test_pids_length(pids):
-    """Ensure test harness pids are present"""
+    """Ensure test harness pids are present."""
     assert len(pids) == 3
 
 
 def test_store_address_length(pids, store):
-    """Test store object ab_id length"""
+    """Test store object ab_id length is 64 characters."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -28,7 +28,7 @@ def test_store_address_length(pids, store):
 
 
 def test_store_object_files_path(pids, store):
-    """Test store object when given a path"""
+    """Test store object when given a path."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -42,7 +42,7 @@ def test_store_object_files_path(pids, store):
 
 
 def test_store_object_files_string(pids, store):
-    """Test store object when given a string"""
+    """Test store object when given a string."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -56,7 +56,7 @@ def test_store_object_files_string(pids, store):
 
 
 def test_store_object_files_input_stream(pids, store):
-    """Test store object given an input stream"""
+    """Test store object given an input stream."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -70,7 +70,7 @@ def test_store_object_files_input_stream(pids, store):
 
 
 def test_store_object_id(pids, store):
-    """Test store object returns expected id (ab_id)"""
+    """Test store object returns expected id (ab_id)."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -79,7 +79,7 @@ def test_store_object_id(pids, store):
 
 
 def test_store_object_rel_path(pids, store):
-    """Test store object returns expected relative path"""
+    """Test store object returns expected relative path."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -90,7 +90,7 @@ def test_store_object_rel_path(pids, store):
 
 
 def test_store_object_abs_path(pids, store):
-    """Test store object returns expected absolute path"""
+    """Test store object returns expected absolute path."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -102,7 +102,7 @@ def test_store_object_abs_path(pids, store):
 
 
 def test_store_object_is_duplicate(pids, store):
-    """Test store object returns expected is_duplicate boolean"""
+    """Test store object returns expected is_duplicate boolean."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -111,7 +111,7 @@ def test_store_object_is_duplicate(pids, store):
 
 
 def test_store_object_hex_digests(pids, store):
-    """Test store object returns expected hex digests dictionary"""
+    """Test store object returns expected hex digests dictionary."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -124,7 +124,7 @@ def test_store_object_hex_digests(pids, store):
 
 
 def test_store_object_pid_empty(store):
-    """Test store object raises error when supplied with empty pid string"""
+    """Test store object raises error when supplied with empty pid string."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -133,7 +133,7 @@ def test_store_object_pid_empty(store):
 
 
 def test_store_object_pid_empty_spaces(store):
-    """Test store object raises error when supplied with empty space character"""
+    """Test store object raises error when supplied with empty space character."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -142,7 +142,7 @@ def test_store_object_pid_empty_spaces(store):
 
 
 def test_store_object_pid_none(store):
-    """Test store object raises error when supplied with None pid"""
+    """Test store object raises error when supplied with 'None' pid."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -151,7 +151,7 @@ def test_store_object_pid_none(store):
 
 
 def test_store_object_data_incorrect_type_none(store):
-    """Test store object raises error when data is None"""
+    """Test store object raises error when data is 'None'."""
     pid = "jtao.1700.1"
     path = None
     with pytest.raises(TypeError):
@@ -159,7 +159,7 @@ def test_store_object_data_incorrect_type_none(store):
 
 
 def test_store_object_data_incorrect_type_empty(store):
-    """Test store object raises error when data is an empty string"""
+    """Test store object raises error when data is an empty string."""
     pid = "jtao.1700.1"
     path = ""
     with pytest.raises(TypeError):
@@ -167,7 +167,7 @@ def test_store_object_data_incorrect_type_empty(store):
 
 
 def test_store_object_data_incorrect_type_empty_spaces(store):
-    """Test store object raises error when data is an empty string with spaces"""
+    """Test store object raises error when data is an empty string with spaces."""
     pid = "jtao.1700.1"
     path = "   "
     with pytest.raises(TypeError):
@@ -175,7 +175,7 @@ def test_store_object_data_incorrect_type_empty_spaces(store):
 
 
 def test_store_object_additional_algorithm_invalid(store):
-    """Test store object raises error when supplied with unsupported algorithm"""
+    """Test store object raises error when supplied with unsupported algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -185,7 +185,7 @@ def test_store_object_additional_algorithm_invalid(store):
 
 
 def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
-    """Test store object formats algorithm in uppercase"""
+    """Test store object formats algorithm in uppercase."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -199,7 +199,7 @@ def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
 
 
 def test_store_object_additional_algorithm_hyphen_lowercase(store):
-    """Test store object with additional algorithm in lowercase"""
+    """Test store object with additional algorithm in lowercase."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -216,7 +216,7 @@ def test_store_object_additional_algorithm_hyphen_lowercase(store):
 
 
 def test_store_object_additional_algorithm_underscore(store):
-    """Test store object with additional algorithm with underscore"""
+    """Test store object with additional algorithm with underscore."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -233,7 +233,7 @@ def test_store_object_additional_algorithm_underscore(store):
 
 
 def test_store_object_checksum_correct(store):
-    """Test store object successfully stores with good checksum"""
+    """Test store object successfully stores with good checksum."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -249,7 +249,7 @@ def test_store_object_checksum_correct(store):
 
 
 def test_store_object_checksum_algorithm_empty(store):
-    """Test store object raises error when checksum supplied with no checksum_algorithm"""
+    """Test store object raises error when checksum supplied with no checksum_algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -261,7 +261,7 @@ def test_store_object_checksum_algorithm_empty(store):
 
 
 def test_store_object_checksum_empty(store):
-    """Test store object raises error when checksum_algorithm supplied and checksum is empty"""
+    """Test store object raises error when checksum_algorithm supplied and checksum is empty."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -273,7 +273,8 @@ def test_store_object_checksum_empty(store):
 
 
 def test_store_object_checksum_empty_spaces(store):
-    """Test store object raises error when checksum_algorithm supplied and checksum is empty with spaces"""
+    """Test store object raises error when checksum_algorithm supplied and checksum is empty
+    with spaces."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -285,7 +286,7 @@ def test_store_object_checksum_empty_spaces(store):
 
 
 def test_store_object_checksum_algorithm_empty_spaces(store):
-    """Test store object raises error when checksum supplied with no checksum_algorithm"""
+    """Test store object raises error when checksum supplied with no checksum_algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -299,7 +300,7 @@ def test_store_object_checksum_algorithm_empty_spaces(store):
 
 
 def test_store_object_checksum_incorrect_checksum(store):
-    """Test store object raises error when supplied with bad checksum"""
+    """Test store object raises error when supplied with bad checksum."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -314,7 +315,7 @@ def test_store_object_checksum_incorrect_checksum(store):
 
 
 def test_store_object_duplicate_raises_error(store):
-    """Test store duplicate object throws FileExistsError"""
+    """Test store duplicate object throws FileExistsError."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -330,7 +331,7 @@ def test_store_object_duplicate_raises_error(store):
 
 
 def test_store_object_duplicates_threads(store):
-    """Test store object thread lock"""
+    """Test store object thread lock."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -363,8 +364,8 @@ def test_store_object_duplicates_threads(store):
 
 @slow_test
 def test_store_object_large_file(store):
-    """Test storing a large object (1GB). This test has also been checked
-    for a 4GB file and the test classes succeeded locally in 296.85s (0:04:56)
+    """Test storing a large object (1GB). This test has also been executed with
+    a 4GB file and the test classes succeeded locally in 296.85s (0:04:56)
     """
     # file_size = 4 * 1024 * 1024 * 1024  # 4GB
     file_size = 1024 * 1024 * 1024  # 1GB
@@ -389,8 +390,27 @@ def test_store_object_large_file(store):
     assert hash_address_id == pid_sha256_hex_digest
 
 
+@slow_test
+def test_store_object_sparse_large_file(store):
+    """Test storing a large object (4GB) via sparse file. This test has also been
+    executed with a 10GB file and the test classes succeeded locally in 117.03s (0:01:57)."""
+    # file_size = 10 * 1024 * 1024 * 1024  # 10GB
+    file_size = 4 * 1024 * 1024 * 1024  # 4GB
+    file_path = store.root + "random_file.bin"
+    # Generate a random file with the specified size
+    with open(file_path, "wb") as file:
+        file.seek(file_size - 1)
+        file.write(b"\0")
+    # Store object
+    pid = "testfile_filehashstore"
+    hash_address = store.store_object(pid, file_path)
+    hash_address_id = hash_address.id
+    pid_sha256_hex_digest = store.get_sha256_hex_digest(pid)
+    assert hash_address_id == pid_sha256_hex_digest
+
+
 def test_store_sysmeta_files_path(pids, store):
-    """Test store sysmeta with path"""
+    """Test store sysmeta with path."""
     test_dir = "tests/testdata/"
     entity = "sysmeta"
     for pid in pids.keys():
@@ -404,7 +424,7 @@ def test_store_sysmeta_files_path(pids, store):
 
 
 def test_store_sysmeta_files_string(pids, store):
-    """Test store sysmeta with string"""
+    """Test store sysmeta with string."""
     test_dir = "tests/testdata/"
     entity = "sysmeta"
     for pid in pids.keys():
@@ -418,7 +438,7 @@ def test_store_sysmeta_files_string(pids, store):
 
 
 def test_store_sysmeta_files_input_stream(pids, store):
-    """Test store sysmeta with an input stream to sysmeta"""
+    """Test store sysmeta with an input stream to sysmeta."""
     test_dir = "tests/testdata/"
     entity = "sysmeta"
     for pid in pids.keys():
@@ -433,7 +453,7 @@ def test_store_sysmeta_files_input_stream(pids, store):
 
 
 def test_store_sysmeta_pid_empty(store):
-    """Test store sysmeta raises error with empty string"""
+    """Test store sysmeta raises error with empty string."""
     test_dir = "tests/testdata/"
     pid = ""
     filename = pid.replace("/", "_") + ".xml"
@@ -443,7 +463,7 @@ def test_store_sysmeta_pid_empty(store):
 
 
 def test_store_sysmeta_pid_empty_spaces(store):
-    """Test store sysmeta raises error with empty string"""
+    """Test store sysmeta raises error with empty string."""
     test_dir = "tests/testdata/"
     pid = "   "
     filename = pid.replace("/", "_") + ".xml"
@@ -453,7 +473,7 @@ def test_store_sysmeta_pid_empty_spaces(store):
 
 
 def test_store_sysmeta_sysmeta_empty(store):
-    """Test store sysmeta raises error with empty sysmeta string"""
+    """Test store sysmeta raises error with empty sysmeta string."""
     pid = "jtao.1700.1"
     syspath_string = "   "
     with pytest.raises(TypeError):
@@ -461,7 +481,7 @@ def test_store_sysmeta_sysmeta_empty(store):
 
 
 def test_store_sysmeta_sysmeta_none(store):
-    """Test store sysmeta raises error with empty sysmeta string"""
+    """Test store sysmeta raises error with empty sysmeta string."""
     pid = "jtao.1700.1"
     syspath_string = None
     with pytest.raises(TypeError):
@@ -469,7 +489,7 @@ def test_store_sysmeta_sysmeta_none(store):
 
 
 def test_store_sysmeta_ab_id(pids, store):
-    """Test store sysmeta returns expected ab_id"""
+    """Test store sysmeta returns expected ab_id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -481,7 +501,7 @@ def test_store_sysmeta_ab_id(pids, store):
 
 
 def test_store_sysmeta_thread_lock(store):
-    """Test store sysmeta thread lock"""
+    """Test store sysmeta thread lock."""
     test_dir = "tests/testdata/"
     entity = "sysmeta"
     pid = "jtao.1700.1"
@@ -507,7 +527,7 @@ def test_store_sysmeta_thread_lock(store):
 
 
 def test_retrieve_object(pids, store):
-    """Test retrieve_object returns correct object data"""
+    """Test retrieve_object returns correct object data."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -522,14 +542,14 @@ def test_retrieve_object(pids, store):
 
 
 def test_retrieve_object_pid_empty(store):
-    """Test retrieve_object raises error when supplied with empty pid"""
+    """Test retrieve_object raises error when supplied with empty pid."""
     pid = "   "
     with pytest.raises(ValueError):
         store.retrieve_object(pid)
 
 
 def test_retrieve_object_pid_invalid(store):
-    """Test retrieve_object raises error when supplied with bad pid"""
+    """Test retrieve_object raises error when supplied with bad pid."""
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
     with pytest.raises(ValueError):
@@ -537,7 +557,7 @@ def test_retrieve_object_pid_invalid(store):
 
 
 def test_retrieve_sysmeta(store):
-    """Test retrieve_sysmeta returns correct sysmeta data"""
+    """Test retrieve_sysmeta returns correct sysmeta data."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -551,7 +571,7 @@ def test_retrieve_sysmeta(store):
 
 
 def test_retrieve_sysmeta_pid_invalid(store):
-    """Test retrieve_sysmeta raises error when supplied with bad pid"""
+    """Test retrieve_sysmeta raises error when supplied with bad pid."""
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
     with pytest.raises(ValueError):
@@ -559,14 +579,14 @@ def test_retrieve_sysmeta_pid_invalid(store):
 
 
 def test_retrieve_sysmeta_pid_empty(store):
-    """Test retrieve_sysmeta raises error when supplied with empty pid"""
+    """Test retrieve_sysmeta raises error when supplied with empty pid."""
     pid = "    "
     with pytest.raises(ValueError):
         store.retrieve_sysmeta(pid)
 
 
 def test_delete_objects(pids, store):
-    """Test delete_object successfully deletes objects"""
+    """Test delete_object successfully deletes objects."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -580,21 +600,21 @@ def test_delete_objects(pids, store):
 
 
 def test_delete_object_pid_empty(store):
-    """Test delete_object raises error when empty pid supplied"""
+    """Test delete_object raises error when empty pid supplied."""
     pid = "    "
     with pytest.raises(ValueError):
         store.delete_object(pid)
 
 
 def test_delete_object_pid_none(store):
-    """Test delete_object raises error when pid is none"""
+    """Test delete_object raises error when pid is 'None'."""
     pid = None
     with pytest.raises(ValueError):
         store.delete_object(pid)
 
 
 def test_delete_sysmeta(pids, store):
-    """Test delete_sysmeta successfully deletes sysmeta"""
+    """Test delete_sysmeta successfully deletes sysmeta."""
     test_dir = "tests/testdata/"
     entity = "sysmeta"
     for pid in pids.keys():
@@ -608,21 +628,21 @@ def test_delete_sysmeta(pids, store):
 
 
 def test_delete_sysmeta_pid_empty(store):
-    """Test delete_object raises error when empty pid supplied"""
+    """Test delete_object raises error when empty pid supplied."""
     pid = "    "
     with pytest.raises(ValueError):
         store.delete_sysmeta(pid)
 
 
 def test_delete_sysmeta_pid_none(store):
-    """Test delete_object raises error when pid is none"""
+    """Test delete_object raises error when pid is 'None'."""
     pid = None
     with pytest.raises(ValueError):
         store.delete_sysmeta(pid)
 
 
 def test_get_hex_digest(store):
-    """Test get_hex_digest for expected value"""
+    """Test get_hex_digest for expected value."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -638,7 +658,7 @@ def test_get_hex_digest(store):
 
 
 def test_get_hex_digest_pid_not_found(store):
-    """Test get_hex_digest raises error when supplied with bad pid"""
+    """Test get_hex_digest raises error when supplied with bad pid."""
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
     algorithm = "sha256"
@@ -647,7 +667,7 @@ def test_get_hex_digest_pid_not_found(store):
 
 
 def test_get_hex_digest_pid_unsupported_algorithm(store):
-    """Test get_hex_digest raises error when supplied with unsupported algorithm"""
+    """Test get_hex_digest raises error when supplied with unsupported algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -661,7 +681,7 @@ def test_get_hex_digest_pid_unsupported_algorithm(store):
 
 
 def test_get_hex_digest_pid_empty(store):
-    """Test get_hex_digest raises error when supplied pid is empty"""
+    """Test get_hex_digest raises error when supplied pid is empty."""
     pid = "    "
     algorithm = "sm3"
     with pytest.raises(ValueError):
@@ -669,7 +689,7 @@ def test_get_hex_digest_pid_empty(store):
 
 
 def test_get_hex_digest_pid_none(store):
-    """Test get_hex_digest raises error when supplied pid is None"""
+    """Test get_hex_digest raises error when supplied pid is 'None'."""
     pid = None
     algorithm = "sm3"
     with pytest.raises(ValueError):
@@ -677,7 +697,7 @@ def test_get_hex_digest_pid_none(store):
 
 
 def test_get_hex_digest_algorithm_empty(store):
-    """Test get_hex_digest raises error when supplied algorithm is empty"""
+    """Test get_hex_digest raises error when supplied algorithm is empty."""
     pid = "jtao.1700.1"
     algorithm = "     "
     with pytest.raises(ValueError):
@@ -685,7 +705,7 @@ def test_get_hex_digest_algorithm_empty(store):
 
 
 def test_get_hex_digest_algorithm_none(store):
-    """Test get_hex_digest raises error when supplied algorithm is None"""
+    """Test get_hex_digest raises error when supplied algorithm is 'None'."""
     pid = "jtao.1700.1"
     algorithm = None
     with pytest.raises(ValueError):

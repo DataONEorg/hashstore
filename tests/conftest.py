@@ -15,7 +15,7 @@ def pytest_addoption(parser):
 
 @pytest.fixture(name="props")
 def init_props(tmp_path):
-    """Return properties to initialize HashStore"""
+    """Properties to initialize HashStore."""
     directory = tmp_path / "metacat"
     directory.mkdir()
     hashstore_path = directory.as_posix()
@@ -33,14 +33,14 @@ def init_props(tmp_path):
 
 @pytest.fixture(name="store")
 def init_store(props):
-    """Create FileHashStore instance for all tests"""
+    """Create FileHashStore instance for all tests."""
     store = FileHashStore(props)
     return store
 
 
 @pytest.fixture(name="pids")
 def init_pids():
-    """Generate test harness data"""
+    """Shared test harness data."""
     test_pids = {
         "doi:10.18739/A2901ZH2M": {
             "ab_id": "0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e",

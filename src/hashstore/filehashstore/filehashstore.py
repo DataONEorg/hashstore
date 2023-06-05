@@ -97,7 +97,7 @@ class FileHashStore(HashStore):
                             + f"HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
                             + f"found at: {self.hashstore_configuration_yaml}"
                         )
-                        logging.error("FileHashStore - %s", exception_string)
+                        logging.critical("FileHashStore - %s", exception_string)
                         raise ValueError(exception_string)
             else:
                 # Check if HashStore exists and throw exception if found
@@ -106,11 +106,11 @@ class FileHashStore(HashStore):
                         f"HashStore directories and/or objects found at: {prop_store_path} but"
                         + f" missing configuration file at: {self.hashstore_configuration_yaml}."
                     )
-                    logging.error("FileHashStore - %s", exception_string)
+                    logging.critical("FileHashStore - %s", exception_string)
                     raise FileNotFoundError(exception_string)
 
             self.configure_logging(prop_store_path)
-            logging.info("FileHashStore - Initializatizing, properties verified.")
+            logging.info("FileHashStore - Initializing, properties verified.")
             self.root = prop_store_path
             self.depth = prop_store_depth
             self.width = prop_store_width
@@ -118,8 +118,10 @@ class FileHashStore(HashStore):
             self.sysmeta_ns = prop_store_sysmeta_namespace
             # Write 'hashstore.yaml' to store path
             if not os.path.exists(self.hashstore_configuration_yaml):
-                logging.info(
-                    "FileHashStore - Configuration file not found. Writing configuration file."
+                # pylint: disable=W1201
+                logging.debug(
+                    "FileHashStore - HashStore does not exist & configuration file not found."
+                    + " Writing configuration file."
                 )
                 self.put_properties(properties)
             # Complete initialization/instantiation by setting store directories
@@ -145,7 +147,7 @@ class FileHashStore(HashStore):
         """
         if not os.path.exists(self.hashstore_configuration_yaml):
             exception_string = "hashstore.yaml not found in store root path"
-            logging.error("FileHashStore - get_properties: %s", exception_string)
+            logging.critical("FileHashStore - get_properties: %s", exception_string)
             raise FileNotFoundError(exception_string)
         # Open file
         with open(self.hashstore_configuration_yaml, "r", encoding="utf-8") as file:
@@ -199,7 +201,7 @@ class FileHashStore(HashStore):
             hashstore_yaml.write(hashstore_configuration_yaml)
         logging.info(
             "FileHashStore - put_properties: Configuration file written at: %s",
-            self.root,
+            self.hashstore_configuration_yaml,
         )
         return
 

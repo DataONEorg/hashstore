@@ -311,7 +311,9 @@ class FileHashStore(HashStore):
         # Create directory and log file if it doesn't exise (exist_ok flag)
         log_filepath.parent.mkdir(parents=True, exist_ok=True)
         log_filepath.touch(exist_ok=True)
+        # force=True removes the default handler which outputs to sys.stderr
         logging.basicConfig(
+            force=True,
             level=logging.INFO,
             filename=log_filepath,
             filemode="a",

@@ -313,6 +313,7 @@ class FileHashStore(HashStore):
         # Create directory and log file if it doesn't exise (exist_ok flag)
         log_filepath.parent.mkdir(parents=True, exist_ok=True)
         log_filepath.touch(exist_ok=True)
+        # TODO: Confirm with team where logging file should exist
         # force=True removes the default handler which outputs to sys.stderr
         logging.basicConfig(
             force=True,
@@ -332,20 +333,31 @@ class FileHashStore(HashStore):
         checksum=None,
         checksum_algorithm=None,
     ):
+        logging.info(
+            "FileHashStore - store_object: Request to store object for pid: %s", pid
+        )
         # Validate input parameters
+        logging.debug("FileHashStore - store_object: Validating arguments.")
         if pid is None or pid.replace(" ", "") == "":
-            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+            exception_string = f"Pid cannot be empty, pid: {pid}"
+            logging.error("FileHashStore - store_object: %s", exception_string)
+            raise ValueError(exception_string)
         if (
             not isinstance(data, str)
             and not isinstance(data, Path)
             and not isinstance(data, io.BufferedIOBase)
         ):
-            raise TypeError(
-                f"Data must be a path, string or buffered stream, data type supplied: {type(data)}"
+            exception_string = (
+                "Data must be a path, string or buffered stream"
+                + f" data type supplied: {type(data)}"
             )
+            logging.error("FileHashStore - store_object: %s", exception_string)
+            raise TypeError(exception_string)
         if isinstance(data, str):
             if data.replace(" ", "") == "":
-                raise TypeError("Data string cannot be empty")
+                exception_string = "Data string cannot be empty"
+                logging.error("FileHashStore - store_object: %s", exception_string)
+                raise TypeError(exception_string)
         # Format additional algorithm if supplied
         additional_algorithm_checked = None
         if additional_algorithm != self.algorithm and additional_algorithm is not None:
@@ -353,24 +365,38 @@ class FileHashStore(HashStore):
         # Checksum and checksum_algorithm must both be supplied
         if checksum is not None:
             if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
-                raise ValueError(
-                    "checksum_algorithm cannot be None or empty if checksum is supplied."
-                )
+                # pylint: disable=C0301
+                exception_string = "checksum_algorithm cannot be None or empty if checksum is supplied."
+                logging.error("FileHashStore - store_object: %s", exception_string)
+                raise ValueError(exception_string)
         checksum_algorithm_checked = None
         if checksum_algorithm is not None:
             checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
             if checksum is None or checksum.replace(" ", "") == "":
-                raise ValueError(
-                    "checksum cannot be None or empty if checksum_algorithm is supplied."
-                )
+                # pylint: disable=C0301
+                exception_string = "checksum cannot be None or empty if checksum_algorithm is supplied."
+                logging.error("FileHashStore - store_object: %s", exception_string)
+                raise ValueError(exception_string)
 
         # Wait for the pid to release if it's in use
         while pid in self.object_locked_pids:
+            logging.debug(
+                "FileHashStore - store_object: %s is currently being stored. Waiting.",
+                pid,
+            )
             time.sleep(self.time_out_sec)
         # Modify object_locked_pids consecutively
         with self.object_lock:
+            logging.debug(
+                "FileHashStore - store_object: Adding pid: %s to object_locked_pids",
+                pid,
+            )
             self.object_locked_pids.append(pid)
         try:
+            logging.info(
+                "FileHashStore - store_object: Attempting to store object for pid: %s",
+                pid,
+            )
             hash_address = self.put_object(
                 pid,
                 data,
@@ -381,7 +407,15 @@ class FileHashStore(HashStore):
         finally:
             # Release pid
             with self.object_lock:
+                logging.debug(
+                    "FileHashStore - store_object: Removing pid: %s from object_locked_pids",
+                    pid,
+                )
                 self.object_locked_pids.remove(pid)
+            logging.info(
+                "FileHashStore - store_object: Successfully stored object for pid: %s",
+                pid,
+            )
         return hash_address
 
     def store_sysmeta(self, pid, sysmeta):
@@ -770,7 +804,9 @@ class FileHashStore(HashStore):
             cleaned_string not in self.default_algo_list
             and cleaned_string not in self.other_algo_list
         ):
-            raise ValueError(f"Algorithm not supported: {cleaned_string}")
+            exception_string = f"Algorithm not supported: {cleaned_string}"
+            logging.error("FileHashStore: clean_algorithm: %s", exception_string)
+            raise ValueError(exception_string)
         return cleaned_string
 
     def computehash(self, stream, algorithm=None):

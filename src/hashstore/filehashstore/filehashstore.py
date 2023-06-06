@@ -537,36 +537,69 @@ class FileHashStore(HashStore):
         return sysmeta
 
     def delete_object(self, pid):
+        logging.debug(
+            "FileHashStore - delete_object: Request to delete object for pid: %s", pid
+        )
         if pid is None or pid.replace(" ", "") == "":
-            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+            exception_string = f"Pid cannot be None or empty, pid: {pid}"
+            logging.error("FileHashStore - delete_object: %s", exception_string)
+            raise ValueError(exception_string)
 
         entity = "objects"
         ab_id = self.get_sha256_hex_digest(pid)
         self.delete(entity, ab_id)
+        logging.info(
+            "FileHashStore - delete_object: Successfully deleted object for pid: %s",
+            pid,
+        )
         return True
 
     def delete_sysmeta(self, pid):
+        logging.debug(
+            "FileHashStore - delete_sysmeta: Request to delete sysmeta for pid: %s",
+            pid,
+        )
         if pid is None or pid.replace(" ", "") == "":
-            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+            exception_string = f"Pid cannot be None or empty, pid: {pid}"
+            logging.error("FileHashStore - delete_sysmeta: %s", exception_string)
+            raise ValueError(exception_string)
 
         entity = "sysmeta"
         ab_id = self.get_sha256_hex_digest(pid)
         self.delete(entity, ab_id)
+        logging.info(
+            "FileHashStore - delete_sysmeta: Successfully deleted sysmeta for pid: %s",
+            pid,
+        )
         return True
 
     def get_hex_digest(self, pid, algorithm):
+        logging.debug(
+            "FileHashStore - get_hex_digest: Request to get hex digest for object with pid: %s",
+            pid,
+        )
         if pid is None or pid.replace(" ", "") == "":
-            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+            exception_string = f"Pid cannot be None or empty, pid: {pid}"
+            logging.error("FileHashStore - get_hex_digest: %s", exception_string)
+            raise ValueError(exception_string)
         if algorithm is None or algorithm.replace(" ", "") == "":
-            raise ValueError(f"Algorithm cannot be None or empty, pid: {pid}")
+            exception_string = f"Algorithm cannot be None or empty, pid: {pid}"
+            logging.error("FileHashStore - get_hex_digest: %s", exception_string)
+            raise ValueError(exception_string)
 
         entity = "objects"
         algorithm = self.clean_algorithm(algorithm)
         ab_id = self.get_sha256_hex_digest(pid)
         if not self.exists(entity, ab_id):
-            raise ValueError(f"No object found for pid: {pid}")
+            exception_string = f"No object found for pid: {pid}"
+            logging.error("FileHashStore - get_hex_digest: %s", exception_string)
+            raise ValueError(exception_string)
         c_stream = self.open(entity, ab_id)
         hex_digest = self.computehash(c_stream, algorithm=algorithm)
+        logging.info(
+            "FileHashStore - get_hex_digest: Successfully calculated hex digest for object-pid: %s",
+            pid,
+        )
         return hex_digest
 
     # FileHashStore Core Methods

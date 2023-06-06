@@ -339,7 +339,7 @@ class FileHashStore(HashStore):
         # Validate input parameters
         logging.debug("FileHashStore - store_object: Validating arguments.")
         if pid is None or pid.replace(" ", "") == "":
-            exception_string = f"Pid cannot be empty, pid: {pid}"
+            exception_string = f"Pid cannot be None or empty, pid: {pid}"
             logging.error("FileHashStore - store_object: %s", exception_string)
             raise ValueError(exception_string)
         if (
@@ -348,7 +348,7 @@ class FileHashStore(HashStore):
             and not isinstance(data, io.BufferedIOBase)
         ):
             exception_string = (
-                "Data must be a path, string or buffered stream"
+                "Data must be a path, string or buffered stream type."
                 + f" data type supplied: {type(data)}"
             )
             logging.error("FileHashStore - store_object: %s", exception_string)
@@ -421,31 +421,56 @@ class FileHashStore(HashStore):
     def store_sysmeta(self, pid, sysmeta):
         # Validate input parameters
         if pid is None or pid.replace(" ", "") == "":
-            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+            exception_string = f"Pid cannot be None or empty, pid: {pid}"
+            logging.error("FileHashStore - store_sysmeta: %s", exception_string)
+            raise ValueError(exception_string)
         if (
             not isinstance(sysmeta, str)
             and not isinstance(sysmeta, Path)
             and not isinstance(sysmeta, io.BufferedIOBase)
         ):
-            raise TypeError(
-                f"Sysmeta must be a path or string object, data type supplied: {type(sysmeta)}"
-            )
+            # pylint: disable=C0301
+            exception_string = f"Sysmeta must be a path or string type, data type supplied: {type(sysmeta)}"
+            logging.error("FileHashStore - store_sysmeta: %s", exception_string)
+            raise TypeError(exception_string)
         if isinstance(sysmeta, str):
             if sysmeta.replace(" ", "") == "":
-                raise TypeError("Data string cannot be empty")
+                exception_string = "String path to sysmeta cannot be empty"
+                logging.error("FileHashStore - store_sysmeta: %s", exception_string)
+                raise TypeError(exception_string)
 
         # Wait for the pid to release if it's in use
         while pid in self.sysmeta_locked_pids:
+            logging.debug(
+                "FileHashStore - store_sysmeta: %s is currently being stored. Waiting.",
+                pid,
+            )
             time.sleep(self.time_out_sec)
         # Modify sysmeta_locked_pids consecutively
         with self.sysmeta_lock:
+            logging.debug(
+                "FileHashStore - store_sysmeta: Adding pid: %s to sysmeta_locked_pids",
+                pid,
+            )
             self.sysmeta_locked_pids.append(pid)
         try:
+            logging.info(
+                "FileHashStore - store_sysmeta: Attempting to store sysmeta for pid: %s",
+                pid,
+            )
             sysmeta_cid = self.put_sysmeta(pid, sysmeta)
         finally:
             # Release pid
             with self.sysmeta_lock:
+                logging.debug(
+                    "FileHashStore - store_sysmeta: Removing pid: %s from sysmeta_locked_pids",
+                    pid,
+                )
                 self.sysmeta_locked_pids.remove(pid)
+            logging.info(
+                "FileHashStore - store_sysmeta: Successfully stored sysmeta for pid: %s",
+                pid,
+            )
         return sysmeta_cid
 
     def retrieve_object(self, pid):

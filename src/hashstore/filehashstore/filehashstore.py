@@ -310,7 +310,7 @@ class FileHashStore(HashStore):
         """Set logging path, file name and format"""
         log_filename = "/filehashstore_log.txt"
         log_filepath = Path(store_path + log_filename)
-        # Create directory and log file if it doesn't exise (exist_ok flag)
+        # Create directory and log file if it doesn't exist (exist_ok flag)
         log_filepath.parent.mkdir(parents=True, exist_ok=True)
         log_filepath.touch(exist_ok=True)
         # TODO: Confirm with team where logging file should exist
@@ -895,7 +895,7 @@ class FileHashStore(HashStore):
                 raise
         else:
             exception_string = (
-                f"Attemptes to move sysmeta for pid: {pid}"
+                f"Attempts to move sysmeta for pid: {pid}"
                 + f". But sysmeta temp file not found: {sysmeta_tmp}"
             )
             logging.error("FileHashStore - put_sysmeta: %s", exception_string)
@@ -1264,7 +1264,7 @@ class Stream(object):
     the stream in.
 
     Successive readings of the stream is supported without having to manually
-    set it's position back to ``0``.
+    set its position back to ``0``.
     """
 
     def __init__(self, obj):

@@ -6,19 +6,6 @@ import pytest
 from hashstore.filehashstore.filehashstore import FileHashStore
 
 
-def test_log_file_created(store):
-    """Confirm that logging file has been created."""
-    log_path = Path(store.root + "/filehashstore_log.txt")
-    assert os.path.exists(log_path)
-
-
-def test_log_file_content(store):
-    """Confirm that logging file has content after initialization"""
-    log_path = Path(store.root + "/filehashstore_log.txt")
-    log_filesize = os.path.getsize(log_path)
-    assert log_filesize > 0
-
-
 def test_init_put_properties_hashstore_yaml_exists(store):
     """Verify properties file present in store root directory."""
     assert os.path.exists(store.hashstore_configuration_yaml)

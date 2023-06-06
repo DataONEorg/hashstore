@@ -83,7 +83,6 @@ class FileHashStore(HashStore):
             # Check to see if a configuration is present in the given store path
             self.hashstore_configuration_yaml = prop_store_path + "/hashstore.yaml"
             if os.path.exists(self.hashstore_configuration_yaml):
-                self.configure_logging(prop_store_path)
                 logging.info(
                     "FileHashStore - Config found (hashstore.yaml) at {%s}. Verifying properties",
                     self.hashstore_configuration_yaml,
@@ -109,7 +108,6 @@ class FileHashStore(HashStore):
                     logging.critical("FileHashStore - %s", exception_string)
                     raise FileNotFoundError(exception_string)
 
-            self.configure_logging(prop_store_path)
             logging.info("FileHashStore - Initializing, properties verified.")
             self.root = prop_store_path
             self.depth = prop_store_depth
@@ -303,25 +301,6 @@ class FileHashStore(HashStore):
                 )
                 raise ValueError(exception_string)
         return properties
-
-    # Logging
-
-    def configure_logging(self, store_path):
-        """Set logging path, file name and format"""
-        log_filename = "/filehashstore_log.txt"
-        log_filepath = Path(store_path + log_filename)
-        # Create directory and log file if it doesn't exist (exist_ok flag)
-        log_filepath.parent.mkdir(parents=True, exist_ok=True)
-        log_filepath.touch(exist_ok=True)
-        # TODO: Confirm with team where logging file should exist
-        # force=True removes the default handler which outputs to sys.stderr
-        logging.basicConfig(
-            force=True,
-            level=logging.INFO,
-            filename=log_filepath,
-            filemode="a",
-            format="%(asctime)s - %(levelname)s - %(message)s",
-        )
 
     # Public API / HashStore Interface Methods
 

@@ -633,6 +633,9 @@ class FileHashStore(HashStore):
         """
         stream = Stream(file)
 
+        logging.debug(
+            "FileHashStore - put_object: Request to put object for pid: %s", pid
+        )
         with closing(stream):
             (
                 ab_id,
@@ -651,6 +654,10 @@ class FileHashStore(HashStore):
 
         hash_address = HashAddress(
             ab_id, rel_path, abs_path, is_duplicate, hex_digest_dict
+        )
+        logging.debug(
+            "FileHashStore - put_object: Successfully put object for pid: %s",
+            pid,
         )
         return hash_address
 
@@ -694,13 +701,20 @@ class FileHashStore(HashStore):
         self.create_path(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
         if os.path.isfile(abs_file_path):
-            raise FileExistsError(
-                f"File already exists for pid: {pid} at {abs_file_path}"
+            exception_string = f"File already exists for pid: {pid} at {abs_file_path}"
+            logging.error(
+                "FileHashStore - _move_and_get_checksums: %s", exception_string
             )
+            raise FileExistsError(exception_string)
         else:
             rel_file_path = os.path.relpath(abs_file_path, self.objects)
 
         # Create temporary file and calculate hex digests
+        # pylint: disable=C0301
+        logging.debug(
+            "FileHashStore - _move_and_get_checksums: Creating temp file and calculating checksums for pid: %s",
+            pid,
+        )
         hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
 
         # Only move file if it doesn't exist.
@@ -717,16 +731,45 @@ class FileHashStore(HashStore):
                     )
             is_duplicate = False
             try:
+                logging.debug(
+                    "FileHashStore - _move_and_get_checksums: Moving temp file to permanent location: %s",
+                    abs_file_path,
+                )
                 shutil.move(tmp_file_name, abs_file_path)
             except Exception as err:
                 # Revert storage process for the time being for any failure
-                # TODO: Discuss handling of permissions, memory and storage exceptions
-                print(f"Unexpected {err=}, {type(err)=}")
+                exception_string = f"Unexpected {err=}, {type(err)=}"
+                logging.debug(
+                    "FileHashStore - _move_and_get_checksums: %s", exception_string
+                )
                 if os.path.isfile(abs_file_path):
-                    self.delete(entity, abs_file_path)
+                    # Check to see if file has moved successfully before deleting
+                    logging.debug(
+                        "FileHashStore - _move_and_get_checksums: Permanent file found during exception, checking hex digest for pid: %s",
+                        pid,
+                    )
+                    pid_checksum = self.get_hex_digest(pid, "sha256")
+                    if pid_checksum == hex_digests.get("sha256"):
+                        logging.warning(
+                            "FileHashStore - _move_and_get_checksums: File moved successfully but unexpected issue encountered: %s",
+                            exception_string,
+                        )
+                        return
+                    else:
+                        logging.debug(
+                            "FileHashStore - _move_and_get_checksums: Permanent file found but with incomplete state, deleting file: %s",
+                            abs_file_path,
+                        )
+                        self.delete(entity, abs_file_path)
+                logging.debug(
+                    "FileHashStore - _move_and_get_checksums: Deleting temporary file: %s",
+                    tmp_file_name,
+                )
                 self.delete(entity, tmp_file_name)
-                # TODO: Log exception
-                # f"Aborting Upload - an unexpected error has occurred when moving file: {ab_id} - Error: {err}"
+                exception_string = f"Aborting Upload - an unexpected error has occurred when moving file: {ab_id} - Error: {err}"
+                logging.error(
+                    "FileHashStore - _move_and_get_checksums: %s", exception_string
+                )
                 raise
         else:
             # Else delete temporary file
@@ -750,6 +793,7 @@ class FileHashStore(HashStore):
                 hex_digest_dict (dictionary): Algorithms and their hex digests.
                 tmp.name: Name of temporary file created and written into.
         """
+        algoritm_list_to_calculate = self.default_algo_list
 
         # Create temporary file in .../{store_path}/tmp
         tmp_root_path = self.get_store_path("objects") / "tmp"
@@ -768,13 +812,20 @@ class FileHashStore(HashStore):
 
         # Additional hash object to digest
         if algorithm is not None:
+            self.clean_algorithm(algorithm)
             if algorithm in self.other_algo_list:
-                self.default_algo_list.append(algorithm)
-            elif algorithm not in self.default_algo_list:
-                raise ValueError(f"Algorithm not supported: {algorithm}")
+                logging.debug(
+                    "FileHashStore - _mktempfile: additional algorithm: %s found in other_algo_lists",
+                    algorithm + ", adding to list of algorithms to calculate",
+                )
+                algoritm_list_to_calculate.append(algorithm)
 
+        logging.debug(
+            "FileHashStore - _mktempfile: tmp file created: %s, calculating hex digests",
+            tmp.name,
+        )
         hash_algorithms = [
-            hashlib.new(algorithm) for algorithm in self.default_algo_list
+            hashlib.new(algorithm) for algorithm in algoritm_list_to_calculate
         ]
 
         # tmp is a file-like object that is already opened for writing by default
@@ -787,8 +838,9 @@ class FileHashStore(HashStore):
         hex_digest_list = [
             hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
         ]
-        hex_digest_dict = dict(zip(self.default_algo_list, hex_digest_list))
+        hex_digest_dict = dict(zip(algoritm_list_to_calculate, hex_digest_list))
 
+        logging.debug("FileHashStore - _mktempfile: Hex digests calculated")
         return hex_digest_dict, tmp.name
 
     def put_sysmeta(self, pid, sysmeta):

@@ -739,11 +739,11 @@ class FileHashStore(HashStore):
             except Exception as err:
                 # Revert storage process for the time being for any failure
                 exception_string = f"Unexpected {err=}, {type(err)=}"
-                logging.debug(
+                logging.error(
                     "FileHashStore - _move_and_get_checksums: %s", exception_string
                 )
                 if os.path.isfile(abs_file_path):
-                    # Check to see if file has moved successfully before deleting
+                    # Check to see if object has moved successfully before deleting to be efficient
                     logging.debug(
                         "FileHashStore - _move_and_get_checksums: Permanent file found during exception, checking hex digest for pid: %s",
                         pid,
@@ -766,10 +766,8 @@ class FileHashStore(HashStore):
                     tmp_file_name,
                 )
                 self.delete(entity, tmp_file_name)
-                exception_string = f"Aborting Upload - an unexpected error has occurred when moving file: {ab_id} - Error: {err}"
-                logging.error(
-                    "FileHashStore - _move_and_get_checksums: %s", exception_string
-                )
+                err_msg = f"Aborting store_object upload - an unexpected error has occurred when moving file: {ab_id} - Error: {err}"
+                logging.error("FileHashStore - _move_and_get_checksums: %s", err_msg)
                 raise
         else:
             # Else delete temporary file
@@ -834,6 +832,10 @@ class FileHashStore(HashStore):
                 tmp_file.write(self._to_bytes(data))
                 for hash_algorithm in hash_algorithms:
                     hash_algorithm.update(self._to_bytes(data))
+        logging.debug(
+            "FileHashStore - _mktempfile: Object stream written to temp file: %s",
+            tmp.name,
+        )
 
         hex_digest_list = [
             hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
@@ -853,6 +855,9 @@ class FileHashStore(HashStore):
         Returns:
             ab_id (string): Address of the sysmeta document.
         """
+        logging.debug(
+            "FileHashStore - put_sysmeta: Request to put sysmeta for pid: %s", pid
+        )
 
         # Create tmp file and write to it
         sysmeta_stream = Stream(sysmeta)
@@ -871,22 +876,30 @@ class FileHashStore(HashStore):
                 parent.mkdir(parents=True, exist_ok=True)
                 # Sysmeta will be replaced if it exists
                 shutil.move(sysmeta_tmp, full_path)
+                logging.debug(
+                    "FileHashStore - put_sysmeta: Successfully put sysmeta for pid: %s",
+                    pid,
+                )
                 return ab_id
             except Exception as err:
-                # TODO: Discuss specific error handling
-                # isADirectoryError/notADirectoryError - if src/dst are directories, cannot move
-                # OSError - if dst is a non-empty directory and insufficient permissions
-                # TODO: Log error - err
-                # Delete tmp file if it exists
+                exception_string = f"Unexpected {err=}, {type(err)=}"
+                logging.error("FileHashStore - put_sysmeta: %s", exception_string)
                 if os.path.exists(sysmeta_tmp):
+                    # Remove tmp sysmeta, calling app must re-upload
+                    logging.debug(
+                        "FileHashStore - put_sysmeta: Deleting sysmeta for pid: %s", pid
+                    )
                     self.sysmeta.delete(sysmeta_tmp)
-                print(f"Unexpected {err=}, {type(err)=}")
+                err_msg = f"Aborting store_sysmeta upload - an unexpected error has occurred: {err}"
+                logging.error("FileHashStore - put_sysmeta: %s", err_msg)
                 raise
         else:
-            raise FileNotFoundError(
-                f"sysmeta_tmp file not found: {sysmeta_tmp}."
-                + " Unable to move sysmeta `{ab_id}` for pid `{pid}`"
+            exception_string = (
+                f"Attemptes to move sysmeta for pid: {pid}"
+                + f". But sysmeta temp file not found: {sysmeta_tmp}"
             )
+            logging.error("FileHashStore - put_sysmeta: %s", exception_string)
+            raise FileNotFoundError()
 
     def _mktmpsysmeta(self, stream, namespace):
         """Create a named temporary file with `sysmeta` bytes and `namespace`.
@@ -914,12 +927,19 @@ class FileHashStore(HashStore):
                 os.umask(oldmask)
 
         # tmp is a file-like object that is already opened for writing by default
+        logging.debug(
+            "FileHashStore - _mktmpsysmeta: Writing stream to tmp sysmeta file: %s",
+            tmp.name,
+        )
         with tmp as tmp_file:
             tmp_file.write(namespace.encode("utf-8"))
             tmp_file.write(b"\x00")
             for data in stream:
                 tmp_file.write(self._to_bytes(data))
 
+        logging.debug(
+            "FileHashStore - _mktmpsysmeta: Successfully written to tmp sysmeta file"
+        )
         return tmp.name
 
     # FileHashStore Utility & Supporting Methods

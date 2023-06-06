@@ -333,7 +333,7 @@ class FileHashStore(HashStore):
         checksum=None,
         checksum_algorithm=None,
     ):
-        logging.info(
+        logging.debug(
             "FileHashStore - store_object: Request to store object for pid: %s", pid
         )
         # Validate input parameters
@@ -393,7 +393,7 @@ class FileHashStore(HashStore):
             )
             self.object_locked_pids.append(pid)
         try:
-            logging.info(
+            logging.debug(
                 "FileHashStore - store_object: Attempting to store object for pid: %s",
                 pid,
             )
@@ -419,6 +419,9 @@ class FileHashStore(HashStore):
         return hash_address
 
     def store_sysmeta(self, pid, sysmeta):
+        logging.debug(
+            "FileHashStore - store_sysmeta: Request to store sysmeta for pid: %s", pid
+        )
         # Validate input parameters
         if pid is None or pid.replace(" ", "") == "":
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
@@ -454,7 +457,7 @@ class FileHashStore(HashStore):
             )
             self.sysmeta_locked_pids.append(pid)
         try:
-            logging.info(
+            logging.debug(
                 "FileHashStore - store_sysmeta: Attempting to store sysmeta for pid: %s",
                 pid,
             )
@@ -474,33 +477,63 @@ class FileHashStore(HashStore):
         return sysmeta_cid
 
     def retrieve_object(self, pid):
+        logging.debug(
+            "FileHashStore - retrieve_object: Request to retrieve object for pid: %s",
+            pid,
+        )
         if pid is None or pid.replace(" ", "") == "":
-            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+            exception_string = f"Pid cannot be None or empty, pid: {pid}"
+            logging.error("FileHashStore - retrieve_object: %s", exception_string)
+            raise ValueError(exception_string)
 
         entity = "objects"
         ab_id = self.get_sha256_hex_digest(pid)
         sysmeta_exists = self.exists(entity, ab_id)
         if sysmeta_exists:
+            logging.debug(
+                "FileHashStore - retrieve_object: Sysmeta exists for pid: %s, retrieving object",
+                pid,
+            )
             obj_stream = self.open(entity, ab_id)
         else:
-            raise ValueError(f"No sysmeta found for pid: {pid}")
+            exception_string = f"No sysmeta found for pid: {pid}"
+            logging.error("FileHashStore - retrieve_object: %s", exception_string)
+            raise ValueError(exception_string)
+        logging.info(
+            "FileHashStore - retrieve_object: Retrieved object for pid: %s", pid
+        )
         return obj_stream
 
     def retrieve_sysmeta(self, pid):
+        logging.debug(
+            "FileHashStore - retrieve_sysmeta: Request to retrieve sysmeta for pid: %s",
+            pid,
+        )
         if pid is None or pid.replace(" ", "") == "":
-            raise ValueError(f"Pid cannot be None or empty, pid: {pid}")
+            exception_string = f"Pid cannot be None or empty, pid: {pid}"
+            logging.error("FileHashStore - retrieve_sysmeta: %s", exception_string)
+            raise ValueError(exception_string)
 
         entity = "sysmeta"
         ab_id = self.get_sha256_hex_digest(pid)
         sysmeta_exists = self.exists(entity, ab_id)
         if sysmeta_exists:
+            logging.debug(
+                "FileHashStore - retrieve_sysmeta: Sysmeta exists for pid: %s, retrieving sysmeta",
+                pid,
+            )
             ab_id = self.get_sha256_hex_digest(pid)
             s_path = self.open(entity, ab_id)
             s_content = s_path.read().decode("utf-8").split("\x00", 1)
             s_path.close()
             sysmeta = s_content[1]
         else:
-            raise ValueError(f"No sysmeta found for pid: {pid}")
+            exception_string = f"No sysmeta found for pid: {pid}"
+            logging.error("FileHashStore - retrieve_sysmeta: %s", exception_string)
+            raise ValueError(exception_string)
+        logging.info(
+            "FileHashStore - retrieve_sysmeta: Retrieved sysmeta for pid: %s", pid
+        )
         return sysmeta
 
     def delete_object(self, pid):

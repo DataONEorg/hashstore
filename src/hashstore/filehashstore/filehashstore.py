@@ -83,8 +83,8 @@ class FileHashStore(HashStore):
             # Check to see if a configuration is present in the given store path
             self.hashstore_configuration_yaml = prop_store_path + "/hashstore.yaml"
             if os.path.exists(self.hashstore_configuration_yaml):
-                logging.info(
-                    "FileHashStore - Config found (hashstore.yaml) at {%s}. Verifying properties",
+                logging.debug(
+                    "FileHashStore - Config found (hashstore.yaml) at {%s}. Verifying properties.",
                     self.hashstore_configuration_yaml,
                 )
                 # If 'hashstore.yaml' is found, verify given properties before init
@@ -108,7 +108,7 @@ class FileHashStore(HashStore):
                     logging.critical("FileHashStore - %s", exception_string)
                     raise FileNotFoundError(exception_string)
 
-            logging.info("FileHashStore - Initializing, properties verified.")
+            logging.debug("FileHashStore - Initializing, properties verified.")
             self.root = prop_store_path
             self.depth = prop_store_depth
             self.width = prop_store_width
@@ -125,14 +125,16 @@ class FileHashStore(HashStore):
             # Complete initialization/instantiation by setting store directories
             self.objects = self.root + "/objects"
             self.sysmeta = self.root + "/sysmeta"
-            logging.info(
+            logging.debug(
                 "FileHashStore - Initialization success. Store root: %s", self.root
             )
         else:
-            # Cannot instantiate or initialize FileHashStore without config
-            raise ValueError(
+            exception_string = (
                 f"HashStore properties must be supplied. Properties: {properties}"
             )
+            logging.debug("FileHashStore - %s", exception_string)
+            # Cannot instantiate or initialize FileHashStore without config
+            raise ValueError(exception_string)
 
     # Configuration Methods
 
@@ -144,7 +146,7 @@ class FileHashStore(HashStore):
             "store_path", "store_depth", "store_width", "store_algorithm","store_sysmeta_namespace".
         """
         if not os.path.exists(self.hashstore_configuration_yaml):
-            exception_string = "hashstore.yaml not found in store root path"
+            exception_string = "hashstore.yaml not found in store root path."
             logging.critical("FileHashStore - get_properties: %s", exception_string)
             raise FileNotFoundError(exception_string)
         # Open file
@@ -154,6 +156,9 @@ class FileHashStore(HashStore):
         hashstore_yaml_dict = {}
         for key in self.property_required_keys:
             hashstore_yaml_dict[key] = yaml_data[key]
+        logging.debug(
+            "FileHashStore - get_properties: Successfully retrieved 'hashstore.yaml' properties."
+        )
         return hashstore_yaml_dict
 
     def put_properties(self, properties):
@@ -173,7 +178,7 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore configuration file 'hashstore.yaml' already exists."
             )
-            logging.error("FileHashStore - put_properties: %s.", exception_string)
+            logging.error("FileHashStore - put_properties: %s", exception_string)
             raise FileExistsError(exception_string)
         # Validate properties
         checked_properties = self._validate_properties(properties)
@@ -197,8 +202,8 @@ class FileHashStore(HashStore):
             self.hashstore_configuration_yaml, "w", encoding="utf-8"
         ) as hashstore_yaml:
             hashstore_yaml.write(hashstore_configuration_yaml)
-        logging.info(
-            "FileHashStore - put_properties: Configuration file written at: %s",
+        logging.debug(
+            "FileHashStore - put_properties: Configuration file written to: %s",
             self.hashstore_configuration_yaml,
         )
         return
@@ -318,7 +323,7 @@ class FileHashStore(HashStore):
         # Validate input parameters
         logging.debug("FileHashStore - store_object: Validating arguments.")
         if pid is None or pid.replace(" ", "") == "":
-            exception_string = f"Pid cannot be None or empty, pid: {pid}"
+            exception_string = f"Pid cannot be None or empty, pid: {pid}."
             logging.error("FileHashStore - store_object: %s", exception_string)
             raise ValueError(exception_string)
         if (
@@ -334,10 +339,13 @@ class FileHashStore(HashStore):
             raise TypeError(exception_string)
         if isinstance(data, str):
             if data.replace(" ", "") == "":
-                exception_string = "Data string cannot be empty"
+                exception_string = "Data string cannot be empty."
                 logging.error("FileHashStore - store_object: %s", exception_string)
                 raise TypeError(exception_string)
         # Format additional algorithm if supplied
+        logging.debug(
+            "FileHashStore - store_object: Validating algorithm and checksum args."
+        )
         additional_algorithm_checked = None
         if additional_algorithm != self.algorithm and additional_algorithm is not None:
             additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
@@ -367,7 +375,7 @@ class FileHashStore(HashStore):
         # Modify object_locked_pids consecutively
         with self.object_lock:
             logging.debug(
-                "FileHashStore - store_object: Adding pid: %s to object_locked_pids",
+                "FileHashStore - store_object: Adding pid: %s to object_locked_pids.",
                 pid,
             )
             self.object_locked_pids.append(pid)
@@ -387,7 +395,7 @@ class FileHashStore(HashStore):
             # Release pid
             with self.object_lock:
                 logging.debug(
-                    "FileHashStore - store_object: Removing pid: %s from object_locked_pids",
+                    "FileHashStore - store_object: Removing pid: %s from object_locked_pids.",
                     pid,
                 )
                 self.object_locked_pids.remove(pid)
@@ -402,6 +410,7 @@ class FileHashStore(HashStore):
             "FileHashStore - store_sysmeta: Request to store sysmeta for pid: %s", pid
         )
         # Validate input parameters
+        logging.debug("FileHashStore - store_sysmeta: Validating arguments.")
         if pid is None or pid.replace(" ", "") == "":
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
             logging.error("FileHashStore - store_sysmeta: %s", exception_string)
@@ -417,7 +426,7 @@ class FileHashStore(HashStore):
             raise TypeError(exception_string)
         if isinstance(sysmeta, str):
             if sysmeta.replace(" ", "") == "":
-                exception_string = "String path to sysmeta cannot be empty"
+                exception_string = "Given string path to sysmeta cannot be empty."
                 logging.error("FileHashStore - store_sysmeta: %s", exception_string)
                 raise TypeError(exception_string)
 
@@ -431,7 +440,7 @@ class FileHashStore(HashStore):
         # Modify sysmeta_locked_pids consecutively
         with self.sysmeta_lock:
             logging.debug(
-                "FileHashStore - store_sysmeta: Adding pid: %s to sysmeta_locked_pids",
+                "FileHashStore - store_sysmeta: Adding pid: %s to sysmeta_locked_pids.",
                 pid,
             )
             self.sysmeta_locked_pids.append(pid)
@@ -445,7 +454,7 @@ class FileHashStore(HashStore):
             # Release pid
             with self.sysmeta_lock:
                 logging.debug(
-                    "FileHashStore - store_sysmeta: Removing pid: %s from sysmeta_locked_pids",
+                    "FileHashStore - store_sysmeta: Removing pid: %s from sysmeta_locked_pids.",
                     pid,
                 )
                 self.sysmeta_locked_pids.remove(pid)
@@ -470,7 +479,7 @@ class FileHashStore(HashStore):
         sysmeta_exists = self.exists(entity, ab_id)
         if sysmeta_exists:
             logging.debug(
-                "FileHashStore - retrieve_object: Sysmeta exists for pid: %s, retrieving object",
+                "FileHashStore - retrieve_object: Sysmeta exists for pid: %s, retrieving object.",
                 pid,
             )
             obj_stream = self.open(entity, ab_id)
@@ -498,7 +507,7 @@ class FileHashStore(HashStore):
         sysmeta_exists = self.exists(entity, ab_id)
         if sysmeta_exists:
             logging.debug(
-                "FileHashStore - retrieve_sysmeta: Sysmeta exists for pid: %s, retrieving sysmeta",
+                "FileHashStore - retrieve_sysmeta: Sysmeta exists for pid: %s, retrieving sysmeta.",
                 pid,
             )
             ab_id = self.get_sha256_hex_digest(pid)
@@ -575,10 +584,12 @@ class FileHashStore(HashStore):
             raise ValueError(exception_string)
         c_stream = self.open(entity, ab_id)
         hex_digest = self.computehash(c_stream, algorithm=algorithm)
-        logging.info(
-            "FileHashStore - get_hex_digest: Successfully calculated hex digest for object-pid: %s",
-            pid,
+
+        logging_info_statement = (
+            f"FileHashStore - get_hex_digest: Successfully calculated hex digest for pid: {pid}."
+            + f" Hex Digest: {hex_digest}",
         )
+        logging.info(logging_info_statement)
         return hex_digest
 
     # FileHashStore Core Methods
@@ -695,6 +706,10 @@ class FileHashStore(HashStore):
             pid,
         )
         hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
+        logging.debug(
+            "FileHashStore - _move_and_get_checksums: Temp file created: %s",
+            tmp_file_name,
+        )
 
         # Only move file if it doesn't exist.
         # Files are stored once and only once
@@ -703,11 +718,15 @@ class FileHashStore(HashStore):
                 hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum:
                     self.delete(entity, tmp_file_name)
-                    raise ValueError(
+                    exception_string = (
                         "Hex digest and checksum do not match - file not stored. "
-                        f"Algorithm: {checksum_algorithm}. "
-                        f"Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
+                        + f"Algorithm: {checksum_algorithm}. "
+                        + f"Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
                     )
+                    logging.error(
+                        "FileHashStore - _move_and_get_checksums: %s", exception_string
+                    )
+                    raise ValueError(exception_string)
             is_duplicate = False
             try:
                 logging.debug(
@@ -716,19 +735,20 @@ class FileHashStore(HashStore):
                 )
                 shutil.move(tmp_file_name, abs_file_path)
             except Exception as err:
-                # Revert storage process for the time being for any failure
+                # Revert storage process
                 exception_string = f"Unexpected {err=}, {type(err)=}"
                 logging.error(
                     "FileHashStore - _move_and_get_checksums: %s", exception_string
                 )
                 if os.path.isfile(abs_file_path):
-                    # Check to see if object has moved successfully before deleting to be efficient
+                    # Check to see if object has moved successfully before deleting
                     logging.debug(
                         "FileHashStore - _move_and_get_checksums: Permanent file found during exception, checking hex digest for pid: %s",
                         pid,
                     )
                     pid_checksum = self.get_hex_digest(pid, "sha256")
                     if pid_checksum == hex_digests.get("sha256"):
+                        # If the checksums match, return and log warning
                         logging.warning(
                             "FileHashStore - _move_and_get_checksums: File moved successfully but unexpected issue encountered: %s",
                             exception_string,
@@ -745,11 +765,15 @@ class FileHashStore(HashStore):
                     tmp_file_name,
                 )
                 self.delete(entity, tmp_file_name)
-                err_msg = f"Aborting store_object upload - an unexpected error has occurred when moving file: {ab_id} - Error: {err}"
+                err_msg = f"Aborting store_object upload - an unexpected error has occurred when moving file to: {ab_id} - Error: {err}"
                 logging.error("FileHashStore - _move_and_get_checksums: %s", err_msg)
                 raise
         else:
             # Else delete temporary file
+            logging.warning(
+                "FileHashStore - _move_and_get_checksums: Object exists at: %s, deleting temporary file.",
+                abs_file_path,
+            )
             is_duplicate = True
             self.delete(entity, tmp_file_name)
 
@@ -791,14 +815,15 @@ class FileHashStore(HashStore):
         if algorithm is not None:
             self.clean_algorithm(algorithm)
             if algorithm in self.other_algo_list:
+                # pylint: disable=C0301
                 logging.debug(
                     "FileHashStore - _mktempfile: additional algorithm: %s found in other_algo_lists",
-                    algorithm + ", adding to list of algorithms to calculate",
+                    algorithm + ", adding to list of algorithms to calculate.",
                 )
                 algoritm_list_to_calculate.append(algorithm)
 
         logging.debug(
-            "FileHashStore - _mktempfile: tmp file created: %s, calculating hex digests",
+            "FileHashStore - _mktempfile: tmp file created: %s, calculating hex digests.",
             tmp.name,
         )
         hash_algorithms = [
@@ -812,7 +837,7 @@ class FileHashStore(HashStore):
                 for hash_algorithm in hash_algorithms:
                     hash_algorithm.update(self._to_bytes(data))
         logging.debug(
-            "FileHashStore - _mktempfile: Object stream written to temp file: %s",
+            "FileHashStore - _mktempfile: Object stream successfully written to tmp file: %s",
             tmp.name,
         )
 
@@ -821,7 +846,7 @@ class FileHashStore(HashStore):
         ]
         hex_digest_dict = dict(zip(algoritm_list_to_calculate, hex_digest_list))
 
-        logging.debug("FileHashStore - _mktempfile: Hex digests calculated")
+        logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
         return hex_digest_dict, tmp.name
 
     def put_sysmeta(self, pid, sysmeta):
@@ -874,8 +899,8 @@ class FileHashStore(HashStore):
                 raise
         else:
             exception_string = (
-                f"Attempts to move sysmeta for pid: {pid}"
-                + f". But sysmeta temp file not found: {sysmeta_tmp}"
+                f"Attempt to move sysmeta for pid: {pid}"
+                + f", but sysmeta temp file not found: {sysmeta_tmp}"
             )
             logging.error("FileHashStore - put_sysmeta: %s", exception_string)
             raise FileNotFoundError()
@@ -917,7 +942,8 @@ class FileHashStore(HashStore):
                 tmp_file.write(self._to_bytes(data))
 
         logging.debug(
-            "FileHashStore - _mktmpsysmeta: Successfully written to tmp sysmeta file"
+            "FileHashStore - _mktmpsysmeta: Successfully written to tmp sysmeta file: %s",
+            tmp.name,
         )
         return tmp.name
 

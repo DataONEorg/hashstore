@@ -72,13 +72,16 @@ class FileHashStore(HashStore):
         if properties:
             # Validate properties against existing configuration if present
             checked_properties = self._validate_properties(properties)
-            prop_store_path = checked_properties.get("store_path")
-            prop_store_depth = checked_properties.get("store_depth")
-            prop_store_width = checked_properties.get("store_width")
-            prop_store_algorithm = checked_properties.get("store_algorithm")
-            prop_store_sysmeta_namespace = checked_properties.get(
-                "store_sysmeta_namespace"
-            )
+            (
+                prop_store_path,
+                prop_store_depth,
+                prop_store_width,
+                prop_store_algorithm,
+                prop_store_sysmeta_namespace,
+            ) = [
+                checked_properties[property_name]
+                for property_name in self.property_required_keys
+            ]
 
             # Check to see if a configuration is present in the given store path
             self.hashstore_configuration_yaml = prop_store_path + "/hashstore.yaml"
@@ -184,11 +187,17 @@ class FileHashStore(HashStore):
         checked_properties = self._validate_properties(properties)
 
         # Collect configuration properties from validated & supplied dictionary
-        store_path = checked_properties.get("store_path")
-        store_depth = checked_properties.get("store_depth")
-        store_width = checked_properties.get("store_width")
-        store_algorithm = checked_properties.get("store_algorithm")
-        store_sysmeta_namespace = checked_properties.get("store_sysmeta_namespace")
+        (
+            store_path,
+            store_depth,
+            store_width,
+            store_algorithm,
+            store_sysmeta_namespace,
+        ) = [
+            checked_properties[property_name]
+            for property_name in self.property_required_keys
+        ]
+
         # .yaml file to write
         hashstore_configuration_yaml = self._build_hashstore_yaml_string(
             store_path,
@@ -352,16 +361,20 @@ class FileHashStore(HashStore):
         # Checksum and checksum_algorithm must both be supplied
         if checksum is not None:
             if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
-                # pylint: disable=C0301
-                exception_string = "checksum_algorithm cannot be None or empty if checksum is supplied."
+                exception_string = (
+                    "checksum_algorithm cannot be None or empty if checksum is"
+                    + "supplied."
+                )
                 logging.error("FileHashStore - store_object: %s", exception_string)
                 raise ValueError(exception_string)
         checksum_algorithm_checked = None
         if checksum_algorithm is not None:
             checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
             if checksum is None or checksum.replace(" ", "") == "":
-                # pylint: disable=C0301
-                exception_string = "checksum cannot be None or empty if checksum_algorithm is supplied."
+                exception_string = (
+                    "checksum cannot be None or empty if checksum_algorithm is"
+                    + " supplied."
+                )
                 logging.error("FileHashStore - store_object: %s", exception_string)
                 raise ValueError(exception_string)
 
@@ -420,8 +433,10 @@ class FileHashStore(HashStore):
             and not isinstance(sysmeta, Path)
             and not isinstance(sysmeta, io.BufferedIOBase)
         ):
-            # pylint: disable=C0301
-            exception_string = f"Sysmeta must be a path or string type, data type supplied: {type(sysmeta)}"
+            exception_string = (
+                "Sysmeta must be a path or string type, data type supplied: "
+                + {type(sysmeta)}
+            )
             logging.error("FileHashStore - store_sysmeta: %s", exception_string)
             raise TypeError(exception_string)
         if isinstance(sysmeta, str):
@@ -696,15 +711,15 @@ class FileHashStore(HashStore):
                 "FileHashStore - _move_and_get_checksums: %s", exception_string
             )
             raise FileExistsError(exception_string)
-        else:
-            rel_file_path = os.path.relpath(abs_file_path, self.objects)
+
+        rel_file_path = os.path.relpath(abs_file_path, self.objects)
 
         # Create temporary file and calculate hex digests
-        # pylint: disable=C0301
-        logging.debug(
-            "FileHashStore - _move_and_get_checksums: Creating temp file and calculating checksums for pid: %s",
-            pid,
+        debug_tmp_file_str = (
+            "FileHashStore - _move_and_get_checksums: Creating temp"
+            + f" file and calculating checksums for pid: {pid}"
         )
+        logging.debug(debug_tmp_file_str)
         hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
         logging.debug(
             "FileHashStore - _move_and_get_checksums: Temp file created: %s",
@@ -719,9 +734,9 @@ class FileHashStore(HashStore):
                 if hex_digest_stored != checksum:
                     self.delete(entity, tmp_file_name)
                     exception_string = (
-                        "Hex digest and checksum do not match - file not stored. "
-                        + f"Algorithm: {checksum_algorithm}. "
-                        + f"Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
+                        "Hex digest and checksum do not match - file not stored."
+                        + f" Algorithm: {checksum_algorithm}."
+                        + f" Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
                     )
                     logging.error(
                         "FileHashStore - _move_and_get_checksums: %s", exception_string
@@ -729,10 +744,11 @@ class FileHashStore(HashStore):
                     raise ValueError(exception_string)
             is_duplicate = False
             try:
-                logging.debug(
-                    "FileHashStore - _move_and_get_checksums: Moving temp file to permanent location: %s",
-                    abs_file_path,
+                debug_move_tmp_file_str = (
+                    "FileHashStore - _move_and_get_checksums: Moving temp file to permanent"
+                    + f" location: {abs_file_path}",
                 )
+                logging.debug(debug_move_tmp_file_str)
                 shutil.move(tmp_file_name, abs_file_path)
             except Exception as err:
                 # Revert storage process
@@ -742,38 +758,45 @@ class FileHashStore(HashStore):
                 )
                 if os.path.isfile(abs_file_path):
                     # Check to see if object has moved successfully before deleting
-                    logging.debug(
-                        "FileHashStore - _move_and_get_checksums: Permanent file found during exception, checking hex digest for pid: %s",
-                        pid,
+                    debug_file_found_exception_str = (
+                        "FileHashStore - _move_and_get_checksums: Permanent file"
+                        + f" found during exception, checking hex digest for pid: {pid}"
                     )
-                    pid_checksum = self.get_hex_digest(pid, "sha256")
-                    if pid_checksum == hex_digests.get("sha256"):
+                    logging.debug(debug_file_found_exception_str)
+                    pid_checksum = self.get_hex_digest(pid, self.algorithm)
+                    if pid_checksum == hex_digests.get(self.algorithm):
                         # If the checksums match, return and log warning
-                        logging.warning(
-                            "FileHashStore - _move_and_get_checksums: File moved successfully but unexpected issue encountered: %s",
-                            exception_string,
+                        warning_file_stored_str = (
+                            "FileHashStore - _move_and_get_checksums: File moved"
+                            + f" successfully but unexpected issue encountered: {exception_string}",
                         )
+                        logging.warning(warning_file_stored_str)
                         return
                     else:
-                        logging.debug(
-                            "FileHashStore - _move_and_get_checksums: Permanent file found but with incomplete state, deleting file: %s",
-                            abs_file_path,
+                        debug_file_incomplete_state_str = (
+                            "FileHashStore - _move_and_get_checksums: Permanent file"
+                            + f" found but with incomplete state, deleting file: {abs_file_path}",
                         )
+                        logging.debug(debug_file_incomplete_state_str)
                         self.delete(entity, abs_file_path)
                 logging.debug(
                     "FileHashStore - _move_and_get_checksums: Deleting temporary file: %s",
                     tmp_file_name,
                 )
                 self.delete(entity, tmp_file_name)
-                err_msg = f"Aborting store_object upload - an unexpected error has occurred when moving file to: {ab_id} - Error: {err}"
+                err_msg = (
+                    "Aborting store_object upload - an unexpected error has occurred when moving"
+                    + f" file to: {ab_id} - Error: {err}"
+                )
                 logging.error("FileHashStore - _move_and_get_checksums: %s", err_msg)
                 raise
         else:
             # Else delete temporary file
-            logging.warning(
-                "FileHashStore - _move_and_get_checksums: Object exists at: %s, deleting temporary file.",
-                abs_file_path,
+            warning_duplicate_file_str = (
+                f"FileHashStore - _move_and_get_checksums: Object exists at: {abs_file_path},"
+                + " deleting temporary file."
             )
+            logging.warning(warning_duplicate_file_str)
             is_duplicate = True
             self.delete(entity, tmp_file_name)
 
@@ -794,7 +817,7 @@ class FileHashStore(HashStore):
                 hex_digest_dict (dictionary): Algorithms and their hex digests.
                 tmp.name: Name of temporary file created and written into.
         """
-        algoritm_list_to_calculate = self.default_algo_list
+        algorithm_list_to_calculate = self.default_algo_list
 
         # Create temporary file in .../{store_path}/tmp
         tmp_root_path = self.get_store_path("objects") / "tmp"
@@ -815,19 +838,19 @@ class FileHashStore(HashStore):
         if algorithm is not None:
             self.clean_algorithm(algorithm)
             if algorithm in self.other_algo_list:
-                # pylint: disable=C0301
-                logging.debug(
-                    "FileHashStore - _mktempfile: additional algorithm: %s found in other_algo_lists",
-                    algorithm + ", adding to list of algorithms to calculate.",
+                debug_additional_other_algo_str = (
+                    f"FileHashStore - _mktempfile: additional algorithm: {algorithm} found"
+                    + " in other_algo_lists, adding to list of algorithms to calculate."
                 )
-                algoritm_list_to_calculate.append(algorithm)
+                logging.debug(debug_additional_other_algo_str)
+                algorithm_list_to_calculate.append(algorithm)
 
         logging.debug(
             "FileHashStore - _mktempfile: tmp file created: %s, calculating hex digests.",
             tmp.name,
         )
         hash_algorithms = [
-            hashlib.new(algorithm) for algorithm in algoritm_list_to_calculate
+            hashlib.new(algorithm) for algorithm in algorithm_list_to_calculate
         ]
 
         # tmp is a file-like object that is already opened for writing by default
@@ -844,7 +867,7 @@ class FileHashStore(HashStore):
         hex_digest_list = [
             hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
         ]
-        hex_digest_dict = dict(zip(algoritm_list_to_calculate, hex_digest_list))
+        hex_digest_dict = dict(zip(algorithm_list_to_calculate, hex_digest_list))
 
         logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
         return hex_digest_dict, tmp.name

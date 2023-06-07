@@ -16,17 +16,17 @@ class HashStoreFactory:
         """Get a `HashStore`-like object based on the specified `module_name` and `class_name`.
 
         Args:
-            module_name (str): Name of module/package (ex. "hashstore.filehashstore.filehashstore") \n
+            module_name (str): Name of package (ex. "hashstore.filehashstore.filehashstore") \n
             class_name (str): Name of class in the given module (ex. "FileHashStore") \n
             properties (dict, optional): Desired HashStore properties, if 'None', default values
             will be used. \n
                 Example Properties Dictionary:
                 {
-                    "store_path": "var/metacat",
-                    "store_depth": 3,
-                    "store_width": 2,
-                    "store_algorithm": "sha256",
-                    "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0"
+                    "store_path": "var/metacat",\n
+                    "store_depth": 3,\n
+                    "store_width": 2,\n
+                    "store_algorithm": "sha256",\n
+                    "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0"\n
                 }
 
         Returns:

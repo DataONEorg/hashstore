@@ -104,7 +104,7 @@ def test_validate_properties_key_value_is_none(store):
 
 
 def test_validate_properties_incorrect_type(store):
-    """Confirm exceptionr raised when key missing in properties."""
+    """Confirm exception raised when key missing in properties."""
     properties = "etc/filehashstore"
     with pytest.raises(ValueError):
         # pylint: disable=W0212

@@ -8,10 +8,13 @@ on a shared file system for simple and fast access by data management
 processes that function across a cluster environment. Some properties:
 
 - Data objects are immutable and never change
-- Data objects are named using the SHA-256, base64-encoded hash of their contents (thus, a content-identifiers)
-- Metadata objects are stored with a pointer to the hash of the data object they describe
-- Metadata objects are named using the SHA-256, base64-encoded hash of their persistent identifier (PID)
-- An object's persistent identifier can be used to read both metadata and contents of the object
+- Data objects are named using the SHA-256, base64-encoded hash of their contents
+    (thus, a content-identifier)
+- Metadata objects are stored with the formatId, a null character and its contents
+- Metadata objects are named using the SHA-256, base64-encoded hash of their
+    persistent identifier (PID)
+- An object's persistent identifier can be used to read both metadata and contents
+    of the object
 """
 
 from hashstore.hashstore import HashStore

@@ -64,9 +64,9 @@ class FileHashStore(HashStore):
     # Variables to orchestrate thread locking and object store synchronization
     time_out_sec = 1
     object_lock = threading.Lock()
-    sysmeta_lock = threading.Lock()
+    metadata_lock = threading.Lock()
     object_locked_pids = []
-    sysmeta_locked_pids = []
+    metadata_locked_pids = []
 
     def __init__(self, properties=None):
         if properties:
@@ -127,7 +127,7 @@ class FileHashStore(HashStore):
                 self.put_properties(properties)
             # Complete initialization/instantiation by setting store directories
             self.objects = self.root + "/objects"
-            self.sysmeta = self.root + "/sysmeta"
+            self.metadata = self.root + "/metadata"
             logging.debug(
                 "FileHashStore - Initialization success. Store root: %s", self.root
             )
@@ -446,19 +446,19 @@ class FileHashStore(HashStore):
                 raise TypeError(exception_string)
 
         # Wait for the pid to release if it's in use
-        while pid in self.sysmeta_locked_pids:
+        while pid in self.metadata_locked_pids:
             logging.debug(
                 "FileHashStore - store_sysmeta: %s is currently being stored. Waiting.",
                 pid,
             )
             time.sleep(self.time_out_sec)
-        # Modify sysmeta_locked_pids consecutively
-        with self.sysmeta_lock:
+        # Modify metadata_locked_pids consecutively
+        with self.metadata_lock:
             logging.debug(
-                "FileHashStore - store_sysmeta: Adding pid: %s to sysmeta_locked_pids.",
+                "FileHashStore - store_sysmeta: Adding pid: %s to metadata_locked_pids.",
                 pid,
             )
-            self.sysmeta_locked_pids.append(pid)
+            self.metadata_locked_pids.append(pid)
         try:
             logging.debug(
                 "FileHashStore - store_sysmeta: Attempting to store sysmeta for pid: %s",
@@ -467,12 +467,12 @@ class FileHashStore(HashStore):
             sysmeta_cid = self.put_sysmeta(pid, sysmeta)
         finally:
             # Release pid
-            with self.sysmeta_lock:
+            with self.metadata_lock:
                 logging.debug(
-                    "FileHashStore - store_sysmeta: Removing pid: %s from sysmeta_locked_pids.",
+                    "FileHashStore - store_sysmeta: Removing pid: %s from metadata_locked_pids.",
                     pid,
                 )
-                self.sysmeta_locked_pids.remove(pid)
+                self.metadata_locked_pids.remove(pid)
             logging.info(
                 "FileHashStore - store_sysmeta: Successfully stored sysmeta for pid: %s",
                 pid,
@@ -916,7 +916,7 @@ class FileHashStore(HashStore):
                     logging.debug(
                         "FileHashStore - put_sysmeta: Deleting sysmeta for pid: %s", pid
                     )
-                    self.sysmeta.delete(sysmeta_tmp)
+                    self.metadata.delete(sysmeta_tmp)
                 err_msg = f"Aborting store_sysmeta upload - an unexpected error has occurred: {err}"
                 logging.error("FileHashStore - put_sysmeta: %s", err_msg)
                 raise
@@ -1030,7 +1030,7 @@ class FileHashStore(HashStore):
         if entity == "objects":
             return Path(self.objects)
         elif entity == "sysmeta":
-            return Path(self.sysmeta)
+            return Path(self.metadata)
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?"
@@ -1187,7 +1187,7 @@ class FileHashStore(HashStore):
         if entity == "objects":
             rel_root = self.objects
         elif entity == "sysmeta":
-            rel_root = self.sysmeta
+            rel_root = self.metadata
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?"
@@ -1240,7 +1240,7 @@ class FileHashStore(HashStore):
         if entity == "objects":
             directory_to_count = self.objects
         elif entity == "sysmeta":
-            directory_to_count = self.sysmeta
+            directory_to_count = self.metadata
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?"

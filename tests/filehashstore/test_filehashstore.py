@@ -467,7 +467,7 @@ def test_get_store_path_sysmeta(store):
     # pylint: disable=W0212
     path_sysmeta = store.get_store_path("sysmeta")
     path_sysmeta_string = str(path_sysmeta)
-    assert path_sysmeta_string.endswith("/metacat/sysmeta")
+    assert path_sysmeta_string.endswith("/metacat/metadata")
 
 
 def test_exists_with_absolute_path(pids, store):

@@ -63,27 +63,27 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def store_metadata(self, pid, format_id, sysmeta):
-        """The `store_sysmeta` method is responsible for adding and/or updating metadata
+    def store_metadata(self, pid, format_id, metadata):
+        """The `store_metadata` method is responsible for adding and/or updating metadata
         (ex. `sysmeta`) to disk using a given path/stream, a persistent identifier `pid`
-        and a metadata `format_id`. The metadata object consists of a header and
-        body section, split by a null character `\x00`.
+        and a metadata `format_id`. The metadata object consists of a header and a body
+        section, which is split by a null character `\x00`.
 
         The header contains the metadata object's permanent address, which is determined
         by calculating the SHA-256 hex digest of the provided `pid` + `format_id`; and the
         body contains the metadata content (ex. `sysmeta`).
 
-        Upon successful storage of sysmeta, `store_sysmeta` returns a string that
+        Upon successful storage of metadata, `store_metadata` returns a string that
         represents the file's permanent address. Lastly, the metadata objects are stored
         in parallel to objects in the `/store_directory/metadata/` directory.
 
         Args:
             pid (string): Authority-based identifier.
             format_id (string): Metadata format
-            sysmeta (mixed): String or path to sysmeta document.
+            metadata (mixed): String or path to metadata document.
 
         Returns:
-            sysmeta_cid (string): Address of the sysmeta document.
+            metadata_cid (string): Address of the metadata document.
         """
         raise NotImplementedError()
 

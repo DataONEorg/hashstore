@@ -31,13 +31,14 @@ def test_store_object_files_path(pids, store):
     """Test store object when given a path."""
     test_dir = "tests/testdata/"
     entity = "objects"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = Path(test_dir + pid.replace("/", "_"))
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        ab_id = store.store_sysmeta(pid, syspath)
-        assert store.exists(entity, ab_id)
+        _metadata_id = store.store_metadata(pid, format_id, syspath)
+        assert store.exists(entity, pids[pid]["ab_id"])
     assert store.count(entity) == 3
 
 
@@ -45,13 +46,14 @@ def test_store_object_files_string(pids, store):
     """Test store object when given a string."""
     test_dir = "tests/testdata/"
     entity = "objects"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path_string = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path_string)
-        ab_id = store.store_sysmeta(pid, syspath)
-        assert store.exists(entity, ab_id)
+        _metadata_id = store.store_metadata(pid, format_id, syspath)
+        assert store.exists(entity, pids[pid]["ab_id"])
     assert store.count(entity) == 3
 
 
@@ -409,112 +411,121 @@ def test_store_object_sparse_large_file(store):
     assert hash_address_id == pid_sha256_hex_digest
 
 
-def test_store_sysmeta_files_path(pids, store):
-    """Test store sysmeta with path."""
+def test_store_metadata_files_path(pids, store):
+    """Test store metadata with path."""
     test_dir = "tests/testdata/"
-    entity = "sysmeta"
+    entity = "metadata"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        ab_id = store.store_sysmeta(pid, syspath)
+        ab_id = store.store_metadata(pid, format_id, syspath)
         assert store.exists(entity, ab_id)
     assert store.count(entity) == 3
 
 
-def test_store_sysmeta_files_string(pids, store):
-    """Test store sysmeta with string."""
+def test_store_metadata_files_string(pids, store):
+    """Test store metadata with string."""
     test_dir = "tests/testdata/"
-    entity = "sysmeta"
+    entity = "metadata"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path_string = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
         _hash_address = store.store_object(pid, path_string)
-        ab_id = store.store_sysmeta(pid, syspath_string)
+        ab_id = store.store_metadata(pid, format_id, syspath_string)
         assert store.exists(entity, ab_id)
     assert store.count(entity) == 3
 
 
-def test_store_sysmeta_files_input_stream(pids, store):
-    """Test store sysmeta with an input stream to sysmeta."""
+def test_store_metadata_files_input_stream(pids, store):
+    """Test store metadata with an input stream to metadata."""
     test_dir = "tests/testdata/"
-    entity = "sysmeta"
+    entity = "metadata"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         _hash_address = store.store_object(pid, path)
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
         syspath_stream = io.open(syspath_string, "rb")
-        _ab_id = store.store_sysmeta(pid, syspath_stream)
+        _ab_id = store.store_metadata(pid, format_id, syspath_stream)
         syspath_stream.close()
     assert store.count(entity) == 3
 
 
-def test_store_sysmeta_pid_empty(store):
-    """Test store sysmeta raises error with empty string."""
+def test_store_metadata_pid_empty(store):
+    """Test store metadata raises error with empty string."""
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = ""
     filename = pid.replace("/", "_") + ".xml"
     syspath_string = str(Path(test_dir) / filename)
     with pytest.raises(ValueError):
-        store.store_sysmeta(pid, syspath_string)
+        store.store_metadata(pid, format_id, syspath_string)
 
 
-def test_store_sysmeta_pid_empty_spaces(store):
-    """Test store sysmeta raises error with empty string."""
+def test_store_metadata_pid_empty_spaces(store):
+    """Test store metadata raises error with empty string."""
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "   "
     filename = pid.replace("/", "_") + ".xml"
     syspath_string = str(Path(test_dir) / filename)
     with pytest.raises(ValueError):
-        store.store_sysmeta(pid, syspath_string)
+        store.store_metadata(pid, format_id, syspath_string)
 
 
-def test_store_sysmeta_sysmeta_empty(store):
-    """Test store sysmeta raises error with empty sysmeta string."""
+def test_store_metadata_metadata_empty(store):
+    """Test store metadata raises error with empty metadata string."""
     pid = "jtao.1700.1"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     syspath_string = "   "
     with pytest.raises(TypeError):
-        store.store_sysmeta(pid, syspath_string)
+        store.store_metadata(pid, format_id, syspath_string)
 
 
-def test_store_sysmeta_sysmeta_none(store):
-    """Test store sysmeta raises error with empty sysmeta string."""
+def test_store_metadata_metadata_none(store):
+    """Test store metadata raises error with empty metadata string."""
     pid = "jtao.1700.1"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     syspath_string = None
     with pytest.raises(TypeError):
-        store.store_sysmeta(pid, syspath_string)
+        store.store_metadata(pid, format_id, syspath_string)
 
 
-def test_store_sysmeta_ab_id(pids, store):
-    """Test store sysmeta returns expected ab_id."""
+def test_store_metadata_ab_id(pids, store):
+    """Test store metadata returns expected ab_id."""
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        ab_id = store.store_sysmeta(pid, syspath)
-        assert ab_id == pids[pid]["ab_id"]
+        ab_id = store.store_metadata(pid, format_id, syspath)
+        assert ab_id == pids[pid]["ab_format_id"]
 
 
-def test_store_sysmeta_thread_lock(store):
-    """Test store sysmeta thread lock."""
+def test_store_metadata_thread_lock(store):
+    """Test store metadata thread lock."""
     test_dir = "tests/testdata/"
-    entity = "sysmeta"
+    entity = "metadata"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "jtao.1700.1"
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     _hash_address = store.store_object(pid, path)
-    store.store_sysmeta(pid, syspath)
+    store.store_metadata(pid, format_id, syspath)
     # Start threads
-    thread1 = Thread(target=store.store_sysmeta, args=(pid, syspath))
-    thread2 = Thread(target=store.store_sysmeta, args=(pid, syspath))
-    thread3 = Thread(target=store.store_sysmeta, args=(pid, syspath))
-    thread4 = Thread(target=store.store_sysmeta, args=(pid, syspath))
+    thread1 = Thread(target=store.store_metadata, args=(pid, format_id, syspath))
+    thread2 = Thread(target=store.store_metadata, args=(pid, format_id, syspath))
+    thread3 = Thread(target=store.store_metadata, args=(pid, format_id, syspath))
+    thread4 = Thread(target=store.store_metadata, args=(pid, format_id, syspath))
     thread1.start()
     thread2.start()
     thread3.start()
@@ -529,12 +540,13 @@ def test_store_sysmeta_thread_lock(store):
 def test_retrieve_object(pids, store):
     """Test retrieve_object returns correct object data."""
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         hash_address = store.store_object(pid, path)
-        store.store_sysmeta(pid, syspath)
+        store.store_metadata(pid, format_id, syspath)
         obj_stream = store.retrieve_object(pid)
         sha256_hex = store.computehash(obj_stream)
         obj_stream.close()
@@ -557,14 +569,15 @@ def test_retrieve_object_pid_invalid(store):
 
 
 def test_retrieve_sysmeta(store):
-    """Test retrieve_sysmeta returns correct sysmeta data."""
+    """Test retrieve_sysmeta returns correct metadata data."""
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "jtao.1700.1"
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     _hash_address = store.store_object(pid, path)
-    _ab_id = store.store_sysmeta(pid, syspath)
+    _ab_id = store.store_metadata(pid, format_id, syspath)
     sysmeta_ret = store.retrieve_sysmeta(pid)
     sysmeta = syspath.read_bytes()
     assert sysmeta.decode("utf-8") == sysmeta_ret
@@ -589,12 +602,13 @@ def test_delete_objects(pids, store):
     """Test delete_object successfully deletes objects."""
     test_dir = "tests/testdata/"
     entity = "objects"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        _ab_id = store.store_sysmeta(pid, syspath)
+        _ab_id = store.store_metadata(pid, format_id, syspath)
         store.delete_object(pid)
     assert store.count(entity) == 0
 
@@ -616,13 +630,14 @@ def test_delete_object_pid_none(store):
 def test_delete_sysmeta(pids, store):
     """Test delete_sysmeta successfully deletes sysmeta."""
     test_dir = "tests/testdata/"
-    entity = "sysmeta"
+    entity = "metadata"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        _ab_id = store.store_sysmeta(pid, syspath)
+        _ab_id = store.store_metadata(pid, format_id, syspath)
         store.delete_sysmeta(pid)
     assert store.count(entity) == 0
 
@@ -644,12 +659,13 @@ def test_delete_sysmeta_pid_none(store):
 def test_get_hex_digest(store):
     """Test get_hex_digest for expected value."""
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "jtao.1700.1"
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     _hash_address = store.store_object(pid, path)
-    _ab_id = store.store_sysmeta(pid, syspath)
+    _ab_id = store.store_metadata(pid, format_id, syspath)
     sha3_256_hex_digest = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )

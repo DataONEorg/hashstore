@@ -18,7 +18,7 @@ def test_init_with_existing_hashstore_mismatched_config(store):
         "store_depth": 1,
         "store_width": 2,
         "store_algorithm": "sha256",
-        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     with pytest.raises(ValueError):
         FileHashStore(properties)
@@ -37,7 +37,7 @@ def test_init_with_existing_hashstore_missing_yaml(store, pids):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
-        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     with pytest.raises(FileNotFoundError):
         FileHashStore(properties)
@@ -51,7 +51,7 @@ def test_get_properties(store):
     assert hashstore_yaml_dict.get("store_width") == 2
     assert hashstore_yaml_dict.get("store_algorithm") == "sha256"
     assert (
-        hashstore_yaml_dict.get("store_sysmeta_namespace")
+        hashstore_yaml_dict.get("store_metadata_namespace")
         == "http://ns.dataone.org/service/types/v2.0"
     )
 
@@ -70,7 +70,7 @@ def test_validate_properties(store):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
-        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     # pylint: disable=W0212
     assert store._validate_properties(properties)
@@ -96,7 +96,7 @@ def test_validate_properties_key_value_is_none(store):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
-        "store_sysmeta_namespace": None,
+        "store_metadata_namespace": None,
     }
     with pytest.raises(ValueError):
         # pylint: disable=W0212
@@ -381,51 +381,54 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         input_stream.close()
 
 
-def test_put_sysmeta_with_path(pids, store):
-    """Test put sysmeta with path object."""
-    entity = "sysmeta"
+def test_put_metadata_with_path(pids, store):
+    """Test put metadata with path object."""
+    entity = "metadata"
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        ab_id = store.store_sysmeta(pid, syspath)
+        ab_id = store.store_metadata(pid, format_id, syspath)
         assert store.exists(entity, ab_id)
     assert store.count(entity) == 3
 
 
-def test_put_sysmeta_with_string(pids, store):
-    """Test put sysmeta with string."""
-    entity = "sysmeta"
+def test_put_metadata_with_string(pids, store):
+    """Test put metadata with string."""
+    entity = "metadata"
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = str(Path(test_dir) / filename)
-        ab_id = store.store_sysmeta(pid, syspath)
+        ab_id = store.store_metadata(pid, format_id, syspath)
         assert store.exists(entity, ab_id)
     assert store.count(entity) == 3
 
 
-def test_put_sysmeta_ab_id(pids, store):
-    """Test put sysmeta returns correct id."""
+def test_put_metadata_ab_id(pids, store):
+    """Test put metadata returns correct id."""
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        ab_id = store.store_sysmeta(pid, syspath)
-        assert ab_id == pids[pid]["ab_id"]
+        ab_id = store.store_metadata(pid, format_id, syspath)
+        assert ab_id == pids[pid]["ab_format_id"]
 
 
-def test_mktmpsysmeta(pids, store):
-    """Test mktmpsysmeta creates tmpFile."""
+def test_mktmpmetadata(pids, store):
+    """Test mktmpmetadata creates tmpFile."""
     test_dir = "tests/testdata/"
-    entity = "sysmeta"
+    entity = "metadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sys_stream = io.open(syspath, "rb")
-        namespace = "http://ns.dataone.org/service/types/v2.0"
+        format_id = "http://ns.dataone.org/service/types/v2.0"
         # pylint: disable=W0212
-        tmp_name = store._mktmpsysmeta(sys_stream, namespace)
+        tmp_name = store._mktmpmetadata(sys_stream, format_id)
         sys_stream.close()
         assert store.exists(entity, tmp_name)
 
@@ -462,12 +465,12 @@ def test_get_store_path_object(store):
     assert path_objects_string.endswith("/metacat/objects")
 
 
-def test_get_store_path_sysmeta(store):
-    """Check get_store_path for sysmeta path."""
+def test_get_store_path_metadata(store):
+    """Check get_store_path for metadata path."""
     # pylint: disable=W0212
-    path_sysmeta = store.get_store_path("sysmeta")
-    path_sysmeta_string = str(path_sysmeta)
-    assert path_sysmeta_string.endswith("/metacat/metadata")
+    path_metadata = store.get_store_path("metadata")
+    path_metadata_string = str(path_metadata)
+    assert path_metadata_string.endswith("/metacat/metadata")
 
 
 def test_exists_with_absolute_path(pids, store):

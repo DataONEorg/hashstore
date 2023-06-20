@@ -566,7 +566,7 @@ class FileHashStore(HashStore):
         )
         return True
 
-    def delete_sysmeta(self, pid):
+    def delete_metadata(self, pid, format_id):
         logging.debug(
             "FileHashStore - delete_sysmeta: Request to delete sysmeta for pid: %s",
             pid,
@@ -576,8 +576,8 @@ class FileHashStore(HashStore):
             logging.error("FileHashStore - delete_sysmeta: %s", exception_string)
             raise ValueError(exception_string)
 
-        entity = "sysmeta"
-        ab_id = self.get_sha256_hex_digest(pid)
+        entity = "metadata"
+        ab_id = self.get_sha256_hex_digest(pid + format_id)
         self.delete(entity, ab_id)
         logging.info(
             "FileHashStore - delete_sysmeta: Successfully deleted sysmeta for pid: %s",

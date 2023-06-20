@@ -105,7 +105,7 @@ class HashStore(ABC):
     @abstractmethod
     def retrieve_metadata(self, pid, format_id):
         """The 'retrieve_metadata' method retrieves the metadata content from disk and
-        returns it in the form of a String using a given persistent identifier.
+        returns it in the form of a String using a given persistent identifier and format_id.
 
         Args:
             pid (string): Authority-based identifier
@@ -130,12 +130,13 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_sysmeta(self, pid):
-        """The 'delete_sysmeta' method deletes a metadata document (sysmeta) permanently
-        from disk using a given persistent identifier.
+    def delete_metadata(self, pid, format_id):
+        """The 'delete_metadata' method deletes a metadata document permanently
+        from disk using a given persistent identifier and format_id.
 
         Args:
-            pid (string): Authority-based identifier.
+            pid (string): Authority-based identifier
+            format_id (string): Metadata format
 
         Returns:
             boolean: `True` upon successful deletion.

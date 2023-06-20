@@ -629,8 +629,8 @@ def test_delete_object_pid_none(store):
         store.delete_object(pid)
 
 
-def test_delete_sysmeta(pids, store):
-    """Test delete_sysmeta successfully deletes sysmeta."""
+def test_delete_metadata(pids, store):
+    """Test delete_metadata successfully deletes sysmeta."""
     test_dir = "tests/testdata/"
     entity = "metadata"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -640,22 +640,24 @@ def test_delete_sysmeta(pids, store):
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
         _ab_id = store.store_metadata(pid, format_id, syspath)
-        store.delete_sysmeta(pid)
+        store.delete_metadata(pid, format_id)
     assert store.count(entity) == 0
 
 
-def test_delete_sysmeta_pid_empty(store):
+def test_delete_metadata_pid_empty(store):
     """Test delete_object raises error when empty pid supplied."""
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "    "
     with pytest.raises(ValueError):
-        store.delete_sysmeta(pid)
+        store.delete_metadata(pid, format_id)
 
 
-def test_delete_sysmeta_pid_none(store):
+def test_delete_metadata_pid_none(store):
     """Test delete_object raises error when pid is 'None'."""
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = None
     with pytest.raises(ValueError):
-        store.delete_sysmeta(pid)
+        store.delete_metadata(pid, format_id)
 
 
 def test_get_hex_digest(store):

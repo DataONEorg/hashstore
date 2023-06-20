@@ -152,14 +152,14 @@ def test_put_object_files_stream(pids, store):
     assert store.count(entity) == 3
 
 
-def test_put_object_id(pids, store):
+def test_put_object_cid(pids, store):
     """Check put returns correct id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         hashaddress = store.put_object(pid, path)
         hashaddress_id = hashaddress.id
-        assert hashaddress_id == pids[pid]["ab_id"]
+        assert hashaddress_id == pids[pid]["object_cid"]
 
 
 def test_put_object_relpath(pids, store):
@@ -262,8 +262,8 @@ def test_move_and_get_checksums_id(pids, store):
             _,
         ) = store._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-        ab_id = store.get_sha256_hex_digest(pid)
-        assert move_id == ab_id
+        metadata_cid = store.get_sha256_hex_digest(pid)
+        assert move_id == metadata_cid
 
 
 def test_move_and_get_checksums_hex_digests(pids, store):
@@ -389,8 +389,8 @@ def test_put_metadata_with_path(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        ab_id = store.store_metadata(pid, format_id, syspath)
-        assert store.exists(entity, ab_id)
+        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
 
 
@@ -402,12 +402,12 @@ def test_put_metadata_with_string(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = str(Path(test_dir) / filename)
-        ab_id = store.store_metadata(pid, format_id, syspath)
-        assert store.exists(entity, ab_id)
+        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
 
 
-def test_put_metadata_ab_id(pids, store):
+def test_put_metadata_cid(pids, store):
     """Test put metadata returns correct id."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -415,7 +415,7 @@ def test_put_metadata_ab_id(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         ab_id = store.store_metadata(pid, format_id, syspath)
-        assert ab_id == pids[pid]["ab_format_id"]
+        assert ab_id == pids[pid]["metadata_cid"]
 
 
 def test_mktmpmetadata(pids, store):
@@ -650,7 +650,7 @@ def test_create_path(pids, store):
     """Test makepath creates folder successfully."""
     for pid in pids:
         root_directory = store.root
-        pid_hex_digest_directory = pids[pid]["ab_id"][:2]
+        pid_hex_digest_directory = pids[pid]["metadata_cid"][:2]
         pid_directory = root_directory + pid_hex_digest_directory
         store.create_path(pid_directory)
         assert os.path.isdir(pid_directory)
@@ -708,7 +708,7 @@ def test_build_abs_path(store, pids):
         path = test_dir + pid.replace("/", "_")
         _ = store.put_object(pid, path)
         # pylint: disable=W0212
-        abs_path = store.build_abs_path(entity, pids[pid]["ab_id"])
+        abs_path = store.build_abs_path(entity, pids[pid]["object_cid"])
         assert abs_path
 
 
@@ -734,4 +734,4 @@ def test_get_sha256_hex_digest(pids, store):
     """Test for correct sha256 return value."""
     for pid in pids:
         hash_val = store.get_sha256_hex_digest(pid)
-        assert hash_val == pids[pid]["ab_id"]
+        assert hash_val == pids[pid]["object_cid"]

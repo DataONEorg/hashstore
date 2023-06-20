@@ -145,8 +145,12 @@ class FileHashStore(HashStore):
         """Get and return the contents of the current HashStore configuration.
 
         Returns:
-            hashstore_yaml_dict (dict): HashStore properties with the following keys/values:
-            "store_path", "store_depth", "store_width", "store_algorithm","store_metadata_namespace".
+            hashstore_yaml_dict (dict): HashStore properties with the following keys (and values):
+                store_path (str): Path to the HashStore directory.
+                store_depth (int): Depth when sharding an object's hex digest.
+                store_width (int): Width of directories when sharding an object's hex digest.
+                store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+                store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         """
         if not os.path.exists(self.hashstore_configuration_yaml):
             exception_string = "hashstore.yaml not found in store root path."
@@ -256,6 +260,7 @@ class FileHashStore(HashStore):
         #    │           └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
 
         ############### Format of the Metadata ###############
+        # The default metadata format
         store_metadata_namespace: "{store_metadata_namespace}"
 
         ############### Hash Algorithms ###############
@@ -422,7 +427,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
         )
-        # Validate input parameters, begin with persistent identifier
+        # Validate input parameters, begin with persistent identifier (pid)
         logging.debug("FileHashStore - store_metadata: Validating arguments.")
         if pid is None or pid.replace(" ", "") == "":
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
@@ -431,11 +436,16 @@ class FileHashStore(HashStore):
         # Then format_id of the metadata
         if format_id is None or format_id.replace(" ", "") == "":
             exception_string = (
-                f"format_id cannot be None or empty, format_id: {format_id}"
+                f"Format_id cannot be None or empty, format_id: {format_id}"
             )
             logging.error("FileHashStore - store_metadata: %s", exception_string)
             raise ValueError(exception_string)
         # Metadata content must be a str, path or stream and cannot be empty
+        if isinstance(metadata, str):
+            if metadata.replace(" ", "") == "":
+                exception_string = "Given string path to metadata cannot be empty."
+                logging.error("FileHashStore - store_metadata: %s", exception_string)
+                raise TypeError(exception_string)
         if (
             not isinstance(metadata, str)
             and not isinstance(metadata, Path)
@@ -447,11 +457,6 @@ class FileHashStore(HashStore):
             )
             logging.error("FileHashStore - store_metadata: %s", exception_string)
             raise TypeError(exception_string)
-        if isinstance(metadata, str):
-            if metadata.replace(" ", "") == "":
-                exception_string = "Given string path to metadata cannot be empty."
-                logging.error("FileHashStore - store_metadata: %s", exception_string)
-                raise TypeError(exception_string)
 
         # Wait for the pid to release if it's in use
         while pid in self.metadata_locked_pids:
@@ -460,19 +465,20 @@ class FileHashStore(HashStore):
                 pid,
             )
             time.sleep(self.time_out_sec)
-        # Modify metadata_locked_pids consecutively
+
         with self.metadata_lock:
             logging.debug(
                 "FileHashStore - store_metadata: Adding pid: %s to metadata_locked_pids.",
                 pid,
             )
+            # Modify metadata_locked_pids consecutively
             self.metadata_locked_pids.append(pid)
+
         try:
             logging.debug(
                 "FileHashStore - store_metadata: Attempting to store metadata for pid: %s",
                 pid,
             )
-            # TODO: Determine if format_id should be part of config file, then update
             metadata_cid = self.put_metadata(pid, format_id, metadata)
         finally:
             # Release pid
@@ -887,7 +893,7 @@ class FileHashStore(HashStore):
 
         Args:
             pid (string): Authority-based identifier.
-            format_id (string): Metadata format
+            format_id (string): Metadata format.
             metadata (mixed): String or path to metadata document.
 
         Returns:
@@ -896,16 +902,14 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - put_metadata: Request to put metadata for pid: %s", pid
         )
-
-        # Create tmp file and write to it
+        # Create metadata tmp file and write to it
         metadata_stream = Stream(metadata)
         with closing(metadata_stream):
-            # TODO: Determine if format_id should be part of config file, then update
-            metadata_tmp = self._mktmpmetadata(metadata_stream, self.sysmeta_ns)
+            metadata_tmp = self._mktmpmetadata(metadata_stream, format_id)
 
-        # Target path (permanent location)
-        ab_id = self.get_sha256_hex_digest(pid + format_id)
-        rel_path = "/".join(self.shard(ab_id))
+        # Get target and related paths (permanent location)
+        ab_format_id = self.get_sha256_hex_digest(pid + format_id)
+        rel_path = "/".join(self.shard(ab_format_id))
         full_path = self.get_store_path("metadata") / rel_path
 
         # Move metadata to target path
@@ -919,7 +923,7 @@ class FileHashStore(HashStore):
                     "FileHashStore - put_metadata: Successfully put metadata for pid: %s",
                     pid,
                 )
-                return ab_id
+                return ab_format_id
             except Exception as err:
                 exception_string = f"Unexpected {err=}, {type(err)=}"
                 logging.error("FileHashStore - put_metadata: %s", exception_string)
@@ -949,7 +953,7 @@ class FileHashStore(HashStore):
             format_id (string): Format of metadata.
 
         Returns:
-            tmp.name (string): Name of temporary file created and written into.
+            tmp.name (string): Path/name of temporary file created and written into.
         """
         # Create temporary file in .../{store_path}/tmp
         tmp_root_path = self.get_store_path("metadata") / "tmp"

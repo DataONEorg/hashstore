@@ -27,6 +27,21 @@ def test_store_address_length(pids, store):
         assert len(object_cid) == 64
 
 
+def test_store_object(pids, store):
+    """Test store object."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        hash_address = store.store_object(pid, path)
+        _metadata_cid = store.store_metadata(pid, format_id, syspath)
+        assert hash_address.id == pids[pid]["object_cid"]
+    assert store.count(entity) == 3
+
+
 def test_store_object_files_path(pids, store):
     """Test store object when given a path."""
     test_dir = "tests/testdata/"
@@ -37,7 +52,7 @@ def test_store_object_files_path(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        _metadata_id = store.store_metadata(pid, format_id, syspath)
+        _metadata_cid = store.store_metadata(pid, format_id, syspath)
         assert store.exists(entity, pids[pid]["object_cid"])
     assert store.count(entity) == 3
 
@@ -52,7 +67,7 @@ def test_store_object_files_string(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path_string)
-        _metadata_id = store.store_metadata(pid, format_id, syspath)
+        _metadata_cid = store.store_metadata(pid, format_id, syspath)
         assert store.exists(entity, pids[pid]["object_cid"])
     assert store.count(entity) == 3
 
@@ -411,6 +426,19 @@ def test_store_object_sparse_large_file(store):
     assert hash_address_id == pid_sha256_hex_digest
 
 
+def test_store_metadata(pids, store):
+    """Test store metadata."""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _hash_address = store.store_object(pid, path)
+        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        assert metadata_cid == pids[pid]["metadata_cid"]
+
+
 def test_store_metadata_files_path(pids, store):
     """Test store metadata with path."""
     test_dir = "tests/testdata/"
@@ -423,6 +451,7 @@ def test_store_metadata_files_path(pids, store):
         _hash_address = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, format_id, syspath)
         assert store.exists(entity, metadata_cid)
+        assert metadata_cid == pids[pid]["metadata_cid"]
     assert store.count(entity) == 3
 
 
@@ -591,7 +620,7 @@ def test_retrieve_object_pid_invalid(store):
 
 
 def test_retrieve_metadata(store):
-    """Test retrieve_metadata returns correct metadata data."""
+    """Test retrieve_metadata returns correct metadata."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "jtao.1700.1"
@@ -600,13 +629,13 @@ def test_retrieve_metadata(store):
     syspath = Path(test_dir) / filename
     _hash_address = store.store_object(pid, path)
     _metadata_cid = store.store_metadata(pid, format_id, syspath)
-    sysmeta_ret = store.retrieve_metadata(pid, format_id)
-    sysmeta = syspath.read_bytes()
-    assert sysmeta.decode("utf-8") == sysmeta_ret
+    metadata_bytes = store.retrieve_metadata(pid, format_id)
+    metadata = syspath.read_bytes()
+    assert metadata.decode("utf-8") == metadata_bytes
 
 
-def test_retrieve_sysmeta_pid_invalid(store):
-    """Test retrieve_sysmeta raises error when supplied with bad pid."""
+def test_retrieve_metadata_bytes_pid_invalid(store):
+    """Test retrieve_metadata raises error when supplied with bad pid."""
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
@@ -614,10 +643,34 @@ def test_retrieve_sysmeta_pid_invalid(store):
         store.retrieve_metadata(pid_does_not_exist, format_id)
 
 
-def test_retrieve_sysmeta_pid_empty(store):
-    """Test retrieve_sysmeta raises error when supplied with empty pid."""
+def test_retrieve_metadata_bytes_pid_empty(store):
+    """Test retrieve_metadata raises error when supplied with empty pid."""
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "    "
+    with pytest.raises(ValueError):
+        store.retrieve_metadata(pid, format_id)
+
+
+def test_retrieve_metadata_format_id_none(store):
+    """Test retrieve_metadata raises error when supplied with None format_id"""
+    format_id = None
+    pid = "jtao.1700.1"
+    with pytest.raises(ValueError):
+        store.retrieve_metadata(pid, format_id)
+
+
+def test_retrieve_metadata_format_id_empty(store):
+    """Test retrieve_metadata raises error when supplied with empty format_id."""
+    format_id = ""
+    pid = "jtao.1700.1"
+    with pytest.raises(ValueError):
+        store.retrieve_metadata(pid, format_id)
+
+
+def test_retrieve_metadata_format_id_empty_spaces(store):
+    """Test retrieve_metadata raises error when supplied with empty format_id."""
+    format_id = "    "
+    pid = "jtao.1700.1"
     with pytest.raises(ValueError):
         store.retrieve_metadata(pid, format_id)
 
@@ -652,7 +705,7 @@ def test_delete_object_pid_none(store):
 
 
 def test_delete_metadata(pids, store):
-    """Test delete_metadata successfully deletes sysmeta."""
+    """Test delete_metadata successfully deletes metadata."""
     test_dir = "tests/testdata/"
     entity = "metadata"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -678,6 +731,22 @@ def test_delete_metadata_pid_none(store):
     """Test delete_object raises error when pid is 'None'."""
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = None
+    with pytest.raises(ValueError):
+        store.delete_metadata(pid, format_id)
+
+
+def test_delete_metadata_format_id_empty(store):
+    """Test delete_object raises error when empty format_id supplied."""
+    format_id = "    "
+    pid = "jtao.1700.1"
+    with pytest.raises(ValueError):
+        store.delete_metadata(pid, format_id)
+
+
+def test_delete_metadata_format_id_none(store):
+    """Test delete_object raises error when format_id is 'None'."""
+    format_id = None
+    pid = "jtao.1700.1"
     with pytest.raises(ValueError):
         store.delete_metadata(pid, format_id)
 

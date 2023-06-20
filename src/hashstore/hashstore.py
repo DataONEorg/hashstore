@@ -26,7 +26,7 @@ class HashStore(ABC):
         """The `store_object` method is responsible for the atomic storage of objects to
         disk using a given InputStream and a persistent identifier (pid). Upon
         successful storage, the method returns a HashAddress object containing
-        relevant file information, such as the file's id, relative path, absolute
+        relevant file information, such as the file's cid, relative path, absolute
         path, duplicate object status, and hex digest map of algorithms and
         checksums. `store_object` also ensures that an object is stored only once by
         synchronizing multiple calls and rejecting calls to store duplicate objects.

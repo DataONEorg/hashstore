@@ -20,7 +20,7 @@ class FileHashStore(HashStore):
     an authority-based identifier's hex digest with a given hash algorithm value
     to address files.
 
-    FileHashStore initializes by providing a properties dictionary containing the
+    FileHashStore initializes using a given properties dictionary containing the
     required keys (see Args). Upon initialization, FileHashStore verifies the provided
     properties and attempts to write a configuration file 'hashstore.yaml' to the given
     store path directory. Properties must always be supplied to ensure consistent
@@ -362,8 +362,9 @@ class FileHashStore(HashStore):
         )
         additional_algorithm_checked = None
         if additional_algorithm != self.algorithm and additional_algorithm is not None:
+            # Set additional_algorithm
             additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
-        # Checksum and checksum_algorithm must both be supplied
+        # Checksum and checksum_algorithm must both be supplied if one is supplied
         if checksum is not None:
             if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
                 exception_string = (
@@ -374,7 +375,6 @@ class FileHashStore(HashStore):
                 raise ValueError(exception_string)
         checksum_algorithm_checked = None
         if checksum_algorithm is not None:
-            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
             if checksum is None or checksum.replace(" ", "") == "":
                 exception_string = (
                     "checksum cannot be None or empty if checksum_algorithm is"
@@ -382,6 +382,8 @@ class FileHashStore(HashStore):
                 )
                 logging.error("FileHashStore - store_object: %s", exception_string)
                 raise ValueError(exception_string)
+            # Set checksum_algorithm
+            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
 
         # Wait for the pid to release if it's in use
         while pid in self.object_locked_pids:
@@ -505,16 +507,16 @@ class FileHashStore(HashStore):
             raise ValueError(exception_string)
 
         entity = "objects"
-        metadata_cid = self.get_sha256_hex_digest(pid)
-        metadata_exists = self.exists(entity, metadata_cid)
-        if metadata_exists:
+        object_cid = self.get_sha256_hex_digest(pid)
+        object_exists = self.exists(entity, object_cid)
+        if object_exists:
             logging.debug(
                 "FileHashStore - retrieve_object: Metadata exists for pid: %s, retrieving object.",
                 pid,
             )
-            obj_stream = self.open(entity, metadata_cid)
+            obj_stream = self.open(entity, object_cid)
         else:
-            exception_string = f"No metadata found for pid: {pid}"
+            exception_string = f"No object found for pid: {pid}"
             logging.error("FileHashStore - retrieve_object: %s", exception_string)
             raise ValueError(exception_string)
         logging.info(
@@ -531,20 +533,26 @@ class FileHashStore(HashStore):
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
+        if format_id is None or format_id.replace(" ", "") == "":
+            exception_string = f"Format_id cannot be None or empty, format_id: {format_id}"
+            logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
+            raise ValueError(exception_string)
 
         entity = "metadata"
         metadata_cid = self.get_sha256_hex_digest(pid + format_id)
         metadata_exists = self.exists(entity, metadata_cid)
         if metadata_exists:
             logging.debug(
-                "FileHashStore - retrieve_metadata: Metadata exists for pid: %s, retrieving metadata.",
-                pid,
+                "FileHashStore - retrieve_metadata: Metadata exists for pid: %s",
+                pid + ", retrieving metadata.",
             )
             metadata_cid = self.get_sha256_hex_digest(pid + format_id)
-            s_path = self.open(entity, metadata_cid)
-            s_content = s_path.read().decode("utf-8").split("\x00", 1)
-            s_path.close()
-            metadata = s_content[1]
+            metadata_cid_stream = self.open(entity, metadata_cid)
+            metadata_cid_content = (
+                metadata_cid_stream.read().decode("utf-8").split("\x00", 1)
+            )
+            metadata_cid_stream.close()
+            metadata = metadata_cid_content[1]
         else:
             exception_string = f"No metadata found for pid: {pid}"
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
@@ -581,6 +589,12 @@ class FileHashStore(HashStore):
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
             logging.error("FileHashStore - delete_metadata: %s", exception_string)
             raise ValueError(exception_string)
+        if format_id is None or format_id.replace(" ", "") == "":
+            exception_string = (
+                f"Format_id cannot be None or empty, format_id: {format_id}"
+            )
+            logging.error("FileHashStore - delete_metadata: %s", exception_string)
+            raise ValueError(exception_string)
 
         entity = "metadata"
         metadata_cid = self.get_sha256_hex_digest(pid + format_id)
@@ -612,8 +626,8 @@ class FileHashStore(HashStore):
             exception_string = f"No object found for pid: {pid}"
             logging.error("FileHashStore - get_hex_digest: %s", exception_string)
             raise ValueError(exception_string)
-        c_stream = self.open(entity, object_cid)
-        hex_digest = self.computehash(c_stream, algorithm=algorithm)
+        cid_stream = self.open(entity, object_cid)
+        hex_digest = self.computehash(cid_stream, algorithm=algorithm)
 
         logging_info_statement = (
             f"FileHashStore - get_hex_digest: Successfully calculated hex digest for pid: {pid}."
@@ -888,8 +902,8 @@ class FileHashStore(HashStore):
         return hex_digest_dict, tmp.name
 
     def put_metadata(self, pid, format_id, metadata):
-        """Store contents of metadata on disk using the hash of the given pid
-        and format_id as the permanent address.
+        """Store contents of metadata to `[self.root]/metadata` using the hash of the
+        given pid and format_id as the permanent address.
 
         Args:
             pid (string): Authority-based identifier.
@@ -946,7 +960,7 @@ class FileHashStore(HashStore):
             raise FileNotFoundError()
 
     def _mktmpmetadata(self, stream, format_id):
-        """Create a named temporary file with `metadata` bytes and `namespace`.
+        """Create a named temporary file with `stream` (metadata) and `format_id`.
 
         Args:
             stream (io.BufferedReader): Metadata stream.

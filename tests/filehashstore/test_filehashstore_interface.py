@@ -568,8 +568,8 @@ def test_retrieve_object_pid_invalid(store):
         store.retrieve_object(pid_does_not_exist)
 
 
-def test_retrieve_sysmeta(store):
-    """Test retrieve_sysmeta returns correct metadata data."""
+def test_retrieve_metadata(store):
+    """Test retrieve_metadata returns correct metadata data."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "jtao.1700.1"
@@ -578,24 +578,26 @@ def test_retrieve_sysmeta(store):
     syspath = Path(test_dir) / filename
     _hash_address = store.store_object(pid, path)
     _ab_id = store.store_metadata(pid, format_id, syspath)
-    sysmeta_ret = store.retrieve_sysmeta(pid)
+    sysmeta_ret = store.retrieve_metadata(pid, format_id)
     sysmeta = syspath.read_bytes()
     assert sysmeta.decode("utf-8") == sysmeta_ret
 
 
 def test_retrieve_sysmeta_pid_invalid(store):
     """Test retrieve_sysmeta raises error when supplied with bad pid."""
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
     with pytest.raises(ValueError):
-        store.retrieve_sysmeta(pid_does_not_exist)
+        store.retrieve_metadata(pid_does_not_exist, format_id)
 
 
 def test_retrieve_sysmeta_pid_empty(store):
     """Test retrieve_sysmeta raises error when supplied with empty pid."""
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "    "
     with pytest.raises(ValueError):
-        store.retrieve_sysmeta(pid)
+        store.retrieve_metadata(pid, format_id)
 
 
 def test_delete_objects(pids, store):

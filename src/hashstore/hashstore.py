@@ -103,15 +103,16 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def retrieve_sysmeta(self, pid):
-        """The 'retrieve_sysmeta' method retrieves the metadata content from disk and
+    def retrieve_metadata(self, pid, format_id):
+        """The 'retrieve_metadata' method retrieves the metadata content from disk and
         returns it in the form of a String using a given persistent identifier.
 
         Args:
-            pid (string): Authority-based identifier.
+            pid (string): Authority-based identifier
+            format_id (string): Metadata format
 
         Returns:
-            sysmeta (string): Sysmeta content.
+            metadata (string): Sysmeta content.
         """
         raise NotImplementedError()
 

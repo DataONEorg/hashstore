@@ -516,35 +516,35 @@ class FileHashStore(HashStore):
         )
         return obj_stream
 
-    def retrieve_sysmeta(self, pid):
+    def retrieve_metadata(self, pid, format_id):
         logging.debug(
-            "FileHashStore - retrieve_sysmeta: Request to retrieve sysmeta for pid: %s",
+            "FileHashStore - retrieve_metadata: Request to retrieve sysmeta for pid: %s",
             pid,
         )
         if pid is None or pid.replace(" ", "") == "":
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - retrieve_sysmeta: %s", exception_string)
+            logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
 
-        entity = "sysmeta"
-        ab_id = self.get_sha256_hex_digest(pid)
+        entity = "metadata"
+        ab_id = self.get_sha256_hex_digest(pid + format_id)
         sysmeta_exists = self.exists(entity, ab_id)
         if sysmeta_exists:
             logging.debug(
-                "FileHashStore - retrieve_sysmeta: Sysmeta exists for pid: %s, retrieving sysmeta.",
+                "FileHashStore - retrieve_metadata: Metadata exists for pid: %s, retrieving sysmeta.",
                 pid,
             )
-            ab_id = self.get_sha256_hex_digest(pid)
+            ab_id = self.get_sha256_hex_digest(pid + format_id)
             s_path = self.open(entity, ab_id)
             s_content = s_path.read().decode("utf-8").split("\x00", 1)
             s_path.close()
             sysmeta = s_content[1]
         else:
             exception_string = f"No sysmeta found for pid: {pid}"
-            logging.error("FileHashStore - retrieve_sysmeta: %s", exception_string)
+            logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
         logging.info(
-            "FileHashStore - retrieve_sysmeta: Retrieved sysmeta for pid: %s", pid
+            "FileHashStore - retrieve_metadata: Retrieved metadata for pid: %s", pid
         )
         return sysmeta
 

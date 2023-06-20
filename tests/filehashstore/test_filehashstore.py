@@ -414,8 +414,8 @@ def test_put_metadata_cid(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        ab_id = store.store_metadata(pid, format_id, syspath)
-        assert ab_id == pids[pid]["metadata_cid"]
+        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        assert metadata_cid == pids[pid]["metadata_cid"]
 
 
 def test_mktmpmetadata(pids, store):

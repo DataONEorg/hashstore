@@ -6,6 +6,11 @@ import pytest
 from hashstore.filehashstore.filehashstore import FileHashStore
 
 
+def test_pids_length(pids):
+    """Ensure test harness pids are present."""
+    assert len(pids) == 3
+
+
 def test_init_put_properties_hashstore_yaml_exists(store):
     """Verify properties file present in store root directory."""
     assert os.path.exists(store.hashstore_configuration_yaml)
@@ -90,7 +95,7 @@ def test_validate_properties_missing_key(store):
 
 
 def test_validate_properties_key_value_is_none(store):
-    """Confirm exception raised when value from key is 'None'"""
+    """Confirm exception raised when value from key is 'None'."""
     properties = {
         "store_path": "/etc/test",
         "store_depth": 3,
@@ -105,7 +110,7 @@ def test_validate_properties_key_value_is_none(store):
 
 def test_validate_properties_incorrect_type(store):
     """Confirm exception raised when key missing in properties."""
-    properties = "etc/filehashstore"
+    properties = "etc/filehashstore/hashstore.yaml"
     with pytest.raises(ValueError):
         # pylint: disable=W0212
         store._validate_properties(properties)
@@ -122,11 +127,6 @@ def test_set_default_algorithms_missing_yaml(store, pids):
     with pytest.raises(FileNotFoundError):
         # pylint: disable=W0212
         store._set_default_algorithms()
-
-
-def test_pids_length(pids):
-    """Ensure test harness pids are present."""
-    assert len(pids) == 3
 
 
 def test_put_object_files_path(pids, store):
@@ -225,7 +225,7 @@ def test_put_object_hex_digests(pids, store):
 
 
 def test_put_object_additional_algorithm(pids, store):
-    """Check put returns additional algorithm in hex digests."""
+    """Check put_object returns additional algorithm in hex digests."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -237,7 +237,7 @@ def test_put_object_additional_algorithm(pids, store):
 
 
 def test_put_object_with_correct_checksums(pids, store):
-    """Check put success with good checksum supplied."""
+    """Check put_object success with valid checksum and checksum algorithm supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -275,8 +275,8 @@ def test_move_and_get_checksums_id(pids, store):
             _,
         ) = store._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-        metadata_cid = store.get_sha256_hex_digest(pid)
-        assert move_id == metadata_cid
+        object_cid = store.get_sha256_hex_digest(pid)
+        assert move_id == object_cid
 
 
 def test_move_and_get_checksums_hex_digests(pids, store):
@@ -302,7 +302,7 @@ def test_move_and_get_checksums_hex_digests(pids, store):
 
 
 def test_move_and_get_checksums_abs_path(pids, store):
-    """Test move returns correct absolute path."""
+    """Test move returns correct absolute path that exists."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -397,6 +397,25 @@ def test_mktempfile_checksum_and_additional_algo(store):
     assert hex_digests.get("sha224") == additional_algo_checksum
 
 
+def test_mktempfile_checksum_and_additional_algo_duplicate(store):
+    """Test _mktempfile succeeds with duplicate algorithms (de-duplicates)"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    input_stream = io.open(path, "rb")
+    additional_algo = "sha224"
+    checksum_algo = "sha224"
+    checksum_correct = "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
+    # pylint: disable=W0212
+    hex_digests, _ = store._mktempfile(
+        input_stream,
+        additional_algorithm=additional_algo,
+        checksum_algorithm=checksum_algo,
+    )
+    input_stream.close()
+    assert hex_digests.get("sha224") == checksum_correct
+
+
 def test_mktempfile_hex_digests(pids, store):
     """Test _mktempfile returns correct hex digests."""
     test_dir = "tests/testdata/"
@@ -413,7 +432,7 @@ def test_mktempfile_hex_digests(pids, store):
         assert hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
-def test_mktempfile_object(pids, store):
+def test_mktempfile_tmpfile_object(pids, store):
     """Test _mktempfile creates file successfully."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -425,19 +444,6 @@ def test_mktempfile_object(pids, store):
         assert os.path.isfile(tmp_file_name) is True
 
 
-def test_mktempfile_with_algorithm(pids, store):
-    """Test _mktempfile returns additional hex digest when supplied."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        algo = "sha224"
-        # pylint: disable=W0212
-        hex_digests, _ = store._mktempfile(input_stream, algo)
-        input_stream.close()
-        assert hex_digests.get("sha224") == pids[pid]["sha224"]
-
-
 def test_mktempfile_with_unsupported_algorithm(pids, store):
     """Test _mktempfile raises error when bad algorithm supplied."""
     test_dir = "tests/testdata/"
@@ -447,12 +453,15 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         algo = "md2"
         with pytest.raises(ValueError):
             # pylint: disable=W0212
-            _, _ = store._mktempfile(input_stream, algo)
+            _, _ = store._mktempfile(input_stream, additional_algorithm=algo)
+        with pytest.raises(ValueError):
+            # pylint: disable=W0212
+            _, _ = store._mktempfile(input_stream, checksum_algorithm=algo)
         input_stream.close()
 
 
 def test_put_metadata_with_path(pids, store):
-    """Test put metadata with path object."""
+    """Test put_metadata with path object."""
     entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -465,7 +474,7 @@ def test_put_metadata_with_path(pids, store):
 
 
 def test_put_metadata_with_string(pids, store):
-    """Test put metadata with string."""
+    """Test_put metadata with string."""
     entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"

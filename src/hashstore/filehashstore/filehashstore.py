@@ -425,7 +425,7 @@ class FileHashStore(HashStore):
             )
         return hash_address
 
-    def store_metadata(self, pid, format_id=None, metadata):
+    def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
         )

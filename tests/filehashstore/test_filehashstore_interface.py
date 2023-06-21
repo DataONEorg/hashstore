@@ -255,14 +255,34 @@ def test_store_object_checksum_correct(store):
     entity = "objects"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    algorithm_other = "sha3_256"
+    checksum_algo = "sha3_256"
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     _hash_address = store.store_object(
-        pid, path, checksum=checksum_correct, checksum_algorithm=algorithm_other
+        pid, path, checksum=checksum_correct, checksum_algorithm=checksum_algo
     )
     assert store.count(entity) == 1
+
+
+def test_store_object_checksum_correct_and_additional_algo(store):
+    """Test store object successfully stores with good checksum and same additional algorithm"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    algorithm_additional = "sha3_256"
+    algorithm_checksum = "sha3_256"
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    hash_address = store.store_object(
+        pid,
+        path,
+        additional_algorithm=algorithm_additional,
+        checksum=checksum_correct,
+        checksum_algorithm=algorithm_checksum,
+    )
+    assert hash_address.hex_digests.get("sha3_256") == checksum_correct
 
 
 def test_store_object_checksum_algorithm_empty(store):

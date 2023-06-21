@@ -111,6 +111,19 @@ def test_validate_properties_incorrect_type(store):
         store._validate_properties(properties)
 
 
+def test_set_default_algorithms_missing_yaml(store, pids):
+    """Confirm set_default_algorithms raises FileNotFoundError when hashstore.yaml
+    not found."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        store.put_object(pid, path)
+    os.remove(store.hashstore_configuration_yaml)
+    with pytest.raises(FileNotFoundError):
+        # pylint: disable=W0212
+        store._set_default_algorithms()
+
+
 def test_pids_length(pids):
     """Ensure test harness pids are present."""
     assert len(pids) == 3
@@ -327,6 +340,63 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
     assert store.count(entity) == 3
 
 
+def test_mktempfile_additional_algo(store):
+    """Test _mktempfile returns correct hex digests for additional algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    input_stream = io.open(path, "rb")
+    checksum_algo = "sha3_256"
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    # pylint: disable=W0212
+    hex_digests, _ = store._mktempfile(input_stream, additional_algorithm=checksum_algo)
+    input_stream.close()
+    assert hex_digests.get("sha3_256") == checksum_correct
+
+
+def test_mktempfile_checksum_algo(store):
+    """Test _mktempfile returns correct hex digests for checksum algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    input_stream = io.open(path, "rb")
+    checksum_algo = "sha3_256"
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    # pylint: disable=W0212
+    hex_digests, _ = store._mktempfile(input_stream, checksum_algorithm=checksum_algo)
+    input_stream.close()
+    assert hex_digests.get("sha3_256") == checksum_correct
+
+
+def test_mktempfile_checksum_and_additional_algo(store):
+    """Test _mktempfile returns correct hex digests for checksum algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    input_stream = io.open(path, "rb")
+    additional_algo = "sha224"
+    additional_algo_checksum = (
+        "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
+    )
+    checksum_algo = "sha3_256"
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    # pylint: disable=W0212
+    hex_digests, _ = store._mktempfile(
+        input_stream,
+        additional_algorithm=additional_algo,
+        checksum_algorithm=checksum_algo,
+    )
+    input_stream.close()
+    assert hex_digests.get("sha3_256") == checksum_correct
+    assert hex_digests.get("sha224") == additional_algo_checksum
+
+
 def test_mktempfile_hex_digests(pids, store):
     """Test _mktempfile returns correct hex digests."""
     test_dir = "tests/testdata/"
@@ -418,7 +488,7 @@ def test_put_metadata_cid(pids, store):
         assert metadata_cid == pids[pid]["metadata_cid"]
 
 
-def test_mktmpmetadata(pids, store):
+def test_mktempmetadata(pids, store):
     """Test mktmpmetadata creates tmpFile."""
     test_dir = "tests/testdata/"
     entity = "metadata"
@@ -428,7 +498,7 @@ def test_mktmpmetadata(pids, store):
         sys_stream = io.open(syspath, "rb")
         format_id = "http://ns.dataone.org/service/types/v2.0"
         # pylint: disable=W0212
-        tmp_name = store._mktmpmetadata(sys_stream, format_id)
+        tmp_name = store._mktempmetadata(sys_stream, format_id)
         sys_stream.close()
         assert store.exists(entity, tmp_name)
 

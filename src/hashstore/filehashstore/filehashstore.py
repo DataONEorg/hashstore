@@ -46,10 +46,6 @@ class FileHashStore(HashStore):
     # Permissions settings for writing files and creating directories
     fmode = 0o664
     dmode = 0o755
-    # Default and other algorithm list for FileHashStore
-    # The default algorithm list includes the hash algorithms calculated when
-    # storing an object to disk and returned to the caller after successful storage.
-    default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
     # The other algorithm list consists of additional algorithms that can be included
     # for calculating when storing objects, in addition to the default list.
     other_algo_list = [
@@ -125,6 +121,8 @@ class FileHashStore(HashStore):
                     + " Writing configuration file."
                 )
                 self.put_properties(properties)
+            # Default algorithm list for FileHashStore based on config file written
+            self._set_default_algorithms()
             # Complete initialization/instantiation by setting store directories
             self.objects = self.root + "/objects"
             self.metadata = self.root + "/metadata"
@@ -139,7 +137,7 @@ class FileHashStore(HashStore):
             # Cannot instantiate or initialize FileHashStore without config
             raise ValueError(exception_string)
 
-    # Configuration Methods
+    # Configuration and Related Methods
 
     def get_properties(self):
         """Get and return the contents of the current HashStore configuration.
@@ -269,22 +267,12 @@ class FileHashStore(HashStore):
         # Algorithm values supported by python hashlib 3.9.0+ for File Hash Store (FHS)
         # The default algorithm list includes the hash algorithms calculated when storing an
         # object to disk and returned to the caller after successful storage.
-        filehashstore_default_algo_list:
-        - "sha1"
-        - "sha256"
-        - "sha384"
-        - "sha512"
-        - "md5"
-        # The other algorithm list consists of additional algorithms that can be included for
-        # calculating when storing objects, in addition to the default list.
-        filehashstore_other_algo_list:
-        - "sha224"
-        - "sha3_224"
-        - "sha3_256"
-        - "sha3_384"
-        - "sha3_512"
-        - "blake2b"
-        - "blake2s"
+        store_default_algo_list:
+        - "MD5"
+        - "SHA-1"
+        - "SHA-256"
+        - "SHA-384"
+        - "SHA-512"
         """
         return hashstore_configuration_yaml
 
@@ -321,13 +309,47 @@ class FileHashStore(HashStore):
                 raise ValueError(exception_string)
         return properties
 
+    def _set_default_algorithms(self):
+        """Set the default algorithms to calculate when storing objects."""
+
+        def lookup_algo(algo):
+            """Translate DataONE controlled algorithms to python hashlib values:
+            https://dataoneorg.github.io/api-documentation/apis/Types.html#Types.ChecksumAlgorithm
+            """
+            dataone_algo_translation = {
+                "MD5": "md5",
+                "SHA-1": "sha1",
+                "SHA-256": "sha256",
+                "SHA-384": "sha384",
+                "SHA-512": "sha512",
+            }
+            return dataone_algo_translation[algo]
+
+        if not os.path.exists(self.hashstore_configuration_yaml):
+            exception_string = "hashstore.yaml not found in store root path."
+            logging.critical(
+                "FileHashStore - set_default_algorithms: %s", exception_string
+            )
+            raise FileNotFoundError(exception_string)
+        with open(self.hashstore_configuration_yaml, "r", encoding="utf-8") as file:
+            yaml_data = yaml.safe_load(file)
+
+        yaml_store_default_algo_list = yaml_data["store_default_algo_list"]
+        translated_default_algo_list = []
+        for algo in yaml_store_default_algo_list:
+            translated_default_algo_list.append(lookup_algo(algo))
+
+        # Set class variable
+        self.default_algo_list = translated_default_algo_list
+        return
+
     # Public API / HashStore Interface Methods
 
     def store_object(
         self,
         pid,
         data,
-        additional_algorithm="sha256",
+        additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
     ):
@@ -755,7 +777,9 @@ class FileHashStore(HashStore):
             + f" file and calculating checksums for pid: {pid}"
         )
         logging.debug(debug_tmp_file_str)
-        hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
+        hex_digests, tmp_file_name = self._mktempfile(
+            stream, additional_algorithm, checksum_algorithm
+        )
         logging.debug(
             "FileHashStore - _move_and_get_checksums: Temp file created: %s",
             tmp_file_name,
@@ -837,15 +861,15 @@ class FileHashStore(HashStore):
 
         return object_cid, rel_file_path, abs_file_path, is_duplicate, hex_digests
 
-    def _mktempfile(self, stream, algorithm=None):
-        """Create a named temporary file from a `Stream` object and
-        return its filename and a dictionary of its algorithms and hex digests.
-        If an algorithm is provided, it will add the respective hex digest to
-        the dictionary.
+    def _mktempfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
+        """Create a named temporary file from a `Stream` object and return its filename
+        and a dictionary of its algorithms and hex digests. If an additionak and/or checksum
+        algorithm is provided, it will add the respective hex digest to the dictionary.
 
         Args:
             stream (io.BufferedReader): Object stream.
-            algorithm (string): Algorithm of additional hex digest to generate.
+            algorithm (string): Algorithm of additional hex digest to generate
+            checksum_algorithm (string): Algorithm of additional checksum algo to generate
 
         Returns:
             hex_digest_dict, tmp.name (tuple pack):
@@ -869,16 +893,27 @@ class FileHashStore(HashStore):
             finally:
                 os.umask(oldmask)
 
-        # Additional hash object to digest
-        if algorithm is not None:
-            self.clean_algorithm(algorithm)
-            if algorithm in self.other_algo_list:
+        # Additional hash objects to digest
+        if checksum_algorithm is not None:
+            self.clean_algorithm(checksum_algorithm)
+            if checksum_algorithm in self.other_algo_list:
                 debug_additional_other_algo_str = (
-                    f"FileHashStore - _mktempfile: additional algorithm: {algorithm} found"
-                    + " in other_algo_lists, adding to list of algorithms to calculate."
+                    f"FileHashStore - _mktempfile: checksum algorithm: {checksum_algorithm}"
+                    + " found in other_algo_lists, adding to list of algorithms to calculate."
                 )
                 logging.debug(debug_additional_other_algo_str)
-                algorithm_list_to_calculate.append(algorithm)
+                algorithm_list_to_calculate.append(checksum_algorithm)
+        if additional_algorithm is not None:
+            self.clean_algorithm(additional_algorithm)
+            if additional_algorithm in self.other_algo_list:
+                debug_additional_other_algo_str = (
+                    f"FileHashStore - _mktempfile: additional algorithm: {additional_algorithm}"
+                    + " found in other_algo_lists, adding to list of algorithms to calculate."
+                )
+                logging.debug(debug_additional_other_algo_str)
+                algorithm_list_to_calculate.append(additional_algorithm)
+        # Remove duplicates
+        algorithm_list_to_calculate = set(algorithm_list_to_calculate)
 
         logging.debug(
             "FileHashStore - _mktempfile: tmp file created: %s, calculating hex digests.",
@@ -925,7 +960,7 @@ class FileHashStore(HashStore):
         # Create metadata tmp file and write to it
         metadata_stream = Stream(metadata)
         with closing(metadata_stream):
-            metadata_tmp = self._mktmpmetadata(metadata_stream, format_id)
+            metadata_tmp = self._mktempmetadata(metadata_stream, format_id)
 
         # Get target and related paths (permanent location)
         metadata_cid = self.get_sha256_hex_digest(pid + format_id)
@@ -965,7 +1000,7 @@ class FileHashStore(HashStore):
             logging.error("FileHashStore - put_metadata: %s", exception_string)
             raise FileNotFoundError()
 
-    def _mktmpmetadata(self, stream, format_id):
+    def _mktempmetadata(self, stream, format_id):
         """Create a named temporary file with `stream` (metadata) and `format_id`.
 
         Args:

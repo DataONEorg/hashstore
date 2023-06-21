@@ -26,7 +26,7 @@ class HashStore(ABC):
         """The `store_object` method is responsible for the atomic storage of objects to
         disk using a given InputStream and a persistent identifier (pid). Upon
         successful storage, the method returns a HashAddress object containing
-        relevant file information, such as the file's id, relative path, absolute
+        relevant file information, such as the file's cid, relative path, absolute
         path, duplicate object status, and hex digest map of algorithms and
         checksums. `store_object` also ensures that an object is stored only once by
         synchronizing multiple calls and rejecting calls to store duplicate objects.
@@ -63,25 +63,27 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def store_sysmeta(self, pid, sysmeta):
-        """The `store_sysmeta` method is responsible for adding and/or updating metadata
-        (`sysmeta`) to disk using a given InputStream and a persistent identifier
-        (pid). The metadata object consists of a header and body portion. The header
-        is formed by writing the namespace/format (utf-8) of the metadata document
-        followed by a null character `\x00` and the body follows immediately after.
+    def store_metadata(self, pid, metadata, format_id):
+        """The `store_metadata` method is responsible for adding and/or updating metadata
+        (ex. `sysmeta`) to disk using a given path/stream, a persistent identifier `pid`
+        and a metadata `format_id`. The metadata object consists of a header and a body
+        section, which is split by a null character `\x00`.
 
-        Upon successful storage of sysmeta, the method returns a String that
-        represents the file's permanent address, and similarly to 'store_object', this
-        permanent address is determined by calculating the SHA-256 hex digest of the
-        provided pid. Finally, sysmeta are stored in parallel to objects in the
-        `/store_directory/sysmeta/` directory.
+        The header contains the metadata object's permanent address, which is determined
+        by calculating the SHA-256 hex digest of the provided `pid` + `format_id`; and the
+        body contains the metadata content (ex. `sysmeta`).
+
+        Upon successful storage of metadata, `store_metadata` returns a string that
+        represents the file's permanent address. Lastly, the metadata objects are stored
+        in parallel to objects in the `/store_directory/metadata/` directory.
 
         Args:
             pid (string): Authority-based identifier.
-            sysmeta (mixed): String or path to sysmeta document.
+            format_id (string): Metadata format
+            metadata (mixed): String or path to metadata document.
 
         Returns:
-            sysmeta_cid (string): Address of the sysmeta document.
+            metadata_cid (string): Address of the metadata document.
         """
         raise NotImplementedError()
 
@@ -101,15 +103,16 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def retrieve_sysmeta(self, pid):
-        """The 'retrieve_sysmeta' method retrieves the metadata content from disk and
-        returns it in the form of a String using a given persistent identifier.
+    def retrieve_metadata(self, pid, format_id):
+        """The 'retrieve_metadata' method retrieves the metadata content from disk and
+        returns it in the form of a String using a given persistent identifier and format_id.
 
         Args:
-            pid (string): Authority-based identifier.
+            pid (string): Authority-based identifier
+            format_id (string): Metadata format
 
         Returns:
-            sysmeta (string): Sysmeta content.
+            metadata (string): Sysmeta content.
         """
         raise NotImplementedError()
 
@@ -127,12 +130,13 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_sysmeta(self, pid):
-        """The 'delete_sysmeta' method deletes a metadata document (sysmeta) permanently
-        from disk using a given persistent identifier.
+    def delete_metadata(self, pid, format_id):
+        """The 'delete_metadata' method deletes a metadata document permanently
+        from disk using a given persistent identifier and format_id.
 
         Args:
-            pid (string): Authority-based identifier.
+            pid (string): Authority-based identifier
+            format_id (string): Metadata format
 
         Returns:
             boolean: `True` upon successful deletion.

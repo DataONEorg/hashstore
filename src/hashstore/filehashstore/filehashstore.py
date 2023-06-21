@@ -20,7 +20,7 @@ class FileHashStore(HashStore):
     an authority-based identifier's hex digest with a given hash algorithm value
     to address files.
 
-    FileHashStore initializes by providing a properties dictionary containing the
+    FileHashStore initializes using a given properties dictionary containing the
     required keys (see Args). Upon initialization, FileHashStore verifies the provided
     properties and attempts to write a configuration file 'hashstore.yaml' to the given
     store path directory. Properties must always be supplied to ensure consistent
@@ -32,7 +32,7 @@ class FileHashStore(HashStore):
             store_depth (int): Depth when sharding an object's hex digest.
             store_width (int): Width of directories when sharding an object's hex digest.
             store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
-            store_sysmeta_namespace (str): Namespace for the HashStore's system metadata.
+            store_metadata_namespace (str): Namespace for the HashStore's system metadata.
     """
 
     # Property (hashstore configuration) requirements
@@ -41,15 +41,11 @@ class FileHashStore(HashStore):
         "store_depth",
         "store_width",
         "store_algorithm",
-        "store_sysmeta_namespace",
+        "store_metadata_namespace",
     ]
     # Permissions settings for writing files and creating directories
     fmode = 0o664
     dmode = 0o755
-    # Default and other algorithm list for FileHashStore
-    # The default algorithm list includes the hash algorithms calculated when
-    # storing an object to disk and returned to the caller after successful storage.
-    default_algo_list = ["sha1", "sha256", "sha384", "sha512", "md5"]
     # The other algorithm list consists of additional algorithms that can be included
     # for calculating when storing objects, in addition to the default list.
     other_algo_list = [
@@ -64,9 +60,9 @@ class FileHashStore(HashStore):
     # Variables to orchestrate thread locking and object store synchronization
     time_out_sec = 1
     object_lock = threading.Lock()
-    sysmeta_lock = threading.Lock()
+    metadata_lock = threading.Lock()
     object_locked_pids = []
-    sysmeta_locked_pids = []
+    metadata_locked_pids = []
 
     def __init__(self, properties=None):
         if properties:
@@ -77,7 +73,7 @@ class FileHashStore(HashStore):
                 prop_store_depth,
                 prop_store_width,
                 prop_store_algorithm,
-                prop_store_sysmeta_namespace,
+                prop_store_metadata_namespace,
             ) = [
                 checked_properties[property_name]
                 for property_name in self.property_required_keys
@@ -116,7 +112,7 @@ class FileHashStore(HashStore):
             self.depth = prop_store_depth
             self.width = prop_store_width
             self.algorithm = prop_store_algorithm
-            self.sysmeta_ns = prop_store_sysmeta_namespace
+            self.sysmeta_ns = prop_store_metadata_namespace
             # Write 'hashstore.yaml' to store path
             if not os.path.exists(self.hashstore_configuration_yaml):
                 # pylint: disable=W1201
@@ -125,9 +121,11 @@ class FileHashStore(HashStore):
                     + " Writing configuration file."
                 )
                 self.put_properties(properties)
+            # Default algorithm list for FileHashStore based on config file written
+            self._set_default_algorithms()
             # Complete initialization/instantiation by setting store directories
             self.objects = self.root + "/objects"
-            self.sysmeta = self.root + "/sysmeta"
+            self.metadata = self.root + "/metadata"
             logging.debug(
                 "FileHashStore - Initialization success. Store root: %s", self.root
             )
@@ -139,14 +137,18 @@ class FileHashStore(HashStore):
             # Cannot instantiate or initialize FileHashStore without config
             raise ValueError(exception_string)
 
-    # Configuration Methods
+    # Configuration and Related Methods
 
     def get_properties(self):
         """Get and return the contents of the current HashStore configuration.
 
         Returns:
-            hashstore_yaml_dict (dict): HashStore properties with the following keys/values:
-            "store_path", "store_depth", "store_width", "store_algorithm","store_sysmeta_namespace".
+            hashstore_yaml_dict (dict): HashStore properties with the following keys (and values):
+                store_path (str): Path to the HashStore directory.
+                store_depth (int): Depth when sharding an object's hex digest.
+                store_width (int): Width of directories when sharding an object's hex digest.
+                store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+                store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         """
         if not os.path.exists(self.hashstore_configuration_yaml):
             exception_string = "hashstore.yaml not found in store root path."
@@ -174,7 +176,7 @@ class FileHashStore(HashStore):
                 store_depth (int): Depth when sharding an object's hex digest.
                 store_width (int): Width of directories when sharding an object's hex digest.
                 store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
-                store_sysmeta_namespace (str): Namespace for the HashStore's system metadata.
+                store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         """
         # If hashstore.yaml already exists, must throw exception and proceed with caution
         if os.path.exists(self.hashstore_configuration_yaml):
@@ -192,7 +194,7 @@ class FileHashStore(HashStore):
             store_depth,
             store_width,
             store_algorithm,
-            store_sysmeta_namespace,
+            store_metadata_namespace,
         ) = [
             checked_properties[property_name]
             for property_name in self.property_required_keys
@@ -204,7 +206,7 @@ class FileHashStore(HashStore):
             store_depth,
             store_width,
             store_algorithm,
-            store_sysmeta_namespace,
+            store_metadata_namespace,
         )
         # Write 'hashstore.yaml'
         with open(
@@ -219,7 +221,7 @@ class FileHashStore(HashStore):
 
     @staticmethod
     def _build_hashstore_yaml_string(
-        store_path, store_depth, store_width, store_algorithm, store_sysmeta_namespace
+        store_path, store_depth, store_width, store_algorithm, store_metadata_namespace
     ):
         """Build a YAML string representing the configuration for a HashStore.
 
@@ -228,7 +230,7 @@ class FileHashStore(HashStore):
             store_depth (int): Depth when sharding an object's hex digest.
             store_width (int): Width of directories when sharding an object's hex digest.
             store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
-            store_sysmeta_namespace (str): Namespace for the HashStore's system metadata.
+            store_metadata_namespace (str): Namespace for the HashStore's system metadata.
 
         Returns:
             hashstore_configuration_yaml (str): A YAML string representing the configuration for
@@ -256,7 +258,8 @@ class FileHashStore(HashStore):
         #    │           └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
 
         ############### Format of the Metadata ###############
-        store_sysmeta_namespace: "{store_sysmeta_namespace}"
+        # The default metadata format
+        store_metadata_namespace: "{store_metadata_namespace}"
 
         ############### Hash Algorithms ###############
         # Hash algorithm to use when calculating object's hex digest for the permanent address
@@ -264,22 +267,12 @@ class FileHashStore(HashStore):
         # Algorithm values supported by python hashlib 3.9.0+ for File Hash Store (FHS)
         # The default algorithm list includes the hash algorithms calculated when storing an
         # object to disk and returned to the caller after successful storage.
-        filehashstore_default_algo_list:
-        - "sha1"
-        - "sha256"
-        - "sha384"
-        - "sha512"
-        - "md5"
-        # The other algorithm list consists of additional algorithms that can be included for
-        # calculating when storing objects, in addition to the default list.
-        filehashstore_other_algo_list:
-        - "sha224"
-        - "sha3_224"
-        - "sha3_256"
-        - "sha3_384"
-        - "sha3_512"
-        - "blake2b"
-        - "blake2s"
+        store_default_algo_list:
+        - "MD5"
+        - "SHA-1"
+        - "SHA-256"
+        - "SHA-384"
+        - "SHA-512"
         """
         return hashstore_configuration_yaml
 
@@ -316,13 +309,47 @@ class FileHashStore(HashStore):
                 raise ValueError(exception_string)
         return properties
 
+    def _set_default_algorithms(self):
+        """Set the default algorithms to calculate when storing objects."""
+
+        def lookup_algo(algo):
+            """Translate DataONE controlled algorithms to python hashlib values:
+            https://dataoneorg.github.io/api-documentation/apis/Types.html#Types.ChecksumAlgorithm
+            """
+            dataone_algo_translation = {
+                "MD5": "md5",
+                "SHA-1": "sha1",
+                "SHA-256": "sha256",
+                "SHA-384": "sha384",
+                "SHA-512": "sha512",
+            }
+            return dataone_algo_translation[algo]
+
+        if not os.path.exists(self.hashstore_configuration_yaml):
+            exception_string = "hashstore.yaml not found in store root path."
+            logging.critical(
+                "FileHashStore - set_default_algorithms: %s", exception_string
+            )
+            raise FileNotFoundError(exception_string)
+        with open(self.hashstore_configuration_yaml, "r", encoding="utf-8") as file:
+            yaml_data = yaml.safe_load(file)
+
+        yaml_store_default_algo_list = yaml_data["store_default_algo_list"]
+        translated_default_algo_list = []
+        for algo in yaml_store_default_algo_list:
+            translated_default_algo_list.append(lookup_algo(algo))
+
+        # Set class variable
+        self.default_algo_list = translated_default_algo_list
+        return
+
     # Public API / HashStore Interface Methods
 
     def store_object(
         self,
         pid,
         data,
-        additional_algorithm="sha256",
+        additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
     ):
@@ -357,8 +384,9 @@ class FileHashStore(HashStore):
         )
         additional_algorithm_checked = None
         if additional_algorithm != self.algorithm and additional_algorithm is not None:
+            # Set additional_algorithm
             additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
-        # Checksum and checksum_algorithm must both be supplied
+        # Checksum and checksum_algorithm must both be supplied if one is supplied
         if checksum is not None:
             if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
                 exception_string = (
@@ -369,7 +397,6 @@ class FileHashStore(HashStore):
                 raise ValueError(exception_string)
         checksum_algorithm_checked = None
         if checksum_algorithm is not None:
-            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
             if checksum is None or checksum.replace(" ", "") == "":
                 exception_string = (
                     "checksum cannot be None or empty if checksum_algorithm is"
@@ -377,6 +404,8 @@ class FileHashStore(HashStore):
                 )
                 logging.error("FileHashStore - store_object: %s", exception_string)
                 raise ValueError(exception_string)
+            # Set checksum_algorithm
+            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
 
         # Wait for the pid to release if it's in use
         while pid in self.object_locked_pids:
@@ -418,66 +447,80 @@ class FileHashStore(HashStore):
             )
         return hash_address
 
-    def store_sysmeta(self, pid, sysmeta):
+    def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
-            "FileHashStore - store_sysmeta: Request to store sysmeta for pid: %s", pid
+            "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
         )
-        # Validate input parameters
-        logging.debug("FileHashStore - store_sysmeta: Validating arguments.")
+        # Validate input parameters, begin with persistent identifier (pid)
+        logging.debug("FileHashStore - store_metadata: Validating arguments.")
         if pid is None or pid.replace(" ", "") == "":
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - store_sysmeta: %s", exception_string)
+            logging.error("FileHashStore - store_metadata: %s", exception_string)
             raise ValueError(exception_string)
+        # Then format_id of the metadata
+        checked_format_id = None
+        if format_id is not None and format_id.replace(" ", "") == "":
+            exception_string = "Format_id cannot be empty."
+            logging.error("FileHashStore - store_metadata: %s", exception_string)
+            raise ValueError(exception_string)
+        elif format_id is None:
+            # Use default value set by hashstore config
+            checked_format_id = self.sysmeta_ns
+        else:
+            checked_format_id = format_id
+        # Metadata content must be a str, path or stream and cannot be empty
+        if isinstance(metadata, str):
+            if metadata.replace(" ", "") == "":
+                exception_string = "Given string path to metadata cannot be empty."
+                logging.error("FileHashStore - store_metadata: %s", exception_string)
+                raise TypeError(exception_string)
         if (
-            not isinstance(sysmeta, str)
-            and not isinstance(sysmeta, Path)
-            and not isinstance(sysmeta, io.BufferedIOBase)
+            not isinstance(metadata, str)
+            and not isinstance(metadata, Path)
+            and not isinstance(metadata, io.BufferedIOBase)
         ):
             exception_string = (
-                "Sysmeta must be a path or string type, data type supplied: "
-                + {type(sysmeta)}
+                "Metadata must be a path or string type, data type supplied: "
+                + {type(metadata)}
             )
-            logging.error("FileHashStore - store_sysmeta: %s", exception_string)
+            logging.error("FileHashStore - store_metadata: %s", exception_string)
             raise TypeError(exception_string)
-        if isinstance(sysmeta, str):
-            if sysmeta.replace(" ", "") == "":
-                exception_string = "Given string path to sysmeta cannot be empty."
-                logging.error("FileHashStore - store_sysmeta: %s", exception_string)
-                raise TypeError(exception_string)
 
         # Wait for the pid to release if it's in use
-        while pid in self.sysmeta_locked_pids:
+        while pid in self.metadata_locked_pids:
             logging.debug(
-                "FileHashStore - store_sysmeta: %s is currently being stored. Waiting.",
+                "FileHashStore - store_metadata: %s is currently being stored. Waiting.",
                 pid,
             )
             time.sleep(self.time_out_sec)
-        # Modify sysmeta_locked_pids consecutively
-        with self.sysmeta_lock:
+
+        with self.metadata_lock:
             logging.debug(
-                "FileHashStore - store_sysmeta: Adding pid: %s to sysmeta_locked_pids.",
+                "FileHashStore - store_metadata: Adding pid: %s to metadata_locked_pids.",
                 pid,
             )
-            self.sysmeta_locked_pids.append(pid)
+            # Modify metadata_locked_pids consecutively
+            self.metadata_locked_pids.append(pid)
+
         try:
             logging.debug(
-                "FileHashStore - store_sysmeta: Attempting to store sysmeta for pid: %s",
+                "FileHashStore - store_metadata: Attempting to store metadata for pid: %s",
                 pid,
             )
-            sysmeta_cid = self.put_sysmeta(pid, sysmeta)
+            metadata_cid = self.put_metadata(metadata, pid, checked_format_id)
         finally:
             # Release pid
-            with self.sysmeta_lock:
+            with self.metadata_lock:
                 logging.debug(
-                    "FileHashStore - store_sysmeta: Removing pid: %s from sysmeta_locked_pids.",
+                    "FileHashStore - store_metadata: Removing pid: %s from metadata_locked_pids.",
                     pid,
                 )
-                self.sysmeta_locked_pids.remove(pid)
+                self.metadata_locked_pids.remove(pid)
             logging.info(
-                "FileHashStore - store_sysmeta: Successfully stored sysmeta for pid: %s",
+                "FileHashStore - store_metadata: Successfully stored metadata for pid: %s",
                 pid,
             )
-        return sysmeta_cid
+        return metadata_cid
 
     def retrieve_object(self, pid):
         logging.debug(
@@ -490,16 +533,16 @@ class FileHashStore(HashStore):
             raise ValueError(exception_string)
 
         entity = "objects"
-        ab_id = self.get_sha256_hex_digest(pid)
-        sysmeta_exists = self.exists(entity, ab_id)
-        if sysmeta_exists:
+        object_cid = self.get_sha256_hex_digest(pid)
+        object_exists = self.exists(entity, object_cid)
+        if object_exists:
             logging.debug(
-                "FileHashStore - retrieve_object: Sysmeta exists for pid: %s, retrieving object.",
+                "FileHashStore - retrieve_object: Metadata exists for pid: %s, retrieving object.",
                 pid,
             )
-            obj_stream = self.open(entity, ab_id)
+            obj_stream = self.open(entity, object_cid)
         else:
-            exception_string = f"No sysmeta found for pid: {pid}"
+            exception_string = f"No object found for pid: {pid}"
             logging.error("FileHashStore - retrieve_object: %s", exception_string)
             raise ValueError(exception_string)
         logging.info(
@@ -507,37 +550,45 @@ class FileHashStore(HashStore):
         )
         return obj_stream
 
-    def retrieve_sysmeta(self, pid):
+    def retrieve_metadata(self, pid, format_id):
         logging.debug(
-            "FileHashStore - retrieve_sysmeta: Request to retrieve sysmeta for pid: %s",
+            "FileHashStore - retrieve_metadata: Request to retrieve metadata for pid: %s",
             pid,
         )
         if pid is None or pid.replace(" ", "") == "":
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - retrieve_sysmeta: %s", exception_string)
+            logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
+            raise ValueError(exception_string)
+        if format_id is None or format_id.replace(" ", "") == "":
+            exception_string = (
+                f"Format_id cannot be None or empty, format_id: {format_id}"
+            )
+            logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
 
-        entity = "sysmeta"
-        ab_id = self.get_sha256_hex_digest(pid)
-        sysmeta_exists = self.exists(entity, ab_id)
-        if sysmeta_exists:
+        entity = "metadata"
+        metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+        metadata_exists = self.exists(entity, metadata_cid)
+        if metadata_exists:
             logging.debug(
-                "FileHashStore - retrieve_sysmeta: Sysmeta exists for pid: %s, retrieving sysmeta.",
-                pid,
+                "FileHashStore - retrieve_metadata: Metadata exists for pid: %s",
+                pid + ", retrieving metadata.",
             )
-            ab_id = self.get_sha256_hex_digest(pid)
-            s_path = self.open(entity, ab_id)
-            s_content = s_path.read().decode("utf-8").split("\x00", 1)
-            s_path.close()
-            sysmeta = s_content[1]
+            metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+            metadata_cid_stream = self.open(entity, metadata_cid)
+            metadata_cid_content = (
+                metadata_cid_stream.read().decode("utf-8").split("\x00", 1)
+            )
+            metadata_cid_stream.close()
+            metadata = metadata_cid_content[1]
         else:
-            exception_string = f"No sysmeta found for pid: {pid}"
-            logging.error("FileHashStore - retrieve_sysmeta: %s", exception_string)
+            exception_string = f"No metadata found for pid: {pid}"
+            logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
         logging.info(
-            "FileHashStore - retrieve_sysmeta: Retrieved sysmeta for pid: %s", pid
+            "FileHashStore - retrieve_metadata: Retrieved metadata for pid: %s", pid
         )
-        return sysmeta
+        return metadata
 
     def delete_object(self, pid):
         logging.debug(
@@ -549,29 +600,35 @@ class FileHashStore(HashStore):
             raise ValueError(exception_string)
 
         entity = "objects"
-        ab_id = self.get_sha256_hex_digest(pid)
-        self.delete(entity, ab_id)
+        object_cid = self.get_sha256_hex_digest(pid)
+        self.delete(entity, object_cid)
         logging.info(
             "FileHashStore - delete_object: Successfully deleted object for pid: %s",
             pid,
         )
         return True
 
-    def delete_sysmeta(self, pid):
+    def delete_metadata(self, pid, format_id):
         logging.debug(
-            "FileHashStore - delete_sysmeta: Request to delete sysmeta for pid: %s",
+            "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
         )
         if pid is None or pid.replace(" ", "") == "":
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - delete_sysmeta: %s", exception_string)
+            logging.error("FileHashStore - delete_metadata: %s", exception_string)
+            raise ValueError(exception_string)
+        if format_id is None or format_id.replace(" ", "") == "":
+            exception_string = (
+                f"Format_id cannot be None or empty, format_id: {format_id}"
+            )
+            logging.error("FileHashStore - delete_metadata: %s", exception_string)
             raise ValueError(exception_string)
 
-        entity = "sysmeta"
-        ab_id = self.get_sha256_hex_digest(pid)
-        self.delete(entity, ab_id)
+        entity = "metadata"
+        metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+        self.delete(entity, metadata_cid)
         logging.info(
-            "FileHashStore - delete_sysmeta: Successfully deleted sysmeta for pid: %s",
+            "FileHashStore - delete_metadata: Successfully deleted metadata for pid: %s",
             pid,
         )
         return True
@@ -592,13 +649,13 @@ class FileHashStore(HashStore):
 
         entity = "objects"
         algorithm = self.clean_algorithm(algorithm)
-        ab_id = self.get_sha256_hex_digest(pid)
-        if not self.exists(entity, ab_id):
+        object_cid = self.get_sha256_hex_digest(pid)
+        if not self.exists(entity, object_cid):
             exception_string = f"No object found for pid: {pid}"
             logging.error("FileHashStore - get_hex_digest: %s", exception_string)
             raise ValueError(exception_string)
-        c_stream = self.open(entity, ab_id)
-        hex_digest = self.computehash(c_stream, algorithm=algorithm)
+        cid_stream = self.open(entity, object_cid)
+        hex_digest = self.computehash(cid_stream, algorithm=algorithm)
 
         logging_info_statement = (
             f"FileHashStore - get_hex_digest: Successfully calculated hex digest for pid: {pid}."
@@ -643,7 +700,7 @@ class FileHashStore(HashStore):
         )
         with closing(stream):
             (
-                ab_id,
+                object_cid,
                 rel_path,
                 abs_path,
                 is_duplicate,
@@ -658,7 +715,7 @@ class FileHashStore(HashStore):
             )
 
         hash_address = HashAddress(
-            ab_id, rel_path, abs_path, is_duplicate, hex_digest_dict
+            object_cid, rel_path, abs_path, is_duplicate, hex_digest_dict
         )
         logging.debug(
             "FileHashStore - put_object: Successfully put object for pid: %s",
@@ -701,8 +758,8 @@ class FileHashStore(HashStore):
             digest dictionary.
         """
         entity = "objects"
-        ab_id = self.get_sha256_hex_digest(pid)
-        abs_file_path = self.build_abs_path(entity, ab_id, extension)
+        object_cid = self.get_sha256_hex_digest(pid)
+        abs_file_path = self.build_abs_path(entity, object_cid, extension)
         self.create_path(os.path.dirname(abs_file_path))
         # Only put file if it doesn't exist
         if os.path.isfile(abs_file_path):
@@ -720,7 +777,9 @@ class FileHashStore(HashStore):
             + f" file and calculating checksums for pid: {pid}"
         )
         logging.debug(debug_tmp_file_str)
-        hex_digests, tmp_file_name = self._mktempfile(stream, additional_algorithm)
+        hex_digests, tmp_file_name = self._mktempfile(
+            stream, additional_algorithm, checksum_algorithm
+        )
         logging.debug(
             "FileHashStore - _move_and_get_checksums: Temp file created: %s",
             tmp_file_name,
@@ -786,7 +845,7 @@ class FileHashStore(HashStore):
                 self.delete(entity, tmp_file_name)
                 err_msg = (
                     "Aborting store_object upload - an unexpected error has occurred when moving"
-                    + f" file to: {ab_id} - Error: {err}"
+                    + f" file to: {object_cid} - Error: {err}"
                 )
                 logging.error("FileHashStore - _move_and_get_checksums: %s", err_msg)
                 raise
@@ -800,17 +859,17 @@ class FileHashStore(HashStore):
             is_duplicate = True
             self.delete(entity, tmp_file_name)
 
-        return ab_id, rel_file_path, abs_file_path, is_duplicate, hex_digests
+        return object_cid, rel_file_path, abs_file_path, is_duplicate, hex_digests
 
-    def _mktempfile(self, stream, algorithm=None):
-        """Create a named temporary file from a `Stream` object and
-        return its filename and a dictionary of its algorithms and hex digests.
-        If an algorithm is provided, it will add the respective hex digest to
-        the dictionary.
+    def _mktempfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
+        """Create a named temporary file from a `Stream` object and return its filename
+        and a dictionary of its algorithms and hex digests. If an additionak and/or checksum
+        algorithm is provided, it will add the respective hex digest to the dictionary.
 
         Args:
             stream (io.BufferedReader): Object stream.
-            algorithm (string): Algorithm of additional hex digest to generate.
+            algorithm (string): Algorithm of additional hex digest to generate
+            checksum_algorithm (string): Algorithm of additional checksum algo to generate
 
         Returns:
             hex_digest_dict, tmp.name (tuple pack):
@@ -834,16 +893,27 @@ class FileHashStore(HashStore):
             finally:
                 os.umask(oldmask)
 
-        # Additional hash object to digest
-        if algorithm is not None:
-            self.clean_algorithm(algorithm)
-            if algorithm in self.other_algo_list:
+        # Additional hash objects to digest
+        if checksum_algorithm is not None:
+            self.clean_algorithm(checksum_algorithm)
+            if checksum_algorithm in self.other_algo_list:
                 debug_additional_other_algo_str = (
-                    f"FileHashStore - _mktempfile: additional algorithm: {algorithm} found"
-                    + " in other_algo_lists, adding to list of algorithms to calculate."
+                    f"FileHashStore - _mktempfile: checksum algorithm: {checksum_algorithm}"
+                    + " found in other_algo_lists, adding to list of algorithms to calculate."
                 )
                 logging.debug(debug_additional_other_algo_str)
-                algorithm_list_to_calculate.append(algorithm)
+                algorithm_list_to_calculate.append(checksum_algorithm)
+        if additional_algorithm is not None:
+            self.clean_algorithm(additional_algorithm)
+            if additional_algorithm in self.other_algo_list:
+                debug_additional_other_algo_str = (
+                    f"FileHashStore - _mktempfile: additional algorithm: {additional_algorithm}"
+                    + " found in other_algo_lists, adding to list of algorithms to calculate."
+                )
+                logging.debug(debug_additional_other_algo_str)
+                algorithm_list_to_calculate.append(additional_algorithm)
+        # Remove duplicates
+        algorithm_list_to_calculate = set(algorithm_list_to_calculate)
 
         logging.debug(
             "FileHashStore - _mktempfile: tmp file created: %s, calculating hex digests.",
@@ -872,74 +942,76 @@ class FileHashStore(HashStore):
         logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
         return hex_digest_dict, tmp.name
 
-    def put_sysmeta(self, pid, sysmeta):
-        """Store contents of `sysmeta` on disk using the hash of the given pid
+    def put_metadata(self, metadata, pid, format_id):
+        """Store contents of metadata to `[self.root]/metadata` using the hash of the
+        given pid and format_id as the permanent address.
 
         Args:
             pid (string): Authority-based identifier.
-            sysmeta (mixed): String or path to sysmeta document.
+            format_id (string): Metadata format.
+            metadata (mixed): String or path to metadata document.
 
         Returns:
-            ab_id (string): Address of the sysmeta document.
+            metadata_cid (string): Address of the metadata document.
         """
         logging.debug(
-            "FileHashStore - put_sysmeta: Request to put sysmeta for pid: %s", pid
+            "FileHashStore - put_metadata: Request to put metadata for pid: %s", pid
         )
+        # Create metadata tmp file and write to it
+        metadata_stream = Stream(metadata)
+        with closing(metadata_stream):
+            metadata_tmp = self._mktempmetadata(metadata_stream, format_id)
 
-        # Create tmp file and write to it
-        sysmeta_stream = Stream(sysmeta)
-        with closing(sysmeta_stream):
-            sysmeta_tmp = self._mktmpsysmeta(sysmeta_stream, self.sysmeta_ns)
+        # Get target and related paths (permanent location)
+        metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+        rel_path = "/".join(self.shard(metadata_cid))
+        full_path = self.get_store_path("metadata") / rel_path
 
-        # Target path (permanent location)
-        ab_id = self.get_sha256_hex_digest(pid)
-        rel_path = "/".join(self.shard(ab_id))
-        full_path = self.get_store_path("sysmeta") / rel_path
-
-        # Move sysmeta to target path
-        if os.path.exists(sysmeta_tmp):
+        # Move metadata to target path
+        if os.path.exists(metadata_tmp):
             try:
                 parent = full_path.parent
                 parent.mkdir(parents=True, exist_ok=True)
-                # Sysmeta will be replaced if it exists
-                shutil.move(sysmeta_tmp, full_path)
+                # Metadata will be replaced if it exists
+                shutil.move(metadata_tmp, full_path)
                 logging.debug(
-                    "FileHashStore - put_sysmeta: Successfully put sysmeta for pid: %s",
+                    "FileHashStore - put_metadata: Successfully put metadata for pid: %s",
                     pid,
                 )
-                return ab_id
+                return metadata_cid
             except Exception as err:
                 exception_string = f"Unexpected {err=}, {type(err)=}"
-                logging.error("FileHashStore - put_sysmeta: %s", exception_string)
-                if os.path.exists(sysmeta_tmp):
-                    # Remove tmp sysmeta, calling app must re-upload
+                logging.error("FileHashStore - put_metadata: %s", exception_string)
+                if os.path.exists(metadata_tmp):
+                    # Remove tmp metadata, calling app must re-upload
                     logging.debug(
-                        "FileHashStore - put_sysmeta: Deleting sysmeta for pid: %s", pid
+                        "FileHashStore - put_metadata: Deleting metadata for pid: %s",
+                        pid,
                     )
-                    self.sysmeta.delete(sysmeta_tmp)
-                err_msg = f"Aborting store_sysmeta upload - an unexpected error has occurred: {err}"
-                logging.error("FileHashStore - put_sysmeta: %s", err_msg)
+                    self.metadata.delete(metadata_tmp)
+                err_msg = f"Aborting store_metadata upload - unexpected error: {err}"
+                logging.error("FileHashStore - put_metadata: %s", err_msg)
                 raise
         else:
             exception_string = (
-                f"Attempt to move sysmeta for pid: {pid}"
-                + f", but sysmeta temp file not found: {sysmeta_tmp}"
+                f"Attempt to move metadata for pid: {pid}"
+                + f", but metadata temp file not found: {metadata_tmp}"
             )
-            logging.error("FileHashStore - put_sysmeta: %s", exception_string)
+            logging.error("FileHashStore - put_metadata: %s", exception_string)
             raise FileNotFoundError()
 
-    def _mktmpsysmeta(self, stream, namespace):
-        """Create a named temporary file with `sysmeta` bytes and `namespace`.
+    def _mktempmetadata(self, stream, format_id):
+        """Create a named temporary file with `stream` (metadata) and `format_id`.
 
         Args:
-            stream (io.BufferedReader): Sysmeta stream.
-            namespace (string): Format of sysmeta.
+            stream (io.BufferedReader): Metadata stream.
+            format_id (string): Format of metadata.
 
         Returns:
-            tmp.name (string): Name of temporary file created and written into.
+            tmp.name (string): Path/name of temporary file created and written into.
         """
         # Create temporary file in .../{store_path}/tmp
-        tmp_root_path = self.get_store_path("sysmeta") / "tmp"
+        tmp_root_path = self.get_store_path("metadata") / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
@@ -955,17 +1027,17 @@ class FileHashStore(HashStore):
 
         # tmp is a file-like object that is already opened for writing by default
         logging.debug(
-            "FileHashStore - _mktmpsysmeta: Writing stream to tmp sysmeta file: %s",
+            "FileHashStore - _mktmpmetadata: Writing stream to tmp metadata file: %s",
             tmp.name,
         )
         with tmp as tmp_file:
-            tmp_file.write(namespace.encode("utf-8"))
+            tmp_file.write(format_id.encode("utf-8"))
             tmp_file.write(b"\x00")
             for data in stream:
                 tmp_file.write(self._to_bytes(data))
 
         logging.debug(
-            "FileHashStore - _mktmpsysmeta: Successfully written to tmp sysmeta file: %s",
+            "FileHashStore - _mktmpmetadata: Successfully written to tmp metadata file: %s",
             tmp.name,
         )
         return tmp.name
@@ -1005,7 +1077,7 @@ class FileHashStore(HashStore):
         or with optional algorithm supported.
 
         Args:
-            stream (io.BufferedReader): A buffered stream of an ab_id object. \n
+            stream (io.BufferedReader): A buffered stream of an object_cid object. \n
             algorithm (string): Algorithm of hex digest to generate.
 
         Returns:
@@ -1025,22 +1097,22 @@ class FileHashStore(HashStore):
         """Return a path object of the root directory of the store.
 
         Args:
-            entity (str): Desired entity type (ex. "objects", "sysmeta").
+            entity (str): Desired entity type: "objects" or "metadata"
         """
         if entity == "objects":
             return Path(self.objects)
-        elif entity == "sysmeta":
-            return Path(self.sysmeta)
+        elif entity == "metadata":
+            return Path(self.metadata)
         else:
             raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?"
+                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
             )
 
     def exists(self, entity, file):
         """Check whether a given file id or path exists on disk.
 
         Args:
-            entity (str): Desired entity type (ex. "objects", "sysmeta"). \n
+            entity (str): Desired entity type (ex. "objects", "metadata"). \n
             file (str): The name of the file to check.
 
         Returns:
@@ -1082,7 +1154,7 @@ class FileHashStore(HashStore):
         for closing the stream.
 
         Args:
-            entity (str): Desired entity type (ex. "objects", "sysmeta"). \n
+            entity (str): Desired entity type (ex. "objects", "metadata"). \n
             file (str): Address ID or path of file. \n
             mode (str, optional): Mode to open file in. Defaults to 'rb'.
 
@@ -1103,7 +1175,7 @@ class FileHashStore(HashStore):
         deleting. No exception is raised if file doesn't exist.
 
         Args:
-            entity (str): Desired entity type (ex. "objects", "sysmeta"). \n
+            entity (str): Desired entity type (ex. "objects", "metadata"). \n
             file (str): Address ID or path of file.
         """
         realpath = self.get_real_path(entity, file)
@@ -1172,7 +1244,7 @@ class FileHashStore(HashStore):
         the expected file path of the id.
 
         Args:
-            entity (str): desired entity type (ex. "objects", "sysmeta"). \n
+            entity (str): desired entity type (ex. "objects", "metadata"). \n
             file (string): Name of file.
 
         Returns:
@@ -1186,11 +1258,11 @@ class FileHashStore(HashStore):
         rel_root = ""
         if entity == "objects":
             rel_root = self.objects
-        elif entity == "sysmeta":
-            rel_root = self.sysmeta
+        elif entity == "metadata":
+            rel_root = self.metadata
         else:
             raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?"
+                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
             )
         relpath = os.path.join(rel_root, file)
         if os.path.isfile(relpath):
@@ -1204,18 +1276,18 @@ class FileHashStore(HashStore):
         # Could not determine a match.
         return None
 
-    def build_abs_path(self, entity, ab_id, extension=""):
+    def build_abs_path(self, entity, cid, extension=""):
         """Build the absolute file path for a given hash id with an optional file extension.
 
         Args:
-            entity (str): Desired entity type (ex. "objects", "sysmeta"). \n
-            ab_id (str): A hash id to build a file path for. \n
+            entity (str): Desired entity type (ex. "objects", "metadata"). \n
+            cid (str): A hash id to build a file path for. \n
             extension (str): An optional file extension to append to the file path.
 
         Returns:
             absolute_path (str): An absolute file path for the specified hash id.
         """
-        paths = self.shard(ab_id)
+        paths = self.shard(cid)
         root_dir = self.get_store_path(entity)
 
         if extension and not extension.startswith(os.extsep):
@@ -1230,7 +1302,7 @@ class FileHashStore(HashStore):
         """Return count of the number of files in the `root` directory.
 
         Args:
-            entity (str): Desired entity type (ex. "objects", "sysmeta").
+            entity (str): Desired entity type (ex. "objects", "metadata").
 
         Returns:
             count (int): Number of files in the directory.
@@ -1239,11 +1311,11 @@ class FileHashStore(HashStore):
         directory_to_count = ""
         if entity == "objects":
             directory_to_count = self.objects
-        elif entity == "sysmeta":
-            directory_to_count = self.sysmeta
+        elif entity == "metadata":
+            directory_to_count = self.metadata
         else:
             raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects' or 'sysmeta'?"
+                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
             )
 
         for _, _, files in os.walk(directory_to_count):

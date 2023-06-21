@@ -6,6 +6,11 @@ import pytest
 from hashstore.filehashstore.filehashstore import FileHashStore
 
 
+def test_pids_length(pids):
+    """Ensure test harness pids are present."""
+    assert len(pids) == 3
+
+
 def test_init_put_properties_hashstore_yaml_exists(store):
     """Verify properties file present in store root directory."""
     assert os.path.exists(store.hashstore_configuration_yaml)
@@ -18,7 +23,7 @@ def test_init_with_existing_hashstore_mismatched_config(store):
         "store_depth": 1,
         "store_width": 2,
         "store_algorithm": "sha256",
-        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     with pytest.raises(ValueError):
         FileHashStore(properties)
@@ -37,7 +42,7 @@ def test_init_with_existing_hashstore_missing_yaml(store, pids):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
-        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     with pytest.raises(FileNotFoundError):
         FileHashStore(properties)
@@ -51,7 +56,7 @@ def test_get_properties(store):
     assert hashstore_yaml_dict.get("store_width") == 2
     assert hashstore_yaml_dict.get("store_algorithm") == "sha256"
     assert (
-        hashstore_yaml_dict.get("store_sysmeta_namespace")
+        hashstore_yaml_dict.get("store_metadata_namespace")
         == "http://ns.dataone.org/service/types/v2.0"
     )
 
@@ -70,7 +75,7 @@ def test_validate_properties(store):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
-        "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     # pylint: disable=W0212
     assert store._validate_properties(properties)
@@ -90,13 +95,13 @@ def test_validate_properties_missing_key(store):
 
 
 def test_validate_properties_key_value_is_none(store):
-    """Confirm exception raised when value from key is 'None'"""
+    """Confirm exception raised when value from key is 'None'."""
     properties = {
         "store_path": "/etc/test",
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
-        "store_sysmeta_namespace": None,
+        "store_metadata_namespace": None,
     }
     with pytest.raises(ValueError):
         # pylint: disable=W0212
@@ -105,15 +110,23 @@ def test_validate_properties_key_value_is_none(store):
 
 def test_validate_properties_incorrect_type(store):
     """Confirm exception raised when key missing in properties."""
-    properties = "etc/filehashstore"
+    properties = "etc/filehashstore/hashstore.yaml"
     with pytest.raises(ValueError):
         # pylint: disable=W0212
         store._validate_properties(properties)
 
 
-def test_pids_length(pids):
-    """Ensure test harness pids are present."""
-    assert len(pids) == 3
+def test_set_default_algorithms_missing_yaml(store, pids):
+    """Confirm set_default_algorithms raises FileNotFoundError when hashstore.yaml
+    not found."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        store.put_object(pid, path)
+    os.remove(store.hashstore_configuration_yaml)
+    with pytest.raises(FileNotFoundError):
+        # pylint: disable=W0212
+        store._set_default_algorithms()
 
 
 def test_put_object_files_path(pids, store):
@@ -152,14 +165,14 @@ def test_put_object_files_stream(pids, store):
     assert store.count(entity) == 3
 
 
-def test_put_object_id(pids, store):
+def test_put_object_cid(pids, store):
     """Check put returns correct id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         hashaddress = store.put_object(pid, path)
         hashaddress_id = hashaddress.id
-        assert hashaddress_id == pids[pid]["ab_id"]
+        assert hashaddress_id == pids[pid]["object_cid"]
 
 
 def test_put_object_relpath(pids, store):
@@ -212,7 +225,7 @@ def test_put_object_hex_digests(pids, store):
 
 
 def test_put_object_additional_algorithm(pids, store):
-    """Check put returns additional algorithm in hex digests."""
+    """Check put_object returns additional algorithm in hex digests."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -224,7 +237,7 @@ def test_put_object_additional_algorithm(pids, store):
 
 
 def test_put_object_with_correct_checksums(pids, store):
-    """Check put success with good checksum supplied."""
+    """Check put_object success with valid checksum and checksum algorithm supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -262,8 +275,8 @@ def test_move_and_get_checksums_id(pids, store):
             _,
         ) = store._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-        ab_id = store.get_sha256_hex_digest(pid)
-        assert move_id == ab_id
+        object_cid = store.get_sha256_hex_digest(pid)
+        assert move_id == object_cid
 
 
 def test_move_and_get_checksums_hex_digests(pids, store):
@@ -289,7 +302,7 @@ def test_move_and_get_checksums_hex_digests(pids, store):
 
 
 def test_move_and_get_checksums_abs_path(pids, store):
-    """Test move returns correct absolute path."""
+    """Test move returns correct absolute path that exists."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -327,6 +340,82 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
     assert store.count(entity) == 3
 
 
+def test_mktempfile_additional_algo(store):
+    """Test _mktempfile returns correct hex digests for additional algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    input_stream = io.open(path, "rb")
+    checksum_algo = "sha3_256"
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    # pylint: disable=W0212
+    hex_digests, _ = store._mktempfile(input_stream, additional_algorithm=checksum_algo)
+    input_stream.close()
+    assert hex_digests.get("sha3_256") == checksum_correct
+
+
+def test_mktempfile_checksum_algo(store):
+    """Test _mktempfile returns correct hex digests for checksum algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    input_stream = io.open(path, "rb")
+    checksum_algo = "sha3_256"
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    # pylint: disable=W0212
+    hex_digests, _ = store._mktempfile(input_stream, checksum_algorithm=checksum_algo)
+    input_stream.close()
+    assert hex_digests.get("sha3_256") == checksum_correct
+
+
+def test_mktempfile_checksum_and_additional_algo(store):
+    """Test _mktempfile returns correct hex digests for checksum algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    input_stream = io.open(path, "rb")
+    additional_algo = "sha224"
+    additional_algo_checksum = (
+        "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
+    )
+    checksum_algo = "sha3_256"
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    # pylint: disable=W0212
+    hex_digests, _ = store._mktempfile(
+        input_stream,
+        additional_algorithm=additional_algo,
+        checksum_algorithm=checksum_algo,
+    )
+    input_stream.close()
+    assert hex_digests.get("sha3_256") == checksum_correct
+    assert hex_digests.get("sha224") == additional_algo_checksum
+
+
+def test_mktempfile_checksum_and_additional_algo_duplicate(store):
+    """Test _mktempfile succeeds with duplicate algorithms (de-duplicates)"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    input_stream = io.open(path, "rb")
+    additional_algo = "sha224"
+    checksum_algo = "sha224"
+    checksum_correct = "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
+    # pylint: disable=W0212
+    hex_digests, _ = store._mktempfile(
+        input_stream,
+        additional_algorithm=additional_algo,
+        checksum_algorithm=checksum_algo,
+    )
+    input_stream.close()
+    assert hex_digests.get("sha224") == checksum_correct
+
+
 def test_mktempfile_hex_digests(pids, store):
     """Test _mktempfile returns correct hex digests."""
     test_dir = "tests/testdata/"
@@ -343,7 +432,7 @@ def test_mktempfile_hex_digests(pids, store):
         assert hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
-def test_mktempfile_object(pids, store):
+def test_mktempfile_tmpfile_object(pids, store):
     """Test _mktempfile creates file successfully."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -355,19 +444,6 @@ def test_mktempfile_object(pids, store):
         assert os.path.isfile(tmp_file_name) is True
 
 
-def test_mktempfile_with_algorithm(pids, store):
-    """Test _mktempfile returns additional hex digest when supplied."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        algo = "sha224"
-        # pylint: disable=W0212
-        hex_digests, _ = store._mktempfile(input_stream, algo)
-        input_stream.close()
-        assert hex_digests.get("sha224") == pids[pid]["sha224"]
-
-
 def test_mktempfile_with_unsupported_algorithm(pids, store):
     """Test _mktempfile raises error when bad algorithm supplied."""
     test_dir = "tests/testdata/"
@@ -377,55 +453,61 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         algo = "md2"
         with pytest.raises(ValueError):
             # pylint: disable=W0212
-            _, _ = store._mktempfile(input_stream, algo)
+            _, _ = store._mktempfile(input_stream, additional_algorithm=algo)
+        with pytest.raises(ValueError):
+            # pylint: disable=W0212
+            _, _ = store._mktempfile(input_stream, checksum_algorithm=algo)
         input_stream.close()
 
 
-def test_put_sysmeta_with_path(pids, store):
-    """Test put sysmeta with path object."""
-    entity = "sysmeta"
+def test_put_metadata_with_path(pids, store):
+    """Test put_metadata with path object."""
+    entity = "metadata"
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        ab_id = store.store_sysmeta(pid, syspath)
-        assert store.exists(entity, ab_id)
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
 
 
-def test_put_sysmeta_with_string(pids, store):
-    """Test put sysmeta with string."""
-    entity = "sysmeta"
+def test_put_metadata_with_string(pids, store):
+    """Test_put metadata with string."""
+    entity = "metadata"
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = str(Path(test_dir) / filename)
-        ab_id = store.store_sysmeta(pid, syspath)
-        assert store.exists(entity, ab_id)
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
 
 
-def test_put_sysmeta_ab_id(pids, store):
-    """Test put sysmeta returns correct id."""
+def test_put_metadata_cid(pids, store):
+    """Test put metadata returns correct id."""
     test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        ab_id = store.store_sysmeta(pid, syspath)
-        assert ab_id == pids[pid]["ab_id"]
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        assert metadata_cid == pids[pid]["metadata_cid"]
 
 
-def test_mktmpsysmeta(pids, store):
-    """Test mktmpsysmeta creates tmpFile."""
+def test_mktempmetadata(pids, store):
+    """Test mktmpmetadata creates tmpFile."""
     test_dir = "tests/testdata/"
-    entity = "sysmeta"
+    entity = "metadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sys_stream = io.open(syspath, "rb")
-        namespace = "http://ns.dataone.org/service/types/v2.0"
+        format_id = "http://ns.dataone.org/service/types/v2.0"
         # pylint: disable=W0212
-        tmp_name = store._mktmpsysmeta(sys_stream, namespace)
+        tmp_name = store._mktempmetadata(sys_stream, format_id)
         sys_stream.close()
         assert store.exists(entity, tmp_name)
 
@@ -462,12 +544,12 @@ def test_get_store_path_object(store):
     assert path_objects_string.endswith("/metacat/objects")
 
 
-def test_get_store_path_sysmeta(store):
-    """Check get_store_path for sysmeta path."""
+def test_get_store_path_metadata(store):
+    """Check get_store_path for metadata path."""
     # pylint: disable=W0212
-    path_sysmeta = store.get_store_path("sysmeta")
-    path_sysmeta_string = str(path_sysmeta)
-    assert path_sysmeta_string.endswith("/metacat/sysmeta")
+    path_metadata = store.get_store_path("metadata")
+    path_metadata_string = str(path_metadata)
+    assert path_metadata_string.endswith("/metacat/metadata")
 
 
 def test_exists_with_absolute_path(pids, store):
@@ -647,7 +729,7 @@ def test_create_path(pids, store):
     """Test makepath creates folder successfully."""
     for pid in pids:
         root_directory = store.root
-        pid_hex_digest_directory = pids[pid]["ab_id"][:2]
+        pid_hex_digest_directory = pids[pid]["metadata_cid"][:2]
         pid_directory = root_directory + pid_hex_digest_directory
         store.create_path(pid_directory)
         assert os.path.isdir(pid_directory)
@@ -705,7 +787,7 @@ def test_build_abs_path(store, pids):
         path = test_dir + pid.replace("/", "_")
         _ = store.put_object(pid, path)
         # pylint: disable=W0212
-        abs_path = store.build_abs_path(entity, pids[pid]["ab_id"])
+        abs_path = store.build_abs_path(entity, pids[pid]["object_cid"])
         assert abs_path
 
 
@@ -731,4 +813,4 @@ def test_get_sha256_hex_digest(pids, store):
     """Test for correct sha256 return value."""
     for pid in pids:
         hash_val = store.get_sha256_hex_digest(pid)
-        assert hash_val == pids[pid]["ab_id"]
+        assert hash_val == pids[pid]["object_cid"]

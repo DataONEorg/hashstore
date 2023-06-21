@@ -266,7 +266,31 @@ def test_store_object_checksum_correct(store):
 
 
 def test_store_object_checksum_correct_and_additional_algo(store):
-    """Test store object successfully stores with good checksum and same additional algorithm"""
+    """Test store object successfully stores with good checksum and same additional algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    algorithm_additional = "sha224"
+    sha224_additional_checksum = (
+        "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
+    )
+    algorithm_checksum = "sha3_256"
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    hash_address = store.store_object(
+        pid,
+        path,
+        additional_algorithm=algorithm_additional,
+        checksum=checksum_correct,
+        checksum_algorithm=algorithm_checksum,
+    )
+    assert hash_address.hex_digests.get("sha224") == sha224_additional_checksum
+    assert hash_address.hex_digests.get("sha3_256") == checksum_correct
+
+
+def test_store_object_checksum_correct_and_additional_algo_duplicate(store):
+    """Test store object successfully stores with good checksum and same additional algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -298,7 +322,7 @@ def test_store_object_checksum_algorithm_empty(store):
 
 
 def test_store_object_checksum_empty(store):
-    """Test store object raises error when checksum_algorithm supplied and checksum is empty."""
+    """Test store object raises error when checksum_algorithm supplied with empty checksum."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -480,7 +504,7 @@ def test_store_metadata_format_id_is_none(pids, store):
 
 
 def test_store_metadata_format_id_is_custom(pids, store):
-    """Confirm default name space is used when format_id is not supplied"""
+    """Confirm new format_id is stored when default 'None' is overridden."""
     test_dir = "tests/testdata/"
     format_id = "http://hashstore.world.com/types/v1.0"
     entity = "metadata"
@@ -558,7 +582,7 @@ def test_store_metadata_pid_empty(store):
 
 
 def test_store_metadata_pid_empty_spaces(store):
-    """Test store metadata raises error with empty string."""
+    """Test store metadata raises error with empty spaces."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "   "
@@ -580,7 +604,7 @@ def test_store_metadata_format_id_empty(store):
 
 
 def test_store_metadata_pid_format_id_spaces(store):
-    """Test store metadata raises error with empty string."""
+    """Test store metadata raises error with empty spaces."""
     test_dir = "tests/testdata/"
     format_id = "       "
     pid = "jtao.1700.1"
@@ -600,7 +624,7 @@ def test_store_metadata_metadata_empty(store):
 
 
 def test_store_metadata_metadata_none(store):
-    """Test store metadata raises error with empty metadata string."""
+    """Test store metadata raises error with empty None metadata."""
     pid = "jtao.1700.1"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     syspath_string = None
@@ -728,7 +752,7 @@ def test_retrieve_metadata_format_id_empty(store):
 
 
 def test_retrieve_metadata_format_id_empty_spaces(store):
-    """Test retrieve_metadata raises error when supplied with empty format_id."""
+    """Test retrieve_metadata raises error when supplied with empty spaces format_id."""
     format_id = "    "
     pid = "jtao.1700.1"
     with pytest.raises(ValueError):

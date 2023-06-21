@@ -41,8 +41,8 @@ def init_store(props):
 @pytest.fixture(name="pids")
 def init_pids():
     """Shared test harness data.
-    object_cid: hex digest of the pid
-    metadata_cid: hex digest of the pid + store_metadata_namespace
+        - object_cid: hex digest of the pid
+        - metadata_cid: hex digest of the pid + store_metadata_namespace
     """
     test_pids = {
         "doi:10.18739/A2901ZH2M": {

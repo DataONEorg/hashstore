@@ -37,7 +37,7 @@ def test_store_object(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         hash_address = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, format_id, syspath)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert hash_address.id == pids[pid]["object_cid"]
     assert store.count(entity) == 3
 
@@ -52,7 +52,7 @@ def test_store_object_files_path(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, format_id, syspath)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, pids[pid]["object_cid"])
     assert store.count(entity) == 3
 
@@ -67,7 +67,7 @@ def test_store_object_files_string(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path_string)
-        _metadata_cid = store.store_metadata(pid, format_id, syspath)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, pids[pid]["object_cid"])
     assert store.count(entity) == 3
 
@@ -435,8 +435,48 @@ def test_store_metadata(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert metadata_cid == pids[pid]["metadata_cid"]
+
+
+def test_store_metadata_format_id_is_none(pids, store):
+    """Confirm default name space is used when format_id is not supplied"""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    entity = "metadata"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _hash_address = store.store_object(pid, path)
+        metadata_cid = store.store_metadata(pid, syspath)
+        metadata_cid_stream = store.open(entity, metadata_cid)
+        metadata_cid_content = (
+            metadata_cid_stream.read().decode("utf-8").split("\x00", 1)
+        )
+        metadata_cid_stream.close()
+        metadata_format = metadata_cid_content[0]
+        assert metadata_format == format_id
+
+
+def test_store_metadata_format_id_is_custom(pids, store):
+    """Confirm default name space is used when format_id is not supplied"""
+    test_dir = "tests/testdata/"
+    format_id = "http://hashstore.world.com/types/v1.0"
+    entity = "metadata"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _hash_address = store.store_object(pid, path)
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        metadata_cid_stream = store.open(entity, metadata_cid)
+        metadata_cid_content = (
+            metadata_cid_stream.read().decode("utf-8").split("\x00", 1)
+        )
+        metadata_cid_stream.close()
+        metadata_format = metadata_cid_content[0]
+        assert metadata_format == format_id
 
 
 def test_store_metadata_files_path(pids, store):
@@ -449,7 +489,7 @@ def test_store_metadata_files_path(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, metadata_cid)
         assert metadata_cid == pids[pid]["metadata_cid"]
     assert store.count(entity) == 3
@@ -465,7 +505,7 @@ def test_store_metadata_files_string(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
         _hash_address = store.store_object(pid, path_string)
-        metadata_cid = store.store_metadata(pid, format_id, syspath_string)
+        metadata_cid = store.store_metadata(pid, syspath_string, format_id)
         assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
 
@@ -481,7 +521,7 @@ def test_store_metadata_files_input_stream(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
         syspath_stream = io.open(syspath_string, "rb")
-        _metadata_cid = store.store_metadata(pid, format_id, syspath_stream)
+        _metadata_cid = store.store_metadata(pid, syspath_stream, format_id)
         syspath_stream.close()
     assert store.count(entity) == 3
 
@@ -494,7 +534,7 @@ def test_store_metadata_pid_empty(store):
     filename = pid.replace("/", "_") + ".xml"
     syspath_string = str(Path(test_dir) / filename)
     with pytest.raises(ValueError):
-        store.store_metadata(pid, format_id, syspath_string)
+        store.store_metadata(pid, syspath_string, format_id)
 
 
 def test_store_metadata_pid_empty_spaces(store):
@@ -505,7 +545,7 @@ def test_store_metadata_pid_empty_spaces(store):
     filename = pid.replace("/", "_") + ".xml"
     syspath_string = str(Path(test_dir) / filename)
     with pytest.raises(ValueError):
-        store.store_metadata(pid, format_id, syspath_string)
+        store.store_metadata(pid, syspath_string, format_id)
 
 
 def test_store_metadata_format_id_empty(store):
@@ -516,7 +556,7 @@ def test_store_metadata_format_id_empty(store):
     filename = pid.replace("/", "_") + ".xml"
     syspath_string = str(Path(test_dir) / filename)
     with pytest.raises(ValueError):
-        store.store_metadata(pid, format_id, syspath_string)
+        store.store_metadata(pid, syspath_string, format_id)
 
 
 def test_store_metadata_pid_format_id_spaces(store):
@@ -527,7 +567,7 @@ def test_store_metadata_pid_format_id_spaces(store):
     filename = pid.replace("/", "_") + ".xml"
     syspath_string = str(Path(test_dir) / filename)
     with pytest.raises(ValueError):
-        store.store_metadata(pid, format_id, syspath_string)
+        store.store_metadata(pid, syspath_string, format_id)
 
 
 def test_store_metadata_metadata_empty(store):
@@ -536,7 +576,7 @@ def test_store_metadata_metadata_empty(store):
     format_id = "http://ns.dataone.org/service/types/v2.0"
     syspath_string = "   "
     with pytest.raises(TypeError):
-        store.store_metadata(pid, format_id, syspath_string)
+        store.store_metadata(pid, syspath_string, format_id)
 
 
 def test_store_metadata_metadata_none(store):
@@ -545,7 +585,7 @@ def test_store_metadata_metadata_none(store):
     format_id = "http://ns.dataone.org/service/types/v2.0"
     syspath_string = None
     with pytest.raises(TypeError):
-        store.store_metadata(pid, format_id, syspath_string)
+        store.store_metadata(pid, syspath_string, format_id)
 
 
 def test_store_metadata_metadata_cid(pids, store):
@@ -557,7 +597,7 @@ def test_store_metadata_metadata_cid(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert metadata_cid == pids[pid]["metadata_cid"]
 
 
@@ -571,12 +611,12 @@ def test_store_metadata_thread_lock(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     _hash_address = store.store_object(pid, path)
-    store.store_metadata(pid, format_id, syspath)
+    store.store_metadata(pid, syspath, format_id)
     # Start threads
-    thread1 = Thread(target=store.store_metadata, args=(pid, format_id, syspath))
-    thread2 = Thread(target=store.store_metadata, args=(pid, format_id, syspath))
-    thread3 = Thread(target=store.store_metadata, args=(pid, format_id, syspath))
-    thread4 = Thread(target=store.store_metadata, args=(pid, format_id, syspath))
+    thread1 = Thread(target=store.store_metadata, args=(pid, syspath, format_id))
+    thread2 = Thread(target=store.store_metadata, args=(pid, syspath, format_id))
+    thread3 = Thread(target=store.store_metadata, args=(pid, syspath, format_id))
+    thread4 = Thread(target=store.store_metadata, args=(pid, syspath, format_id))
     thread1.start()
     thread2.start()
     thread3.start()
@@ -597,7 +637,7 @@ def test_retrieve_object(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         hash_address = store.store_object(pid, path)
-        store.store_metadata(pid, format_id, syspath)
+        store.store_metadata(pid, syspath, format_id)
         obj_stream = store.retrieve_object(pid)
         sha256_hex = store.computehash(obj_stream)
         obj_stream.close()
@@ -628,7 +668,7 @@ def test_retrieve_metadata(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     _hash_address = store.store_object(pid, path)
-    _metadata_cid = store.store_metadata(pid, format_id, syspath)
+    _metadata_cid = store.store_metadata(pid, syspath, format_id)
     metadata_bytes = store.retrieve_metadata(pid, format_id)
     metadata = syspath.read_bytes()
     assert metadata.decode("utf-8") == metadata_bytes
@@ -685,7 +725,7 @@ def test_delete_objects(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, format_id, syspath)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
     assert store.count(entity) == 0
 
@@ -714,7 +754,7 @@ def test_delete_metadata(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _hash_address = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, format_id, syspath)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_metadata(pid, format_id)
     assert store.count(entity) == 0
 
@@ -760,7 +800,7 @@ def test_get_hex_digest(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     _hash_address = store.store_object(pid, path)
-    _metadata_cid = store.store_metadata(pid, format_id, syspath)
+    _metadata_cid = store.store_metadata(pid, syspath, format_id)
     sha3_256_hex_digest = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )

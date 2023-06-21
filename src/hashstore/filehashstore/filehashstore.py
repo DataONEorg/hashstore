@@ -425,7 +425,7 @@ class FileHashStore(HashStore):
             )
         return hash_address
 
-    def store_metadata(self, pid, format_id, metadata):
+    def store_metadata(self, pid, format_id=None, metadata):
         logging.debug(
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
         )
@@ -436,12 +436,16 @@ class FileHashStore(HashStore):
             logging.error("FileHashStore - store_metadata: %s", exception_string)
             raise ValueError(exception_string)
         # Then format_id of the metadata
-        if format_id is None or format_id.replace(" ", "") == "":
-            exception_string = (
-                f"Format_id cannot be None or empty, format_id: {format_id}"
-            )
+        checked_format_id = None
+        if format_id is not None and format_id.replace(" ", "") == "":
+            exception_string = "Format_id cannot be empty."
             logging.error("FileHashStore - store_metadata: %s", exception_string)
             raise ValueError(exception_string)
+        elif format_id is None:
+            # Use default value set by hashstore config
+            checked_format_id = self.sysmeta_ns
+        else:
+            checked_format_id = format_id
         # Metadata content must be a str, path or stream and cannot be empty
         if isinstance(metadata, str):
             if metadata.replace(" ", "") == "":
@@ -481,7 +485,7 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_metadata: Attempting to store metadata for pid: %s",
                 pid,
             )
-            metadata_cid = self.put_metadata(pid, format_id, metadata)
+            metadata_cid = self.put_metadata(metadata, pid, checked_format_id)
         finally:
             # Release pid
             with self.metadata_lock:
@@ -534,7 +538,9 @@ class FileHashStore(HashStore):
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
         if format_id is None or format_id.replace(" ", "") == "":
-            exception_string = f"Format_id cannot be None or empty, format_id: {format_id}"
+            exception_string = (
+                f"Format_id cannot be None or empty, format_id: {format_id}"
+            )
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
 
@@ -901,7 +907,7 @@ class FileHashStore(HashStore):
         logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
         return hex_digest_dict, tmp.name
 
-    def put_metadata(self, pid, format_id, metadata):
+    def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the
         given pid and format_id as the permanent address.
 

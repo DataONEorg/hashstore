@@ -389,7 +389,7 @@ def test_put_metadata_with_path(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
 
@@ -402,7 +402,7 @@ def test_put_metadata_with_string(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = str(Path(test_dir) / filename)
-        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
 
@@ -414,7 +414,7 @@ def test_put_metadata_cid(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, format_id, syspath)
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert metadata_cid == pids[pid]["metadata_cid"]
 
 

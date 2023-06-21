@@ -63,7 +63,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def store_metadata(self, pid, format_id, metadata):
+    def store_metadata(self, pid, metadata, format_id):
         """The `store_metadata` method is responsible for adding and/or updating metadata
         (ex. `sysmeta`) to disk using a given path/stream, a persistent identifier `pid`
         and a metadata `format_id`. The metadata object consists of a header and a body

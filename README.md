@@ -28,9 +28,9 @@ take a longer time to run (relating to the storage of large files) - to execute 
 `pytest --run-slow`. To see detailed
 
 ## Usage Example
-```
-# To view more details about the Public API - see 'hashstore.py` interface documentation
 
+To view more details about the Public API - see 'hashstore.py` interface documentation
+```
 # Instantiate a factory
 hashstore_factory = HashStoreFactory()
 
@@ -59,12 +59,14 @@ object_cid = mystore.store_object(pid, object)
 pid = "j.tao.1700.1"
 sysmeta = "/path/to/your/metadata/document.xml"
 metadata_cid = mystore.store_metadata(pid, sysmeta)
+```
 
-# If you want to store other types of metadata, add an additional `format_id`
+If you want to store other types of metadata, add an additional `format_id`
+```
 pid = "j.tao.1700.1"
-sysmeta = "/path/to/your/metadata/document.xml"
+metadata = "/path/to/your/metadata/document.xml"
 format_id = "http://custom.metadata.format/type/v1.0"
-metadata_cid = mystore.store_metadata(pid, sysmeta, format_id)
+metadata_cid = mystore.store_metadata(pid, metadata, format_id)
 
 ```
 

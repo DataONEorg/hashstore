@@ -52,22 +52,21 @@ my_store = factory.get_hashstore(module_name, class_name, properties)
 # Store objects (.../[hashstore_path]/objects/)
 pid = "j.tao.1700.1"
 object = "/path/to/your/object.data"
-object_cid = mystore.store_object(pid, object)
+object_cid = my_store.store_object(pid, object)
 
 # Store metadata (.../[hashstore_path]/metadata/)
 # By default, storing metadata will use the given properties namespace `format_id`
 pid = "j.tao.1700.1"
-sysmeta = "/path/to/your/metadata/document.xml"
-metadata_cid = mystore.store_metadata(pid, sysmeta)
+sysmeta = "/path/to/your/sysmeta/document.xml"
+metadata_cid = my_store.store_metadata(pid, sysmeta)
 ```
 
-If you want to store other types of metadata, add an additional `format_id`
+If you want to store other types of metadata, add an additional `format_id`.
 ```
 pid = "j.tao.1700.1"
-metadata = "/path/to/your/metadata/document.xml"
-format_id = "http://custom.metadata.format/type/v1.0"
-metadata_cid = mystore.store_metadata(pid, metadata, format_id)
-
+metadata = "/path/to/your/metadata/document.json"
+format_id = "http://custom.metadata.com/json/type/v1.0"
+metadata_cid = my_store.store_metadata(pid, metadata, format_id)
 ```
 
 ## License

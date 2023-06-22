@@ -52,7 +52,8 @@ my_store = factory.get_hashstore(module_name, class_name, properties)
 # Store objects (.../[hashstore_path]/objects/)
 pid = "j.tao.1700.1"
 object = "/path/to/your/object.data"
-object_cid = my_store.store_object(pid, object)
+hash_address = my_store.store_object(pid, object)
+object_cid = hash_address.id
 
 # Store metadata (.../[hashstore_path]/metadata/)
 # By default, storing metadata will use the given properties namespace `format_id`

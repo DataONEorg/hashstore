@@ -11,10 +11,12 @@ processes that function across a cluster environment. Some properties:
 - Data objects are named using the SHA-256, base64-encoded hash of their contents
     (thus, a content-identifier)
 - Metadata objects are stored with the formatId, a null character and its contents
-- Metadata objects are named using the SHA-256, base64-encoded hash of their
-    persistent identifier (PID)
-- An object's persistent identifier can be used to read both metadata and contents
-    of the object
+- Metadata objects are named using the SHA-256 + formatId, base64-encoded hash of
+    their persistent identifier (PID)
 """
 
 from hashstore.hashstore import HashStore
+from hashstore.hashaddress import HashAddress
+from hashstore.hashstore_factory import HashStoreFactory
+
+__all__ = ("HashStore", "HashAddress", "HashStoreFactory")

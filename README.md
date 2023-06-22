@@ -27,6 +27,47 @@ To run tests, navigate to the root directory and run `pytest -s`. The test suite
 take a longer time to run (relating to the storage of large files) - to execute all tests, run
 `pytest --run-slow`. To see detailed
 
+## Usage Example
+```
+# To view more details about the Public API - see 'hashstore.py` interface documentation
+
+# Instantiate a factory
+hashstore_factory = HashStoreFactory()
+
+# Create a properties dictionary with the required fields
+hashstore_path = "/path/to/your/store"
+properties = {
+    "store_path": hashstore_path,
+    "store_depth": 3,
+    "store_width": 2,
+    "store_algorithm": "sha256",
+    "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+}
+
+# Get HashStore from factory
+module_name = "hashstore.filehashstore.filehashstore"
+class_name = "FileHashStore"
+my_store = factory.get_hashstore(module_name, class_name, properties)
+
+# Store objects (.../[hashstore_path]/objects/)
+pid = "j.tao.1700.1"
+object = "/path/to/your/object.data"
+object_cid = mystore.store_object(pid, object)
+
+# Store metadata (.../[hashstore_path]/metadata/)
+# By default, storing metadata will use the given properties namespace `format_id`
+pid = "j.tao.1700.1"
+sysmeta = "/path/to/your/metadata/document.xml"
+metadata_cid = mystore.store_metadata(pid, sysmeta)
+
+# If you want to store other types of metadata, add an additional `format_id`
+pid = "j.tao.1700.1"
+sysmeta = "/path/to/your/metadata/document.xml"
+format_id = "http://custom.metadata.format/type/v1.0"
+metadata_cid = mystore.store_metadata(pid, sysmeta, format_id)
+
+```
+
 ## License
 ```
 Copyright [2022] [Regents of the University of California]

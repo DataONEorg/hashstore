@@ -574,13 +574,7 @@ class FileHashStore(HashStore):
                 "FileHashStore - retrieve_metadata: Metadata exists for pid: %s",
                 pid + ", retrieving metadata.",
             )
-            metadata_cid = self.get_sha256_hex_digest(pid + format_id)
-            metadata_cid_stream = self.open(entity, metadata_cid)
-            metadata_cid_content = (
-                metadata_cid_stream.read().decode("utf-8").split("\x00", 1)
-            )
-            metadata_cid_stream.close()
-            metadata = metadata_cid_content[1]
+            metadata_stream = self.open(entity, metadata_cid)
         else:
             exception_string = f"No metadata found for pid: {pid}"
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
@@ -588,7 +582,7 @@ class FileHashStore(HashStore):
         logging.info(
             "FileHashStore - retrieve_metadata: Retrieved metadata for pid: %s", pid
         )
-        return metadata
+        return metadata_stream
 
     def delete_object(self, pid):
         logging.debug(
@@ -960,7 +954,7 @@ class FileHashStore(HashStore):
         # Create metadata tmp file and write to it
         metadata_stream = Stream(metadata)
         with closing(metadata_stream):
-            metadata_tmp = self._mktempmetadata(metadata_stream, format_id)
+            metadata_tmp = self._mktempmetadata(metadata_stream)
 
         # Get target and related paths (permanent location)
         metadata_cid = self.get_sha256_hex_digest(pid + format_id)
@@ -1000,7 +994,7 @@ class FileHashStore(HashStore):
             logging.error("FileHashStore - put_metadata: %s", exception_string)
             raise FileNotFoundError()
 
-    def _mktempmetadata(self, stream, format_id):
+    def _mktempmetadata(self, stream):
         """Create a named temporary file with `stream` (metadata) and `format_id`.
 
         Args:
@@ -1031,8 +1025,6 @@ class FileHashStore(HashStore):
             tmp.name,
         )
         with tmp as tmp_file:
-            tmp_file.write(format_id.encode("utf-8"))
-            tmp_file.write(b"\x00")
             for data in stream:
                 tmp_file.write(self._to_bytes(data))
 

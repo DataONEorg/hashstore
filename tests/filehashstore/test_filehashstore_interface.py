@@ -483,46 +483,6 @@ def test_store_metadata(pids, store):
         assert metadata_cid == pids[pid]["metadata_cid"]
 
 
-def test_store_metadata_format_id_is_none(pids, store):
-    """Confirm default name space is used when format_id is not supplied"""
-    test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
-    entity = "metadata"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
-        metadata_cid = store.store_metadata(pid, syspath)
-        metadata_cid_stream = store.open(entity, metadata_cid)
-        metadata_cid_content = (
-            metadata_cid_stream.read().decode("utf-8").split("\x00", 1)
-        )
-        metadata_cid_stream.close()
-        metadata_format = metadata_cid_content[0]
-        assert metadata_format == format_id
-
-
-def test_store_metadata_format_id_is_custom(pids, store):
-    """Confirm new format_id is stored when default 'None' is overridden."""
-    test_dir = "tests/testdata/"
-    format_id = "http://hashstore.world.com/types/v1.0"
-    entity = "metadata"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
-        metadata_cid_stream = store.open(entity, metadata_cid)
-        metadata_cid_content = (
-            metadata_cid_stream.read().decode("utf-8").split("\x00", 1)
-        )
-        metadata_cid_stream.close()
-        metadata_format = metadata_cid_content[0]
-        assert metadata_format == format_id
-
-
 def test_store_metadata_files_path(pids, store):
     """Test store metadata with path."""
     test_dir = "tests/testdata/"
@@ -713,9 +673,11 @@ def test_retrieve_metadata(store):
     syspath = Path(test_dir) / filename
     _hash_address = store.store_object(pid, path)
     _metadata_cid = store.store_metadata(pid, syspath, format_id)
-    metadata_bytes = store.retrieve_metadata(pid, format_id)
+    metadata_stream = store.retrieve_metadata(pid, format_id)
+    metadata_content = metadata_stream.read().decode("utf-8")
+    metadata_stream.close()
     metadata = syspath.read_bytes()
-    assert metadata.decode("utf-8") == metadata_bytes
+    assert metadata.decode("utf-8") == metadata_content
 
 
 def test_retrieve_metadata_bytes_pid_invalid(store):

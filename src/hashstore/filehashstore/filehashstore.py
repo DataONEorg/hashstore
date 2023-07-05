@@ -550,7 +550,7 @@ class FileHashStore(HashStore):
         )
         return obj_stream
 
-    def retrieve_metadata(self, pid, format_id):
+    def retrieve_metadata(self, pid, format_id=None):
         logging.debug(
             "FileHashStore - retrieve_metadata: Request to retrieve metadata for pid: %s",
             pid,
@@ -559,28 +559,28 @@ class FileHashStore(HashStore):
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
-        if format_id is None or format_id.replace(" ", "") == "":
+        checked_format_id = None
+        if format_id is None:
+            checked_format_id = self.sysmeta_ns
+        elif format_id.replace(" ", "") == "":
             exception_string = (
-                f"Format_id cannot be None or empty, format_id: {format_id}"
+                "Format_id cannot empty, must be 'None'"
+                + " for default HashStore format or supplied."
             )
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
+        else:
+            checked_format_id = format_id
 
         entity = "metadata"
-        metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+        metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
         metadata_exists = self.exists(entity, metadata_cid)
         if metadata_exists:
             logging.debug(
                 "FileHashStore - retrieve_metadata: Metadata exists for pid: %s",
                 pid + ", retrieving metadata.",
             )
-            metadata_cid = self.get_sha256_hex_digest(pid + format_id)
-            metadata_cid_stream = self.open(entity, metadata_cid)
-            metadata_cid_content = (
-                metadata_cid_stream.read().decode("utf-8").split("\x00", 1)
-            )
-            metadata_cid_stream.close()
-            metadata = metadata_cid_content[1]
+            metadata_stream = self.open(entity, metadata_cid)
         else:
             exception_string = f"No metadata found for pid: {pid}"
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
@@ -588,7 +588,7 @@ class FileHashStore(HashStore):
         logging.info(
             "FileHashStore - retrieve_metadata: Retrieved metadata for pid: %s", pid
         )
-        return metadata
+        return metadata_stream
 
     def delete_object(self, pid):
         logging.debug(
@@ -608,7 +608,7 @@ class FileHashStore(HashStore):
         )
         return True
 
-    def delete_metadata(self, pid, format_id):
+    def delete_metadata(self, pid, format_id=None):
         logging.debug(
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
@@ -617,15 +617,21 @@ class FileHashStore(HashStore):
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
             logging.error("FileHashStore - delete_metadata: %s", exception_string)
             raise ValueError(exception_string)
-        if format_id is None or format_id.replace(" ", "") == "":
+        checked_format_id = None
+        if format_id is None:
+            checked_format_id = self.sysmeta_ns
+        elif format_id.replace(" ", "") == "":
             exception_string = (
-                f"Format_id cannot be None or empty, format_id: {format_id}"
+                "Format_id cannot empty, must be 'None'"
+                + " for default HashStore format or supplied."
             )
             logging.error("FileHashStore - delete_metadata: %s", exception_string)
             raise ValueError(exception_string)
+        else:
+            checked_format_id = format_id
 
         entity = "metadata"
-        metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+        metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
         self.delete(entity, metadata_cid)
         logging.info(
             "FileHashStore - delete_metadata: Successfully deleted metadata for pid: %s",
@@ -960,7 +966,7 @@ class FileHashStore(HashStore):
         # Create metadata tmp file and write to it
         metadata_stream = Stream(metadata)
         with closing(metadata_stream):
-            metadata_tmp = self._mktempmetadata(metadata_stream, format_id)
+            metadata_tmp = self._mktempmetadata(metadata_stream)
 
         # Get target and related paths (permanent location)
         metadata_cid = self.get_sha256_hex_digest(pid + format_id)
@@ -1000,7 +1006,7 @@ class FileHashStore(HashStore):
             logging.error("FileHashStore - put_metadata: %s", exception_string)
             raise FileNotFoundError()
 
-    def _mktempmetadata(self, stream, format_id):
+    def _mktempmetadata(self, stream):
         """Create a named temporary file with `stream` (metadata) and `format_id`.
 
         Args:
@@ -1031,8 +1037,6 @@ class FileHashStore(HashStore):
             tmp.name,
         )
         with tmp as tmp_file:
-            tmp_file.write(format_id.encode("utf-8"))
-            tmp_file.write(b"\x00")
             for data in stream:
                 tmp_file.write(self._to_bytes(data))
 

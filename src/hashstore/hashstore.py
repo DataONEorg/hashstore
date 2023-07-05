@@ -66,12 +66,8 @@ class HashStore(ABC):
     def store_metadata(self, pid, metadata, format_id):
         """The `store_metadata` method is responsible for adding and/or updating metadata
         (ex. `sysmeta`) to disk using a given path/stream, a persistent identifier `pid`
-        and a metadata `format_id`. The metadata object consists of a header and a body
-        section, which is split by a null character `\x00`.
-
-        The header contains the metadata object's permanent address, which is determined
-        by calculating the SHA-256 hex digest of the provided `pid` + `format_id`; and the
-        body contains the metadata content (ex. `sysmeta`).
+        and a metadata `format_id`. The metadata object's permanent address, which is
+        determined by calculating the SHA-256 hex digest of the provided `pid` + `format_id`.
 
         Upon successful storage of metadata, `store_metadata` returns a string that
         represents the file's permanent address. Lastly, the metadata objects are stored
@@ -98,7 +94,7 @@ class HashStore(ABC):
             pid (string): Authority-based identifier.
 
         Returns:
-            obj_stream (io.BufferedReader): A buffered stream of an ab_id object.
+            obj_stream (io.BufferedReader): A buffered stream of a data object.
         """
         raise NotImplementedError()
 
@@ -112,7 +108,7 @@ class HashStore(ABC):
             format_id (string): Metadata format
 
         Returns:
-            metadata (string): Sysmeta content.
+            metadata_stream (io.BufferedReader): A buffered stream of a metadata object.
         """
         raise NotImplementedError()
 

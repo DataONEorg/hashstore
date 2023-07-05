@@ -484,7 +484,7 @@ def test_store_metadata(pids, store):
 
 
 def test_store_metadata_default_format_id(pids, store):
-    """Test store metadata returns expected id when storing with default format_id"""
+    """Test store metadata returns expected id when storing with default format_id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -682,7 +682,7 @@ def test_retrieve_metadata(store):
 
 
 def test_retrieve_metadata_default_format_id(store):
-    """Test retrieve_metadata retrieves expected metadata when format_id is none"""
+    """Test retrieve_metadata retrieves expected metadata with default format_id."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -774,6 +774,20 @@ def test_delete_metadata(pids, store):
     assert store.count(entity) == 0
 
 
+def test_delete_metadata_default_format_id(store, pids):
+    """Test delete_metadata deletes successfully with default format_id."""
+    test_dir = "tests/testdata/"
+    entity = "metadata"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _hash_address = store.store_object(pid, path)
+        _metadata_cid = store.store_metadata(pid, syspath)
+        store.delete_metadata(pid)
+    assert store.count(entity) == 0
+
+
 def test_delete_metadata_pid_empty(store):
     """Test delete_object raises error when empty pid supplied."""
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -793,14 +807,6 @@ def test_delete_metadata_pid_none(store):
 def test_delete_metadata_format_id_empty(store):
     """Test delete_object raises error when empty format_id supplied."""
     format_id = "    "
-    pid = "jtao.1700.1"
-    with pytest.raises(ValueError):
-        store.delete_metadata(pid, format_id)
-
-
-def test_delete_metadata_format_id_none(store):
-    """Test delete_object raises error when format_id is 'None'."""
-    format_id = None
     pid = "jtao.1700.1"
     with pytest.raises(ValueError):
         store.delete_metadata(pid, format_id)

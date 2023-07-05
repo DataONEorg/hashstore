@@ -565,7 +565,7 @@ class FileHashStore(HashStore):
         elif format_id.replace(" ", "") == "":
             exception_string = (
                 "Format_id cannot empty, must be 'None'"
-                + "for default HashStore format or supplied."
+                + " for default HashStore format or supplied."
             )
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
@@ -608,7 +608,7 @@ class FileHashStore(HashStore):
         )
         return True
 
-    def delete_metadata(self, pid, format_id):
+    def delete_metadata(self, pid, format_id=None):
         logging.debug(
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
@@ -617,15 +617,21 @@ class FileHashStore(HashStore):
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
             logging.error("FileHashStore - delete_metadata: %s", exception_string)
             raise ValueError(exception_string)
-        if format_id is None or format_id.replace(" ", "") == "":
+        checked_format_id = None
+        if format_id is None:
+            checked_format_id = self.sysmeta_ns
+        elif format_id.replace(" ", "") == "":
             exception_string = (
-                f"Format_id cannot be None or empty, format_id: {format_id}"
+                "Format_id cannot empty, must be 'None'"
+                + " for default HashStore format or supplied."
             )
             logging.error("FileHashStore - delete_metadata: %s", exception_string)
             raise ValueError(exception_string)
+        else:
+            checked_format_id = format_id
 
         entity = "metadata"
-        metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+        metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
         self.delete(entity, metadata_cid)
         logging.info(
             "FileHashStore - delete_metadata: Successfully deleted metadata for pid: %s",

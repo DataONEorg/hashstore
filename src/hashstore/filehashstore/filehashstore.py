@@ -550,7 +550,7 @@ class FileHashStore(HashStore):
         )
         return obj_stream
 
-    def retrieve_metadata(self, pid, format_id):
+    def retrieve_metadata(self, pid, format_id=None):
         logging.debug(
             "FileHashStore - retrieve_metadata: Request to retrieve metadata for pid: %s",
             pid,
@@ -559,15 +559,21 @@ class FileHashStore(HashStore):
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
-        if format_id is None or format_id.replace(" ", "") == "":
+        checked_format_id = None
+        if format_id is None:
+            checked_format_id = self.sysmeta_ns
+        elif format_id.replace(" ", "") == "":
             exception_string = (
-                f"Format_id cannot be None or empty, format_id: {format_id}"
+                "Format_id cannot empty, must be 'None'"
+                + "for default HashStore format or supplied."
             )
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
+        else:
+            checked_format_id = format_id
 
         entity = "metadata"
-        metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+        metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
         metadata_exists = self.exists(entity, metadata_cid)
         if metadata_exists:
             logging.debug(

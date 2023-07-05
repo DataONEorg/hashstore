@@ -483,6 +483,18 @@ def test_store_metadata(pids, store):
         assert metadata_cid == pids[pid]["metadata_cid"]
 
 
+def test_store_metadata_default_format_id(pids, store):
+    """Test store metadata returns expected id when storing with default format_id"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _hash_address = store.store_object(pid, path)
+        metadata_cid = store.store_metadata(pid, syspath)
+        assert metadata_cid == pids[pid]["metadata_cid"]
+
+
 def test_store_metadata_files_path(pids, store):
     """Test store metadata with path."""
     test_dir = "tests/testdata/"
@@ -546,17 +558,6 @@ def test_store_metadata_pid_empty_spaces(store):
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "   "
-    filename = pid.replace("/", "_") + ".xml"
-    syspath_string = str(Path(test_dir) / filename)
-    with pytest.raises(ValueError):
-        store.store_metadata(pid, syspath_string, format_id)
-
-
-def test_store_metadata_format_id_empty(store):
-    """Test store metadata raises error with empty string."""
-    test_dir = "tests/testdata/"
-    format_id = ""
-    pid = "jtao.1700.1"
     filename = pid.replace("/", "_") + ".xml"
     syspath_string = str(Path(test_dir) / filename)
     with pytest.raises(ValueError):
@@ -680,6 +681,22 @@ def test_retrieve_metadata(store):
     assert metadata.decode("utf-8") == metadata_content
 
 
+def test_retrieve_metadata_default_format_id(store):
+    """Test retrieve_metadata retrieves expected metadata when format_id is none"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    filename = pid + ".xml"
+    syspath = Path(test_dir) / filename
+    _hash_address = store.store_object(pid, path)
+    _metadata_cid = store.store_metadata(pid, syspath)
+    metadata_stream = store.retrieve_metadata(pid)
+    metadata_content = metadata_stream.read().decode("utf-8")
+    metadata_stream.close()
+    metadata = syspath.read_bytes()
+    assert metadata.decode("utf-8") == metadata_content
+
+
 def test_retrieve_metadata_bytes_pid_invalid(store):
     """Test retrieve_metadata raises error when supplied with bad pid."""
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -693,14 +710,6 @@ def test_retrieve_metadata_bytes_pid_empty(store):
     """Test retrieve_metadata raises error when supplied with empty pid."""
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "    "
-    with pytest.raises(ValueError):
-        store.retrieve_metadata(pid, format_id)
-
-
-def test_retrieve_metadata_format_id_none(store):
-    """Test retrieve_metadata raises error when supplied with None format_id"""
-    format_id = None
-    pid = "jtao.1700.1"
     with pytest.raises(ValueError):
         store.retrieve_metadata(pid, format_id)
 

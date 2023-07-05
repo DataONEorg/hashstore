@@ -505,7 +505,6 @@ def test_mktempmetadata(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         sys_stream = io.open(syspath, "rb")
-        format_id = "http://ns.dataone.org/service/types/v2.0"
         # pylint: disable=W0212
         tmp_name = store._mktempmetadata(sys_stream)
         sys_stream.close()

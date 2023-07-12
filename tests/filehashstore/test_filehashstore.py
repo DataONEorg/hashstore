@@ -20,6 +20,32 @@ def test_init_directories_created(store):
     assert os.path.exists(store.metadata + "/tmp")
 
 
+def test_init_existing_store_incorrect_algorithm_format(store):
+    """Confirm that exception is thrown when store_algorithm is not a DataONE controlled value"""
+    properties = {
+        "store_path": store.root,
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "sha256",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    with pytest.raises(ValueError):
+        FileHashStore(properties)
+
+
+def test_init_existing_store_correct_algorithm_format(store):
+    """Confirm second instance of HashStore with DataONE controlled value"""
+    properties = {
+        "store_path": store.root,
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    hashstore_instance = FileHashStore(properties)
+    assert isinstance(hashstore_instance, FileHashStore)
+
+
 def test_init_write_properties_hashstore_yaml_exists(store):
     """Verify properties file present in store root directory."""
     assert os.path.exists(store.hashstore_configuration_yaml)

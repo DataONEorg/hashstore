@@ -100,8 +100,11 @@ class HashStore(ABC):
 
     @abstractmethod
     def retrieve_metadata(self, pid, format_id):
-        """The 'retrieve_metadata' method retrieves the metadata content from disk and
-        returns it in the form of a String using a given persistent identifier and format_id.
+        """The 'retrieve_metadata' method retrieves the metadata object from disk using
+        a given persistent identifier (pid) and metadata namespace (format_id).
+        If the object exists (determined by calculating the metadata object's permanent
+        address using the SHA-256 hash of the given pid+format_id), the method will open
+        and return a buffered metadata stream ready to read from.
 
         Args:
             pid (string): Authority-based identifier

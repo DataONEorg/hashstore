@@ -11,7 +11,16 @@ def test_pids_length(pids):
     assert len(pids) == 3
 
 
-def test_init_put_properties_hashstore_yaml_exists(store):
+def test_init_directories_created(store):
+    """Confirm that object and metadata directories have been created."""
+    assert os.path.exists(store.root)
+    assert os.path.exists(store.objects)
+    assert os.path.exists(store.objects + "/tmp")
+    assert os.path.exists(store.metadata)
+    assert os.path.exists(store.metadata + "/tmp")
+
+
+def test_init_write_properties_hashstore_yaml_exists(store):
     """Verify properties file present in store root directory."""
     assert os.path.exists(store.hashstore_configuration_yaml)
 
@@ -48,9 +57,9 @@ def test_init_with_existing_hashstore_missing_yaml(store, pids):
         FileHashStore(properties)
 
 
-def test_get_properties(store):
-    """Verify dictionary returned from get_properties matches initialization."""
-    hashstore_yaml_dict = store.get_properties()
+def test_load_properties(store):
+    """Verify dictionary returned from load_properties matches initialization."""
+    hashstore_yaml_dict = store.load_properties()
     assert hashstore_yaml_dict.get("store_path") == store.root
     assert hashstore_yaml_dict.get("store_depth") == 3
     assert hashstore_yaml_dict.get("store_width") == 2
@@ -61,11 +70,11 @@ def test_get_properties(store):
     )
 
 
-def test_get_properties_hashstore_yaml_missing(store):
+def test_load_properties_hashstore_yaml_missing(store):
     """Confirm FileNotFoundError is raised when hashstore.yaml does not exist."""
     os.remove(store.hashstore_configuration_yaml)
     with pytest.raises(FileNotFoundError):
-        store.get_properties()
+        store.load_properties()
 
 
 def test_validate_properties(store):

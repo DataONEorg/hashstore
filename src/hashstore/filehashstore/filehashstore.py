@@ -460,17 +460,7 @@ class FileHashStore(HashStore):
         # Validate input parameters, begin with persistent identifier (pid)
         logging.debug("FileHashStore - store_metadata: Validating arguments.")
         self._is_string_none_or_empty(pid, "pid", "store_metadata")
-        # Then format_id of the metadata
-        checked_format_id = None
-        if format_id is not None and format_id.replace(" ", "") == "":
-            exception_string = "Format_id cannot be empty."
-            logging.error("FileHashStore - store_metadata: %s", exception_string)
-            raise ValueError(exception_string)
-        elif format_id is None:
-            # Use default value set by hashstore config
-            checked_format_id = self.sysmeta_ns
-        else:
-            checked_format_id = format_id
+        checked_format_id = self._validate_format_id(format_id, "store_metadata")
         # Metadata content must be a str, path or stream and cannot be empty
         if isinstance(metadata, str):
             if metadata.replace(" ", "") == "":
@@ -555,24 +545,8 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_metadata: Request to retrieve metadata for pid: %s",
             pid,
         )
-        if pid is None or pid.replace(" ", "") == "":
-            exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
-            raise ValueError(exception_string)
         self._is_string_none_or_empty(pid, "pid", "retrieve_metadata")
-
-        checked_format_id = None
-        if format_id is None:
-            checked_format_id = self.sysmeta_ns
-        elif format_id.replace(" ", "") == "":
-            exception_string = (
-                "Format_id cannot empty, must be 'None'"
-                + " for default HashStore format or supplied."
-            )
-            logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
-            raise ValueError(exception_string)
-        else:
-            checked_format_id = format_id
+        checked_format_id = self._validate_format_id(format_id, "retrieve_metadata")
 
         entity = "metadata"
         metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
@@ -613,18 +587,7 @@ class FileHashStore(HashStore):
             pid,
         )
         self._is_string_none_or_empty(pid, "pid", "delete_metadata")
-        checked_format_id = None
-        if format_id is None:
-            checked_format_id = self.sysmeta_ns
-        elif format_id.replace(" ", "") == "":
-            exception_string = (
-                "Format_id cannot empty, must be 'None'"
-                + " for default HashStore format or supplied."
-            )
-            logging.error("FileHashStore - delete_metadata: %s", exception_string)
-            raise ValueError(exception_string)
-        else:
-            checked_format_id = format_id
+        checked_format_id = self._validate_format_id(format_id, "delete_metadata")
 
         entity = "metadata"
         metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
@@ -1062,6 +1025,29 @@ class FileHashStore(HashStore):
             # Set checksum_algorithm
             checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
         return checksum_algorithm_checked
+
+    def _validate_format_id(self, format_id, method):
+        """Determines the metadata namespace (format_id) to use for storing,
+        retrieving and deleting metadata.
+
+        Args:
+            format_id (string): Metadata namespace to review
+            method (string): Calling method for logging purposes
+
+        Returns:
+            checked_format_id (string): Valid metadata namespace
+        """
+        checked_format_id = None
+        if format_id is not None and format_id.replace(" ", "") == "":
+            exception_string = f"FileHashStore - {method}: Format_id cannot be empty."
+            logging.error(exception_string)
+            raise ValueError(exception_string)
+        elif format_id is None:
+            # Use default value set by hashstore config
+            checked_format_id = self.sysmeta_ns
+        else:
+            checked_format_id = format_id
+        return checked_format_id
 
     def clean_algorithm(self, algorithm_string):
         """Format a string and ensure that it is supported and compatible with

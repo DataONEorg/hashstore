@@ -81,7 +81,7 @@ class FileHashStore(HashStore):
 
             # Check to see if a configuration is present in the given store path
             self.hashstore_configuration_yaml = prop_store_path + "/hashstore.yaml"
-            self.verify_hashstore_properties(properties, prop_store_path)
+            self._verify_hashstore_properties(properties, prop_store_path)
 
             # If no exceptions thrown, FileHashStore ready for initialization
             logging.debug("FileHashStore - Initializing, properties verified.")
@@ -121,48 +121,6 @@ class FileHashStore(HashStore):
             raise ValueError(exception_string)
 
     # Configuration and Related Methods
-
-    def verify_hashstore_properties(self, properties, prop_store_path):
-        """Determines whether FileHashStore can instantiate by validating a set of arguments
-        and throwing exceptions. HashStore will not instantiate if an existing configuration
-        file's properties (`hashstore.yaml`) are different from what is supplied - or if an
-        object store exists at the given path, but it is missing the `hashstore.yaml` config file.
-
-        If `hashstore.yaml` exists, it will retrieve its properties and compare them with the
-        given values; and if there is a mismatch, an exception will be thrown. If not, it will
-        look to see if any directories/files exist in the given store path and throw an exception
-        if any file or directory is found.
-
-        Args:
-            properties (dict): HashStore properties
-            prop_store_path (string): Store path to check
-        """
-        if os.path.exists(self.hashstore_configuration_yaml):
-            logging.debug(
-                "FileHashStore - Config found (hashstore.yaml) at {%s}. Verifying properties.",
-                self.hashstore_configuration_yaml,
-            )
-            # If 'hashstore.yaml' is found, verify given properties before init
-            hashstore_yaml_dict = self.load_properties()
-            for key in self.property_required_keys:
-                if hashstore_yaml_dict[key] != properties[key]:
-                    exception_string = (
-                        f"Given properties ({key}: {properties[key]}) does not match "
-                        + f"HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
-                        + f"found at: {self.hashstore_configuration_yaml}"
-                    )
-                    logging.critical("FileHashStore - %s", exception_string)
-                    raise ValueError(exception_string)
-        else:
-            if os.path.exists(prop_store_path):
-                # Check if HashStore exists and throw exception if found
-                if any(Path(prop_store_path).iterdir()):
-                    exception_string = (
-                        f"HashStore directories and/or objects found at: {prop_store_path} but"
-                        + f" missing configuration file at: {self.hashstore_configuration_yaml}."
-                    )
-                    logging.critical("FileHashStore - %s", exception_string)
-                    raise FileNotFoundError(exception_string)
 
     def load_properties(self):
         """Get and return the contents of the current HashStore configuration.
@@ -301,6 +259,48 @@ class FileHashStore(HashStore):
         """
         return hashstore_configuration_yaml
 
+    def _verify_hashstore_properties(self, properties, prop_store_path):
+        """Determines whether FileHashStore can instantiate by validating a set of arguments
+        and throwing exceptions. HashStore will not instantiate if an existing configuration
+        file's properties (`hashstore.yaml`) are different from what is supplied - or if an
+        object store exists at the given path, but it is missing the `hashstore.yaml` config file.
+
+        If `hashstore.yaml` exists, it will retrieve its properties and compare them with the
+        given values; and if there is a mismatch, an exception will be thrown. If not, it will
+        look to see if any directories/files exist in the given store path and throw an exception
+        if any file or directory is found.
+
+        Args:
+            properties (dict): HashStore properties
+            prop_store_path (string): Store path to check
+        """
+        if os.path.exists(self.hashstore_configuration_yaml):
+            logging.debug(
+                "FileHashStore - Config found (hashstore.yaml) at {%s}. Verifying properties.",
+                self.hashstore_configuration_yaml,
+            )
+            # If 'hashstore.yaml' is found, verify given properties before init
+            hashstore_yaml_dict = self.load_properties()
+            for key in self.property_required_keys:
+                if hashstore_yaml_dict[key] != properties[key]:
+                    exception_string = (
+                        f"Given properties ({key}: {properties[key]}) does not match "
+                        + f"HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
+                        + f"found at: {self.hashstore_configuration_yaml}"
+                    )
+                    logging.critical("FileHashStore - %s", exception_string)
+                    raise ValueError(exception_string)
+        else:
+            if os.path.exists(prop_store_path):
+                # Check if HashStore exists and throw exception if found
+                if any(Path(prop_store_path).iterdir()):
+                    exception_string = (
+                        f"HashStore directories and/or objects found at: {prop_store_path} but"
+                        + f" missing configuration file at: {self.hashstore_configuration_yaml}."
+                    )
+                    logging.critical("FileHashStore - %s", exception_string)
+                    raise FileNotFoundError(exception_string)
+
     def _validate_properties(self, properties):
         """Validate a properties dictionary by checking if it contains all the
         required keys and non-None values.
@@ -412,7 +412,7 @@ class FileHashStore(HashStore):
             # Set additional_algorithm
             additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
         # Checksum and checksum_algorithm must both be supplied if one is supplied
-        checksum_algorithm_checked = self.validate_checksum_args(
+        checksum_algorithm_checked = self._validate_checksum_args(
             checksum, checksum_algorithm
         )
 
@@ -680,35 +680,6 @@ class FileHashStore(HashStore):
         return hex_digest
 
     # FileHashStore Core Methods
-
-    def validate_checksum_args(self, checksum, checksum_algorithm):
-        """Determines whether calling app has supplied the necessary arguments to validate
-        an object with a checksum value
-
-        Args:
-            checksum (string): value of checksum
-            checksum_algorithm (string): algorithm of checksum
-        """
-        checksum_algorithm_checked = None
-        if checksum is not None:
-            if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
-                exception_string = (
-                    "checksum_algorithm cannot be None or empty if checksum is"
-                    + "supplied."
-                )
-                logging.error("FileHashStore - store_object: %s", exception_string)
-                raise ValueError(exception_string)
-        if checksum_algorithm is not None:
-            if checksum is None or checksum.replace(" ", "") == "":
-                exception_string = (
-                    "checksum cannot be None or empty if checksum_algorithm is"
-                    + " supplied."
-                )
-                logging.error("FileHashStore - store_object: %s", exception_string)
-                raise ValueError(exception_string)
-            # Set checksum_algorithm
-            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
-        return checksum_algorithm_checked
 
     def put_object(
         self,
@@ -1085,6 +1056,41 @@ class FileHashStore(HashStore):
         return tmp.name
 
     # FileHashStore Utility & Supporting Methods
+
+    def _validate_checksum_args(self, checksum, checksum_algorithm):
+        """Determines whether calling app has supplied the necessary arguments to validate
+        an object with a checksum value
+
+        Args:
+            checksum (string): value of checksum
+            checksum_algorithm (string): algorithm of checksum
+        """
+        checksum_algorithm_checked = None
+        if checksum is not None:
+            if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
+                exception_string = (
+                    "checksum_algorithm cannot be None or empty if checksum is"
+                    + "supplied."
+                )
+                logging.error(
+                    "FileHashStore - validate_checksum_args (store_object): %s",
+                    exception_string,
+                )
+                raise ValueError(exception_string)
+        if checksum_algorithm is not None:
+            if checksum is None or checksum.replace(" ", "") == "":
+                exception_string = (
+                    "checksum cannot be None or empty if checksum_algorithm is"
+                    + " supplied."
+                )
+                logging.error(
+                    "FileHashStore - validate_checksum_args (store_object): %s",
+                    exception_string,
+                )
+                raise ValueError(exception_string)
+            # Set checksum_algorithm
+            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
+        return checksum_algorithm_checked
 
     def clean_algorithm(self, algorithm_string):
         """Format a string and ensure that it is supported and compatible with

@@ -155,14 +155,15 @@ class FileHashStore(HashStore):
                     logging.critical("FileHashStore - %s", exception_string)
                     raise ValueError(exception_string)
         else:
-            # Check if HashStore exists and throw exception if found
-            if any(Path(prop_store_path).iterdir()):
-                exception_string = (
-                    f"HashStore directories and/or objects found at: {prop_store_path} but"
-                    + f" missing configuration file at: {self.hashstore_configuration_yaml}."
-                )
-                logging.critical("FileHashStore - %s", exception_string)
-                raise FileNotFoundError(exception_string)
+            if os.path.exists(prop_store_path):
+                # Check if HashStore exists and throw exception if found
+                if any(Path(prop_store_path).iterdir()):
+                    exception_string = (
+                        f"HashStore directories and/or objects found at: {prop_store_path} but"
+                        + f" missing configuration file at: {self.hashstore_configuration_yaml}."
+                    )
+                    logging.critical("FileHashStore - %s", exception_string)
+                    raise FileNotFoundError(exception_string)
 
     def load_properties(self):
         """Get and return the contents of the current HashStore configuration.

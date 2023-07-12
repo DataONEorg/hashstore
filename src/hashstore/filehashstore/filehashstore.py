@@ -383,10 +383,7 @@ class FileHashStore(HashStore):
         )
         # Validate input parameters
         logging.debug("FileHashStore - store_object: Validating arguments.")
-        if pid is None or pid.replace(" ", "") == "":
-            exception_string = f"Pid cannot be None or empty, pid: {pid}."
-            logging.error("FileHashStore - store_object: %s", exception_string)
-            raise ValueError(exception_string)
+        self._is_string_none_or_empty(pid, "pid", "store_object")
         if (
             not isinstance(data, str)
             and not isinstance(data, Path)
@@ -462,10 +459,7 @@ class FileHashStore(HashStore):
         )
         # Validate input parameters, begin with persistent identifier (pid)
         logging.debug("FileHashStore - store_metadata: Validating arguments.")
-        if pid is None or pid.replace(" ", "") == "":
-            exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - store_metadata: %s", exception_string)
-            raise ValueError(exception_string)
+        self._is_string_none_or_empty(pid, "pid", "store_metadata")
         # Then format_id of the metadata
         checked_format_id = None
         if format_id is not None and format_id.replace(" ", "") == "":
@@ -536,10 +530,7 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_object: Request to retrieve object for pid: %s",
             pid,
         )
-        if pid is None or pid.replace(" ", "") == "":
-            exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - retrieve_object: %s", exception_string)
-            raise ValueError(exception_string)
+        self._is_string_none_or_empty(pid, "pid", "retrieve_object")
 
         entity = "objects"
         object_cid = self.get_sha256_hex_digest(pid)
@@ -568,6 +559,8 @@ class FileHashStore(HashStore):
             exception_string = f"Pid cannot be None or empty, pid: {pid}"
             logging.error("FileHashStore - retrieve_metadata: %s", exception_string)
             raise ValueError(exception_string)
+        self._is_string_none_or_empty(pid, "pid", "retrieve_metadata")
+
         checked_format_id = None
         if format_id is None:
             checked_format_id = self.sysmeta_ns
@@ -603,10 +596,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - delete_object: Request to delete object for pid: %s", pid
         )
-        if pid is None or pid.replace(" ", "") == "":
-            exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - delete_object: %s", exception_string)
-            raise ValueError(exception_string)
+        self._is_string_none_or_empty(pid, "pid", "delete_object")
 
         entity = "objects"
         object_cid = self.get_sha256_hex_digest(pid)
@@ -622,10 +612,7 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
         )
-        if pid is None or pid.replace(" ", "") == "":
-            exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - delete_metadata: %s", exception_string)
-            raise ValueError(exception_string)
+        self._is_string_none_or_empty(pid, "pid", "delete_metadata")
         checked_format_id = None
         if format_id is None:
             checked_format_id = self.sysmeta_ns
@@ -653,14 +640,8 @@ class FileHashStore(HashStore):
             "FileHashStore - get_hex_digest: Request to get hex digest for object with pid: %s",
             pid,
         )
-        if pid is None or pid.replace(" ", "") == "":
-            exception_string = f"Pid cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - get_hex_digest: %s", exception_string)
-            raise ValueError(exception_string)
-        if algorithm is None or algorithm.replace(" ", "") == "":
-            exception_string = f"Algorithm cannot be None or empty, pid: {pid}"
-            logging.error("FileHashStore - get_hex_digest: %s", exception_string)
-            raise ValueError(exception_string)
+        self._is_string_none_or_empty(pid, "pid", "get_hex_digest")
+        self._is_string_none_or_empty(algorithm, "algorithm", "get_hex_digest")
 
         entity = "objects"
         algorithm = self.clean_algorithm(algorithm)
@@ -1067,27 +1048,17 @@ class FileHashStore(HashStore):
         """
         checksum_algorithm_checked = None
         if checksum is not None:
-            if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
-                exception_string = (
-                    "checksum_algorithm cannot be None or empty if checksum is"
-                    + "supplied."
-                )
-                logging.error(
-                    "FileHashStore - validate_checksum_args (store_object): %s",
-                    exception_string,
-                )
-                raise ValueError(exception_string)
+            self._is_string_none_or_empty(
+                checksum_algorithm,
+                "checksum_algorithm",
+                "validate_checksum_args (store_object)",
+            )
         if checksum_algorithm is not None:
-            if checksum is None or checksum.replace(" ", "") == "":
-                exception_string = (
-                    "checksum cannot be None or empty if checksum_algorithm is"
-                    + " supplied."
-                )
-                logging.error(
-                    "FileHashStore - validate_checksum_args (store_object): %s",
-                    exception_string,
-                )
-                raise ValueError(exception_string)
+            self._is_string_none_or_empty(
+                checksum,
+                "checksum",
+                "validate_checksum_args (store_object)",
+            )
             # Set checksum_algorithm
             checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
         return checksum_algorithm_checked
@@ -1372,6 +1343,24 @@ class FileHashStore(HashStore):
         return count
 
     # Other Static Methods
+
+    @staticmethod
+    def _is_string_none_or_empty(string, arg, method):
+        """Checks whether a string is None or empty and throws an exception if so.
+
+        Args:
+            string (string): Value to check
+            arg (): Name of argument to check
+            method (string): Calling method for logging purposes
+
+        """
+        if string is None or string.replace(" ", "") == "":
+            exception_string = (
+                f"FileHashStore - {method}: {arg} cannot be None"
+                + f" or empty, {arg}: {string}."
+            )
+            logging.error(exception_string)
+            raise ValueError(exception_string)
 
     @staticmethod
     def _to_bytes(text):

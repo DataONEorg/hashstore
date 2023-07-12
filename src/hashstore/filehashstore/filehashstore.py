@@ -79,7 +79,6 @@ class FileHashStore(HashStore):
                 for property_name in self.property_required_keys
             ]
 
-
             # Check to see if a configuration is present in the given store path
             self.hashstore_configuration_yaml = prop_store_path + "/hashstore.yaml"
             self.verify_hashstore_properties(properties, prop_store_path)
@@ -413,25 +412,9 @@ class FileHashStore(HashStore):
             # Set additional_algorithm
             additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
         # Checksum and checksum_algorithm must both be supplied if one is supplied
-        if checksum is not None:
-            if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
-                exception_string = (
-                    "checksum_algorithm cannot be None or empty if checksum is"
-                    + "supplied."
-                )
-                logging.error("FileHashStore - store_object: %s", exception_string)
-                raise ValueError(exception_string)
-        checksum_algorithm_checked = None
-        if checksum_algorithm is not None:
-            if checksum is None or checksum.replace(" ", "") == "":
-                exception_string = (
-                    "checksum cannot be None or empty if checksum_algorithm is"
-                    + " supplied."
-                )
-                logging.error("FileHashStore - store_object: %s", exception_string)
-                raise ValueError(exception_string)
-            # Set checksum_algorithm
-            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
+        checksum_algorithm_checked = self.validate_checksum_args(
+            checksum, checksum_algorithm
+        )
 
         # Wait for the pid to release if it's in use
         while pid in self.object_locked_pids:
@@ -698,6 +681,35 @@ class FileHashStore(HashStore):
 
     # FileHashStore Core Methods
 
+    def validate_checksum_args(self, checksum, checksum_algorithm):
+        """Determines whether calling app has supplied the necessary arguments to validate
+        an object with a checksum value
+
+        Args:
+            checksum (string): value of checksum
+            checksum_algorithm (string): algorithm of checksum
+        """
+        checksum_algorithm_checked = None
+        if checksum is not None:
+            if checksum_algorithm is None or checksum_algorithm.replace(" ", "") == "":
+                exception_string = (
+                    "checksum_algorithm cannot be None or empty if checksum is"
+                    + "supplied."
+                )
+                logging.error("FileHashStore - store_object: %s", exception_string)
+                raise ValueError(exception_string)
+        if checksum_algorithm is not None:
+            if checksum is None or checksum.replace(" ", "") == "":
+                exception_string = (
+                    "checksum cannot be None or empty if checksum_algorithm is"
+                    + " supplied."
+                )
+                logging.error("FileHashStore - store_object: %s", exception_string)
+                raise ValueError(exception_string)
+            # Set checksum_algorithm
+            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
+        return checksum_algorithm_checked
+
     def put_object(
         self,
         pid,
@@ -820,6 +832,7 @@ class FileHashStore(HashStore):
         # Only move file if it doesn't exist.
         # Files are stored once and only once
         if not os.path.isfile(abs_file_path):
+            is_duplicate = False
             if checksum_algorithm is not None and checksum is not None:
                 hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum:
@@ -833,7 +846,6 @@ class FileHashStore(HashStore):
                         "FileHashStore - _move_and_get_checksums: %s", exception_string
                     )
                     raise ValueError(exception_string)
-            is_duplicate = False
             try:
                 debug_move_tmp_file_str = (
                     "FileHashStore - _move_and_get_checksums: Moving temp file to permanent"

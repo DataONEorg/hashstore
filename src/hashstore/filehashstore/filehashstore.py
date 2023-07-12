@@ -79,34 +79,12 @@ class FileHashStore(HashStore):
                 for property_name in self.property_required_keys
             ]
 
+
             # Check to see if a configuration is present in the given store path
             self.hashstore_configuration_yaml = prop_store_path + "/hashstore.yaml"
-            if os.path.exists(self.hashstore_configuration_yaml):
-                logging.debug(
-                    "FileHashStore - Config found (hashstore.yaml) at {%s}. Verifying properties.",
-                    self.hashstore_configuration_yaml,
-                )
-                # If 'hashstore.yaml' is found, verify given properties before init
-                hashstore_yaml_dict = self.get_properties()
-                for key in self.property_required_keys:
-                    if hashstore_yaml_dict[key] != properties[key]:
-                        exception_string = (
-                            f"Given properties ({key}: {properties[key]}) does not match "
-                            + f"HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
-                            + f"found at: {self.hashstore_configuration_yaml}"
-                        )
-                        logging.critical("FileHashStore - %s", exception_string)
-                        raise ValueError(exception_string)
-            else:
-                # Check if HashStore exists and throw exception if found
-                if any(Path(prop_store_path).iterdir()):
-                    exception_string = (
-                        f"HashStore directories and/or objects found at: {prop_store_path} but"
-                        + f" missing configuration file at: {self.hashstore_configuration_yaml}."
-                    )
-                    logging.critical("FileHashStore - %s", exception_string)
-                    raise FileNotFoundError(exception_string)
+            self.verify_hashstore_properties(properties, prop_store_path)
 
+            # If no exceptions thrown, FileHashStore ready for initialization
             logging.debug("FileHashStore - Initializing, properties verified.")
             self.root = prop_store_path
             self.depth = prop_store_depth
@@ -120,12 +98,18 @@ class FileHashStore(HashStore):
                     "FileHashStore - HashStore does not exist & configuration file not found."
                     + " Writing configuration file."
                 )
-                self.put_properties(properties)
+                self.write_properties(properties)
             # Default algorithm list for FileHashStore based on config file written
             self._set_default_algorithms()
-            # Complete initialization/instantiation by setting store directories
+            # Complete initialization/instantiation by setting and creating store directories
             self.objects = self.root + "/objects"
             self.metadata = self.root + "/metadata"
+            if not os.path.exists(self.root):
+                self.create_path(self.root)
+            if not os.path.exists(self.objects):
+                self.create_path(self.objects + "/tmp")
+            if not os.path.exists(self.metadata):
+                self.create_path(self.metadata + "/tmp")
             logging.debug(
                 "FileHashStore - Initialization success. Store root: %s", self.root
             )
@@ -139,7 +123,48 @@ class FileHashStore(HashStore):
 
     # Configuration and Related Methods
 
-    def get_properties(self):
+    def verify_hashstore_properties(self, properties, prop_store_path):
+        """Determines whether FileHashStore can instantiate by validating a set of arguments
+        and throwing exceptions. HashStore will not instantiate if an existing configuration
+        file's properties (`hashstore.yaml`) are different from what is supplied - or if an
+        object store exists at the given path, but it is missing the `hashstore.yaml` config file.
+
+        If `hashstore.yaml` exists, it will retrieve its properties and compare them with the
+        given values; and if there is a mismatch, an exception will be thrown. If not, it will
+        look to see if any directories/files exist in the given store path and throw an exception
+        if any file or directory is found.
+
+        Args:
+            properties (dict): HashStore properties
+            prop_store_path (string): Store path to check
+        """
+        if os.path.exists(self.hashstore_configuration_yaml):
+            logging.debug(
+                "FileHashStore - Config found (hashstore.yaml) at {%s}. Verifying properties.",
+                self.hashstore_configuration_yaml,
+            )
+            # If 'hashstore.yaml' is found, verify given properties before init
+            hashstore_yaml_dict = self.load_properties()
+            for key in self.property_required_keys:
+                if hashstore_yaml_dict[key] != properties[key]:
+                    exception_string = (
+                        f"Given properties ({key}: {properties[key]}) does not match "
+                        + f"HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
+                        + f"found at: {self.hashstore_configuration_yaml}"
+                    )
+                    logging.critical("FileHashStore - %s", exception_string)
+                    raise ValueError(exception_string)
+        else:
+            # Check if HashStore exists and throw exception if found
+            if any(Path(prop_store_path).iterdir()):
+                exception_string = (
+                    f"HashStore directories and/or objects found at: {prop_store_path} but"
+                    + f" missing configuration file at: {self.hashstore_configuration_yaml}."
+                )
+                logging.critical("FileHashStore - %s", exception_string)
+                raise FileNotFoundError(exception_string)
+
+    def load_properties(self):
         """Get and return the contents of the current HashStore configuration.
 
         Returns:
@@ -152,7 +177,7 @@ class FileHashStore(HashStore):
         """
         if not os.path.exists(self.hashstore_configuration_yaml):
             exception_string = "hashstore.yaml not found in store root path."
-            logging.critical("FileHashStore - get_properties: %s", exception_string)
+            logging.critical("FileHashStore - load_properties: %s", exception_string)
             raise FileNotFoundError(exception_string)
         # Open file
         with open(self.hashstore_configuration_yaml, "r", encoding="utf-8") as file:
@@ -162,11 +187,11 @@ class FileHashStore(HashStore):
         for key in self.property_required_keys:
             hashstore_yaml_dict[key] = yaml_data[key]
         logging.debug(
-            "FileHashStore - get_properties: Successfully retrieved 'hashstore.yaml' properties."
+            "FileHashStore - load_properties: Successfully retrieved 'hashstore.yaml' properties."
         )
         return hashstore_yaml_dict
 
-    def put_properties(self, properties):
+    def write_properties(self, properties):
         """Writes 'hashstore.yaml' to FileHashStore's root directory with the respective
         properties object supplied.
 
@@ -1228,7 +1253,7 @@ class FileHashStore(HashStore):
         return is_subdir
 
     def create_path(self, path):
-        """Physically create the folder path on disk.
+        """Physically create the folder path (and all intermediate ones) on disk.
 
         Args:
             path (str): The path to create.

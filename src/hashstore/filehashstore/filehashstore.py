@@ -169,7 +169,7 @@ class FileHashStore(HashStore):
         # If hashstore.yaml already exists, must throw exception and proceed with caution
         if os.path.exists(self.hashstore_configuration_yaml):
             exception_string = (
-                "FileHashStore - put_properties: configuration file 'hashstore.yaml'"
+                "FileHashStore - write_properties: configuration file 'hashstore.yaml'"
                 + " already exists."
             )
             logging.error(exception_string)
@@ -190,21 +190,32 @@ class FileHashStore(HashStore):
         ]
 
         # Standardize algorithm value for cross-language compatibility
-        dataone_algo_translation = {
+        checked_store_algoritm = None
+        # Note, this must be declared here because HashStore has not yet been initialized
+        accepted_store_algorithms = {
             "md5": "MD5",
             "sha1": "SHA-1",
             "sha256": "SHA-256",
             "sha384": "SHA-384",
             "sha512": "SHA-512",
         }
-        store_algorithm = dataone_algo_translation[store_algorithm]
+        if store_algorithm in accepted_store_algorithms:
+            checked_store_algoritm = accepted_store_algorithms[store_algorithm]
+        else:
+            exception_string = (
+                "FileHashStore - write_properties: algorithm supplied cannot"
+                + " be used as default for HashStore. Must be one of:"
+                + " md5, sha1, sha256, sha384, sha512"
+            )
+            logging.error(exception_string)
+            raise ValueError(exception_string)
 
         # .yaml file to write
         hashstore_configuration_yaml = self._build_hashstore_yaml_string(
             store_path,
             store_depth,
             store_width,
-            store_algorithm,
+            checked_store_algoritm,
             store_metadata_namespace,
         )
         # Write 'hashstore.yaml'
@@ -214,7 +225,7 @@ class FileHashStore(HashStore):
             hashstore_yaml.write(hashstore_configuration_yaml)
 
         logging.debug(
-            "FileHashStore - put_properties: Configuration file written to: %s",
+            "FileHashStore - write_properties: Configuration file written to: %s",
             self.hashstore_configuration_yaml,
         )
         return

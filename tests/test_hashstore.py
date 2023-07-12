@@ -1,5 +1,6 @@
 """Test module for HashStore (and HashStoreFactory)"""
 import pytest
+import os
 from hashstore.filehashstore.filehashstore import FileHashStore
 from hashstore.hashstore_factory import HashStoreFactory
 
@@ -39,3 +40,19 @@ def test_factory_get_hashstore_unsupported_module(factory):
         module_name = "hashstore.s3filestore.s3filestore"
         class_name = "FileHashStore"
         factory.get_hashstore(module_name, class_name)
+
+
+def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
+    """Check factory creates instance of FileHashStore."""
+    module_name = "hashstore.filehashstore.filehashstore"
+    class_name = "FileHashStore"
+
+    properties = {
+        "store_path": os.getcwd() + "/metacat/test",
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "md2",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    with pytest.raises(ValueError):
+        factory.get_hashstore(module_name, class_name, properties)

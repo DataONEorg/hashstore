@@ -86,6 +86,8 @@ class FileHashStore(HashStore):
             # If no exceptions thrown, FileHashStore ready for initialization
             logging.debug("FileHashStore - Initializing, properties verified.")
             self.root = prop_store_path
+            if not os.path.exists(self.root):
+                self.create_path(self.root)
             self.depth = prop_store_depth
             self.width = prop_store_width
             self.algorithm = prop_store_algorithm
@@ -103,8 +105,6 @@ class FileHashStore(HashStore):
             # Complete initialization/instantiation by setting and creating store directories
             self.objects = self.root + "/objects"
             self.metadata = self.root + "/metadata"
-            if not os.path.exists(self.root):
-                self.create_path(self.root)
             if not os.path.exists(self.objects):
                 self.create_path(self.objects + "/tmp")
             if not os.path.exists(self.metadata):
@@ -188,6 +188,16 @@ class FileHashStore(HashStore):
             checked_properties[property_name]
             for property_name in self.property_required_keys
         ]
+
+        # Standardize algorithm value for cross-language compatibility
+        dataone_algo_translation = {
+            "md5": "MD5",
+            "sha1": "SHA-1",
+            "sha256": "SHA-256",
+            "sha384": "SHA-384",
+            "sha512": "SHA-512",
+        }
+        store_algorithm = dataone_algo_translation[store_algorithm]
 
         # .yaml file to write
         hashstore_configuration_yaml = self._build_hashstore_yaml_string(
@@ -293,7 +303,7 @@ class FileHashStore(HashStore):
                     exception_string = (
                         f"FileHashStore - Given properties ({key}: {properties[key]}) does not"
                         + f" match. HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
-                        + f"found at: {self.hashstore_configuration_yaml}"
+                        + f" found at: {self.hashstore_configuration_yaml}"
                     )
                     logging.critical(exception_string)
                     raise ValueError(exception_string)

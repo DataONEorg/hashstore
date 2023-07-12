@@ -63,7 +63,9 @@ def test_load_properties(store):
     assert hashstore_yaml_dict.get("store_path") == store.root
     assert hashstore_yaml_dict.get("store_depth") == 3
     assert hashstore_yaml_dict.get("store_width") == 2
-    assert hashstore_yaml_dict.get("store_algorithm") == "sha256"
+    # Note, the store_algorithm from `hashstore.yaml` gets translated to a standardized value
+    # Ex. "sha256" is supplied but is written into the file as "SHA-256"
+    assert hashstore_yaml_dict.get("store_algorithm") == "SHA-256"
     assert (
         hashstore_yaml_dict.get("store_metadata_namespace")
         == "http://ns.dataone.org/service/types/v2.0"

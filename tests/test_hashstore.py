@@ -43,7 +43,7 @@ def test_factory_get_hashstore_unsupported_module(factory):
 
 
 def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
-    """Check factory creates instance of FileHashStore."""
+    """Check factory raises exception with store algorithm value that part of the default list"""
     module_name = "hashstore.filehashstore.filehashstore"
     class_name = "FileHashStore"
 
@@ -52,6 +52,22 @@ def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "md2",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    with pytest.raises(ValueError):
+        factory.get_hashstore(module_name, class_name, properties)
+
+
+def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory):
+    """Check factory raises exception with incorrectly formatted algorithm value"""
+    module_name = "hashstore.filehashstore.filehashstore"
+    class_name = "FileHashStore"
+
+    properties = {
+        "store_path": os.getcwd() + "/metacat/test",
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "sha256",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     with pytest.raises(ValueError):

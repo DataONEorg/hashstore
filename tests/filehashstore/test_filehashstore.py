@@ -76,7 +76,7 @@ def test_init_with_existing_hashstore_missing_yaml(store, pids):
         "store_path": store.root,
         "store_depth": 3,
         "store_width": 2,
-        "store_algorithm": "sha256",
+        "store_algorithm": "SHA-256",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     with pytest.raises(FileNotFoundError):
@@ -90,7 +90,7 @@ def test_load_properties(store):
     assert hashstore_yaml_dict.get("store_depth") == 3
     assert hashstore_yaml_dict.get("store_width") == 2
     # Note, the store_algorithm from `hashstore.yaml` gets translated to a standardized value
-    # Ex. "sha256" is supplied but is written into the file as "SHA-256"
+    # Ex. "SHA-256" is supplied but is written into the file as "SHA-256"
     assert hashstore_yaml_dict.get("store_algorithm") == "SHA-256"
     assert (
         hashstore_yaml_dict.get("store_metadata_namespace")
@@ -111,7 +111,7 @@ def test_validate_properties(store):
         "store_path": "/etc/test",
         "store_depth": 3,
         "store_width": 2,
-        "store_algorithm": "sha256",
+        "store_algorithm": "SHA-256",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     # pylint: disable=W0212
@@ -124,7 +124,7 @@ def test_validate_properties_missing_key(store):
         "store_path": "/etc/test",
         "store_depth": 3,
         "store_width": 2,
-        "store_algorithm": "sha256",
+        "store_algorithm": "SHA-256",
     }
     with pytest.raises(KeyError):
         # pylint: disable=W0212
@@ -137,7 +137,7 @@ def test_validate_properties_key_value_is_none(store):
         "store_path": "/etc/test",
         "store_depth": 3,
         "store_width": 2,
-        "store_algorithm": "sha256",
+        "store_algorithm": "SHA-256",
         "store_metadata_namespace": None,
     }
     with pytest.raises(ValueError):

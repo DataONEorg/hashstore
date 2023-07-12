@@ -192,20 +192,15 @@ class FileHashStore(HashStore):
         # Standardize algorithm value for cross-language compatibility
         checked_store_algoritm = None
         # Note, this must be declared here because HashStore has not yet been initialized
-        accepted_store_algorithms = {
-            "md5": "MD5",
-            "sha1": "SHA-1",
-            "sha256": "SHA-256",
-            "sha384": "SHA-384",
-            "sha512": "SHA-512",
-        }
+        accepted_store_algorithms = ["MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512"]
         if store_algorithm in accepted_store_algorithms:
-            checked_store_algoritm = accepted_store_algorithms[store_algorithm]
+            checked_store_algoritm = store_algorithm
         else:
             exception_string = (
                 "FileHashStore - write_properties: algorithm supplied cannot"
                 + " be used as default for HashStore. Must be one of:"
-                + " md5, sha1, sha256, sha384, sha512"
+                + " MD5, SHA-1, SHA-256, SHA-384, SHA-512 which are DataONE"
+                + " controlled algorithm values"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
@@ -395,6 +390,7 @@ class FileHashStore(HashStore):
         with open(self.hashstore_configuration_yaml, "r", encoding="utf-8") as file:
             yaml_data = yaml.safe_load(file)
 
+        # Takes DataOne controlled algorithm values and translates to hashlib supported values
         yaml_store_default_algo_list = yaml_data["store_default_algo_list"]
         translated_default_algo_list = []
         for algo in yaml_store_default_algo_list:

@@ -25,7 +25,7 @@ def init_props(tmp_path):
         "store_path": hashstore_path,
         "store_depth": 3,
         "store_width": 2,
-        "store_algorithm": "sha256",
+        "store_algorithm": "SHA-256",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     return properties

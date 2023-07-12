@@ -86,6 +86,8 @@ class FileHashStore(HashStore):
             # If no exceptions thrown, FileHashStore ready for initialization
             logging.debug("FileHashStore - Initializing, properties verified.")
             self.root = prop_store_path
+            if not os.path.exists(self.root):
+                self.create_path(self.root)
             self.depth = prop_store_depth
             self.width = prop_store_width
             self.algorithm = prop_store_algorithm
@@ -103,8 +105,6 @@ class FileHashStore(HashStore):
             # Complete initialization/instantiation by setting and creating store directories
             self.objects = self.root + "/objects"
             self.metadata = self.root + "/metadata"
-            if not os.path.exists(self.root):
-                self.create_path(self.root)
             if not os.path.exists(self.objects):
                 self.create_path(self.objects + "/tmp")
             if not os.path.exists(self.metadata):
@@ -169,7 +169,7 @@ class FileHashStore(HashStore):
         # If hashstore.yaml already exists, must throw exception and proceed with caution
         if os.path.exists(self.hashstore_configuration_yaml):
             exception_string = (
-                "FileHashStore - put_properties: configuration file 'hashstore.yaml'"
+                "FileHashStore - write_properties: configuration file 'hashstore.yaml'"
                 + " already exists."
             )
             logging.error(exception_string)
@@ -189,12 +189,33 @@ class FileHashStore(HashStore):
             for property_name in self.property_required_keys
         ]
 
+        # Standardize algorithm value for cross-language compatibility
+        checked_store_algoritm = None
+        # Note, this must be declared here because HashStore has not yet been initialized
+        accepted_store_algorithms = {
+            "md5": "MD5",
+            "sha1": "SHA-1",
+            "sha256": "SHA-256",
+            "sha384": "SHA-384",
+            "sha512": "SHA-512",
+        }
+        if store_algorithm in accepted_store_algorithms:
+            checked_store_algoritm = accepted_store_algorithms[store_algorithm]
+        else:
+            exception_string = (
+                "FileHashStore - write_properties: algorithm supplied cannot"
+                + " be used as default for HashStore. Must be one of:"
+                + " md5, sha1, sha256, sha384, sha512"
+            )
+            logging.error(exception_string)
+            raise ValueError(exception_string)
+
         # .yaml file to write
         hashstore_configuration_yaml = self._build_hashstore_yaml_string(
             store_path,
             store_depth,
             store_width,
-            store_algorithm,
+            checked_store_algoritm,
             store_metadata_namespace,
         )
         # Write 'hashstore.yaml'
@@ -204,7 +225,7 @@ class FileHashStore(HashStore):
             hashstore_yaml.write(hashstore_configuration_yaml)
 
         logging.debug(
-            "FileHashStore - put_properties: Configuration file written to: %s",
+            "FileHashStore - write_properties: Configuration file written to: %s",
             self.hashstore_configuration_yaml,
         )
         return
@@ -293,7 +314,7 @@ class FileHashStore(HashStore):
                     exception_string = (
                         f"FileHashStore - Given properties ({key}: {properties[key]}) does not"
                         + f" match. HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
-                        + f"found at: {self.hashstore_configuration_yaml}"
+                        + f" found at: {self.hashstore_configuration_yaml}"
                     )
                     logging.critical(exception_string)
                     raise ValueError(exception_string)

@@ -37,7 +37,7 @@ def test_factory_get_hashstore_unsupported_class(factory):
 def test_factory_get_hashstore_unsupported_module(factory):
     """Check that ModuleNotFoundError is raised when provided with unsupported module."""
     with pytest.raises(ModuleNotFoundError):
-        module_name = "hashstore.s3filestore.s3filestore"
+        module_name = "hashstore.s3filestore"
         class_name = "FileHashStore"
         factory.get_hashstore(module_name, class_name)
 
@@ -51,7 +51,7 @@ def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
         "store_path": os.getcwd() + "/metacat/test",
         "store_depth": 3,
         "store_width": 2,
-        "store_algorithm": "md2",
+        "store_algorithm": "MD2",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     with pytest.raises(ValueError):

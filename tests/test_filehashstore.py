@@ -47,7 +47,7 @@ def test_init_existing_store_correct_algorithm_format(store):
 
 
 def test_init_write_properties_hashstore_yaml_exists(store):
-    """Verify properties file present in store root directory."""
+    """Verify config file present in store root directory."""
     assert os.path.exists(store.hashstore_configuration_yaml)
 
 
@@ -57,7 +57,7 @@ def test_init_with_existing_hashstore_mismatched_config(store):
         "store_path": store.root,
         "store_depth": 1,
         "store_width": 2,
-        "store_algorithm": "sha256",
+        "store_algorithm": "SHA-256",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     with pytest.raises(ValueError):
@@ -89,8 +89,6 @@ def test_load_properties(store):
     assert hashstore_yaml_dict.get("store_path") == store.root
     assert hashstore_yaml_dict.get("store_depth") == 3
     assert hashstore_yaml_dict.get("store_width") == 2
-    # Note, the store_algorithm from `hashstore.yaml` gets translated to a standardized value
-    # Ex. "SHA-256" is supplied but is written into the file as "SHA-256"
     assert hashstore_yaml_dict.get("store_algorithm") == "SHA-256"
     assert (
         hashstore_yaml_dict.get("store_metadata_namespace")
@@ -389,7 +387,7 @@ def test_mktempfile_additional_algo(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     # pylint: disable=W0212
-    hex_digests, _, _ = store._mktempfile(
+    hex_digests, _, _ = store._mktmpfile(
         input_stream, additional_algorithm=checksum_algo
     )
     input_stream.close()
@@ -407,9 +405,7 @@ def test_mktempfile_checksum_algo(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     # pylint: disable=W0212
-    hex_digests, _, _ = store._mktempfile(
-        input_stream, checksum_algorithm=checksum_algo
-    )
+    hex_digests, _, _ = store._mktmpfile(input_stream, checksum_algorithm=checksum_algo)
     input_stream.close()
     assert hex_digests.get("sha3_256") == checksum_correct
 
@@ -429,7 +425,7 @@ def test_mktempfile_checksum_and_additional_algo(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     # pylint: disable=W0212
-    hex_digests, _, _ = store._mktempfile(
+    hex_digests, _, _ = store._mktmpfile(
         input_stream,
         additional_algorithm=additional_algo,
         checksum_algorithm=checksum_algo,
@@ -440,7 +436,7 @@ def test_mktempfile_checksum_and_additional_algo(store):
 
 
 def test_mktempfile_checksum_and_additional_algo_duplicate(store):
-    """Test _mktempfile succeeds with duplicate algorithms (de-duplicates)"""
+    """Test _mktempfile succeeds with duplicate algorithms (de-duplicates)."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -449,7 +445,7 @@ def test_mktempfile_checksum_and_additional_algo_duplicate(store):
     checksum_algo = "sha224"
     checksum_correct = "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
     # pylint: disable=W0212
-    hex_digests, _, _ = store._mktempfile(
+    hex_digests, _, _ = store._mktmpfile(
         input_stream,
         additional_algorithm=additional_algo,
         checksum_algorithm=checksum_algo,
@@ -465,7 +461,7 @@ def test_mktempfile_file_size(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         # pylint: disable=W0212
-        _, _, tmp_file_size = store._mktempfile(input_stream)
+        _, _, tmp_file_size = store._mktmpfile(input_stream)
         input_stream.close()
         assert tmp_file_size == pids[pid]["file_size_bytes"]
 
@@ -477,7 +473,7 @@ def test_mktempfile_hex_digests(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         # pylint: disable=W0212
-        hex_digests, _, _ = store._mktempfile(input_stream)
+        hex_digests, _, _ = store._mktmpfile(input_stream)
         input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
@@ -493,7 +489,7 @@ def test_mktempfile_tmpfile_object(pids, store):
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         # pylint: disable=W0212
-        _, tmp_file_name, _ = store._mktempfile(input_stream)
+        _, tmp_file_name, _ = store._mktmpfile(input_stream)
         input_stream.close()
         assert os.path.isfile(tmp_file_name) is True
 
@@ -507,10 +503,10 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         algo = "md2"
         with pytest.raises(ValueError):
             # pylint: disable=W0212
-            _, _, _ = store._mktempfile(input_stream, additional_algorithm=algo)
+            _, _, _ = store._mktmpfile(input_stream, additional_algorithm=algo)
         with pytest.raises(ValueError):
             # pylint: disable=W0212
-            _, _, _ = store._mktempfile(input_stream, checksum_algorithm=algo)
+            _, _, _ = store._mktmpfile(input_stream, checksum_algorithm=algo)
         input_stream.close()
 
 
@@ -551,7 +547,7 @@ def test_put_metadata_cid(pids, store):
         assert metadata_cid == pids[pid]["metadata_cid"]
 
 
-def test_mktempmetadata(pids, store):
+def test_mktmpmetadata(pids, store):
     """Test mktmpmetadata creates tmpFile."""
     test_dir = "tests/testdata/"
     entity = "metadata"
@@ -560,7 +556,7 @@ def test_mktempmetadata(pids, store):
         syspath = Path(test_dir) / filename
         sys_stream = io.open(syspath, "rb")
         # pylint: disable=W0212
-        tmp_name = store._mktempmetadata(sys_stream)
+        tmp_name = store._mktmpmetadata(sys_stream)
         sys_stream.close()
         assert store.exists(entity, tmp_name)
 
@@ -662,7 +658,7 @@ def test_open_objects(pids, store):
 
 
 def test_delete_by_object_metadata_id(pids, store):
-    """Check objects are deleted after calling delete with hash addres id"""
+    """Check objects are deleted after calling delete with hash address id."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -774,7 +770,7 @@ def test_get_real_path_file_does_not_exist(store):
 
 
 def test_get_real_path_with_object_id(store, pids):
-    """Test get_real_path returns absolute path given an object id"""
+    """Test get_real_path returns absolute path given an object id."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -785,7 +781,7 @@ def test_get_real_path_with_object_id(store, pids):
 
 
 def test_get_real_path_with_object_id_sharded(pids, store):
-    """Test exists method with a sharded path (relative path)"""
+    """Test exists method with a sharded path (relative path)."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -798,7 +794,7 @@ def test_get_real_path_with_object_id_sharded(pids, store):
 
 
 def test_get_real_path_with_metadata_id(store, pids):
-    """Test get_real_path returns absolute path given a metadata id"""
+    """Test get_real_path returns absolute path given a metadata id."""
     entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -811,7 +807,7 @@ def test_get_real_path_with_metadata_id(store, pids):
 
 
 def test_get_real_path_with_bad_entity(store, pids):
-    """Test get_real_path returns absolute path given an object id"""
+    """Test get_real_path returns absolute path given an object id."""
     test_dir = "tests/testdata/"
     entity = "bad_entity"
     for pid in pids.keys():

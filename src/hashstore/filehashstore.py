@@ -740,7 +740,7 @@ class FileHashStore(HashStore):
             + f" file and calculating checksums for pid: {pid}"
         )
         logging.debug(debug_msg)
-        hex_digests, tmp_file_name, tmp_file_size = self._mktempfile(
+        hex_digests, tmp_file_name, tmp_file_size = self._mktmpfile(
             stream, additional_algorithm, checksum_algorithm
         )
         logging.debug(
@@ -823,7 +823,7 @@ class FileHashStore(HashStore):
 
         return (object_cid, tmp_file_size, is_object_duplicate, hex_digests)
 
-    def _mktempfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
+    def _mktmpfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
         """Create a named temporary file from a `Stream` object and return its filename
         and a dictionary of its algorithms and hex digests. If an additionak and/or checksum
         algorithm is provided, it will add the respective hex digest to the dictionary.
@@ -903,7 +903,7 @@ class FileHashStore(HashStore):
         # Create metadata tmp file and write to it
         metadata_stream = Stream(metadata)
         with closing(metadata_stream):
-            metadata_tmp = self._mktempmetadata(metadata_stream)
+            metadata_tmp = self._mktmpmetadata(metadata_stream)
 
         # Get target and related paths (permanent location)
         metadata_cid = self.get_sha256_hex_digest(pid + format_id)
@@ -943,7 +943,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
 
-    def _mktempmetadata(self, stream):
+    def _mktmpmetadata(self, stream):
         """Create a named temporary file with `stream` (metadata) and `format_id`.
 
         Args:

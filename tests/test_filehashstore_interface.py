@@ -412,7 +412,7 @@ def test_store_object_with_obj_file_size_non_integer(store, pids):
 
 
 def test_store_object_with_obj_file_size_zero(store, pids):
-    """Test store object throws exception with a non integer value as the file size."""
+    """Test store object throws exception with zero as the file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         obj_file_size = 0

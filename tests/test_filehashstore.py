@@ -3,7 +3,7 @@ import io
 import os
 from pathlib import Path
 import pytest
-from hashstore.filehashstore.filehashstore import FileHashStore
+from hashstore.filehashstore import FileHashStore
 
 
 def test_pids_length(pids):

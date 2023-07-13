@@ -2,7 +2,7 @@
 import os
 import pytest
 from hashstore.hashstore import HashAddress, HashStoreFactory
-from hashstore.filehashstore.filehashstore import FileHashStore
+from hashstore.filehashstore import FileHashStore
 
 
 @pytest.fixture(name="factory")
@@ -19,7 +19,7 @@ def test_init(factory):
 
 def test_factory_get_hashstore_filehashstore(factory, props):
     """Check factory creates instance of FileHashStore."""
-    module_name = "hashstore.filehashstore.filehashstore"
+    module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
     # These props can be found in tests/conftest.py
     store = factory.get_hashstore(module_name, class_name, props)
@@ -29,7 +29,7 @@ def test_factory_get_hashstore_filehashstore(factory, props):
 def test_factory_get_hashstore_unsupported_class(factory):
     """Check that AttributeError is raised when provided with unsupported class."""
     with pytest.raises(AttributeError):
-        module_name = "hashstore.filehashstore.filehashstore"
+        module_name = "hashstore.filehashstore"
         class_name = "S3HashStore"
         factory.get_hashstore(module_name, class_name)
 
@@ -44,7 +44,7 @@ def test_factory_get_hashstore_unsupported_module(factory):
 
 def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
     """Check factory raises exception with store algorithm value that part of the default list"""
-    module_name = "hashstore.filehashstore.filehashstore"
+    module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
 
     properties = {
@@ -60,7 +60,7 @@ def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
 
 def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory):
     """Check factory raises exception with incorrectly formatted algorithm value"""
-    module_name = "hashstore.filehashstore.filehashstore"
+    module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
 
     properties = {

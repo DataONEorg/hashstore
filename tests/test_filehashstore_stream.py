@@ -3,7 +3,7 @@ import hashlib
 import io
 from pathlib import Path
 import pytest
-from hashstore.filehashstore.filehashstore import Stream
+from hashstore.filehashstore import Stream
 
 
 def test_stream_reads_file(pids):

@@ -172,7 +172,7 @@ class HashStoreFactory:
         """Get a `HashStore`-like object based on the specified `module_name` and `class_name`.
 
         Args:
-            module_name (str): Name of package (ex. "hashstore.filehashstore.filehashstore") \n
+            module_name (str): Name of package (ex. "hashstore.filehashstore") \n
             class_name (str): Name of class in the given module (ex. "FileHashStore") \n
             properties (dict, optional): Desired HashStore properties, if 'None', default values
             will be used. \n

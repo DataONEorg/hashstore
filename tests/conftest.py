@@ -1,6 +1,6 @@
 """Pytest overall configuration file for fixtures"""
 import pytest
-from hashstore.filehashstore.filehashstore import FileHashStore
+from hashstore.filehashstore import FileHashStore
 
 
 def pytest_addoption(parser):

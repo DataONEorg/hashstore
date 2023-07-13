@@ -10,8 +10,7 @@ from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
 import yaml
-from hashstore import HashStore
-from hashstore.hashaddress import HashAddress
+from hashstore import HashStore, HashAddress
 
 
 class FileHashStore(HashStore):

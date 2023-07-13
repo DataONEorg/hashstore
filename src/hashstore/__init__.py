@@ -15,8 +15,6 @@ processes that function across a cluster environment. Some properties:
     their persistent identifier (PID)
 """
 
-from hashstore.hashstore import HashStore
-from hashstore.hashaddress import HashAddress
-from hashstore.hashstore_factory import HashStoreFactory
+from hashstore.hashstore import HashStore, HashStoreFactory, HashAddress
 
 __all__ = ("HashStore", "HashAddress", "HashStoreFactory")

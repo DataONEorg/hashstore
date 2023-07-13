@@ -10,7 +10,7 @@ from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
 import yaml
-from hashstore import HashStore, HashAddress
+from hashstore import HashStore, ObjectMetadata
 
 
 class FileHashStore(HashStore):
@@ -408,6 +408,7 @@ class FileHashStore(HashStore):
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
+        expected_object_size=None,
     ):
         logging.debug(
             "FileHashStore - store_object: Request to store object for pid: %s", pid
@@ -415,6 +416,7 @@ class FileHashStore(HashStore):
         # Validate input parameters
         self._is_string_none_or_empty(pid, "pid", "store_object")
         self._validate_data_to_store(data)
+        self._validate_file_size(expected_object_size)
         (
             additional_algorithm_checked,
             checksum_algorithm_checked,
@@ -441,12 +443,13 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_object: Attempting to store object for pid: %s",
                 pid,
             )
-            hash_address = self.put_object(
+            object_metadata = self.put_object(
                 pid,
                 data,
                 additional_algorithm=additional_algorithm_checked,
                 checksum=checksum,
                 checksum_algorithm=checksum_algorithm_checked,
+                file_size_to_validate=expected_object_size,
             )
         finally:
             # Release pid
@@ -461,7 +464,7 @@ class FileHashStore(HashStore):
                 pid,
             )
 
-        return hash_address
+        return object_metadata
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
@@ -634,6 +637,7 @@ class FileHashStore(HashStore):
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
+        file_size_to_validate=None,
     ):
         """Store contents of `file` on disk using the hash of the given pid
 
@@ -649,9 +653,8 @@ class FileHashStore(HashStore):
             checksum_algorithm (str, optional): Algorithm value of given checksum.
 
         Returns:
-            hash_address (HashAddress): object that contains the permanent address,
-            relative file path, absolute file path, duplicate file boolean and hex
-            digest dictionary.
+            object_metadata (ObjectMetadata): object that contains the object id,
+            object file size, duplicate file boolean and hex digest dictionary.
         """
         stream = Stream(file)
 
@@ -661,8 +664,7 @@ class FileHashStore(HashStore):
         with closing(stream):
             (
                 object_cid,
-                rel_path,
-                abs_path,
+                obj_file_size,
                 is_duplicate,
                 hex_digest_dict,
             ) = self._move_and_get_checksums(
@@ -672,16 +674,17 @@ class FileHashStore(HashStore):
                 additional_algorithm,
                 checksum,
                 checksum_algorithm,
+                file_size_to_validate,
             )
 
-        hash_address = HashAddress(
-            object_cid, rel_path, abs_path, is_duplicate, hex_digest_dict
+        object_metadata = ObjectMetadata(
+            object_cid, obj_file_size, is_duplicate, hex_digest_dict
         )
         logging.debug(
             "FileHashStore - put_object: Successfully put object for pid: %s",
             pid,
         )
-        return hash_address
+        return object_metadata
 
     def _move_and_get_checksums(
         self,
@@ -691,6 +694,7 @@ class FileHashStore(HashStore):
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
+        file_size_to_validate=None,
     ):
         """Copy the contents of `stream` onto disk with an optional file
         extension appended. The copy process uses a temporary file to store the
@@ -713,9 +717,8 @@ class FileHashStore(HashStore):
             checksum_algorithm (str, optional): Algorithm value of given checksum. \n
 
         Returns:
-            hash_address (HashAddress): object that contains the permanent address,
-            relative file path, absolute file path, duplicate file boolean and hex
-            digest dictionary.
+            object_metadata (tuple): object id, object file size, duplicate file
+            boolean and hex digest dictionary.
         """
         entity = "objects"
         object_cid = self.get_sha256_hex_digest(pid)
@@ -731,15 +734,13 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise FileExistsError(exception_string)
 
-        rel_file_path = os.path.relpath(abs_file_path, self.objects)
-
         # Create temporary file and calculate hex digests
         debug_msg = (
             "FileHashStore - _move_and_get_checksums: Creating temp"
             + f" file and calculating checksums for pid: {pid}"
         )
         logging.debug(debug_msg)
-        hex_digests, tmp_file_name = self._mktempfile(
+        hex_digests, tmp_file_name, tmp_file_size = self._mktmpfile(
             stream, additional_algorithm, checksum_algorithm
         )
         logging.debug(
@@ -752,7 +753,14 @@ class FileHashStore(HashStore):
         is_object_duplicate = False
         if not os.path.isfile(abs_file_path):
             self._validate_object(
-                checksum, checksum_algorithm, entity, hex_digests, tmp_file_name
+                pid,
+                checksum,
+                checksum_algorithm,
+                entity,
+                hex_digests,
+                tmp_file_name,
+                tmp_file_size,
+                file_size_to_validate,
             )
 
             try:
@@ -813,15 +821,9 @@ class FileHashStore(HashStore):
             is_object_duplicate = True
             self.delete(entity, tmp_file_name)
 
-        return (
-            object_cid,
-            rel_file_path,
-            abs_file_path,
-            is_object_duplicate,
-            hex_digests,
-        )
+        return (object_cid, tmp_file_size, is_object_duplicate, hex_digests)
 
-    def _mktempfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
+    def _mktmpfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
         """Create a named temporary file from a `Stream` object and return its filename
         and a dictionary of its algorithms and hex digests. If an additionak and/or checksum
         algorithm is provided, it will add the respective hex digest to the dictionary.
@@ -878,9 +880,10 @@ class FileHashStore(HashStore):
             hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
         ]
         hex_digest_dict = dict(zip(algorithm_list_to_calculate, hex_digest_list))
+        tmp_file_size = os.path.getsize(tmp.name)
 
         logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
-        return hex_digest_dict, tmp.name
+        return hex_digest_dict, tmp.name, tmp_file_size
 
     def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the
@@ -900,7 +903,7 @@ class FileHashStore(HashStore):
         # Create metadata tmp file and write to it
         metadata_stream = Stream(metadata)
         with closing(metadata_stream):
-            metadata_tmp = self._mktempmetadata(metadata_stream)
+            metadata_tmp = self._mktmpmetadata(metadata_stream)
 
         # Get target and related paths (permanent location)
         metadata_cid = self.get_sha256_hex_digest(pid + format_id)
@@ -940,7 +943,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
 
-    def _mktempmetadata(self, stream):
+    def _mktmpmetadata(self, stream):
         """Create a named temporary file with `stream` (metadata) and `format_id`.
 
         Args:
@@ -1075,25 +1078,48 @@ class FileHashStore(HashStore):
         return algorithm_list_to_calculate
 
     def _validate_object(
-        self, checksum, checksum_algorithm, entity, hex_digests, tmp_file_name
+        self,
+        pid,
+        checksum,
+        checksum_algorithm,
+        entity,
+        hex_digests,
+        tmp_file_name,
+        tmp_file_size,
+        file_size_to_validate,
     ):
         """Evaluates an object's integrity
 
         Args:
+            pid: For logging purposes
             checksum: Value of checksum
             checksum_algoritm: Algorithm of checksum
             entity: Type of object
             hex_digests: Dictionary of hex digests to select from
             tmp_file_name: Name of tmp file
+            tmp_file_size: Size of the tmp file
+            file_size_to_validate: Expected size of the object
         """
+        if file_size_to_validate is not None and file_size_to_validate > 0:
+            if file_size_to_validate != tmp_file_size:
+                self.delete(entity, tmp_file_name)
+                exception_string = (
+                    "FileHashStore - _move_and_get_checksums: Object file size calculated: "
+                    + f" {tmp_file_size} does not match with expected size:"
+                    + f"{file_size_to_validate}. Tmp file deleted and file not stored for"
+                    + f" pid: {pid}"
+                )
+                logging.error(exception_string)
+                raise ValueError(exception_string)
         if checksum_algorithm is not None and checksum is not None:
             hex_digest_stored = hex_digests[checksum_algorithm]
             if hex_digest_stored != checksum:
                 self.delete(entity, tmp_file_name)
                 exception_string = (
                     "FileHashStore - _move_and_get_checksums: Hex digest and checksum"
-                    + f" do not match - file not stored. Algorithm: {checksum_algorithm}."
-                    + f" Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
+                    + f" do not match - file not stored for pid: {pid}. Algorithm:"
+                    + f" {checksum_algorithm}. Checksum provided: {checksum} !="
+                    + f"HexDigest: {hex_digest_stored}. Tmp file deleted."
                 )
                 logging.error(exception_string)
                 raise ValueError(exception_string)
@@ -1433,6 +1459,28 @@ class FileHashStore(HashStore):
     # Other Static Methods
 
     @staticmethod
+    def _validate_file_size(file_size):
+        """Checks whether a file size is > 0 and an int and throws exception if not.
+
+        Args:
+            file_size (int): file size to check
+        """
+        if file_size is not None:
+            if not isinstance(file_size, int):
+                exception_string = (
+                    "FileHashStore - _is_file_size_valid: size given must be an integer."
+                    + f" File size: {file_size}. Arg Type: {type(file_size)}."
+                )
+                logging.error(exception_string)
+                raise TypeError(exception_string)
+            if file_size < 1 or not isinstance(file_size, int):
+                exception_string = (
+                    "FileHashStore - _is_file_size_valid: size given must be > 0"
+                )
+                logging.error(exception_string)
+                raise ValueError(exception_string)
+
+    @staticmethod
     def _is_string_none_or_empty(string, arg, method):
         """Checks whether a string is None or empty and throws an exception if so.
 
@@ -1440,7 +1488,6 @@ class FileHashStore(HashStore):
             string (string): Value to check
             arg (): Name of argument to check
             method (string): Calling method for logging purposes
-
         """
         if string is None or string.replace(" ", "") == "":
             exception_string = (

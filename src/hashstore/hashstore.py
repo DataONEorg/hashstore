@@ -23,6 +23,7 @@ class HashStore(ABC):
         additional_algorithm,
         checksum,
         checksum_algorithm,
+        expected_object_size,
     ):
         """The `store_object` method is responsible for the atomic storage of objects to
         disk using a given InputStream and a persistent identifier (pid). Upon
@@ -46,8 +47,8 @@ class HashStore(ABC):
         with its corresponding hex digest. An algorithm is considered "supported" if it
         is recognized as a valid hash algorithm in the `hashlib` library.
 
-        Similarly, if a checksum and a checksumAlgorithm value are provided,
-        `store_object` validates the object to ensure it matches what is provided
+        Similarly, if a file size and/or checksum & checksumAlgorithm value are provided,
+        `store_object` validates the object to ensure it matches the given arguments
         before moving the file to its permanent address.
 
         Args:
@@ -56,10 +57,11 @@ class HashStore(ABC):
             additional_algorithm (string): Additional hex digest to include.
             checksum (string): Checksum to validate against.
             checksum_algorithm (string): Algorithm of supplied checksum.
+            expected_object_size (int): Size of object to verify
 
         Returns:
-            address (HashAddress): Object that contains the permanent address, relative
-            file path, absolute file path, duplicate file boolean and hex digest dictionary.
+            object_metadata (ObjectMetadata): Object that contains the permanent address,
+            file size, duplicate file boolean and hex digest dictionary.
         """
         raise NotImplementedError()
 
@@ -208,17 +210,14 @@ class HashStoreFactory:
         )
 
 
-class HashAddress(
-    namedtuple(
-        "HashAddress", ["id", "relpath", "abspath", "is_duplicate", "hex_digests"]
-    )
+class ObjectMetadata(
+    namedtuple("ObjectMetadata", ["id", "obj_size", "is_duplicate", "hex_digests"])
 ):
     """File address containing file's path on disk and its content hash ID.
 
     Args:
         ab_id (str): Hash ID (hexdigest) of file contents.
-        relpath (str): Relative path location to :attr:`HashFS.root`.
-        abspath (str): Absolute path location of file on disk.
+        obj_size (bytes): Size of the object
         is_duplicate (boolean, optional): Whether the hash address created was
             a duplicate of a previously existing file. Can only be ``True``
             after a put operation. Defaults to ``False``.
@@ -227,7 +226,7 @@ class HashAddress(
     """
 
     # Default value to prevent dangerous default value
-    def __new__(cls, ab_id, relpath, abspath, is_duplicate=False, hex_digests=None):
-        return super(HashAddress, cls).__new__(
-            cls, ab_id, relpath, abspath, is_duplicate, hex_digests
+    def __new__(cls, ab_id, obj_size, is_duplicate=False, hex_digests=None):
+        return super(ObjectMetadata, cls).__new__(
+            cls, ab_id, obj_size, is_duplicate, hex_digests
         )

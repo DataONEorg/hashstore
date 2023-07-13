@@ -58,8 +58,8 @@ class HashStore(ABC):
             checksum_algorithm (string): Algorithm of supplied checksum.
 
         Returns:
-            address (HashAddress): Object that contains the permanent address, relative
-            file path, absolute file path, duplicate file boolean and hex digest dictionary.
+            object_metadata (ObjectMetadata): Object that contains the permanent address,
+            file size, duplicate file boolean and hex digest dictionary.
         """
         raise NotImplementedError()
 
@@ -209,16 +209,13 @@ class HashStoreFactory:
 
 
 class ObjectMetadata(
-    namedtuple(
-        "HashAddress", ["id", "relpath", "abspath", "is_duplicate", "hex_digests"]
-    )
+    namedtuple("ObjectMetadata", ["id", "obj_size", "is_duplicate", "hex_digests"])
 ):
     """File address containing file's path on disk and its content hash ID.
 
     Args:
         ab_id (str): Hash ID (hexdigest) of file contents.
-        relpath (str): Relative path location to :attr:`HashFS.root`.
-        abspath (str): Absolute path location of file on disk.
+        obj_size (bytes): Size of the object
         is_duplicate (boolean, optional): Whether the hash address created was
             a duplicate of a previously existing file. Can only be ``True``
             after a put operation. Defaults to ``False``.
@@ -227,7 +224,7 @@ class ObjectMetadata(
     """
 
     # Default value to prevent dangerous default value
-    def __new__(cls, ab_id, relpath, abspath, is_duplicate=False, hex_digests=None):
+    def __new__(cls, ab_id, obj_size, is_duplicate=False, hex_digests=None):
         return super(ObjectMetadata, cls).__new__(
-            cls, ab_id, relpath, abspath, is_duplicate, hex_digests
+            cls, ab_id, obj_size, is_duplicate, hex_digests
         )

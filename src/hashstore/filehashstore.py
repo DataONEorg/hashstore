@@ -441,7 +441,7 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_object: Attempting to store object for pid: %s",
                 pid,
             )
-            hash_address = self.put_object(
+            object_metadata = self.put_object(
                 pid,
                 data,
                 additional_algorithm=additional_algorithm_checked,
@@ -461,7 +461,7 @@ class FileHashStore(HashStore):
                 pid,
             )
 
-        return hash_address
+        return object_metadata
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
@@ -649,9 +649,8 @@ class FileHashStore(HashStore):
             checksum_algorithm (str, optional): Algorithm value of given checksum.
 
         Returns:
-            hash_address (HashAddress): object that contains the permanent address,
-            relative file path, absolute file path, duplicate file boolean and hex
-            digest dictionary.
+            object_metadata (ObjectMetadata): object that contains the object id,
+            object file size, duplicate file boolean and hex digest dictionary.
         """
         stream = Stream(file)
 
@@ -661,8 +660,7 @@ class FileHashStore(HashStore):
         with closing(stream):
             (
                 object_cid,
-                rel_path,
-                abs_path,
+                file_size,
                 is_duplicate,
                 hex_digest_dict,
             ) = self._move_and_get_checksums(
@@ -674,14 +672,14 @@ class FileHashStore(HashStore):
                 checksum_algorithm,
             )
 
-        hash_address = ObjectMetadata(
-            object_cid, rel_path, abs_path, is_duplicate, hex_digest_dict
+        object_metadata = ObjectMetadata(
+            object_cid, file_size, is_duplicate, hex_digest_dict
         )
         logging.debug(
             "FileHashStore - put_object: Successfully put object for pid: %s",
             pid,
         )
-        return hash_address
+        return object_metadata
 
     def _move_and_get_checksums(
         self,
@@ -713,9 +711,8 @@ class FileHashStore(HashStore):
             checksum_algorithm (str, optional): Algorithm value of given checksum. \n
 
         Returns:
-            hash_address (HashAddress): object that contains the permanent address,
-            relative file path, absolute file path, duplicate file boolean and hex
-            digest dictionary.
+            object_metadata (tuple): object id, object file size, duplicate file
+            boolean and hex digest dictionary.
         """
         entity = "objects"
         object_cid = self.get_sha256_hex_digest(pid)
@@ -731,15 +728,13 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise FileExistsError(exception_string)
 
-        rel_file_path = os.path.relpath(abs_file_path, self.objects)
-
         # Create temporary file and calculate hex digests
         debug_msg = (
             "FileHashStore - _move_and_get_checksums: Creating temp"
             + f" file and calculating checksums for pid: {pid}"
         )
         logging.debug(debug_msg)
-        hex_digests, tmp_file_name = self._mktempfile(
+        hex_digests, tmp_file_name, tmp_file_size = self._mktempfile(
             stream, additional_algorithm, checksum_algorithm
         )
         logging.debug(
@@ -813,13 +808,7 @@ class FileHashStore(HashStore):
             is_object_duplicate = True
             self.delete(entity, tmp_file_name)
 
-        return (
-            object_cid,
-            rel_file_path,
-            abs_file_path,
-            is_object_duplicate,
-            hex_digests,
-        )
+        return (object_cid, tmp_file_size, is_object_duplicate, hex_digests)
 
     def _mktempfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
         """Create a named temporary file from a `Stream` object and return its filename
@@ -878,9 +867,10 @@ class FileHashStore(HashStore):
             hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
         ]
         hex_digest_dict = dict(zip(algorithm_list_to_calculate, hex_digest_list))
+        tmp_file_size = os.path.getsize(tmp.name)
 
         logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
-        return hex_digest_dict, tmp.name
+        return hex_digest_dict, tmp.name, tmp_file_size
 
     def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the

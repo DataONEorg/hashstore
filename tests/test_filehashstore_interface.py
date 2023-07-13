@@ -22,8 +22,8 @@ def test_store_address_length(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.store_object(pid, path)
-        object_cid = hash_address.id
+        object_metadata = store.store_object(pid, path)
+        object_cid = object_metadata.id
         assert len(object_cid) == 64
 
 
@@ -36,9 +36,9 @@ def test_store_object(pids, store):
         path = Path(test_dir + pid.replace("/", "_"))
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        hash_address = store.store_object(pid, path)
+        object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        assert hash_address.id == pids[pid]["object_cid"]
+        assert object_metadata.id == pids[pid]["object_cid"]
     assert store.count(entity) == 3
 
 
@@ -51,7 +51,7 @@ def test_store_object_files_path(pids, store):
         path = Path(test_dir + pid.replace("/", "_"))
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
+        _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, pids[pid]["object_cid"])
     assert store.count(entity) == 3
@@ -66,7 +66,7 @@ def test_store_object_files_string(pids, store):
         path_string = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path_string)
+        _object_metadata = store.store_object(pid, path_string)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, pids[pid]["object_cid"])
     assert store.count(entity) == 3
@@ -79,7 +79,7 @@ def test_store_object_files_input_stream(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        _hash_address = store.store_object(pid, input_stream)
+        _object_metadata = store.store_object(pid, input_stream)
         input_stream.close()
         object_cid = store.get_sha256_hex_digest(pid)
         assert store.exists(entity, object_cid)
@@ -91,31 +91,18 @@ def test_store_object_id(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.store_object(pid, path)
-        assert hash_address.id == pids[pid]["object_cid"]
+        object_metadata = store.store_object(pid, path)
+        assert object_metadata.id == pids[pid]["object_cid"]
 
 
-def test_store_object_rel_path(pids, store):
-    """Test store object returns expected relative path."""
+def test_store_object_obj_size(pids, store):
+    """Test store object returns expected file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.store_object(pid, path)
-        object_cid = pids[pid]["object_cid"]
-        object_cid_rel_path = "/".join(store.shard(object_cid))
-        assert hash_address.relpath == object_cid_rel_path
-
-
-def test_store_object_abs_path(pids, store):
-    """Test store object returns expected absolute path."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        hash_address = store.store_object(pid, path)
-        object_cid = pids[pid]["object_cid"]
-        object_cid_rel_path = "/".join(store.shard(object_cid))
-        object_cid_abs_path = store.objects + "/" + object_cid_rel_path
-        assert hash_address.abspath == object_cid_abs_path
+        object_metadata = store.store_object(pid, path)
+        object_size = object_metadata.obj_size
+        assert object_size == pids[pid]["file_size_bytes"]
 
 
 def test_store_object_is_duplicate(pids, store):
@@ -123,8 +110,8 @@ def test_store_object_is_duplicate(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.store_object(pid, path)
-        assert hash_address.is_duplicate is False
+        object_metadata = store.store_object(pid, path)
+        assert object_metadata.is_duplicate is False
 
 
 def test_store_object_hex_digests(pids, store):
@@ -132,12 +119,12 @@ def test_store_object_hex_digests(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        hash_address = store.store_object(pid, path)
-        assert hash_address.hex_digests.get("md5") == pids[pid]["md5"]
-        assert hash_address.hex_digests.get("sha1") == pids[pid]["sha1"]
-        assert hash_address.hex_digests.get("sha256") == pids[pid]["sha256"]
-        assert hash_address.hex_digests.get("sha384") == pids[pid]["sha384"]
-        assert hash_address.hex_digests.get("sha512") == pids[pid]["sha512"]
+        object_metadata = store.store_object(pid, path)
+        assert object_metadata.hex_digests.get("md5") == pids[pid]["md5"]
+        assert object_metadata.hex_digests.get("sha1") == pids[pid]["sha1"]
+        assert object_metadata.hex_digests.get("sha256") == pids[pid]["sha256"]
+        assert object_metadata.hex_digests.get("sha384") == pids[pid]["sha384"]
+        assert object_metadata.hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
 def test_store_object_pid_empty(store):
@@ -208,8 +195,8 @@ def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_with_hyphen_and_upper = "SHA-384"
-    hash_address = store.store_object(pid, path, algorithm_with_hyphen_and_upper)
-    sha256_cid = hash_address.hex_digests.get("sha384")
+    object_metadata = store.store_object(pid, path, algorithm_with_hyphen_and_upper)
+    sha256_cid = object_metadata.hex_digests.get("sha384")
     assert sha256_cid == pids[pid]["sha384"]
     object_cid = store.get_sha256_hex_digest(pid)
     assert store.exists(entity, object_cid)
@@ -222,8 +209,8 @@ def test_store_object_additional_algorithm_hyphen_lowercase(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_other = "sha3-256"
-    hash_address = store.store_object(pid, path, algorithm_other)
-    additional_sha3_256_hex_digest = hash_address.hex_digests.get("sha3_256")
+    object_metadata = store.store_object(pid, path, algorithm_other)
+    additional_sha3_256_hex_digest = object_metadata.hex_digests.get("sha3_256")
     sha3_256_checksum = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
@@ -239,8 +226,8 @@ def test_store_object_additional_algorithm_underscore(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_other = "sha3_256"
-    hash_address = store.store_object(pid, path, algorithm_other)
-    additional_sha3_256_hex_digest = hash_address.hex_digests.get("sha3_256")
+    object_metadata = store.store_object(pid, path, algorithm_other)
+    additional_sha3_256_hex_digest = object_metadata.hex_digests.get("sha3_256")
     sha3_256_checksum = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
@@ -259,7 +246,7 @@ def test_store_object_checksum_correct(store):
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    _hash_address = store.store_object(
+    _object_metadata = store.store_object(
         pid, path, checksum=checksum_correct, checksum_algorithm=checksum_algo
     )
     assert store.count(entity) == 1
@@ -278,15 +265,15 @@ def test_store_object_checksum_correct_and_additional_algo(store):
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    hash_address = store.store_object(
+    object_metadata = store.store_object(
         pid,
         path,
         additional_algorithm=algorithm_additional,
         checksum=checksum_correct,
         checksum_algorithm=algorithm_checksum,
     )
-    assert hash_address.hex_digests.get("sha224") == sha224_additional_checksum
-    assert hash_address.hex_digests.get("sha3_256") == checksum_correct
+    assert object_metadata.hex_digests.get("sha224") == sha224_additional_checksum
+    assert object_metadata.hex_digests.get("sha3_256") == checksum_correct
 
 
 def test_store_object_checksum_correct_and_additional_algo_duplicate(store):
@@ -299,14 +286,14 @@ def test_store_object_checksum_correct_and_additional_algo_duplicate(store):
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    hash_address = store.store_object(
+    object_metadata = store.store_object(
         pid,
         path,
         additional_algorithm=algorithm_additional,
         checksum=checksum_correct,
         checksum_algorithm=algorithm_checksum,
     )
-    assert hash_address.hex_digests.get("sha3_256") == checksum_correct
+    assert object_metadata.hex_digests.get("sha3_256") == checksum_correct
 
 
 def test_store_object_checksum_algorithm_empty(store):
@@ -382,10 +369,10 @@ def test_store_object_duplicate_raises_error(store):
     path = test_dir + pid
     entity = "objects"
     # Store first blob
-    _hash_address_one = store.store_object(pid, path)
+    _object_metadata_one = store.store_object(pid, path)
     # Store second blob
     with pytest.raises(FileExistsError):
-        _hash_address_two = store.store_object(pid, path)
+        _object_metadata_two = store.store_object(pid, path)
     assert store.count(entity) == 1
     object_cid = store.get_sha256_hex_digest(pid)
     assert store.exists(entity, object_cid)
@@ -445,16 +432,17 @@ def test_store_object_large_file(store):
             remaining_bytes -= bytes_to_write
     # Store object
     pid = "testfile_filehashstore"
-    hash_address = store.store_object(pid, file_path)
-    hash_address_id = hash_address.id
+    object_metadata = store.store_object(pid, file_path)
+    object_metadata_id = object_metadata.id
     pid_sha256_hex_digest = store.get_sha256_hex_digest(pid)
-    assert hash_address_id == pid_sha256_hex_digest
+    assert object_metadata_id == pid_sha256_hex_digest
 
 
 @slow_test
 def test_store_object_sparse_large_file(store):
     """Test storing a large object (4GB) via sparse file. This test has also been
-    executed with a 10GB file and the test classes succeeded locally in 117.03s (0:01:57)."""
+    executed with a 10GB file and the test classes succeeded locally in 117.03s (0:01:57).
+    """
     # file_size = 10 * 1024 * 1024 * 1024  # 10GB
     file_size = 4 * 1024 * 1024 * 1024  # 4GB
     file_path = store.root + "random_file.bin"
@@ -464,10 +452,10 @@ def test_store_object_sparse_large_file(store):
         file.write(b"\0")
     # Store object
     pid = "testfile_filehashstore"
-    hash_address = store.store_object(pid, file_path)
-    hash_address_id = hash_address.id
+    object_metadata = store.store_object(pid, file_path)
+    object_metadata_id = object_metadata.id
     pid_sha256_hex_digest = store.get_sha256_hex_digest(pid)
-    assert hash_address_id == pid_sha256_hex_digest
+    assert object_metadata_id == pid_sha256_hex_digest
 
 
 def test_store_metadata(pids, store):
@@ -478,7 +466,7 @@ def test_store_metadata(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
+        _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert metadata_cid == pids[pid]["metadata_cid"]
 
@@ -490,7 +478,7 @@ def test_store_metadata_default_format_id(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
+        _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath)
         assert metadata_cid == pids[pid]["metadata_cid"]
 
@@ -504,7 +492,7 @@ def test_store_metadata_files_path(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
+        _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, metadata_cid)
         assert metadata_cid == pids[pid]["metadata_cid"]
@@ -520,7 +508,7 @@ def test_store_metadata_files_string(pids, store):
         path_string = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
-        _hash_address = store.store_object(pid, path_string)
+        _object_metadata = store.store_object(pid, path_string)
         metadata_cid = store.store_metadata(pid, syspath_string, format_id)
         assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
@@ -533,7 +521,7 @@ def test_store_metadata_files_input_stream(pids, store):
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        _hash_address = store.store_object(pid, path)
+        _object_metadata = store.store_object(pid, path)
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
         syspath_stream = io.open(syspath_string, "rb")
@@ -601,7 +589,7 @@ def test_store_metadata_metadata_cid(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
+        _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert metadata_cid == pids[pid]["metadata_cid"]
 
@@ -615,7 +603,7 @@ def test_store_metadata_thread_lock(store):
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    _hash_address = store.store_object(pid, path)
+    _object_metadata = store.store_object(pid, path)
     store.store_metadata(pid, syspath, format_id)
     # Start threads
     thread1 = Thread(target=store.store_metadata, args=(pid, syspath, format_id))
@@ -641,12 +629,12 @@ def test_retrieve_object(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        hash_address = store.store_object(pid, path)
+        object_metadata = store.store_object(pid, path)
         store.store_metadata(pid, syspath, format_id)
         obj_stream = store.retrieve_object(pid)
         sha256_hex = store.computehash(obj_stream)
         obj_stream.close()
-        assert sha256_hex == hash_address.hex_digests.get("sha256")
+        assert sha256_hex == object_metadata.hex_digests.get("sha256")
 
 
 def test_retrieve_object_pid_empty(store):
@@ -672,7 +660,7 @@ def test_retrieve_metadata(store):
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    _hash_address = store.store_object(pid, path)
+    _object_metadata = store.store_object(pid, path)
     _metadata_cid = store.store_metadata(pid, syspath, format_id)
     metadata_stream = store.retrieve_metadata(pid, format_id)
     metadata_content = metadata_stream.read().decode("utf-8")
@@ -688,7 +676,7 @@ def test_retrieve_metadata_default_format_id(store):
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    _hash_address = store.store_object(pid, path)
+    _object_metadata = store.store_object(pid, path)
     _metadata_cid = store.store_metadata(pid, syspath)
     metadata_stream = store.retrieve_metadata(pid)
     metadata_content = metadata_stream.read().decode("utf-8")
@@ -739,7 +727,7 @@ def test_delete_objects(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
+        _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
     assert store.count(entity) == 0
@@ -768,7 +756,7 @@ def test_delete_metadata(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
+        _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_metadata(pid, format_id)
     assert store.count(entity) == 0
@@ -782,7 +770,7 @@ def test_delete_metadata_default_format_id(store, pids):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _hash_address = store.store_object(pid, path)
+        _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath)
         store.delete_metadata(pid)
     assert store.count(entity) == 0
@@ -820,7 +808,7 @@ def test_get_hex_digest(store):
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    _hash_address = store.store_object(pid, path)
+    _object_metadata = store.store_object(pid, path)
     _metadata_cid = store.store_metadata(pid, syspath, format_id)
     sha3_256_hex_digest = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
@@ -846,7 +834,7 @@ def test_get_hex_digest_pid_unsupported_algorithm(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     syspath.read_bytes()
-    _hash_address = store.store_object(pid, path)
+    _object_metadata = store.store_object(pid, path)
     algorithm = "sm3"
     with pytest.raises(ValueError):
         store.get_hex_digest(pid, algorithm)

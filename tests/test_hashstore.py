@@ -77,9 +77,8 @@ def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory)
 def test_hashaddress():
     """Test class returns correct values via dot notation."""
     ab_id = "hashstoretest"
-    rel_path = "rel/path/to/object"
-    abs_path = "abs/path/to/object"
     is_duplicate = "false"
+    obj_size = 1234
     hex_digest_dict = {
         "md5": "md5value",
         "sha1": "sha1value",
@@ -87,15 +86,12 @@ def test_hashaddress():
         "sha256": "sha256value",
         "sha512": "sha512value",
     }
-    hash_address = ObjectMetadata(
-        ab_id, rel_path, abs_path, is_duplicate, hex_digest_dict
-    )
-    assert hash_address.id == ab_id
-    assert hash_address.relpath == rel_path
-    assert hash_address.abspath == abs_path
-    assert hash_address.is_duplicate == is_duplicate
-    assert hash_address.hex_digests.get("md5") == hex_digest_dict["md5"]
-    assert hash_address.hex_digests.get("sha1") == hex_digest_dict["sha1"]
-    assert hash_address.hex_digests.get("sha224") == hex_digest_dict["sha224"]
-    assert hash_address.hex_digests.get("sha256") == hex_digest_dict["sha256"]
-    assert hash_address.hex_digests.get("sha512") == hex_digest_dict["sha512"]
+    object_metadata = ObjectMetadata(ab_id, obj_size, is_duplicate, hex_digest_dict)
+    assert object_metadata.id == ab_id
+    assert object_metadata.obj_size == obj_size
+    assert object_metadata.is_duplicate == is_duplicate
+    assert object_metadata.hex_digests.get("md5") == hex_digest_dict["md5"]
+    assert object_metadata.hex_digests.get("sha1") == hex_digest_dict["sha1"]
+    assert object_metadata.hex_digests.get("sha224") == hex_digest_dict["sha224"]
+    assert object_metadata.hex_digests.get("sha256") == hex_digest_dict["sha256"]
+    assert object_metadata.hex_digests.get("sha512") == hex_digest_dict["sha512"]

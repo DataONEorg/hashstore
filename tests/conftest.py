@@ -46,6 +46,7 @@ def init_pids():
     """
     test_pids = {
         "doi:10.18739/A2901ZH2M": {
+            "file_size_bytes": 39993,
             "object_cid": "0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e",
             "metadata_cid": "323e0799524cec4c7e14d31289cefd884b563b5c052f154a066de5ec1e477da7",
             "md5": "db91c910a3202478c8def1071c54aae5",
@@ -56,6 +57,7 @@ def init_pids():
             "sha512": "e9bcd6b91b102ef5803d1bd60c7a5d2dbec1a2baf5f62f7da60de07607ad6797d6a9b740d97a257fd2774f2c26503d455d8f2a03a128773477dfa96ab96a2e54",
         },
         "jtao.1700.1": {
+            "file_size_bytes": 8724,
             "object_cid": "a8241925740d5dcd719596639e780e0a090c9d55a5d0372b0eaf55ed711d4edf",
             "metadata_cid": "ddf07952ef28efc099d10d8b682480f7d2da60015f5d8873b6e1ea75b4baf689",
             "md5": "f4ea2d07db950873462a064937197b0f",
@@ -66,6 +68,7 @@ def init_pids():
             "sha512": "bf9e7f4d4e66bd082817d87659d1d57c2220c376cd032ed97cadd481cf40d78dd479cbed14d34d98bae8cebc603b40c633d088751f07155a94468aa59e2ad109",
         },
         "urn:uuid:1b35d0a5-b17a-423b-a2ed-de2b18dc367a": {
+            "file_size_bytes": 18699,
             "object_cid": "7f5cc18f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6",
             "metadata_cid": "9a2e08c666b728e6cbd04d247b9e556df3de5b2ca49f7c5a24868eb27cddbff2",
             "md5": "e1932fc75ca94de8b64f1d73dc898079",

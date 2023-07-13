@@ -1,9 +1,8 @@
-"""Test module for HashStore (and HashStoreFactory)"""
-import pytest
+"""Test module for HashStore Module"""
 import os
-from hashstore.hashstore import HashAddress
+import pytest
+from hashstore.hashstore import HashAddress, HashStoreFactory
 from hashstore.filehashstore.filehashstore import FileHashStore
-from hashstore.hashstore_factory import HashStoreFactory
 
 
 @pytest.fixture(name="factory")

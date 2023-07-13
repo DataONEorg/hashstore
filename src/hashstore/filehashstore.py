@@ -10,7 +10,7 @@ from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
 import yaml
-from hashstore import HashStore, HashAddress
+from hashstore import HashStore, ObjectMetadata
 
 
 class FileHashStore(HashStore):
@@ -674,7 +674,7 @@ class FileHashStore(HashStore):
                 checksum_algorithm,
             )
 
-        hash_address = HashAddress(
+        hash_address = ObjectMetadata(
             object_cid, rel_path, abs_path, is_duplicate, hex_digest_dict
         )
         logging.debug(

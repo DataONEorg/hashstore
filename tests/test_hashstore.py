@@ -1,7 +1,7 @@
 """Test module for HashStore Module"""
 import os
 import pytest
-from hashstore.hashstore import HashAddress, HashStoreFactory
+from hashstore.hashstore import ObjectMetadata, HashStoreFactory
 from hashstore.filehashstore import FileHashStore
 
 
@@ -87,7 +87,9 @@ def test_hashaddress():
         "sha256": "sha256value",
         "sha512": "sha512value",
     }
-    hash_address = HashAddress(ab_id, rel_path, abs_path, is_duplicate, hex_digest_dict)
+    hash_address = ObjectMetadata(
+        ab_id, rel_path, abs_path, is_duplicate, hex_digest_dict
+    )
     assert hash_address.id == ab_id
     assert hash_address.relpath == rel_path
     assert hash_address.abspath == abs_path

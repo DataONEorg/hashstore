@@ -208,7 +208,7 @@ class HashStoreFactory:
         )
 
 
-class HashAddress(
+class ObjectMetadata(
     namedtuple(
         "HashAddress", ["id", "relpath", "abspath", "is_duplicate", "hex_digests"]
     )
@@ -228,6 +228,6 @@ class HashAddress(
 
     # Default value to prevent dangerous default value
     def __new__(cls, ab_id, relpath, abspath, is_duplicate=False, hex_digests=None):
-        return super(HashAddress, cls).__new__(
+        return super(ObjectMetadata, cls).__new__(
             cls, ab_id, relpath, abspath, is_duplicate, hex_digests
         )

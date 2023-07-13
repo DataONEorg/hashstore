@@ -378,6 +378,49 @@ def test_store_object_duplicate_raises_error(store):
     assert store.exists(entity, object_cid)
 
 
+def test_store_object_with_obj_file_size(store, pids):
+    """Test store object with correct file sizes."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        obj_file_size = pids[pid]["file_size_bytes"]
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(
+            pid, path, expected_object_size=obj_file_size
+        )
+        object_size = object_metadata.obj_size
+        assert object_size == obj_file_size
+
+
+def test_store_object_with_obj_file_size_incorrect(store, pids):
+    """Test store object throws exception with incorrect file size."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        obj_file_size = 1234
+        path = test_dir + pid.replace("/", "_")
+        with pytest.raises(ValueError):
+            store.store_object(pid, path, expected_object_size=obj_file_size)
+
+
+def test_store_object_with_obj_file_size_non_integer(store, pids):
+    """Test store object throws exception with a non integer value as the file size."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        obj_file_size = "Bob"
+        path = test_dir + pid.replace("/", "_")
+        with pytest.raises(TypeError):
+            store.store_object(pid, path, expected_object_size=obj_file_size)
+
+
+def test_store_object_with_obj_file_size_zero(store, pids):
+    """Test store object throws exception with a non integer value as the file size."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        obj_file_size = 0
+        path = test_dir + pid.replace("/", "_")
+        with pytest.raises(ValueError):
+            store.store_object(pid, path, expected_object_size=obj_file_size)
+
+
 def test_store_object_duplicates_threads(store):
     """Test store object thread lock."""
     test_dir = "tests/testdata/"

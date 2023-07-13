@@ -23,6 +23,7 @@ class HashStore(ABC):
         additional_algorithm,
         checksum,
         checksum_algorithm,
+        expected_object_size,
     ):
         """The `store_object` method is responsible for the atomic storage of objects to
         disk using a given InputStream and a persistent identifier (pid). Upon
@@ -46,8 +47,8 @@ class HashStore(ABC):
         with its corresponding hex digest. An algorithm is considered "supported" if it
         is recognized as a valid hash algorithm in the `hashlib` library.
 
-        Similarly, if a checksum and a checksumAlgorithm value are provided,
-        `store_object` validates the object to ensure it matches what is provided
+        Similarly, if a file size and/or checksum & checksumAlgorithm value are provided,
+        `store_object` validates the object to ensure it matches the given arguments
         before moving the file to its permanent address.
 
         Args:
@@ -56,6 +57,7 @@ class HashStore(ABC):
             additional_algorithm (string): Additional hex digest to include.
             checksum (string): Checksum to validate against.
             checksum_algorithm (string): Algorithm of supplied checksum.
+            expected_object_size (int): Size of object to verify
 
         Returns:
             object_metadata (ObjectMetadata): Object that contains the permanent address,

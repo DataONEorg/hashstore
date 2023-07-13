@@ -358,6 +358,26 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
     assert store.count(entity) == 3
 
 
+def test_move_and_get_checksums_file_size_raises_error(pids, store):
+    """Test move and get checksum raises error with incorrect file size"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        with pytest.raises(ValueError):
+            path = test_dir + pid.replace("/", "_")
+            input_stream = io.open(path, "rb")
+            incorrect_file_size = 1000
+            # pylint: disable=W0212
+            (
+                _,
+                _,
+                _,
+                _,
+            ) = store._move_and_get_checksums(
+                pid, input_stream, file_size_to_validate=incorrect_file_size
+            )
+            input_stream.close()
+
+
 def test_mktempfile_additional_algo(store):
     """Test _mktempfile returns correct hex digests for additional algorithm."""
     test_dir = "tests/testdata/"

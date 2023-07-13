@@ -408,6 +408,7 @@ class FileHashStore(HashStore):
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
+        expected_object_size=None,
     ):
         logging.debug(
             "FileHashStore - store_object: Request to store object for pid: %s", pid
@@ -415,6 +416,7 @@ class FileHashStore(HashStore):
         # Validate input parameters
         self._is_string_none_or_empty(pid, "pid", "store_object")
         self._validate_data_to_store(data)
+        self._validate_file_size(expected_object_size)
         (
             additional_algorithm_checked,
             checksum_algorithm_checked,
@@ -447,6 +449,7 @@ class FileHashStore(HashStore):
                 additional_algorithm=additional_algorithm_checked,
                 checksum=checksum,
                 checksum_algorithm=checksum_algorithm_checked,
+                file_size_to_validate=expected_object_size,
             )
         finally:
             # Release pid
@@ -634,6 +637,7 @@ class FileHashStore(HashStore):
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
+        file_size_to_validate=None,
     ):
         """Store contents of `file` on disk using the hash of the given pid
 
@@ -660,7 +664,7 @@ class FileHashStore(HashStore):
         with closing(stream):
             (
                 object_cid,
-                file_size,
+                obj_file_size,
                 is_duplicate,
                 hex_digest_dict,
             ) = self._move_and_get_checksums(
@@ -670,10 +674,11 @@ class FileHashStore(HashStore):
                 additional_algorithm,
                 checksum,
                 checksum_algorithm,
+                file_size_to_validate,
             )
 
         object_metadata = ObjectMetadata(
-            object_cid, file_size, is_duplicate, hex_digest_dict
+            object_cid, obj_file_size, is_duplicate, hex_digest_dict
         )
         logging.debug(
             "FileHashStore - put_object: Successfully put object for pid: %s",
@@ -689,6 +694,7 @@ class FileHashStore(HashStore):
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
+        file_size_to_validate=None,
     ):
         """Copy the contents of `stream` onto disk with an optional file
         extension appended. The copy process uses a temporary file to store the
@@ -747,7 +753,14 @@ class FileHashStore(HashStore):
         is_object_duplicate = False
         if not os.path.isfile(abs_file_path):
             self._validate_object(
-                checksum, checksum_algorithm, entity, hex_digests, tmp_file_name
+                pid,
+                checksum,
+                checksum_algorithm,
+                entity,
+                hex_digests,
+                tmp_file_name,
+                tmp_file_size,
+                file_size_to_validate,
             )
 
             try:
@@ -1065,25 +1078,48 @@ class FileHashStore(HashStore):
         return algorithm_list_to_calculate
 
     def _validate_object(
-        self, checksum, checksum_algorithm, entity, hex_digests, tmp_file_name
+        self,
+        pid,
+        checksum,
+        checksum_algorithm,
+        entity,
+        hex_digests,
+        tmp_file_name,
+        tmp_file_size,
+        file_size_to_validate,
     ):
         """Evaluates an object's integrity
 
         Args:
+            pid: For logging purposes
             checksum: Value of checksum
             checksum_algoritm: Algorithm of checksum
             entity: Type of object
             hex_digests: Dictionary of hex digests to select from
             tmp_file_name: Name of tmp file
+            tmp_file_size: Size of the tmp file
+            file_size_to_validate: Expected size of the object
         """
+        if file_size_to_validate is not None and file_size_to_validate > 0:
+            if file_size_to_validate != tmp_file_size:
+                self.delete(entity, tmp_file_name)
+                exception_string = (
+                    "FileHashStore - _move_and_get_checksums: Object file size calculated: "
+                    + f" {tmp_file_size} does not match with expected size:"
+                    + f"{file_size_to_validate}. Tmp file deleted and file not stored for"
+                    + f" pid: {pid}"
+                )
+                logging.error(exception_string)
+                raise ValueError(exception_string)
         if checksum_algorithm is not None and checksum is not None:
             hex_digest_stored = hex_digests[checksum_algorithm]
             if hex_digest_stored != checksum:
                 self.delete(entity, tmp_file_name)
                 exception_string = (
                     "FileHashStore - _move_and_get_checksums: Hex digest and checksum"
-                    + f" do not match - file not stored. Algorithm: {checksum_algorithm}."
-                    + f" Checksum provided: {checksum} != Hex Digest: {hex_digest_stored}"
+                    + f" do not match - file not stored for pid: {pid}. Algorithm:"
+                    + f" {checksum_algorithm}. Checksum provided: {checksum} !="
+                    + f"HexDigest: {hex_digest_stored}. Tmp file deleted."
                 )
                 logging.error(exception_string)
                 raise ValueError(exception_string)
@@ -1423,6 +1459,28 @@ class FileHashStore(HashStore):
     # Other Static Methods
 
     @staticmethod
+    def _validate_file_size(file_size):
+        """Checks whether a file size is > 0 and an int and throws exception if not.
+
+        Args:
+            file_size (int): file size to check
+        """
+        if file_size is not None:
+            if not isinstance(file_size, int):
+                exception_string = (
+                    "FileHashStore - _is_file_size_valid: size given must be an integer."
+                    + f" File size: {file_size}. Arg Type: {type(file_size)}."
+                )
+                logging.error(exception_string)
+                raise TypeError(exception_string)
+            if file_size < 1 or not isinstance(file_size, int):
+                exception_string = (
+                    "FileHashStore - _is_file_size_valid: size given must be > 0"
+                )
+                logging.error(exception_string)
+                raise ValueError(exception_string)
+
+    @staticmethod
     def _is_string_none_or_empty(string, arg, method):
         """Checks whether a string is None or empty and throws an exception if so.
 
@@ -1430,7 +1488,6 @@ class FileHashStore(HashStore):
             string (string): Value to check
             arg (): Name of argument to check
             method (string): Calling method for logging purposes
-
         """
         if string is None or string.replace(" ", "") == "":
             exception_string = (

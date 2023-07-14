@@ -4,7 +4,7 @@ from hashstore import HashStoreFactory
 
 
 def add_client_optional_arguments(argp):
-    """Adds the optional arguments for HashStore Client.
+    """Adds the optional arguments for the HashStore Client.
 
     Args:
         argp (parser): argparse Parser object
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if getattr(args, "create_hashstore"):
         # Create a HashStore at the given directory
-        # Get store attributes and validate properties
+        # Get store attributes, HashStore will validate properties
         props = {
             "store_path": getattr(args, "store_path"),
             "store_depth": getattr(args, "depth"),

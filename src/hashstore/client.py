@@ -33,8 +33,8 @@ def add_client_optional_arguments(argp):
 
     # Directory to convert into a HashStore
     argp.add_argument(
-        "-dir",
-        dest="directory_to_convert",
+        "-cvd",
+        dest="convert_directory",
         help="Directory of objects to convert to a HashStore",
     )
 
@@ -57,6 +57,12 @@ def get_hashstore(properties):
     # Class variables
     hashstore = store.get_hashstore(module_name, class_name, properties)
     return hashstore
+
+
+def convert_directory_to_hashstore(directory, hashstore_path):
+    """Store objects in a given directory into HashStore."""
+    print(directory)
+    print(hashstore_path)
 
 
 if __name__ == "__main__":
@@ -90,3 +96,9 @@ if __name__ == "__main__":
             "store_metadata_namespace": getattr(args, "formatid"),
         }
         my_store = get_hashstore(props)
+    if getattr(args, "convert_directory"):
+        # If HashStore does not exist, raise exception
+        ## Calling app must create HashStore first
+        # Get list of files from directory
+        # Store them into HashStore
+        pass

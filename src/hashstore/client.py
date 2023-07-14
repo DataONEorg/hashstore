@@ -24,16 +24,16 @@ if __name__ == "__main__":
 
     # HashStore creation and property arguments
     parser.add_argument("-chs", dest="action", help="Create a HashStore")
-    parser.add_argument("-store_depth", dest="action", help="Depth of HashStore")
-    parser.add_argument("-store_width", dest="action", help="Width of HashStore")
+    parser.add_argument("-store_depth", dest="depth", help="Depth of HashStore")
+    parser.add_argument("-store_width", dest="width", help="Width of HashStore")
     parser.add_argument(
         "-store_algorithm",
-        dest="action",
+        dest="algorithm",
         help="Algorithm to use when calculating object address",
     )
     parser.add_argument(
         "-store_namespace",
-        dest="action",
+        dest="formatid",
         help="Default metadata namespace for metadata",
     )
 

@@ -15,16 +15,47 @@ if __name__ == "__main__":
         epilog=EPILOG,
     )
 
-    # Positional Arguments
-    # Path of the HashStore to create and/or store/delete objects to/from
+    ### Positional Arguments
+
+    # Path of the HashStore
     parser.add_argument("store_path", help="Path of the HashStore")
 
-    # Optional Arguments
+    ### Optional Arguments
+
+    # HashStore creation and property arguments
     parser.add_argument("-chs", dest="action", help="Create a HashStore")
+    parser.add_argument("-store_depth", dest="action", help="Depth of HashStore")
+    parser.add_argument("-store_width", dest="action", help="Width of HashStore")
+    parser.add_argument(
+        "-store_algorithm",
+        dest="action",
+        help="Algorithm to use when calculating object address",
+    )
+    parser.add_argument(
+        "-store_namespace",
+        dest="action",
+        help="Default metadata namespace for metadata",
+    )
+
+    # Directory to convert into a HashStore
+    parser.add_argument(
+        "-dir",
+        dest="action",
+        help="Directory of objects to convert to a HashStore",
+    )
+
+    # Public API Equivalent Methods
+    # object identifier
+    parser.add_argument("-pid", dest="pid", help="Object Identifier")
+    # store_object
     parser.add_argument("-sobj", dest="action", help="Store an object to the HashStore")
+    # delete_object
     parser.add_argument(
         "-dobj", dest="action", help="Delete an object to the HashStore"
     )
-    parser.add_argument("-pid", dest="pid", help="Object Identifier")
 
+    # TODO: Add methods and functionality
     parser.parse_args(["--help"])
+
+    # args = parser.parse_args()
+    # print(args)

@@ -1,7 +1,7 @@
 """HashStore Command Line App"""
 import os
-import yaml
 from argparse import ArgumentParser
+import yaml
 from hashstore import HashStoreFactory
 
 
@@ -38,6 +38,11 @@ def add_client_optional_arguments(argp):
         "-cvd",
         dest="convert_directory",
         help="Directory of objects to convert to a HashStore",
+    )
+    argp.add_argument(
+        "-nobj",
+        dest="num_obj_to_convert",
+        help="Number of objects to convert",
     )
 
 
@@ -100,22 +105,27 @@ def load_properties(hashstore_yaml):
     return hashstore_yaml_dict
 
 
-def convert_directory_to_hashstore(config_yaml):
-    """Store objects in a given directory into HashStore with a random pid."""
+def convert_directory_to_hashstore(config_yaml, num):
+    """Store objects in a given directory into HashStore with a random pid.
+
+    Args:
+        config_yaml (str): Path to HashStore config file `hashstore.yaml`
+        num (int): Number of files to store
+    """
     properties = load_properties(config_yaml)
     store = get_hashstore(properties)
 
     # Get list of files from directory
     obj_list = os.listdir(directory_to_convert)
+    if num is None:
+        checked_num = len(obj_list)
+    else:
+        checked_num = int(num)
 
     # Store them into HashStore
-    # pylint: disable=C0103
-    pid_count = 1
-    for obj in obj_list:
-        # Temporary unique identifier
-        pid = f"dou.test.{pid_count}"
-        pid_count += 1
-        obj_file_path = directory_to_convert + "/" + obj
+    for i in range(0, checked_num):
+        pid = f"dou.test.{i}"
+        obj_file_path = directory_to_convert + "/" + obj_list[i]
         _hash_address = store.store_object(pid, obj_file_path)
 
 
@@ -157,10 +167,13 @@ if __name__ == "__main__":
     elif getattr(args, "convert_directory") is not None:
         directory_to_convert = getattr(args, "convert_directory")
         if os.path.exists(directory_to_convert):
+            number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
             store_path = getattr(args, "store_path")
             store_path_config_yaml = store_path + "/hashstore.yaml"
             if os.path.exists(store_path_config_yaml):
-                convert_directory_to_hashstore(store_path_config_yaml)
+                convert_directory_to_hashstore(
+                    store_path_config_yaml, number_of_objects_to_convert
+                )
             else:
                 # If HashStore does not exist, raise exception
                 # Calling app must create HashStore first before calling methods

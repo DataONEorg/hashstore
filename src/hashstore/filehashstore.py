@@ -304,7 +304,10 @@ class FileHashStore(HashStore):
             # If 'hashstore.yaml' is found, verify given properties before init
             hashstore_yaml_dict = self.load_properties()
             for key in self.property_required_keys:
-                if hashstore_yaml_dict[key] != properties[key]:
+                checked_key = properties[key]
+                if key is "store_depth" or key is "store_width":
+                    checked_key = int(properties[key])
+                if hashstore_yaml_dict[key] != checked_key:
                     exception_string = (
                         f"FileHashStore - Given properties ({key}: {properties[key]}) does not"
                         + f" match. HashStore configuration ({key}: {hashstore_yaml_dict[key]})"

@@ -305,7 +305,7 @@ class FileHashStore(HashStore):
             hashstore_yaml_dict = self.load_properties()
             for key in self.property_required_keys:
                 checked_key = properties[key]
-                if key is "store_depth" or key is "store_width":
+                if key == "store_depth" or key == "store_width":
                     checked_key = int(properties[key])
                 if hashstore_yaml_dict[key] != checked_key:
                     exception_string = (

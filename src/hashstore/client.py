@@ -3,6 +3,7 @@ import os
 from argparse import ArgumentParser
 import yaml
 from hashstore import HashStoreFactory
+from datetime import datetime
 
 
 def add_client_optional_arguments(argp):
@@ -105,6 +106,17 @@ def load_properties(hashstore_yaml):
     return hashstore_yaml_dict
 
 
+def write_command_metadata(directory, filename, content):
+    """Write a text file to a given directory."""
+    # Combine the directory path and filename
+    file_path = f"{directory}/{filename}"
+
+    # Open the file in write mode ('w')
+    with open(file_path, "w", encoding="utf-8") as file:
+        # Write the content to the file
+        file.write(content)
+
+
 def convert_directory_to_hashstore(config_yaml, num):
     """Store objects in a given directory into HashStore with a random pid.
 
@@ -123,10 +135,15 @@ def convert_directory_to_hashstore(config_yaml, num):
         checked_num = int(num)
 
     # Store them into HashStore
+    start_time = datetime.now()
     for i in range(0, checked_num):
         pid = f"dou.test.{i}"
         obj_file_path = directory_to_convert + "/" + obj_list[i]
         _hash_address = store.store_object(pid, obj_file_path)
+    end_time = datetime.now()
+
+    content = f"Start Time: {start_time}\nEnd Time: {end_time}"
+    write_command_metadata(properties["store_path"], "client_metadata.txt", content)
 
 
 if __name__ == "__main__":

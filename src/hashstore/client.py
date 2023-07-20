@@ -143,7 +143,11 @@ async def convert_directory_to_hashstore(obj_directory, config_yaml, num):
         """Store object to HashStore"""
         pid = item["pid"]
         obj_path = item["obj_path"]
-        store.store_object(pid, obj_path)
+
+        async def store_obj_await(pid, path):
+            store.store_object(pid, path)
+
+        await store_obj_await(pid, obj_path)
 
     # Get list of files from directory
     obj_list = os.listdir(obj_directory)
@@ -191,7 +195,7 @@ async def convert_directory_to_hashstore(obj_directory, config_yaml, num):
 
     # End
     end_time = datetime.now()
-    content = f"Start Time: {start_time}\nEnd Time: {end_time}"
+    content = f"Start Time: {start_time}\nEnd Time: {end_time}\nTotal Time to Store {checked_num} Objects: {end_time - start_time}"
     write_text_to_path(properties["store_path"], "client_metadata.txt", content)
 
 

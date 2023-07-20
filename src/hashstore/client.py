@@ -6,6 +6,7 @@ import asyncio
 import queue
 import yaml
 from hashstore import HashStoreFactory
+import multiprocessing
 
 
 def add_client_optional_arguments(argp):
@@ -131,6 +132,12 @@ async def convert_directory_to_hashstore(obj_directory, config_yaml, num):
     properties = load_properties(config_yaml)
     store = get_hashstore(properties)
 
+    def store_obj(obj_name):
+        """Store object to HashStore"""
+        pid = f"dou.test.{obj_name}"
+        obj_path = (obj_directory + "/" + obj_name,)
+        _hash_address = store.store_object(pid, obj_path)
+
     # def process_store_obj_queue_thread(my_queue):
     #     """Store object to HashStore"""
     #     while not my_queue.empty():
@@ -139,15 +146,15 @@ async def convert_directory_to_hashstore(obj_directory, config_yaml, num):
     #         obj_path = queue_item["obj_path"]
     #         _hash_address = store.store_object(pid, obj_path)
 
-    async def store_obj(item):
-        """Store object to HashStore"""
-        pid = item["pid"]
-        obj_path = item["obj_path"]
+    # async def store_obj(item):
+    #     """Store object to HashStore"""
+    #     pid = item["pid"]
+    #     obj_path = item["obj_path"]
 
-        async def store_obj_await(pid, path):
-            store.store_object(pid, path)
+    #     async def store_obj_await(pid, path):
+    #         store.store_object(pid, path)
 
-        await store_obj_await(pid, obj_path)
+    #     await store_obj_await(pid, obj_path)
 
     # Get list of files from directory
     obj_list = os.listdir(obj_directory)
@@ -173,8 +180,14 @@ async def convert_directory_to_hashstore(obj_directory, config_yaml, num):
     # Start
     start_time = datetime.now()
 
-    coroutines = [store_obj(item) for item in store_obj_list]
-    await asyncio.gather(*coroutines)
+    num_processes = 4
+    pool = multiprocessing.Pool(processes=num_processes)
+
+    pool.close()
+    pool.join()
+
+    # coroutines = [store_obj(item) for item in store_obj_list]
+    # await asyncio.gather(*coroutines)
 
     # # Number of threads
     # num_threads = 5

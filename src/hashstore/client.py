@@ -1,9 +1,11 @@
 """HashStore Command Line App"""
 import os
 from argparse import ArgumentParser
+from datetime import datetime
+import queue
+import threading
 import yaml
 from hashstore import HashStoreFactory
-from datetime import datetime
 
 
 def add_client_optional_arguments(argp):
@@ -106,7 +108,7 @@ def load_properties(hashstore_yaml):
     return hashstore_yaml_dict
 
 
-def write_command_metadata(directory, filename, content):
+def write_text_to_path(directory, filename, content):
     """Write a text file to a given directory."""
     # Combine the directory path and filename
     file_path = f"{directory}/{filename}"
@@ -117,33 +119,65 @@ def write_command_metadata(directory, filename, content):
         file.write(content)
 
 
-def convert_directory_to_hashstore(config_yaml, num):
+def convert_directory_to_hashstore(obj_directory, config_yaml, num):
     """Store objects in a given directory into HashStore with a random pid.
 
     Args:
+        obj_directory (str): Directory to convert
         config_yaml (str): Path to HashStore config file `hashstore.yaml`
         num (int): Number of files to store
     """
+
     properties = load_properties(config_yaml)
     store = get_hashstore(properties)
 
+    def process_store_obj_queue(my_queue):
+        """Store object to HashStore"""
+        while not my_queue.empty():
+            queue_item = my_queue.get()
+            pid = queue_item["pid"]
+            obj_path = queue_item["obj_path"]
+            _hash_address = store.store_object(pid, obj_path)
+
     # Get list of files from directory
-    obj_list = os.listdir(directory_to_convert)
+    obj_list = os.listdir(obj_directory)
+    # Create queue
+    store_obj_queue = queue.Queue(maxsize=len(obj_list))
+
+    # Check number of files to store
     if num is None:
         checked_num = len(obj_list)
     else:
         checked_num = int(num)
 
-    # Store them into HashStore
-    start_time = datetime.now()
+    # Make a queue of objects to store
     for i in range(0, checked_num):
-        pid = f"dou.test.{i}"
-        obj_file_path = directory_to_convert + "/" + obj_list[i]
-        _hash_address = store.store_object(pid, obj_file_path)
-    end_time = datetime.now()
+        item_dict = {
+            "pid": f"dou.test.{i}",
+            "obj_path": obj_directory + "/" + obj_list[i],
+        }
+        store_obj_queue.put(item_dict)
 
+    # Number of threads
+    num_threads = 5
+
+    # Create and start threads
+    start_time = datetime.now()
+    threads = []
+    for _ in range(num_threads):
+        thread = threading.Thread(
+            target=process_store_obj_queue, args=(store_obj_queue,)
+        )
+        thread.start()
+        threads.append(thread)
+
+    # Wait for all threads to finish
+    for thread in threads:
+        thread.join()
+
+    end_time = datetime.now()
     content = f"Start Time: {start_time}\nEnd Time: {end_time}"
-    write_command_metadata(properties["store_path"], "client_metadata.txt", content)
+    write_text_to_path(properties["store_path"], "client_metadata.txt", content)
 
 
 if __name__ == "__main__":
@@ -189,7 +223,9 @@ if __name__ == "__main__":
             store_path_config_yaml = store_path + "/hashstore.yaml"
             if os.path.exists(store_path_config_yaml):
                 convert_directory_to_hashstore(
-                    store_path_config_yaml, number_of_objects_to_convert
+                    directory_to_convert,
+                    store_path_config_yaml,
+                    number_of_objects_to_convert,
                 )
             else:
                 # If HashStore does not exist, raise exception

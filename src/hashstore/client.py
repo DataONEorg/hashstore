@@ -262,16 +262,18 @@ def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
     if num is not None:
         checked_num = int(num)
 
+    # Create tuple to pass to store.store_object via starmap
     for i in range(0, checked_num):
         tuple_item = (f"dou.test.{i}", obj_directory + "/" + obj_list[i])
         checked_obj_list.append(tuple_item)
 
     start_time = datetime.now()
 
+    # Setup pool and processes
     num_processes = 4
     pool = multiprocessing.Pool(processes=num_processes)
 
-    # Map the square_number function to the list of numbers using the process pool
+    # Call store object
     pool.starmap(store.store_object, checked_obj_list)
 
     # Close the pool and wait for all processes to complete

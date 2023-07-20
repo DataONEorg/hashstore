@@ -270,8 +270,9 @@ def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
     start_time = datetime.now()
 
     # Setup pool and processes
-    num_processes = 4
-    pool = multiprocessing.Pool(processes=num_processes)
+    # num_processes = os.cpu_count() - 2
+    # pool = multiprocessing.Pool(processes=num_processes)
+    pool = multiprocessing.Pool()
 
     # Call store object
     pool.starmap(store.store_object, checked_obj_list)

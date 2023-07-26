@@ -161,7 +161,7 @@ def write_text_to_path(directory, filename, content):
 
 def get_objs_from_metacat_db(properties, obj_directory, num):
     """Get the list of objects from knbvm's metacat db to store into HashStore"""
-    # Get db config from locally created file in store path (`pgdb.yaml`)
+    # Note: Manually create `pgdb.yaml` for security purposes
     pgyaml_path = properties["store_path"] + "/pgdb.yaml"
     print(f"Retrieving db config from: {pgyaml_path}")
 
@@ -211,8 +211,8 @@ def get_objs_from_metacat_db(properties, obj_directory, num):
 
 
 def get_metadata_from_metacat_db(properties, metadata_directory, num):
-    """Get the list of objects from knbvm's metacat db to store into HashStore"""
-    # Get db config from locally created file in store path (`pgdb.yaml`)
+    """Get the list of metadata objs from knbvm's metacat db to store into HashStore"""
+    # Note: Manually create `pgdb.yaml` for security purposes
     pgyaml_path = properties["store_path"] + "/pgdb.yaml"
     print(f"Retrieving db config from: {pgyaml_path}")
 
@@ -235,7 +235,7 @@ def get_metadata_from_metacat_db(properties, metadata_directory, num):
     # Create a cursor to execute queries
     cursor = conn.cursor()
 
-    # Query to refine matching rows between `identifier` and `systemmetadata`` table
+    # Query to refine rows between `identifier` and `systemmetadata`` table
     query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
             systemmetadata.object_format FROM identifier INNER JOIN systemmetadata
             ON identifier.guid = systemmetadata.guid LIMIT {num};"""
@@ -279,12 +279,11 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     # Get list of files from directory
     file_list = os.listdir(origin_dir)
     checked_num_of_files = len(file_list)
-
     # Check number of files to store
     if num is not None:
         checked_num_of_files = int(num)
 
-    # Get list of objects to store
+    # Get list of objects to store from metacat db
     if obj_type == "object":
         checked_obj_list = get_objs_from_metacat_db(
             properties, origin_dir, checked_num_of_files
@@ -301,7 +300,7 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     # pool = multiprocessing.Pool(processes=num_processes)
     pool = multiprocessing.Pool()
 
-    # Call store object
+    # Call 'obj_type' respective public API methods
     if obj_type == "object":
         print("Storing objects")
         pool.starmap(store.store_object, checked_obj_list)
@@ -356,7 +355,7 @@ if __name__ == "__main__":
         }
         get_hashstore(props)
 
-    # Convert a directory into HashStore if config file and directory exist
+    # Convert a directory to a HashStore if config file present
     elif getattr(args, "convert_directory") is not None:
         directory_to_convert = getattr(args, "convert_directory")
         if os.path.exists(directory_to_convert):
@@ -365,7 +364,9 @@ if __name__ == "__main__":
             store_path_config_yaml = store_path + "/hashstore.yaml"
             directory_type = getattr(args, "convert_directory_type")
             if directory_type != "object" or directory_type != "metadata":
-                raise ValueError("Directory type must be 'object' or 'metadata'")
+                raise ValueError(
+                    "Directory `-cvt` cannot be empty, must be 'object' or 'metadata'"
+                )
             if os.path.exists(store_path_config_yaml):
                 store_to_hashstore(
                     directory_to_convert,

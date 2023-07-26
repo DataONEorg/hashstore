@@ -246,6 +246,7 @@ def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
     content = (
         f"Start Time: {start_time}\nEnd Time: {end_time}\n"
         + f"Total Time to Store {checked_num} Objects: {end_time - start_time}"
+        + f"Expected number of data objects stored: {len(checked_obj_list)}"
     )
     write_text_to_path(properties["store_path"], "client_metadata", content)
 

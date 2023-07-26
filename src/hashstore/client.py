@@ -192,7 +192,7 @@ def get_objs_from_metacat_db(properties, obj_directory, num):
     for row in rows:
         # Get pid and filename
         pid_guid = row[0]
-        filepath_docid_rev = obj_directory + "/" + row[1] + "." + row[2]
+        filepath_docid_rev = obj_directory + "/" + row[1] + "." + str(row[2])
         tuple_item = (pid_guid, filepath_docid_rev)
         # Only add to the list if it is an object, not metadata document
         if os.path.exists(filepath_docid_rev):

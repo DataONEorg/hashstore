@@ -2,11 +2,9 @@
 import os
 from argparse import ArgumentParser
 from datetime import datetime
-import threading
-import asyncio
-import queue
-import yaml
 import multiprocessing
+import yaml
+import pg8000
 from hashstore import HashStoreFactory
 
 
@@ -71,7 +69,7 @@ def get_hashstore(properties):
     return hashstore
 
 
-def load_properties(hashstore_yaml):
+def load_store_properties(hashstore_yaml):
     """Get and return the contents of the current HashStore configuration.
 
     Returns:
@@ -92,7 +90,7 @@ def load_properties(hashstore_yaml):
 
     if not os.path.exists(hashstore_yaml):
         exception_string = (
-            "HashStore CLI Client - load_properties: hashstore.yaml not found"
+            "HashStore CLI Client - load_store_properties: hashstore.yaml not found"
             + " in store root path."
         )
         raise FileNotFoundError(exception_string)
@@ -110,10 +108,45 @@ def load_properties(hashstore_yaml):
     return hashstore_yaml_dict
 
 
+def load_db_properties(pgdb_yaml):
+    """Get and return the contents of a postgres config file
+
+    Args:
+        pgdb_yaml (string): Path to yaml file
+
+    Returns:
+        hashstore_yaml_dict (dict): postgres db config properties
+    """
+    db_keys = [
+        "db_user",
+        "db_password",
+        "db_host",
+        "db_port",
+        "db_name",
+    ]
+
+    if not os.path.exists(pgdb_yaml):
+        exception_string = (
+            "HashStore CLI Client - load_db_properties: pgdb.yaml not found"
+            + " in store root path."
+        )
+        raise FileNotFoundError(exception_string)
+    # Open file
+    with open(pgdb_yaml, "r", encoding="utf-8") as file:
+        yaml_data = yaml.safe_load(file)
+
+    # Get hashstore properties
+    db_yaml_dict = {}
+    for key in db_keys:
+        checked_property = yaml_data[key]
+        db_yaml_dict[key] = checked_property
+    return db_yaml_dict
+
+
 def write_text_to_path(directory, filename, content):
     """Write a text file to a given directory."""
     # Combine the directory path and filename
-    file_path = f"{directory}/{filename}"
+    file_path = f"{directory}/{filename}.txt"
 
     # Open the file in write mode ('w')
     with open(file_path, "w", encoding="utf-8") as file:
@@ -121,124 +154,55 @@ def write_text_to_path(directory, filename, content):
         file.write(content)
 
 
-async def convert_dir_to_hs_async(obj_directory, config_yaml, num):
-    """Store objects in a given directory into HashStore with a random pid.
+def get_objs_from_metacat_db(properties, obj_directory, num):
+    """Get the list of objects from knbvm's metacat db to store into HashStore"""
+    # Get db config from locally created file in store path (`pgdb.yaml`)
+    pgyaml_path = properties["store_path"] + "/pgdb.yaml"
+    print(f"Retrieving db config from: {pgyaml_path}")
 
-    Args:
-        obj_directory (str): Directory to convert
-        config_yaml (str): Path to HashStore config file `hashstore.yaml`
-        num (int): Number of files to store
-    """
+    db_properties = load_db_properties(pgyaml_path)
+    db_user = db_properties["db_user"]
+    db_password = db_properties["db_password"]
+    db_host = db_properties["db_host"]
+    db_port = db_properties["db_port"]
+    db_name = db_properties["db_name"]
 
-    properties = load_properties(config_yaml)
-    store = get_hashstore(properties)
-
-    async def store_obj(item):
-        """Store object to HashStore"""
-        pid = item["pid"]
-        obj_path = item["obj_path"]
-
-        async def store_obj_await(pid, path):
-            store.store_object(pid, path)
-
-        await store_obj_await(pid, obj_path)
-
-    # Get list of files from directory
-    obj_list = os.listdir(obj_directory)
-    store_obj_list = []
-
-    # Check number of files to store
-    if num is None:
-        checked_num = len(obj_list)
-    else:
-        checked_num = int(num)
-
-    # Make a queue of objects to store
-    for i in range(0, checked_num):
-        item_dict = {
-            "pid": f"dou.test.{i}",
-            "obj_path": obj_directory + "/" + obj_list[i],
-        }
-        store_obj_list.append(item_dict)
-
-    start_time = datetime.now()
-
-    coroutines = [store_obj(item) for item in store_obj_list]
-    await asyncio.gather(*coroutines)
-
-    end_time = datetime.now()
-    content = (
-        f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-        + f"Total Time to Store {checked_num} Objects: {end_time - start_time}"
+    # Create a connection to the database
+    conn = pg8000.connect(
+        user=db_user,
+        password=db_password,
+        host=db_host,
+        port=int(db_port),
+        database=db_name,
     )
-    write_text_to_path(properties["store_path"], "client_metadata.txt", content)
 
+    # Create a cursor to execute queries
+    cursor = conn.cursor()
 
-def convert_dir_to_hs_thread(obj_directory, config_yaml, num):
-    """Store objects in a given directory into HashStore with a random pid.
+    # Query to get rows from `identifier` table
+    query = f"SELECT * FROM identifier LIMIT {num};"
+    cursor.execute(query)
 
-    Args:
-        obj_directory (str): Directory to convert
-        config_yaml (str): Path to HashStore config file `hashstore.yaml`
-        num (int): Number of files to store
-    """
+    # Fetch all rows from the result set
+    rows = cursor.fetchall()
 
-    properties = load_properties(config_yaml)
-    store = get_hashstore(properties)
+    # Create object list to store into HashStore
+    print("Creating list of objects to store into HashStore")
+    checked_obj_list = []
+    for row in rows:
+        # Get pid and filename
+        pid_guid = row[0]
+        filepath_docid_rev = obj_directory + "/" + row[1] + "." + row[2]
+        tuple_item = (pid_guid, filepath_docid_rev)
+        # Only add to the list if it is an object, not metadata document
+        if os.path.exists(filepath_docid_rev):
+            checked_obj_list.append(tuple_item)
 
-    def process_store_obj_queue(my_queue):
-        """Store object to HashStore"""
-        while not my_queue.empty():
-            queue_item = my_queue.get()
-            pid = queue_item["pid"]
-            obj_path = queue_item["obj_path"]
-            _hash_address = store.store_object(pid, obj_path)
+    # Close the cursor and connection when done
+    cursor.close()
+    conn.close()
 
-    # Get list of files from directory
-    obj_list = os.listdir(obj_directory)
-    # Create queue
-    store_obj_queue = queue.Queue(maxsize=len(obj_list))
-
-    # Check number of files to store
-    if num is None:
-        checked_num = len(obj_list)
-    else:
-        checked_num = int(num)
-
-    # Make a queue of objects to store
-    for i in range(0, checked_num):
-        item_dict = {
-            "pid": f"dou.test.{i}",
-            "obj_path": obj_directory + "/" + obj_list[i],
-        }
-        store_obj_queue.put(item_dict)
-
-    start_time = datetime.now()
-
-    # Number of threads
-    num_threads = 5
-    threads = []
-    for _ in range(num_threads):
-        thread = threading.Thread(
-            target=process_store_obj_queue, args=(store_obj_queue,)
-        )
-        thread.start()
-        threads.append(thread)
-
-    # Wait for all threads to finish
-    for thread in threads:
-        thread.join()
-
-    for _ in range(0, checked_num):
-        process_store_obj_queue(store_obj_queue)
-
-    # End
-    end_time = datetime.now()
-    content = (
-        f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-        + f"Total Time to Store {checked_num} Objects: {end_time - start_time}"
-    )
-    write_text_to_path(properties["store_path"], "client_metadata.txt", content)
+    return checked_obj_list
 
 
 def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
@@ -249,23 +213,19 @@ def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
         config_yaml (str): Path to HashStore config file `hashstore.yaml`
         num (int): Number of files to store
     """
-
-    properties = load_properties(config_yaml)
+    properties = load_store_properties(config_yaml)
     store = get_hashstore(properties)
 
     # Get list of files from directory
     obj_list = os.listdir(obj_directory)
     checked_num = len(obj_list)
-    checked_obj_list = []
 
     # Check number of files to store
     if num is not None:
         checked_num = int(num)
 
-    # Create tuple to pass to store.store_object via starmap
-    for i in range(0, checked_num):
-        tuple_item = (f"dou.test.{i}", obj_directory + "/" + obj_list[i])
-        checked_obj_list.append(tuple_item)
+    # Get list of objects to store
+    checked_obj_list = get_objs_from_metacat_db(properties, obj_directory, checked_num)
 
     start_time = datetime.now()
 
@@ -275,6 +235,7 @@ def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
     pool = multiprocessing.Pool()
 
     # Call store object
+    print("Storing objects")
     pool.starmap(store.store_object, checked_obj_list)
 
     # Close the pool and wait for all processes to complete
@@ -286,7 +247,7 @@ def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
         f"Start Time: {start_time}\nEnd Time: {end_time}\n"
         + f"Total Time to Store {checked_num} Objects: {end_time - start_time}"
     )
-    write_text_to_path(properties["store_path"], "client_metadata.txt", content)
+    write_text_to_path(properties["store_path"], "client_metadata", content)
 
 
 if __name__ == "__main__":
@@ -331,13 +292,6 @@ if __name__ == "__main__":
             store_path = getattr(args, "store_path")
             store_path_config_yaml = store_path + "/hashstore.yaml"
             if os.path.exists(store_path_config_yaml):
-                # asyncio.run(
-                #     convert_dir_to_hs_async(
-                #         directory_to_convert,
-                #         store_path_config_yaml,
-                #         number_of_objects_to_convert,
-                #     )
-                # )
                 convert_dir_to_hs_multi(
                     directory_to_convert,
                     store_path_config_yaml,

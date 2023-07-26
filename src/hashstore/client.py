@@ -43,6 +43,11 @@ def add_client_optional_arguments(argp):
         help="Directory of objects to convert to a HashStore",
     )
     argp.add_argument(
+        "-cvt",
+        dest="convert_directory_type",
+        help="Type of directory to convert (ex. 'objects' or 'metadata')",
+    )
+    argp.add_argument(
         "-nobj",
         dest="num_obj_to_convert",
         help="Number of objects to convert",
@@ -135,7 +140,7 @@ def load_db_properties(pgdb_yaml):
     with open(pgdb_yaml, "r", encoding="utf-8") as file:
         yaml_data = yaml.safe_load(file)
 
-    # Get hashstore properties
+    # Get database values
     db_yaml_dict = {}
     for key in db_keys:
         checked_property = yaml_data[key]
@@ -205,11 +210,66 @@ def get_objs_from_metacat_db(properties, obj_directory, num):
     return checked_obj_list
 
 
-def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
-    """Store objects in a given directory into HashStore with a random pid.
+def get_metadata_from_metacat_db(properties, metadata_directory, num):
+    """Get the list of objects from knbvm's metacat db to store into HashStore"""
+    # Get db config from locally created file in store path (`pgdb.yaml`)
+    pgyaml_path = properties["store_path"] + "/pgdb.yaml"
+    print(f"Retrieving db config from: {pgyaml_path}")
+
+    db_properties = load_db_properties(pgyaml_path)
+    db_user = db_properties["db_user"]
+    db_password = db_properties["db_password"]
+    db_host = db_properties["db_host"]
+    db_port = db_properties["db_port"]
+    db_name = db_properties["db_name"]
+
+    # Create a connection to the database
+    conn = pg8000.connect(
+        user=db_user,
+        password=db_password,
+        host=db_host,
+        port=int(db_port),
+        database=db_name,
+    )
+
+    # Create a cursor to execute queries
+    cursor = conn.cursor()
+
+    # Query to refine matching rows between `identifier` and `systemmetadata`` table
+    query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
+            systemmetadata.object_format FROM identifier INNER JOIN systemmetadata
+            ON identifier.guid = systemmetadata.guid LIMIT {num};"""
+    cursor.execute(query)
+
+    # Fetch all rows from the result set
+    rows = cursor.fetchall()
+
+    # Create metadata list to store into HashStore
+    print("Creating list of metadata to store into HashStore")
+    checked_metadata_list = []
+    for row in rows:
+        # Get pid, filepath and formatId
+        pid_guid = row[0]
+        metadatapath_docid_rev = metadata_directory + "/" + row[1] + "." + str(row[2])
+        metadata_namespace = row[3]
+        tuple_item = (pid_guid, metadatapath_docid_rev, metadata_namespace)
+        # Only add to the list if it is an object, not metadata document
+        if os.path.exists(metadatapath_docid_rev):
+            checked_metadata_list.append(tuple_item)
+
+    # Close the cursor and connection when done
+    cursor.close()
+    conn.close()
+
+    return checked_metadata_list
+
+
+def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
+    """Store objects in a given directory into HashStore
 
     Args:
-        obj_directory (str): Directory to convert
+        origin_dir (str): Directory to convert
+        obj_type (str): 'object' or 'metadata'
         config_yaml (str): Path to HashStore config file `hashstore.yaml`
         num (int): Number of files to store
     """
@@ -217,15 +277,22 @@ def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
     store = get_hashstore(properties)
 
     # Get list of files from directory
-    obj_list = os.listdir(obj_directory)
-    checked_num = len(obj_list)
+    file_list = os.listdir(origin_dir)
+    checked_num_of_files = len(file_list)
 
     # Check number of files to store
     if num is not None:
-        checked_num = int(num)
+        checked_num_of_files = int(num)
 
     # Get list of objects to store
-    checked_obj_list = get_objs_from_metacat_db(properties, obj_directory, checked_num)
+    if obj_type == "object":
+        checked_obj_list = get_objs_from_metacat_db(
+            properties, origin_dir, checked_num_of_files
+        )
+    if obj_type == "metadata":
+        checked_obj_list = get_metadata_from_metacat_db(
+            properties, origin_dir, checked_num_of_files
+        )
 
     start_time = datetime.now()
 
@@ -235,8 +302,12 @@ def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
     pool = multiprocessing.Pool()
 
     # Call store object
-    print("Storing objects")
-    pool.starmap(store.store_object, checked_obj_list)
+    if obj_type == "object":
+        print("Storing objects")
+        pool.starmap(store.store_object, checked_obj_list)
+    if obj_type == "metadata":
+        print("Storing metadata")
+        pool.starmap(store.store_metadata, checked_obj_list)
 
     # Close the pool and wait for all processes to complete
     pool.close()
@@ -245,8 +316,8 @@ def convert_dir_to_hs_multi(obj_directory, config_yaml, num):
     end_time = datetime.now()
     content = (
         f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-        + f"Total Time to Store {checked_num} Objects: {end_time - start_time}"
-        + f"Expected number of data objects stored: {len(checked_obj_list)}"
+        + f"Total Time to Store {checked_num_of_files} Objects: {end_time - start_time}"
+        + f"Expected number of data {obj_type} stored: {len(checked_obj_list)}"
     )
     write_text_to_path(properties["store_path"], "client_metadata", content)
 
@@ -292,9 +363,13 @@ if __name__ == "__main__":
             number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
             store_path = getattr(args, "store_path")
             store_path_config_yaml = store_path + "/hashstore.yaml"
+            directory_type = getattr(args, "convert_directory_type")
+            if directory_type != "object" or directory_type != "metadata":
+                raise ValueError("Directory type must be 'object' or 'metadata'")
             if os.path.exists(store_path_config_yaml):
-                convert_dir_to_hs_multi(
+                store_to_hashstore(
                     directory_to_convert,
+                    directory_type,
                     store_path_config_yaml,
                     number_of_objects_to_convert,
                 )

@@ -2,6 +2,7 @@
 import os
 from argparse import ArgumentParser
 from datetime import datetime
+import hashlib
 import multiprocessing
 import yaml
 import pg8000
@@ -159,6 +160,19 @@ def write_text_to_path(directory, filename, content):
         file.write(content)
 
 
+def get_sha256_hex_digest(string):
+    """Calculate the SHA-256 digest of a UTF-8 encoded string.
+
+    Args:
+        string (string): String to convert.
+
+    Returns:
+        hex (string): Hexadecimal string.
+    """
+    hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
+    return hex_digest
+
+
 def get_objs_from_metacat_db(properties, obj_directory, num):
     """Get the list of objects from knbvm's metacat db to store into HashStore"""
     # Note: Manually create `pgdb.yaml` for security purposes
@@ -201,7 +215,11 @@ def get_objs_from_metacat_db(properties, obj_directory, num):
         tuple_item = (pid_guid, filepath_docid_rev)
         # Only add to the list if it is an object, not metadata document
         if os.path.exists(filepath_docid_rev):
-            checked_obj_list.append(tuple_item)
+            # If the file has already been stored, skip it
+            if os.path.exists(get_sha256_hex_digest(pid_guid)):
+                pass
+            else:
+                checked_obj_list.append(tuple_item)
 
     # Close the cursor and connection when done
     cursor.close()
@@ -255,6 +273,8 @@ def get_metadata_from_metacat_db(properties, metadata_directory, num):
         tuple_item = (pid_guid, metadatapath_docid_rev, metadata_namespace)
         # Only add to the list if it is an object, not metadata document
         if os.path.exists(metadatapath_docid_rev):
+            # If the file already exists, don't attempt to add it
+
             checked_metadata_list.append(tuple_item)
 
     # Close the cursor and connection when done

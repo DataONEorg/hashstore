@@ -255,9 +255,9 @@ def get_metadata_from_metacat_db(properties, metadata_directory, num):
     cursor = conn.cursor()
 
     # Query to refine rows between `identifier` and `systemmetadata`` table
-    query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
+    query = """SELECT identifier.guid, identifier.docid, identifier.rev,
             systemmetadata.object_format FROM identifier INNER JOIN systemmetadata
-            ON identifier.guid = systemmetadata.guid LIMIT {num};"""
+            ON identifier.guid = systemmetadata.guid;"""
     cursor.execute(query)
 
     # Fetch all rows from the result set

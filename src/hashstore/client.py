@@ -1,4 +1,5 @@
 """HashStore Command Line App"""
+import sys
 import os
 from argparse import ArgumentParser
 from datetime import datetime
@@ -274,7 +275,7 @@ def get_metadata_from_metacat_db(properties, metadata_directory, num):
         # Only add to the list if it is an object, not metadata document
         if os.path.exists(metadatapath_docid_rev):
             # If the file already exists, don't attempt to add it
-
+            print(f"Metadata doc found: {metadatapath_docid_rev} for pid: {pid_guid}")
             checked_metadata_list.append(tuple_item)
 
     # Close the cursor and connection when done
@@ -335,8 +336,8 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     end_time = datetime.now()
     content = (
         f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-        + f"Total Time to Store {checked_num_of_files} Objects: {end_time - start_time}"
-        + f"Expected number of data {obj_type} stored: {len(checked_obj_list)}"
+        + f"Total Time to Store {len(checked_obj_list)} {obj_type}"
+        + f" Objects: {end_time - start_time}\n"
     )
     write_text_to_path(properties["store_path"], "client_metadata", content)
 

@@ -173,7 +173,7 @@ def get_sha256_hex_digest(string):
     return hex_digest
 
 
-def get_objs_from_metacat_db(properties, obj_directory, num):
+def get_objs_from_metacat_db(properties, obj_directory, num, store):
     """Get the list of objects from knbvm's metacat db to store into HashStore"""
     # Note: Manually create `pgdb.yaml` for security purposes
     pgyaml_path = properties["store_path"] + "/pgdb.yaml"
@@ -216,8 +216,10 @@ def get_objs_from_metacat_db(properties, obj_directory, num):
         # Only add to the list if it is an object, not metadata document
         if os.path.exists(filepath_docid_rev):
             # If the file has already been stored, skip it
-            if os.path.exists(get_sha256_hex_digest(pid_guid)):
-                pass
+            if os.path.exists(
+                store.get_real_path(store.get_sha256_hex_digest(pid_guid))
+            ):
+                print(f"Object exists in HashStore for guid: {pid_guid}")
             else:
                 checked_obj_list.append(tuple_item)
 
@@ -306,7 +308,7 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     # Get list of objects to store from metacat db
     if obj_type == "object":
         checked_obj_list = get_objs_from_metacat_db(
-            properties, origin_dir, checked_num_of_files
+            properties, origin_dir, checked_num_of_files, store
         )
     if obj_type == "metadata":
         checked_obj_list = get_metadata_from_metacat_db(

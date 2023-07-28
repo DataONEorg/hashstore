@@ -216,9 +216,7 @@ def get_objs_from_metacat_db(properties, obj_directory, num, store):
         # Only add to the list if it is an object, not metadata document
         if os.path.exists(filepath_docid_rev):
             # If the file has already been stored, skip it
-            if os.path.exists(
-                store.get_real_path("objects", store.get_sha256_hex_digest(pid_guid))
-            ):
+            if store.exists("objects", store.get_sha256_hex_digest(pid_guid)):
                 print(f"Object exists in HashStore for guid: {pid_guid}")
             else:
                 checked_obj_list.append(tuple_item)

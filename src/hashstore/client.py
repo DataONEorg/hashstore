@@ -385,7 +385,8 @@ if __name__ == "__main__":
             directory_type = getattr(args, "convert_directory_type")
             if directory_type != "object" or directory_type != "metadata":
                 raise ValueError(
-                    "Directory `-cvt` cannot be empty, must be 'object' or 'metadata'"
+                    "Directory `-cvt` cannot be empty, must be 'object' or 'metadata'."
+                    + f"convert_directory_type: {directory_type}"
                 )
             if os.path.exists(store_path_config_yaml):
                 store_to_hashstore(

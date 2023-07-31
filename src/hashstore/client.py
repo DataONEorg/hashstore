@@ -1,5 +1,6 @@
 """HashStore Command Line App"""
 import sys
+import logging
 import os
 from argparse import ArgumentParser
 from datetime import datetime
@@ -296,6 +297,12 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     """
     properties = load_store_properties(config_yaml)
     store = get_hashstore(properties)
+    logging.basicConfig(
+        filename=properties["store_path"] + "/python/python_store.log",
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     # Get list of files from directory
     file_list = os.listdir(origin_dir)
@@ -324,10 +331,24 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     # Call 'obj_type' respective public API methods
     if obj_type == "object":
         print("Storing objects")
-        pool.starmap(store.store_object, checked_obj_list)
+        results = pool.starmap(store.store_object, checked_obj_list)
     if obj_type == "metadata":
         print("Storing metadata")
-        pool.starmap(store.store_metadata, checked_obj_list)
+        results = pool.starmap(store.store_metadata, checked_obj_list)
+
+    # Log exceptions
+    print("Checking results and logging exceptions")
+    for index, result in enumerate(results):
+        exception_type = type(result).__name__
+        exception_message = result.args[0]
+        err_msg = f"Exception ({exception_type}): {exception_message}"
+        if isinstance(result, Exception):
+            logging.info(err_msg)
+            write_text_to_path(
+                properties["store_path"] + f"/python/errors/{obj_type}",
+                f"exception_{index}_{exception_type}",
+                err_msg,
+            )
 
     # Close the pool and wait for all processes to complete
     pool.close()
@@ -339,6 +360,7 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
         + f"Total Time to Store {len(checked_obj_list)} {obj_type}"
         + f" Objects: {end_time - start_time}\n"
     )
+    logging.info(content)
     write_text_to_path(properties["store_path"], "client_metadata", content)
 
 

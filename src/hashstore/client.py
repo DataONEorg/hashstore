@@ -338,17 +338,11 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
 
     # Log exceptions
     print("Checking results and logging exceptions")
-    for index, result in enumerate(results):
-        exception_type = type(result).__name__
-        exception_message = result.args[0]
-        err_msg = f"Exception ({exception_type}): {exception_message}"
+    for result in results:
+        result_type = type(result).__name__
         if isinstance(result, Exception):
-            logging.info(err_msg)
-            write_text_to_path(
-                properties["store_path"] + f"/python/errors/{obj_type}",
-                f"exception_{index}_{exception_type}",
-                err_msg,
-            )
+            print(f"{result_type}: {result}")
+            logging.info(result)
 
     # Close the pool and wait for all processes to complete
     pool.close()

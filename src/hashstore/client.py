@@ -66,6 +66,7 @@ def get_hashstore(properties):
     Returns:
         hashstore (FileHashStore): HashStore
     """
+    logging.info("Initializing HashStore")
     factory = HashStoreFactory()
 
     # Get HashStore from factory
@@ -297,12 +298,6 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     """
     properties = load_store_properties(config_yaml)
     store = get_hashstore(properties)
-    logging.basicConfig(
-        filename=properties["store_path"] + "/python/python_store.log",
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
 
     # Get list of files from directory
     file_list = os.listdir(origin_dir)
@@ -330,19 +325,19 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
 
     # Call 'obj_type' respective public API methods
     if obj_type == "object":
-        print("Storing objects")
+        logging.info("Storing objects")
         results = pool.starmap(store.store_object, checked_obj_list)
     if obj_type == "metadata":
-        print("Storing metadata")
+        logging.info("Storing metadata")
         results = pool.starmap(store.store_metadata, checked_obj_list)
 
     # Log exceptions
-    print("Checking results and logging exceptions")
+    cleanup_msg = "Checking results and logging exceptions"
+    print(cleanup_msg)
+    logging.info(cleanup_msg)
     for result in results:
-        logging.info(result)
-        result_type = type(result).__name__
         if isinstance(result, Exception):
-            print(f"{result_type}: {result}")
+            print(result)
             logging.info(result)
 
     # Close the pool and wait for all processes to complete
@@ -356,7 +351,6 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
         + f" Objects: {end_time - start_time}\n"
     )
     logging.info(content)
-    write_text_to_path(properties["store_path"], "client_metadata", content)
 
 
 if __name__ == "__main__":
@@ -372,13 +366,21 @@ if __name__ == "__main__":
         description=DESCRIPTION,
         epilog=EPILOG,
     )
-
     ### Add Positional and Optional Arguments
     parser.add_argument("store_path", help="Path of the HashStore")
     add_client_optional_arguments(parser)
 
     # Client entry point
     args = parser.parse_args()
+
+    ### Initialize Logging
+    python_log_file_path = getattr(args, "store_path") + "/python_store.log"
+    logging.basicConfig(
+        filename=python_log_file_path,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     # Create HashStore if -chs flag is true
     if getattr(args, "create_hashstore"):

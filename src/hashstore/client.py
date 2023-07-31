@@ -339,7 +339,7 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     # Log exceptions
     print("Checking results and logging exceptions")
     for result in results:
-        print(result)
+        logging.info(result)
         result_type = type(result).__name__
         if isinstance(result, Exception):
             print(f"{result_type}: {result}")

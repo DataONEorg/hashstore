@@ -56,6 +56,18 @@ def add_client_optional_arguments(argp):
         help="Number of objects to convert",
     )
 
+    # Individual API calls
+    argp.add_argument(
+        "-pid",
+        dest="object_pid",
+        help="Pid/Guid of object to work with",
+    )
+    argp.add_argument(
+        "-algo",
+        dest="object_algorithm",
+        help="Algorithm to work with",
+    )
+
 
 def get_hashstore(properties):
     """Create a HashStore instance with the supplied properties.
@@ -353,6 +365,17 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     logging.info(content)
 
 
+def get_obj_hex_digest_from_store(config_yaml, pid, algorithm):
+    """Given a pid and algorithm, get the hex digest of the object"""
+    properties = load_store_properties(config_yaml)
+    store = get_hashstore(properties)
+
+    digest = store.get_hex_digest(pid, algorithm)
+    print(f"guid/pid: {pid}")
+    print(f"algorithm: {algorithm}")
+    print(f"digest: {digest}")
+
+
 if __name__ == "__main__":
     PROGRAM_NAME = "HashStore Command Line Client"
     DESCRIPTION = (
@@ -426,4 +449,24 @@ if __name__ == "__main__":
         else:
             raise FileNotFoundError(
                 f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."
+            )
+
+    # Calculate the hex digest of a given pid with algorithm supplied
+    elif (
+        getattr(args, "object_pid") is not None
+        and getattr(args, "object_algorithm") is not None
+    ):
+        pid = getattr(args, "object_pid")
+        algorithm = getattr(args, "object_algorithm")
+        store_path = getattr(args, "store_path")
+        store_path_config_yaml = store_path + "/hashstore.yaml"
+
+        if os.path.exists(store_path_config_yaml):
+            get_obj_hex_digest_from_store(store_path_config_yaml, pid, algorithm)
+        else:
+            # If HashStore does not exist, raise exception
+            # Calling app must create HashStore first before calling methods
+            raise FileNotFoundError(
+                f"Missing config file (hashstore.yaml) at store path: {store_path}."
+                + " HashStore must be initialized, use `--help` for more information."
             )

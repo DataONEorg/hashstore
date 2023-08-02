@@ -1,17 +1,18 @@
 """HashStore Command Line App"""
-import sys
 import logging
 import os
 from argparse import ArgumentParser
 from datetime import datetime
-import hashlib
 import multiprocessing
 import yaml
 import pg8000
 from hashstore import HashStoreFactory
 
 
-def add_client_optional_arguments(argp):
+# Supporting Methods
+
+
+def _add_client_optional_arguments(argp):
     """Adds the optional arguments for the HashStore Client.
 
     Args:
@@ -69,7 +70,7 @@ def add_client_optional_arguments(argp):
     )
 
 
-def get_hashstore(properties):
+def _get_hashstore(properties):
     """Create a HashStore instance with the supplied properties.
 
     Args:
@@ -90,7 +91,7 @@ def get_hashstore(properties):
     return hashstore
 
 
-def load_store_properties(hashstore_yaml):
+def _load_store_properties(hashstore_yaml):
     """Get and return the contents of the current HashStore configuration.
 
     Returns:
@@ -111,7 +112,7 @@ def load_store_properties(hashstore_yaml):
 
     if not os.path.exists(hashstore_yaml):
         exception_string = (
-            "HashStore CLI Client - load_store_properties: hashstore.yaml not found"
+            "HashStore CLI Client - _load_store_properties: hashstore.yaml not found"
             + " in store root path."
         )
         raise FileNotFoundError(exception_string)
@@ -129,8 +130,9 @@ def load_store_properties(hashstore_yaml):
     return hashstore_yaml_dict
 
 
-def load_db_properties(pgdb_yaml):
-    """Get and return the contents of a postgres config file
+def _load_metacat_db_properties(pgdb_yaml):
+    """Get and return the contents of a config file with credentials
+    to access a postgres db.
 
     Args:
         pgdb_yaml (string): Path to yaml file
@@ -148,7 +150,7 @@ def load_db_properties(pgdb_yaml):
 
     if not os.path.exists(pgdb_yaml):
         exception_string = (
-            "HashStore CLI Client - load_db_properties: pgdb.yaml not found"
+            "HashStore CLI Client - _load_metacat_db_properties: pgdb.yaml not found"
             + " in store root path."
         )
         raise FileNotFoundError(exception_string)
@@ -164,92 +166,13 @@ def load_db_properties(pgdb_yaml):
     return db_yaml_dict
 
 
-def write_text_to_path(directory, filename, content):
-    """Write a text file to a given directory."""
-    # Combine the directory path and filename
-    file_path = f"{directory}/{filename}.txt"
-
-    # Open the file in write mode ('w')
-    with open(file_path, "w", encoding="utf-8") as file:
-        # Write the content to the file
-        file.write(content)
-
-
-def get_sha256_hex_digest(string):
-    """Calculate the SHA-256 digest of a UTF-8 encoded string.
-
-    Args:
-        string (string): String to convert.
-
-    Returns:
-        hex (string): Hexadecimal string.
-    """
-    hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
-    return hex_digest
-
-
-def get_objs_from_metacat_db(properties, obj_directory, num, store):
-    """Get the list of objects from knbvm's metacat db to store into HashStore"""
+def _get_full_obj_list_from_metacat_db(properties, metadata_directory, num):
+    """Get the list of objects and metadata from knbvm's metacat db"""
     # Note: Manually create `pgdb.yaml` for security purposes
     pgyaml_path = properties["store_path"] + "/pgdb.yaml"
     print(f"Retrieving db config from: {pgyaml_path}")
 
-    db_properties = load_db_properties(pgyaml_path)
-    db_user = db_properties["db_user"]
-    db_password = db_properties["db_password"]
-    db_host = db_properties["db_host"]
-    db_port = db_properties["db_port"]
-    db_name = db_properties["db_name"]
-
-    # Create a connection to the database
-    conn = pg8000.connect(
-        user=db_user,
-        password=db_password,
-        host=db_host,
-        port=int(db_port),
-        database=db_name,
-    )
-
-    # Create a cursor to execute queries
-    cursor = conn.cursor()
-
-    # Query to get rows from `identifier` table
-    query = f"SELECT * FROM identifier LIMIT {num};"
-    cursor.execute(query)
-
-    # Fetch all rows from the result set
-    rows = cursor.fetchall()
-
-    # Create object list to store into HashStore
-    print("Creating list of objects to store into HashStore")
-    checked_obj_list = []
-    for row in rows:
-        # Get pid and filename
-        pid_guid = row[0]
-        filepath_docid_rev = obj_directory + "/" + row[1] + "." + str(row[2])
-        tuple_item = (pid_guid, filepath_docid_rev)
-        # Only add to the list if it is an object, not metadata document
-        if os.path.exists(filepath_docid_rev):
-            # If the file has already been stored, skip it
-            if store.exists("objects", store.get_sha256_hex_digest(pid_guid)):
-                print(f"Object exists in HashStore for guid: {pid_guid}")
-            else:
-                checked_obj_list.append(tuple_item)
-
-    # Close the cursor and connection when done
-    cursor.close()
-    conn.close()
-
-    return checked_obj_list
-
-
-def get_metadata_from_metacat_db(properties, metadata_directory, num):
-    """Get the list of metadata objs from knbvm's metacat db to store into HashStore"""
-    # Note: Manually create `pgdb.yaml` for security purposes
-    pgyaml_path = properties["store_path"] + "/pgdb.yaml"
-    print(f"Retrieving db config from: {pgyaml_path}")
-
-    db_properties = load_db_properties(pgyaml_path)
+    db_properties = _load_metacat_db_properties(pgyaml_path)
     db_user = db_properties["db_user"]
     db_password = db_properties["db_password"]
     db_host = db_properties["db_host"]
@@ -269,37 +192,86 @@ def get_metadata_from_metacat_db(properties, metadata_directory, num):
     cursor = conn.cursor()
 
     # Query to refine rows between `identifier` and `systemmetadata`` table
-    query = """SELECT identifier.guid, identifier.docid, identifier.rev,
-            systemmetadata.object_format FROM identifier INNER JOIN systemmetadata
-            ON identifier.guid = systemmetadata.guid;"""
+    if num is None:
+        limit_query = ""
+    else:
+        limit_query = f" LIMIT {num}"
+    query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
+            systemmetadata.object_format, systemmetadata.checksum,
+            systemmetadata.checksum_algorithm FROM identifier INNER JOIN systemmetadata
+            ON identifier.guid = systemmetadata.guid{limit_query};"""
     cursor.execute(query)
 
     # Fetch all rows from the result set
     rows = cursor.fetchall()
 
-    # Create metadata list to store into HashStore
-    print("Creating list of metadata to store into HashStore")
-    checked_metadata_list = []
+    # Create full object list to store into HashStore
+    print("Creating list of objects and metadata from metacat db")
+    object_metadata_list = []
     for row in rows:
         # Get pid, filepath and formatId
         pid_guid = row[0]
         metadatapath_docid_rev = metadata_directory + "/" + row[1] + "." + str(row[2])
         metadata_namespace = row[3]
-        tuple_item = (pid_guid, metadatapath_docid_rev, metadata_namespace)
-        # Only add to the list if it is an object, not metadata document
-        if os.path.exists(metadatapath_docid_rev):
-            # If the file already exists, don't attempt to add it
-            print(f"Metadata doc found: {metadatapath_docid_rev} for pid: {pid_guid}")
-            checked_metadata_list.append(tuple_item)
+        checksum = row[4]
+        checksum_algorithm = row[5]
+        tuple_item = (
+            pid_guid,
+            metadatapath_docid_rev,
+            metadata_namespace,
+            checksum,
+            checksum_algorithm,
+        )
+        object_metadata_list.append(tuple_item)
 
     # Close the cursor and connection when done
     cursor.close()
     conn.close()
 
-    return checked_metadata_list
+    return object_metadata_list
 
 
-def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
+def _refine_object_list(store, metacat_obj_list):
+    """Refine a list of objects by checking for file existence and removing duplicates."""
+    refined_list = []
+    for obj in metacat_obj_list:
+        pid_guid = obj[0]
+        filepath_docid_rev = obj[1]
+        if os.path.exists(filepath_docid_rev):
+            # If the file has already been stored, skip it
+            if store.exists("objects", store.get_sha256_hex_digest(pid_guid)):
+                print(
+                    f"Skipping store_object for {pid_guid} - object exists in HashStore"
+                )
+            else:
+                tuple_item = (pid_guid, filepath_docid_rev)
+                refined_list.append(tuple_item)
+    return refined_list
+
+
+def _refine_metadata_list(store, metacat_obj_list):
+    """Refine a list of metadata by checking for file existence and removing duplicates."""
+    refined_list = []
+    for obj in metacat_obj_list:
+        pid_guid = obj[0]
+        filepath_docid_rev = obj[1]
+        metadata_namespace = obj[2]
+        if os.path.exists(filepath_docid_rev):
+            # If the file has already been stored, skip it
+            if store.exists("metadata", store.get_sha256_hex_digest(pid_guid)):
+                print(
+                    f"Skipping store_metadata for {pid_guid} - metadata exists in HashStore"
+                )
+            else:
+                tuple_item = (pid_guid, metadata_namespace, filepath_docid_rev)
+                refined_list.append(tuple_item)
+    return refined_list
+
+
+# Concrete Methods
+
+
+def store_to_hashstore_from_list(origin_dir, obj_type, config_yaml, num):
     """Store objects in a given directory into HashStore
 
     Args:
@@ -308,8 +280,8 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
         config_yaml (str): Path to HashStore config file `hashstore.yaml`
         num (int): Number of files to store
     """
-    properties = load_store_properties(config_yaml)
-    store = get_hashstore(properties)
+    properties = _load_store_properties(config_yaml)
+    store = _get_hashstore(properties)
 
     # Get list of files from directory
     file_list = os.listdir(origin_dir)
@@ -318,15 +290,16 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     if num is not None:
         checked_num_of_files = int(num)
 
+    # Object and Metadata list
+    metacat_obj_list = _get_full_obj_list_from_metacat_db(
+        properties, origin_dir, checked_num_of_files
+    )
+
     # Get list of objects to store from metacat db
     if obj_type == "object":
-        checked_obj_list = get_objs_from_metacat_db(
-            properties, origin_dir, checked_num_of_files, store
-        )
+        checked_obj_list = _refine_object_list(store, metacat_obj_list)
     if obj_type == "metadata":
-        checked_obj_list = get_metadata_from_metacat_db(
-            properties, origin_dir, checked_num_of_files
-        )
+        checked_obj_list = _refine_metadata_list(store, metacat_obj_list)
 
     start_time = datetime.now()
 
@@ -365,14 +338,14 @@ def store_to_hashstore(origin_dir, obj_type, config_yaml, num):
     logging.info(content)
 
 
-def get_obj_hex_digest_from_store(config_yaml, pid, algorithm):
+def get_obj_hex_digest_from_store(config_yaml, pid_guid, obj_algo):
     """Given a pid and algorithm, get the hex digest of the object"""
-    properties = load_store_properties(config_yaml)
-    store = get_hashstore(properties)
+    properties = _load_store_properties(config_yaml)
+    store = _get_hashstore(properties)
 
     digest = store.get_hex_digest(pid, algorithm)
-    print(f"guid/pid: {pid}")
-    print(f"algorithm: {algorithm}")
+    print(f"guid/pid: {pid_guid}")
+    print(f"algorithm: {obj_algo}")
     print(f"digest: {digest}")
 
 
@@ -391,7 +364,7 @@ if __name__ == "__main__":
     )
     ### Add Positional and Optional Arguments
     parser.add_argument("store_path", help="Path of the HashStore")
-    add_client_optional_arguments(parser)
+    _add_client_optional_arguments(parser)
 
     # Client entry point
     args = parser.parse_args()
@@ -405,9 +378,8 @@ if __name__ == "__main__":
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Create HashStore if -chs flag is true
     if getattr(args, "create_hashstore"):
-        # Create a HashStore at the given directory
+        # Create HashStore if -chs flag is true in a given directory
         # Get store attributes, HashStore will validate properties
         props = {
             "store_path": getattr(args, "store_path"),
@@ -416,10 +388,9 @@ if __name__ == "__main__":
             "store_algorithm": getattr(args, "algorithm"),
             "store_metadata_namespace": getattr(args, "formatid"),
         }
-        get_hashstore(props)
-
-    # Convert a directory to a HashStore if config file present
+        _get_hashstore(props)
     elif getattr(args, "convert_directory") is not None:
+        # Convert a directory to a HashStore if config file present
         directory_to_convert = getattr(args, "convert_directory")
         if os.path.exists(directory_to_convert):
             number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
@@ -433,7 +404,7 @@ if __name__ == "__main__":
                     + f" convert_directory_type: {directory_type}"
                 )
             if os.path.exists(store_path_config_yaml):
-                store_to_hashstore(
+                store_to_hashstore_from_list(
                     directory_to_convert,
                     directory_type,
                     store_path_config_yaml,
@@ -450,12 +421,11 @@ if __name__ == "__main__":
             raise FileNotFoundError(
                 f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."
             )
-
-    # Calculate the hex digest of a given pid with algorithm supplied
     elif (
         getattr(args, "object_pid") is not None
         and getattr(args, "object_algorithm") is not None
     ):
+        # Calculate the hex digest of a given pid with algorithm supplied
         pid = getattr(args, "object_pid")
         algorithm = getattr(args, "object_algorithm")
         store_path = getattr(args, "store_path")

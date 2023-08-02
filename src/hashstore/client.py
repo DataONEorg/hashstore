@@ -247,7 +247,7 @@ def _refine_object_list(store, metacat_obj_list):
             # If the file has already been stored, skip it
             if store.exists("objects", store.get_sha256_hex_digest(pid_guid)):
                 print(
-                    f"Skipping store_object for {pid_guid} - object exists in HashStore"
+                    f"Refining Object List: Skipping {pid_guid} - object exists in HashStore"
                 )
             else:
                 tuple_item = (pid_guid, filepath_docid_rev)
@@ -390,7 +390,7 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
 
     if obj_type == "object":
         logging.info("Storing objects")
-        results = pool.starmap(retrieve_and_validate, checked_obj_list)
+        results = pool.map(retrieve_and_validate, checked_obj_list)
     if obj_type == "metadata":
         logging.info("Storing metadata")
         # TODO

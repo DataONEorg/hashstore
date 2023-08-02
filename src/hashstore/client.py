@@ -56,6 +56,12 @@ def _add_client_optional_arguments(argp):
         dest="num_obj_to_convert",
         help="Number of objects to convert",
     )
+    argp.add_argument(
+        "-rav",
+        dest="retrieve_and_validate",
+        action="store_true",
+        help="Retrieve and validate objects in HashStore",
+    )
 
     # Individual API calls
     argp.add_argument(
@@ -166,7 +172,7 @@ def _load_metacat_db_properties(pgdb_yaml):
     return db_yaml_dict
 
 
-def _get_full_obj_list_from_metacat_db(properties, metadata_directory, num):
+def _get_full_obj_list_from_metacat_db(properties, metacat_dir, num):
     """Get the list of objects and metadata from knbvm's metacat db"""
     # Note: Manually create `pgdb.yaml` for security purposes
     pgyaml_path = properties["store_path"] + "/pgdb.yaml"
@@ -211,7 +217,7 @@ def _get_full_obj_list_from_metacat_db(properties, metadata_directory, num):
     for row in rows:
         # Get pid, filepath and formatId
         pid_guid = row[0]
-        metadatapath_docid_rev = metadata_directory + "/" + row[1] + "." + str(row[2])
+        metadatapath_docid_rev = metacat_dir + "/" + row[1] + "." + str(row[2])
         metadata_namespace = row[3]
         checksum = row[4]
         checksum_algorithm = row[5]
@@ -323,6 +329,79 @@ def store_to_hashstore_from_list(origin_dir, obj_type, config_yaml, num):
     for result in results:
         if isinstance(result, Exception):
             print(result)
+            logging.error(result)
+
+    # Close the pool and wait for all processes to complete
+    pool.close()
+    pool.join()
+
+    end_time = datetime.now()
+    content = (
+        f"store_to_hashstore_from_list:\n"
+        f"Start Time: {start_time}\nEnd Time: {end_time}\n"
+        + f"Total Time to Store {len(checked_obj_list)} {obj_type}"
+        + f" Objects: {end_time - start_time}\n"
+    )
+    logging.info(content)
+
+
+def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num):
+    "Retrieve objects or metadata from a Hashstore and validate the content."
+    properties = _load_store_properties(config_yaml)
+    store = _get_hashstore(properties)
+
+    checked_num_of_files = None
+    # Check number of files to store
+    if num is not None:
+        checked_num_of_files = int(num)
+
+    # Object and Metadata list
+    metacat_obj_list = _get_full_obj_list_from_metacat_db(
+        properties, origin_dir, checked_num_of_files
+    )
+
+    # Get list of objects to store from metacat db
+    if obj_type == "object":
+        checked_obj_list = _refine_object_list(store, metacat_obj_list)
+    if obj_type == "metadata":
+        checked_obj_list = _refine_metadata_list(store, metacat_obj_list)
+
+    start_time = datetime.now()
+
+    # Retrieve, validate and close stream
+    def retrieve_and_validate(obj_tuple):
+        pid_guid = obj_tuple[0]
+        algo = obj_tuple[4]
+        checksum = obj_tuple[3]
+        obj_stream = store.retrieve_object(pid_guid)
+        digest = store.computehash(obj_stream, algo)
+        obj_stream.close()
+        # Check algorithm
+        if digest != checksum:
+            err_msg = (
+                f"Unexpected Exception for pid/guid: {pid_guid} -"
+                + f" Digest calcualted from stream ({digest}) does not match"
+                + f" checksum from metacata db: {checksum}"
+            )
+            raise AssertionError(err_msg)
+
+    # Setup pool and processes
+    pool = multiprocessing.Pool()
+
+    if obj_type == "object":
+        logging.info("Storing objects")
+        results = pool.starmap(retrieve_and_validate, checked_obj_list)
+    if obj_type == "metadata":
+        logging.info("Storing metadata")
+        # TODO
+
+    # Log exceptions
+    cleanup_msg = "Checking results and logging exceptions"
+    print(cleanup_msg)
+    logging.info(cleanup_msg)
+    for result in results:
+        if isinstance(result, Exception):
+            print(result)
             logging.info(result)
 
     # Close the pool and wait for all processes to complete
@@ -331,8 +410,9 @@ def store_to_hashstore_from_list(origin_dir, obj_type, config_yaml, num):
 
     end_time = datetime.now()
     content = (
+        f"retrieve_and_validate_from_hashstore:\n"
         f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-        + f"Total Time to Store {len(checked_obj_list)} {obj_type}"
+        + f"Total Time to retrieve and validate {len(checked_obj_list)} {obj_type}"
         + f" Objects: {end_time - start_time}\n"
     )
     logging.info(content)
@@ -373,7 +453,7 @@ if __name__ == "__main__":
     python_log_file_path = getattr(args, "store_path") + "/python_store.log"
     logging.basicConfig(
         filename=python_log_file_path,
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
@@ -389,8 +469,9 @@ if __name__ == "__main__":
             "store_metadata_namespace": getattr(args, "formatid"),
         }
         _get_hashstore(props)
+
     elif getattr(args, "convert_directory") is not None:
-        # Convert a directory to a HashStore if config file present
+        # Perform operations to a HashStore if config file present
         directory_to_convert = getattr(args, "convert_directory")
         if os.path.exists(directory_to_convert):
             number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
@@ -404,12 +485,20 @@ if __name__ == "__main__":
                     + f" convert_directory_type: {directory_type}"
                 )
             if os.path.exists(store_path_config_yaml):
-                store_to_hashstore_from_list(
-                    directory_to_convert,
-                    directory_type,
-                    store_path_config_yaml,
-                    number_of_objects_to_convert,
-                )
+                if getattr(args, "retrieve_and_validate"):
+                    retrieve_and_validate_from_hashstore(
+                        directory_to_convert,
+                        directory_type,
+                        store_path_config_yaml,
+                        number_of_objects_to_convert,
+                    )
+                else:
+                    store_to_hashstore_from_list(
+                        directory_to_convert,
+                        directory_type,
+                        store_path_config_yaml,
+                        number_of_objects_to_convert,
+                    )
             else:
                 # If HashStore does not exist, raise exception
                 # Calling app must create HashStore first before calling methods
@@ -421,6 +510,7 @@ if __name__ == "__main__":
             raise FileNotFoundError(
                 f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."
             )
+
     elif (
         getattr(args, "object_pid") is not None
         and getattr(args, "object_algorithm") is not None

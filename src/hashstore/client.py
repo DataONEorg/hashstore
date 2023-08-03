@@ -41,8 +41,14 @@ class HashStoreClient:
                 + f" Digest calcualted from stream ({digest}) does not match"
                 + f" checksum from metacata db: {checksum}"
             )
-            logging.info(err_msg)
             raise AssertionError(err_msg)
+        else:
+            info_msg = (
+                f"Checksums match for pid/guid:{pid_guid} -"
+                + f" Digest calcualted from stream: {digest}."
+                + f" Checksum from metacata db: {checksum}."
+            )
+            logging.info(info_msg)
 
 
 def _add_client_optional_arguments(argp):

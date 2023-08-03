@@ -44,7 +44,7 @@ class HashStoreClient:
             raise AssertionError(err_msg)
         else:
             info_msg = (
-                f"Checksums match for pid/guid:{pid_guid} -"
+                f"Checksums match for pid/guid: {pid_guid} -"
                 + f" Digest calcualted from stream: {digest}."
                 + f" Checksum from metacata db: {checksum}."
             )
@@ -292,7 +292,9 @@ def _refine_object_list(store, metacat_obj_list, action):
                 else:
                     refined_list.append(tuple_item)
             if action == "retrieve":
-                refined_list.append(tuple_item)
+                if store.exists("objects", store.get_sha256_hex_digest(pid_guid)):
+                    refined_list.append(tuple_item)
+
     return refined_list
 
 

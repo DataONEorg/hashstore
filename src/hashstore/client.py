@@ -12,6 +12,21 @@ from hashstore import HashStoreFactory
 # Supporting Methods
 
 
+class HashStoreClient:
+    """Create a HashStore"""
+
+    def __init__(self, properties):
+        logging.info("Initializing HashStore")
+        factory = HashStoreFactory()
+
+        # Get HashStore from factory
+        module_name = "filehashstore"
+        class_name = "FileHashStore"
+
+        # Class variables
+        self.hashstore = factory.get_hashstore(module_name, class_name, properties)
+
+
 def _add_client_optional_arguments(argp):
     """Adds the optional arguments for the HashStore Client.
 
@@ -237,19 +252,23 @@ def _get_full_obj_list_from_metacat_db(properties, metacat_dir, num):
     return object_metadata_list
 
 
-def _refine_object_list(store, metacat_obj_list):
+def _refine_object_list(store, metacat_obj_list, action):
     """Refine a list of objects by checking for file existence and removing duplicates."""
     refined_list = []
     for obj in metacat_obj_list:
         pid_guid = obj[0]
         filepath_docid_rev = obj[1]
         if os.path.exists(filepath_docid_rev):
-            # If the file has already been stored, skip it
-            if store.exists("objects", store.get_sha256_hex_digest(pid_guid)):
-                print(
-                    f"Refining Object List: Skipping {pid_guid} - object exists in HashStore"
-                )
-            else:
+            if action == "store":
+                # If the file has already been stored, skip it
+                if store.exists("objects", store.get_sha256_hex_digest(pid_guid)):
+                    print(
+                        f"Refining Object List: Skipping {pid_guid} - object exists in HashStore"
+                    )
+                else:
+                    tuple_item = (pid_guid, filepath_docid_rev)
+                    refined_list.append(tuple_item)
+            if action == "retrieve":
                 tuple_item = (pid_guid, filepath_docid_rev)
                 refined_list.append(tuple_item)
     return refined_list
@@ -303,7 +322,7 @@ def store_to_hashstore_from_list(origin_dir, obj_type, config_yaml, num):
 
     # Get list of objects to store from metacat db
     if obj_type == "object":
-        checked_obj_list = _refine_object_list(store, metacat_obj_list)
+        checked_obj_list = _refine_object_list(store, metacat_obj_list, "store")
     if obj_type == "metadata":
         checked_obj_list = _refine_metadata_list(store, metacat_obj_list)
 
@@ -348,7 +367,8 @@ def store_to_hashstore_from_list(origin_dir, obj_type, config_yaml, num):
 def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num):
     "Retrieve objects or metadata from a Hashstore and validate the content."
     properties = _load_store_properties(config_yaml)
-    store = _get_hashstore(properties)
+    # store = _get_hashstore(properties)
+    store = HashStoreClient(properties).hashstore
 
     checked_num_of_files = None
     # Check number of files to store
@@ -362,7 +382,7 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
 
     # Get list of objects to store from metacat db
     if obj_type == "object":
-        checked_obj_list = _refine_object_list(store, metacat_obj_list)
+        checked_obj_list = _refine_object_list(store, metacat_obj_list, "retrieve")
     if obj_type == "metadata":
         checked_obj_list = _refine_metadata_list(store, metacat_obj_list)
 
@@ -389,10 +409,10 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
     pool = multiprocessing.Pool()
 
     if obj_type == "object":
-        logging.info("Storing objects")
+        logging.info("Retrieving objects")
         results = pool.map(retrieve_and_validate, checked_obj_list)
     if obj_type == "metadata":
-        logging.info("Storing metadata")
+        logging.info("Retrieiving metadata")
         # TODO
 
     # Log exceptions

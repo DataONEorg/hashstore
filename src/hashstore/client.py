@@ -386,7 +386,7 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
     "Retrieve objects or metadata from a Hashstore and validate the content."
     properties = _load_store_properties(config_yaml)
     # store = _get_hashstore(properties)
-    store = HashStoreClient(properties).hashstore
+    store = HashStoreClient(properties)
 
     checked_num_of_files = None
     # Check number of files to store

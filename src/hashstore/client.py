@@ -26,6 +26,24 @@ class HashStoreClient:
         # Class variables
         self.hashstore = factory.get_hashstore(module_name, class_name, properties)
 
+    def retrieve_and_validate(self, obj_tuple):
+        """Retrieve and validate a list of objects."""
+        pid_guid = obj_tuple[0]
+        algo = obj_tuple[4]
+        checksum = obj_tuple[3]
+        obj_stream = self.hashstore.retrieve_object(pid_guid)
+        digest = self.hashstore.computehash(obj_stream, algo)
+        obj_stream.close()
+        # Check algorithm
+        if digest != checksum:
+            err_msg = (
+                f"Unexpected Exception for pid/guid: {pid_guid} -"
+                + f" Digest calcualted from stream ({digest}) does not match"
+                + f" checksum from metacata db: {checksum}"
+            )
+            logging.info(err_msg)
+            raise AssertionError(err_msg)
+
 
 def _add_client_optional_arguments(argp):
     """Adds the optional arguments for the HashStore Client.
@@ -388,29 +406,12 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
 
     start_time = datetime.now()
 
-    # Retrieve, validate and close stream
-    def retrieve_and_validate(obj_tuple):
-        pid_guid = obj_tuple[0]
-        algo = obj_tuple[4]
-        checksum = obj_tuple[3]
-        obj_stream = store.retrieve_object(pid_guid)
-        digest = store.computehash(obj_stream, algo)
-        obj_stream.close()
-        # Check algorithm
-        if digest != checksum:
-            err_msg = (
-                f"Unexpected Exception for pid/guid: {pid_guid} -"
-                + f" Digest calcualted from stream ({digest}) does not match"
-                + f" checksum from metacata db: {checksum}"
-            )
-            raise AssertionError(err_msg)
-
     # Setup pool and processes
     pool = multiprocessing.Pool()
 
     if obj_type == "object":
         logging.info("Retrieving objects")
-        results = pool.map(retrieve_and_validate, checked_obj_list)
+        results = pool.map(store.retrieve_and_validate, checked_obj_list)
     if obj_type == "metadata":
         logging.info("Retrieiving metadata")
         # TODO

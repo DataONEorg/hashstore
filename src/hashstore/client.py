@@ -54,7 +54,148 @@ class HashStoreClient:
         print(f"digest: {digest}")
 
 
-# Supporting Methods
+class MetacatDB:
+    """Adapter class to interact with Metacat's Postgres DB"""
+
+    def __init__(self, pgdb_yaml, hashstore):
+        """Initialize credentials to access metacat pgdb."""
+        db_keys = [
+            "db_user",
+            "db_password",
+            "db_host",
+            "db_port",
+            "db_name",
+        ]
+
+        if not os.path.exists(pgdb_yaml):
+            exception_string = (
+                "HashStore CLI Client - _load_metacat_db_properties: pgdb.yaml not found"
+                + " in store root path. Must be manually created with the following keys:"
+                + " db_user, db_password, db_host, db_port, db_name"
+            )
+            raise FileNotFoundError(exception_string)
+        # Open file
+        with open(pgdb_yaml, "r", encoding="utf-8") as file:
+            yaml_data = yaml.safe_load(file)
+
+        # Get database values
+        self.hashstore = hashstore
+        self.db_yaml_dict = {}
+        for key in db_keys:
+            checked_property = yaml_data[key]
+            self.db_yaml_dict[key] = checked_property
+
+    def get_object_metadata_list(self, origin_directory, num):
+        """Query the metacat db for the full obj and metadata list.
+
+        Args:
+            origin_directory (string): 'var/metacat/data' or 'var/metacat/documents'
+            num (int): Number of rows to retrieve from metacat db
+        """
+        # Create a connection to the database
+        db_user = self.db_yaml_dict["db_user"]
+        db_password = self.db_yaml_dict["db_password"]
+        db_host = self.db_yaml_dict["db_host"]
+        db_port = self.db_yaml_dict["db_port"]
+        db_name = self.db_yaml_dict["db_name"]
+
+        conn = pg8000.connect(
+            user=db_user,
+            password=db_password,
+            host=db_host,
+            port=int(db_port),
+            database=db_name,
+        )
+
+        # Create a cursor to execute queries
+        cursor = conn.cursor()
+
+        # Query to refine rows between `identifier` and `systemmetadata`` table
+        if num is None:
+            limit_query = ""
+        else:
+            limit_query = f" LIMIT {num}"
+        query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
+                systemmetadata.object_format, systemmetadata.checksum,
+                systemmetadata.checksum_algorithm FROM identifier INNER JOIN systemmetadata
+                ON identifier.guid = systemmetadata.guid{limit_query};"""
+        cursor.execute(query)
+
+        # Fetch all rows from the result set
+        rows = cursor.fetchall()
+
+        # Create full object list to store into HashStore
+        print("Creating list of objects and metadata from metacat db")
+        object_metadata_list = []
+        for row in rows:
+            # Get pid, filepath and formatId
+            pid_guid = row[0]
+            metadatapath_docid_rev = origin_directory + "/" + row[1] + "." + str(row[2])
+            metadata_namespace = row[3]
+            checksum = row[4]
+            checksum_algorithm = row[5]
+            tuple_item = (
+                pid_guid,
+                metadatapath_docid_rev,
+                metadata_namespace,
+                checksum,
+                checksum_algorithm,
+            )
+            object_metadata_list.append(tuple_item)
+
+        # Close the cursor and connection when done
+        cursor.close()
+        conn.close()
+
+        return object_metadata_list
+
+    def refine_list_for_objects(self, metacat_obj_list, action):
+        """Refine a list of objects by checking for file existence and removing duplicates.
+
+        Args:
+            store (HashStore): HashStore object
+            metacat_obj_list (List): List of tuple objects representing rows from metacat db
+            action (string): "store" or "retrieve".
+                "store" will create a list of objects to store that do not exist in HashStore.
+                "retrieve" will create a list of objects that exist in HashStore.
+
+        Returns:
+            refine_list (List): List of tuple objects based on "action"
+        """
+        refined_object_list = []
+        for tuple_item in metacat_obj_list:
+            pid_guid = tuple_item[0]
+            filepath_docid_rev = tuple_item[1]
+            if os.path.exists(filepath_docid_rev):
+                if action == "store":
+                    # If the file has already been stored, skip it
+                    if not self.hashstore.exists(
+                        "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
+                    ):
+                        refined_object_list.append(tuple_item)
+                if action == "retrieve":
+                    if self.hashstore.exists(
+                        "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
+                    ):
+                        refined_object_list.append(tuple_item)
+
+        return refined_object_list
+
+    def refine_list_for_metadta(self, metacat_obj_list):
+        """Refine a list of metadata by checking for file existence and removing duplicates."""
+        refined_metadta_list = []
+        for obj in metacat_obj_list:
+            pid_guid = obj[0]
+            filepath_docid_rev = obj[1]
+            metadata_namespace = obj[2]
+            if os.path.exists(filepath_docid_rev):
+                # If the file has already been stored, skip it
+                if not self.hashstore.exists(
+                    "metadata", self.hashstore.get_sha256_hex_digest(pid_guid)
+                ):
+                    tuple_item = (pid_guid, metadata_namespace, filepath_docid_rev)
+                    refined_metadta_list.append(tuple_item)
+        return refined_metadta_list
 
 
 def _add_client_optional_arguments(argp):
@@ -158,148 +299,6 @@ def _load_store_properties(hashstore_yaml):
             checked_property = int(yaml_data[key])
         hashstore_yaml_dict[key] = checked_property
     return hashstore_yaml_dict
-
-
-def _load_metacat_db_properties(pgdb_yaml):
-    """Get and return the contents of a config file with credentials
-    to access a postgres db.
-
-    Args:
-        pgdb_yaml (string): Path to yaml file
-
-    Returns:
-        hashstore_yaml_dict (dict): postgres db config properties
-    """
-    db_keys = [
-        "db_user",
-        "db_password",
-        "db_host",
-        "db_port",
-        "db_name",
-    ]
-
-    if not os.path.exists(pgdb_yaml):
-        exception_string = (
-            "HashStore CLI Client - _load_metacat_db_properties: pgdb.yaml not found"
-            + " in store root path."
-        )
-        raise FileNotFoundError(exception_string)
-    # Open file
-    with open(pgdb_yaml, "r", encoding="utf-8") as file:
-        yaml_data = yaml.safe_load(file)
-
-    # Get database values
-    db_yaml_dict = {}
-    for key in db_keys:
-        checked_property = yaml_data[key]
-        db_yaml_dict[key] = checked_property
-    return db_yaml_dict
-
-
-def _get_full_obj_list_from_metacat_db(properties, metacat_dir, num):
-    """Get the list of objects and metadata from knbvm's metacat db"""
-    # Note: Manually create `pgdb.yaml` for security purposes
-    pgyaml_path = properties["store_path"] + "/pgdb.yaml"
-    print(f"Retrieving db config from: {pgyaml_path}")
-
-    db_properties = _load_metacat_db_properties(pgyaml_path)
-    db_user = db_properties["db_user"]
-    db_password = db_properties["db_password"]
-    db_host = db_properties["db_host"]
-    db_port = db_properties["db_port"]
-    db_name = db_properties["db_name"]
-
-    # Create a connection to the database
-    conn = pg8000.connect(
-        user=db_user,
-        password=db_password,
-        host=db_host,
-        port=int(db_port),
-        database=db_name,
-    )
-
-    # Create a cursor to execute queries
-    cursor = conn.cursor()
-
-    # Query to refine rows between `identifier` and `systemmetadata`` table
-    if num is None:
-        limit_query = ""
-    else:
-        limit_query = f" LIMIT {num}"
-    query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
-            systemmetadata.object_format, systemmetadata.checksum,
-            systemmetadata.checksum_algorithm FROM identifier INNER JOIN systemmetadata
-            ON identifier.guid = systemmetadata.guid{limit_query};"""
-    cursor.execute(query)
-
-    # Fetch all rows from the result set
-    rows = cursor.fetchall()
-
-    # Create full object list to store into HashStore
-    print("Creating list of objects and metadata from metacat db")
-    object_metadata_list = []
-    for row in rows:
-        # Get pid, filepath and formatId
-        pid_guid = row[0]
-        metadatapath_docid_rev = metacat_dir + "/" + row[1] + "." + str(row[2])
-        metadata_namespace = row[3]
-        checksum = row[4]
-        checksum_algorithm = row[5]
-        tuple_item = (
-            pid_guid,
-            metadatapath_docid_rev,
-            metadata_namespace,
-            checksum,
-            checksum_algorithm,
-        )
-        object_metadata_list.append(tuple_item)
-
-    # Close the cursor and connection when done
-    cursor.close()
-    conn.close()
-
-    return object_metadata_list
-
-
-def _refine_object_list(store, metacat_obj_list, action):
-    """Refine a list of objects by checking for file existence and removing duplicates."""
-    refined_list = []
-    for tuple_item in metacat_obj_list:
-        pid_guid = tuple_item[0]
-        filepath_docid_rev = tuple_item[1]
-        if os.path.exists(filepath_docid_rev):
-            if action == "store":
-                # If the file has already been stored, skip it
-                if store.exists("objects", store.get_sha256_hex_digest(pid_guid)):
-                    print(
-                        f"Refining Object List: Skipping {pid_guid} - object exists in HashStore"
-                    )
-                else:
-                    refined_list.append(tuple_item)
-            if action == "retrieve":
-                if store.exists("objects", store.get_sha256_hex_digest(pid_guid)):
-                    refined_list.append(tuple_item)
-
-    return refined_list
-
-
-def _refine_metadata_list(store, metacat_obj_list):
-    """Refine a list of metadata by checking for file existence and removing duplicates."""
-    refined_list = []
-    for obj in metacat_obj_list:
-        pid_guid = obj[0]
-        filepath_docid_rev = obj[1]
-        metadata_namespace = obj[2]
-        if os.path.exists(filepath_docid_rev):
-            # If the file has already been stored, skip it
-            if store.exists("metadata", store.get_sha256_hex_digest(pid_guid)):
-                print(
-                    f"Skipping store_metadata for {pid_guid} - metadata exists in HashStore"
-                )
-            else:
-                tuple_item = (pid_guid, metadata_namespace, filepath_docid_rev)
-                refined_list.append(tuple_item)
-    return refined_list
 
 
 # Concrete Methods

@@ -289,13 +289,24 @@ class MetacatDB:
         for tuple_item in metacat_obj_list:
             pid_guid = tuple_item[0]
             filepath_docid_rev = tuple_item[1]
+            checksum = tuple_item[3]
+            checksum_algorithm = tuple_item[4]
             if os.path.exists(filepath_docid_rev):
                 if action == "store":
                     # If the file has already been stored, skip it
                     if not self.hashstore.exists(
                         "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
                     ):
-                        refined_object_list.append(tuple_item)
+                        # This tuple is formed to match 'HashStore' store_object's signature
+                        # Which is '.starmap()'ed when called
+                        store_object_tuple_item = (
+                            pid_guid,
+                            filepath_docid_rev,
+                            None,
+                            checksum,
+                            checksum_algorithm,
+                        )
+                        refined_object_list.append(store_object_tuple_item)
                 if action == "retrieve":
                     if self.hashstore.exists(
                         "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
@@ -465,69 +476,66 @@ if __name__ == "__main__":
         }
         HashStoreClient(props)
 
-    elif getattr(args, "convert_directory") is not None:
-        # Perform operations to a HashStore if config file present
-        directory_to_convert = getattr(args, "convert_directory")
-        # Check if the directory to convert exists
-        if os.path.exists(directory_to_convert):
-            # If -nobj is supplied, limit the objects we work with
-            number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
-            store_path = getattr(args, "store_path")
-            store_path_config_yaml = store_path + "/hashstore.yaml"
-            # Determine if we are working with objects or metadata
-            directory_type = getattr(args, "convert_directory_type")
-            accepted_directory_types = ["object", "metadata"]
-            if directory_type not in accepted_directory_types:
-                raise ValueError(
-                    "Directory `-cvt` cannot be empty, must be 'object' or 'metadata'."
-                    + f" convert_directory_type: {directory_type}"
-                )
-            # HashStore can only be called if a configuration file is present
-            if os.path.exists(store_path_config_yaml):
-                props = _load_store_properties(store_path_config_yaml)
-                hs = HashStoreClient(props)
-                if getattr(args, "retrieve_and_validate"):
-                    hs.retrieve_and_validate_from_hashstore(
-                        directory_to_convert,
-                        directory_type,
-                        number_of_objects_to_convert,
+    else:
+        # Initialize HashStore
+        store_path = getattr(args, "store_path")
+        store_path_config_yaml = store_path + "/hashstore.yaml"
+        props = _load_store_properties(store_path_config_yaml)
+        hs = HashStoreClient(props)
+
+        if getattr(args, "convert_directory") is not None:
+            directory_to_convert = getattr(args, "convert_directory")
+            # Check if the directory to convert exists
+            if os.path.exists(directory_to_convert):
+                # If -nobj is supplied, limit the objects we work with
+                number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
+                # Determine if we are working with objects or metadata
+                directory_type = getattr(args, "convert_directory_type")
+                accepted_directory_types = ["object", "metadata"]
+                if directory_type not in accepted_directory_types:
+                    raise ValueError(
+                        "Directory `-cvt` cannot be empty, must be 'object' or 'metadata'."
+                        + f" convert_directory_type: {directory_type}"
                     )
+                # HashStore can only be called if a configuration file is present
+                if os.path.exists(store_path_config_yaml):
+                    if getattr(args, "retrieve_and_validate"):
+                        hs.retrieve_and_validate_from_hashstore(
+                            directory_to_convert,
+                            directory_type,
+                            number_of_objects_to_convert,
+                        )
+                    else:
+                        hs.store_to_hashstore_from_list(
+                            directory_to_convert,
+                            directory_type,
+                            number_of_objects_to_convert,
+                        )
                 else:
-                    hs.store_to_hashstore_from_list(
-                        directory_to_convert,
-                        directory_type,
-                        number_of_objects_to_convert,
+                    # If HashStore does not exist, raise exception
+                    # Calling app must create HashStore first before calling methods
+                    raise FileNotFoundError(
+                        f"Missing config file (hashstore.yaml) at store path: {store_path}."
+                        + " HashStore must be initialized, use `--help` for more information."
                     )
             else:
-                # If HashStore does not exist, raise exception
-                # Calling app must create HashStore first before calling methods
+                raise FileNotFoundError(
+                    f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."
+                )
+
+        elif (
+            getattr(args, "object_pid") is not None
+            and getattr(args, "object_algorithm") is not None
+        ):
+            # Calculate the hex digest of a given pid with algorithm supplied
+            pid = getattr(args, "object_pid")
+            algorithm = getattr(args, "object_algorithm")
+
+            if os.path.exists(store_path_config_yaml):
+                hs.get_obj_hex_digest_from_store(pid, algorithm)
+            else:
+                # Calling app must initialize HashStore first before calling methods
                 raise FileNotFoundError(
                     f"Missing config file (hashstore.yaml) at store path: {store_path}."
                     + " HashStore must be initialized, use `--help` for more information."
                 )
-        else:
-            raise FileNotFoundError(
-                f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."
-            )
-
-    elif (
-        getattr(args, "object_pid") is not None
-        and getattr(args, "object_algorithm") is not None
-    ):
-        # Calculate the hex digest of a given pid with algorithm supplied
-        pid = getattr(args, "object_pid")
-        algorithm = getattr(args, "object_algorithm")
-        store_path = getattr(args, "store_path")
-        store_path_config_yaml = store_path + "/hashstore.yaml"
-
-        # If HashStore does not exist, raise exception
-        if os.path.exists(store_path_config_yaml):
-            props = _load_store_properties(store_path_config_yaml)
-            hs = HashStoreClient(props).hashstore
-            hs.get_obj_hex_digest_from_store(pid, algorithm)
-        else:
-            # Calling app must initialize HashStore first before calling methods
-            raise FileNotFoundError(
-                f"Missing config file (hashstore.yaml) at store path: {store_path}."
-                + " HashStore must be initialized, use `--help` for more information."
-            )

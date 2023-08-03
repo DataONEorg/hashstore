@@ -273,9 +273,9 @@ def _get_full_obj_list_from_metacat_db(properties, metacat_dir, num):
 def _refine_object_list(store, metacat_obj_list, action):
     """Refine a list of objects by checking for file existence and removing duplicates."""
     refined_list = []
-    for obj in metacat_obj_list:
-        pid_guid = obj[0]
-        filepath_docid_rev = obj[1]
+    for tuple_item in metacat_obj_list:
+        pid_guid = tuple_item[0]
+        filepath_docid_rev = tuple_item[1]
         if os.path.exists(filepath_docid_rev):
             if action == "store":
                 # If the file has already been stored, skip it
@@ -284,10 +284,8 @@ def _refine_object_list(store, metacat_obj_list, action):
                         f"Refining Object List: Skipping {pid_guid} - object exists in HashStore"
                     )
                 else:
-                    tuple_item = (pid_guid, filepath_docid_rev)
                     refined_list.append(tuple_item)
             if action == "retrieve":
-                tuple_item = (pid_guid, filepath_docid_rev)
                 refined_list.append(tuple_item)
     return refined_list
 

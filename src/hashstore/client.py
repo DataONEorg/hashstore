@@ -13,6 +13,7 @@ class HashStoreClient:
     """Create a HashStore Client to use through the command line."""
 
     def __init__(self, properties):
+        """Initialize HashStore and MetacatDB adapters"""
         factory = HashStoreFactory()
 
         # Get HashStore from factory
@@ -21,8 +22,129 @@ class HashStoreClient:
 
         # Class variables
         self.hashstore = factory.get_hashstore(module_name, class_name, properties)
+        self.metacatdb = MetacatDB(properties["store_path"], self.hashstore)
 
-    def retrieve_and_validate(self, obj_tuple):
+    def store_to_hashstore_from_list(self, origin_dir, obj_type, num):
+        """Store objects in a given directory into HashStore
+
+        Args:
+            origin_dir (str): Directory to convert
+            obj_type (str): 'object' or 'metadata'
+            config_yaml (str): Path to HashStore config file `hashstore.yaml`
+            num (int): Number of files to store
+        """
+        # Get list of files from directory
+        file_list = os.listdir(origin_dir)
+        checked_num_of_files = len(file_list)
+        # Check number of files to store
+        if num is not None:
+            checked_num_of_files = int(num)
+
+        # Object and Metadata list
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(
+            origin_dir, checked_num_of_files
+        )
+
+        # Get list of objects to store from metacat db
+        if obj_type == "object":
+            checked_obj_list = self.metacatdb.refine_list_for_objects(
+                metacat_obj_list, "store"
+            )
+        if obj_type == "metadata":
+            checked_obj_list = self.metacatdb.refine_list_for_metadata(metacat_obj_list)
+
+        start_time = datetime.now()
+
+        # Setup pool and processes
+        # num_processes = os.cpu_count() - 2
+        # pool = multiprocessing.Pool(processes=num_processes)
+        pool = multiprocessing.Pool()
+
+        # Call 'obj_type' respective public API methods
+        if obj_type == "object":
+            logging.info("Storing objects")
+            results = pool.starmap(self.hashstore.store_object, checked_obj_list)
+        if obj_type == "metadata":
+            logging.info("Storing metadata")
+            results = pool.starmap(self.hashstore.store_metadata, checked_obj_list)
+
+        # Log exceptions
+        cleanup_msg = "Checking results and logging exceptions"
+        print(cleanup_msg)
+        logging.info(cleanup_msg)
+        for result in results:
+            if isinstance(result, Exception):
+                print(result)
+                logging.error(result)
+
+        # Close the pool and wait for all processes to complete
+        pool.close()
+        pool.join()
+
+        end_time = datetime.now()
+        content = (
+            f"HashStoreClient (store_to_hashstore_from_list):\n"
+            f"Start Time: {start_time}\nEnd Time: {end_time}\n"
+            + f"Total Time to Store {len(checked_obj_list)} {obj_type}"
+            + f" Objects: {end_time - start_time}\n"
+        )
+        logging.info(content)
+
+    def retrieve_and_validate_from_hashstore(self, origin_dir, obj_type, num):
+        "Retrieve objects or metadata from a Hashstore and validate the content."
+        checked_num_of_files = None
+        # Check number of files to store
+        if num is not None:
+            checked_num_of_files = int(num)
+
+        # Object and Metadata list
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(
+            origin_dir, checked_num_of_files
+        )
+
+        # Get list of objects to store from metacat db
+        if obj_type == "object":
+            checked_obj_list = self.metacatdb.refine_list_for_objects(
+                metacat_obj_list, "retrieve"
+            )
+        if obj_type == "metadata":
+            checked_obj_list = self.metacatdb.refine_list_for_metadata(metacat_obj_list)
+
+        start_time = datetime.now()
+
+        # Setup pool and processes
+        pool = multiprocessing.Pool()
+
+        if obj_type == "object":
+            logging.info("Retrieving objects")
+            results = pool.map(self.validate, checked_obj_list)
+        if obj_type == "metadata":
+            logging.info("Retrieiving metadata")
+            # TODO
+
+        # Log exceptions
+        cleanup_msg = "Checking results and logging exceptions"
+        print(cleanup_msg)
+        logging.info(cleanup_msg)
+        for result in results:
+            if isinstance(result, Exception):
+                print(result)
+                logging.info(result)
+
+        # Close the pool and wait for all processes to complete
+        pool.close()
+        pool.join()
+
+        end_time = datetime.now()
+        content = (
+            f"retrieve_and_validate_from_hashstore:\n"
+            f"Start Time: {start_time}\nEnd Time: {end_time}\n"
+            + f"Total Time to retrieve and validate {len(checked_obj_list)} {obj_type}"
+            + f" Objects: {end_time - start_time}\n"
+        )
+        logging.info(content)
+
+    def validate(self, obj_tuple):
         """Retrieve and validate a list of objects."""
         pid_guid = obj_tuple[0]
         algo = obj_tuple[4]
@@ -57,7 +179,7 @@ class HashStoreClient:
 class MetacatDB:
     """Adapter class to interact with Metacat's Postgres DB"""
 
-    def __init__(self, pgdb_yaml, hashstore):
+    def __init__(self, hashstore_path, hashstore):
         """Initialize credentials to access metacat pgdb."""
         db_keys = [
             "db_user",
@@ -67,7 +189,8 @@ class MetacatDB:
             "db_name",
         ]
 
-        if not os.path.exists(pgdb_yaml):
+        pgyaml_path = hashstore_path + "/pgdb.yaml"
+        if not os.path.exists(pgyaml_path):
             exception_string = (
                 "HashStore CLI Client - _load_metacat_db_properties: pgdb.yaml not found"
                 + " in store root path. Must be manually created with the following keys:"
@@ -75,7 +198,7 @@ class MetacatDB:
             )
             raise FileNotFoundError(exception_string)
         # Open file
-        with open(pgdb_yaml, "r", encoding="utf-8") as file:
+        with open(pgyaml_path, "r", encoding="utf-8") as file:
             yaml_data = yaml.safe_load(file)
 
         # Get database values
@@ -181,7 +304,7 @@ class MetacatDB:
 
         return refined_object_list
 
-    def refine_list_for_metadta(self, metacat_obj_list):
+    def refine_list_for_metadata(self, metacat_obj_list):
         """Refine a list of metadata by checking for file existence and removing duplicates."""
         refined_metadta_list = []
         for obj in metacat_obj_list:
@@ -301,135 +424,6 @@ def _load_store_properties(hashstore_yaml):
     return hashstore_yaml_dict
 
 
-# Concrete Methods
-
-
-def store_to_hashstore_from_list(origin_dir, obj_type, config_yaml, num):
-    """Store objects in a given directory into HashStore
-
-    Args:
-        origin_dir (str): Directory to convert
-        obj_type (str): 'object' or 'metadata'
-        config_yaml (str): Path to HashStore config file `hashstore.yaml`
-        num (int): Number of files to store
-    """
-    properties = _load_store_properties(config_yaml)
-    store = HashStoreClient(properties).hashstore
-
-    # Get list of files from directory
-    file_list = os.listdir(origin_dir)
-    checked_num_of_files = len(file_list)
-    # Check number of files to store
-    if num is not None:
-        checked_num_of_files = int(num)
-
-    # Object and Metadata list
-    metacat_obj_list = _get_full_obj_list_from_metacat_db(
-        properties, origin_dir, checked_num_of_files
-    )
-
-    # Get list of objects to store from metacat db
-    if obj_type == "object":
-        checked_obj_list = _refine_object_list(store, metacat_obj_list, "store")
-    if obj_type == "metadata":
-        checked_obj_list = _refine_metadata_list(store, metacat_obj_list)
-
-    start_time = datetime.now()
-
-    # Setup pool and processes
-    # num_processes = os.cpu_count() - 2
-    # pool = multiprocessing.Pool(processes=num_processes)
-    pool = multiprocessing.Pool()
-
-    # Call 'obj_type' respective public API methods
-    if obj_type == "object":
-        logging.info("Storing objects")
-        results = pool.starmap(store.store_object, checked_obj_list)
-    if obj_type == "metadata":
-        logging.info("Storing metadata")
-        results = pool.starmap(store.store_metadata, checked_obj_list)
-
-    # Log exceptions
-    cleanup_msg = "Checking results and logging exceptions"
-    print(cleanup_msg)
-    logging.info(cleanup_msg)
-    for result in results:
-        if isinstance(result, Exception):
-            print(result)
-            logging.error(result)
-
-    # Close the pool and wait for all processes to complete
-    pool.close()
-    pool.join()
-
-    end_time = datetime.now()
-    content = (
-        f"store_to_hashstore_from_list:\n"
-        f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-        + f"Total Time to Store {len(checked_obj_list)} {obj_type}"
-        + f" Objects: {end_time - start_time}\n"
-    )
-    logging.info(content)
-
-
-def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num):
-    "Retrieve objects or metadata from a Hashstore and validate the content."
-    properties = _load_store_properties(config_yaml)
-    # store = _get_hashstore(properties)
-    hashstoreclient = HashStoreClient(properties)
-    store = hashstoreclient.hashstore
-
-    checked_num_of_files = None
-    # Check number of files to store
-    if num is not None:
-        checked_num_of_files = int(num)
-
-    # Object and Metadata list
-    metacat_obj_list = _get_full_obj_list_from_metacat_db(
-        properties, origin_dir, checked_num_of_files
-    )
-
-    # Get list of objects to store from metacat db
-    if obj_type == "object":
-        checked_obj_list = _refine_object_list(store, metacat_obj_list, "retrieve")
-    if obj_type == "metadata":
-        checked_obj_list = _refine_metadata_list(store, metacat_obj_list)
-
-    start_time = datetime.now()
-
-    # Setup pool and processes
-    pool = multiprocessing.Pool()
-
-    if obj_type == "object":
-        logging.info("Retrieving objects")
-        results = pool.map(hashstoreclient.retrieve_and_validate, checked_obj_list)
-    if obj_type == "metadata":
-        logging.info("Retrieiving metadata")
-        # TODO
-
-    # Log exceptions
-    cleanup_msg = "Checking results and logging exceptions"
-    print(cleanup_msg)
-    logging.info(cleanup_msg)
-    for result in results:
-        if isinstance(result, Exception):
-            print(result)
-            logging.info(result)
-
-    # Close the pool and wait for all processes to complete
-    pool.close()
-    pool.join()
-
-    end_time = datetime.now()
-    content = (
-        f"retrieve_and_validate_from_hashstore:\n"
-        f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-        + f"Total Time to retrieve and validate {len(checked_obj_list)} {obj_type}"
-        + f" Objects: {end_time - start_time}\n"
-    )
-    logging.info(content)
-
-
 if __name__ == "__main__":
     PROGRAM_NAME = "HashStore Command Line Client"
     DESCRIPTION = (
@@ -490,18 +484,18 @@ if __name__ == "__main__":
                 )
             # HashStore can only be called if a configuration file is present
             if os.path.exists(store_path_config_yaml):
+                props = _load_store_properties(store_path_config_yaml)
+                hs = HashStoreClient(props)
                 if getattr(args, "retrieve_and_validate"):
-                    retrieve_and_validate_from_hashstore(
+                    hs.retrieve_and_validate_from_hashstore(
                         directory_to_convert,
                         directory_type,
-                        store_path_config_yaml,
                         number_of_objects_to_convert,
                     )
                 else:
-                    store_to_hashstore_from_list(
+                    hs.store_to_hashstore_from_list(
                         directory_to_convert,
                         directory_type,
-                        store_path_config_yaml,
                         number_of_objects_to_convert,
                     )
             else:

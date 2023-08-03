@@ -9,14 +9,10 @@ import pg8000
 from hashstore import HashStoreFactory
 
 
-# Supporting Methods
-
-
 class HashStoreClient:
-    """Create a HashStore"""
+    """Create a HashStore Client to use through the command line."""
 
     def __init__(self, properties):
-        logging.info("Initializing HashStore")
         factory = HashStoreFactory()
 
         # Get HashStore from factory
@@ -49,6 +45,16 @@ class HashStoreClient:
                 + f" Checksum from metacata db: {checksum}."
             )
             logging.info(info_msg)
+
+    def get_obj_hex_digest_from_store(self, pid_guid, obj_algo):
+        """Given a pid and algorithm, get the hex digest of the object"""
+        digest = self.hashstore.get_hex_digest(pid, algorithm)
+        print(f"guid/pid: {pid_guid}")
+        print(f"algorithm: {obj_algo}")
+        print(f"digest: {digest}")
+
+
+# Supporting Methods
 
 
 def _add_client_optional_arguments(argp):
@@ -113,27 +119,6 @@ def _add_client_optional_arguments(argp):
         dest="object_algorithm",
         help="Algorithm to work with",
     )
-
-
-def _get_hashstore(properties):
-    """Create a HashStore instance with the supplied properties.
-
-    Args:
-        properties: HashStore properties (see 'FileHashStore' module for details)
-
-    Returns:
-        hashstore (FileHashStore): HashStore
-    """
-    logging.info("Initializing HashStore")
-    factory = HashStoreFactory()
-
-    # Get HashStore from factory
-    module_name = "filehashstore"
-    class_name = "FileHashStore"
-
-    # Class variables
-    hashstore = factory.get_hashstore(module_name, class_name, properties)
-    return hashstore
 
 
 def _load_store_properties(hashstore_yaml):
@@ -330,7 +315,7 @@ def store_to_hashstore_from_list(origin_dir, obj_type, config_yaml, num):
         num (int): Number of files to store
     """
     properties = _load_store_properties(config_yaml)
-    store = _get_hashstore(properties)
+    store = HashStoreClient(properties).hashstore
 
     # Get list of files from directory
     file_list = os.listdir(origin_dir)
@@ -392,7 +377,8 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
     "Retrieve objects or metadata from a Hashstore and validate the content."
     properties = _load_store_properties(config_yaml)
     # store = _get_hashstore(properties)
-    store = HashStoreClient(properties)
+    hashstoreclient = HashStoreClient(properties)
+    store = hashstoreclient.hashstore
 
     checked_num_of_files = None
     # Check number of files to store
@@ -406,11 +392,9 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
 
     # Get list of objects to store from metacat db
     if obj_type == "object":
-        checked_obj_list = _refine_object_list(
-            store.hashstore, metacat_obj_list, "retrieve"
-        )
+        checked_obj_list = _refine_object_list(store, metacat_obj_list, "retrieve")
     if obj_type == "metadata":
-        checked_obj_list = _refine_metadata_list(store.hashstore, metacat_obj_list)
+        checked_obj_list = _refine_metadata_list(store, metacat_obj_list)
 
     start_time = datetime.now()
 
@@ -419,7 +403,7 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
 
     if obj_type == "object":
         logging.info("Retrieving objects")
-        results = pool.map(store.retrieve_and_validate, checked_obj_list)
+        results = pool.map(hashstoreclient.retrieve_and_validate, checked_obj_list)
     if obj_type == "metadata":
         logging.info("Retrieiving metadata")
         # TODO
@@ -445,17 +429,6 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
         + f" Objects: {end_time - start_time}\n"
     )
     logging.info(content)
-
-
-def get_obj_hex_digest_from_store(config_yaml, pid_guid, obj_algo):
-    """Given a pid and algorithm, get the hex digest of the object"""
-    properties = _load_store_properties(config_yaml)
-    store = _get_hashstore(properties)
-
-    digest = store.get_hex_digest(pid, algorithm)
-    print(f"guid/pid: {pid_guid}")
-    print(f"algorithm: {obj_algo}")
-    print(f"digest: {digest}")
 
 
 if __name__ == "__main__":
@@ -497,15 +470,18 @@ if __name__ == "__main__":
             "store_algorithm": getattr(args, "algorithm"),
             "store_metadata_namespace": getattr(args, "formatid"),
         }
-        _get_hashstore(props)
+        HashStoreClient(props)
 
     elif getattr(args, "convert_directory") is not None:
         # Perform operations to a HashStore if config file present
         directory_to_convert = getattr(args, "convert_directory")
+        # Check if the directory to convert exists
         if os.path.exists(directory_to_convert):
+            # If -nobj is supplied, limit the objects we work with
             number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
             store_path = getattr(args, "store_path")
             store_path_config_yaml = store_path + "/hashstore.yaml"
+            # Determine if we are working with objects or metadata
             directory_type = getattr(args, "convert_directory_type")
             accepted_directory_types = ["object", "metadata"]
             if directory_type not in accepted_directory_types:
@@ -513,6 +489,7 @@ if __name__ == "__main__":
                     "Directory `-cvt` cannot be empty, must be 'object' or 'metadata'."
                     + f" convert_directory_type: {directory_type}"
                 )
+            # HashStore can only be called if a configuration file is present
             if os.path.exists(store_path_config_yaml):
                 if getattr(args, "retrieve_and_validate"):
                     retrieve_and_validate_from_hashstore(
@@ -550,11 +527,13 @@ if __name__ == "__main__":
         store_path = getattr(args, "store_path")
         store_path_config_yaml = store_path + "/hashstore.yaml"
 
+        # If HashStore does not exist, raise exception
         if os.path.exists(store_path_config_yaml):
-            get_obj_hex_digest_from_store(store_path_config_yaml, pid, algorithm)
+            props = _load_store_properties(store_path_config_yaml)
+            hs = HashStoreClient(props).hashstore
+            hs.get_obj_hex_digest_from_store(pid, algorithm)
         else:
-            # If HashStore does not exist, raise exception
-            # Calling app must create HashStore first before calling methods
+            # Calling app must initialize HashStore first before calling methods
             raise FileNotFoundError(
                 f"Missing config file (hashstore.yaml) at store path: {store_path}."
                 + " HashStore must be initialized, use `--help` for more information."

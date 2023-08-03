@@ -406,9 +406,11 @@ def retrieve_and_validate_from_hashstore(origin_dir, obj_type, config_yaml, num)
 
     # Get list of objects to store from metacat db
     if obj_type == "object":
-        checked_obj_list = _refine_object_list(store, metacat_obj_list, "retrieve")
+        checked_obj_list = _refine_object_list(
+            store.hashstore, metacat_obj_list, "retrieve"
+        )
     if obj_type == "metadata":
-        checked_obj_list = _refine_metadata_list(store, metacat_obj_list)
+        checked_obj_list = _refine_metadata_list(store.hashstore, metacat_obj_list)
 
     start_time = datetime.now()
 

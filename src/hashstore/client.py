@@ -123,13 +123,13 @@ class HashStoreClient:
             # TODO
 
         # Log exceptions
-        cleanup_msg = "Checking results and logging exceptions"
-        print(cleanup_msg)
-        logging.info(cleanup_msg)
-        for result in results:
-            if isinstance(result, Exception):
-                print(result)
-                logging.info(result)
+        # cleanup_msg = "Checking results and logging exceptions"
+        # print(cleanup_msg)
+        # logging.info(cleanup_msg)
+        # for result in results:
+        #     if isinstance(result, Exception):
+        #         print(result)
+        #         logging.error(result)
 
         # Close the pool and wait for all processes to complete
         pool.close()
@@ -155,11 +155,11 @@ class HashStoreClient:
         # Check algorithm
         if digest != checksum:
             err_msg = (
-                f"Unexpected Exception for pid/guid: {pid_guid} -"
+                f"Assertion Error for pid/guid: {pid_guid} -"
                 + f" Digest calcualted from stream ({digest}) does not match"
                 + f" checksum from metacata db: {checksum}"
             )
-            raise AssertionError(err_msg)
+            logging.error(err_msg)
         else:
             info_msg = (
                 f"Checksums match for pid/guid: {pid_guid} -"
@@ -459,7 +459,7 @@ if __name__ == "__main__":
     python_log_file_path = getattr(args, "store_path") + "/python_store.log"
     logging.basicConfig(
         filename=python_log_file_path,
-        level=logging.DEBUG,
+        level=logging.ERROR,
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )

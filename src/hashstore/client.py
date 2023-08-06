@@ -116,20 +116,18 @@ class HashStoreClient:
         pool = multiprocessing.Pool()
 
         if obj_type == "object":
-            logging.info("Retrieving objects")
             results = pool.map(self.validate, checked_obj_list)
-        if obj_type == "metadata":
-            logging.info("Retrieiving metadata")
-            # TODO
+        # if obj_type == "metadata":
+        # TODO
 
         # Log exceptions
-        # cleanup_msg = "Checking results and logging exceptions"
-        # print(cleanup_msg)
-        # logging.info(cleanup_msg)
-        # for result in results:
-        #     if isinstance(result, Exception):
-        #         print(result)
-        #         logging.error(result)
+        cleanup_msg = "Checking results and logging exceptions"
+        print(cleanup_msg)
+        logging.info(cleanup_msg)
+        for result in results:
+            if isinstance(result, Exception):
+                print(result)
+                logging.error(result)
 
         # Close the pool and wait for all processes to complete
         pool.close()

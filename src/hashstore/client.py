@@ -113,9 +113,9 @@ class HashStoreClient:
         start_time = datetime.now()
 
         # Setup pool and processes
-        # pool = multiprocessing.Pool()
-        num_processes = os.cpu_count() - 2
-        pool = multiprocessing.Pool(processes=num_processes)
+        pool = multiprocessing.Pool()
+        # num_processes = os.cpu_count() - 2
+        # pool = multiprocessing.Pool(processes=num_processes)
 
         if obj_type == "object":
             results = pool.map(self.validate, checked_obj_list)

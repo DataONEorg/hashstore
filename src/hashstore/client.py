@@ -150,7 +150,9 @@ class HashStoreClient:
         obj_stream = self.hashstore.retrieve_object(pid_guid)
         digest = self.hashstore.computehash(obj_stream, algo)
         obj_stream.close()
+
         # Check algorithm
+        print(f"Validating pid: {pid_guid}")
         if digest != checksum:
             err_msg = (
                 f"Assertion Error for pid/guid: {pid_guid} -"
@@ -158,13 +160,14 @@ class HashStoreClient:
                 + f" checksum from metacata db: {checksum}"
             )
             logging.error(err_msg)
+            print(err_msg)
         else:
             info_msg = (
                 f"Checksums match for pid/guid: {pid_guid} -"
                 + f" Digest calcualted from stream: {digest}."
                 + f" Checksum from metacata db: {checksum}."
             )
-            logging.info(info_msg)
+            print(info_msg)
 
     def get_obj_hex_digest_from_store(self, pid_guid, obj_algo):
         """Given a pid and algorithm, get the hex digest of the object"""
@@ -175,7 +178,7 @@ class HashStoreClient:
 
 
 class MetacatDB:
-    """Adapter class to interact with Metacat's Postgres DB"""
+    """Class to interact with Metacat's Postgres DB"""
 
     def __init__(self, hashstore_path, hashstore):
         """Initialize credentials to access metacat pgdb."""
@@ -457,7 +460,7 @@ if __name__ == "__main__":
     python_log_file_path = getattr(args, "store_path") + "/python_store.log"
     logging.basicConfig(
         filename=python_log_file_path,
-        level=logging.ERROR,
+        level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )

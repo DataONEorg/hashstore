@@ -311,10 +311,12 @@ class MetacatDB:
                         )
                         refined_object_list.append(store_object_tuple_item)
                 if action == "retrieve":
+                    print(f"Checking for pid: {pid_guid} in HashStore")
                     if self.hashstore.exists(
                         "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
                     ):
                         refined_object_list.append(tuple_item)
+                        print("Found! Adding to refined list")
 
         return refined_object_list
 

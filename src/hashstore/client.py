@@ -91,7 +91,7 @@ class HashStoreClient:
         logging.info(content)
 
     def retrieve_and_validate_from_hashstore(self, origin_dir, obj_type, num):
-        "Retrieve objects or metadata from a Hashstore and validate the content."
+        """Retrieve objects or metadata from a Hashstore and validate the content."""
         checked_num_of_files = None
         # Check number of files to store
         if num is not None:
@@ -113,7 +113,9 @@ class HashStoreClient:
         start_time = datetime.now()
 
         # Setup pool and processes
-        pool = multiprocessing.Pool()
+        # pool = multiprocessing.Pool()
+        num_processes = os.cpu_count() - 2
+        pool = multiprocessing.Pool(processes=num_processes)
 
         if obj_type == "object":
             results = pool.map(self.validate, checked_obj_list)
@@ -147,25 +149,25 @@ class HashStoreClient:
         pid_guid = obj_tuple[0]
         algo = obj_tuple[4]
         checksum = obj_tuple[3]
-        obj_stream = self.hashstore.retrieve_object(pid_guid)
-        digest = self.hashstore.computehash(obj_stream, algo)
-        obj_stream.close()
+        with self.hashstore.retrieve_object(pid_guid) as obj_stream:
+            digest = self.hashstore.computehash(obj_stream, algo)
+            obj_stream.close()
 
         # Check algorithm
         print(f"Validating pid: {pid_guid}")
         if digest != checksum:
             err_msg = (
                 f"Assertion Error for pid/guid: {pid_guid} -"
-                + f" Digest calcualted from stream ({digest}) does not match"
-                + f" checksum from metacata db: {checksum}"
+                + f" Digest calculated from stream ({digest}) does not match"
+                + f" checksum from metacat db: {checksum}"
             )
             logging.error(err_msg)
             print(err_msg)
         else:
             info_msg = (
                 f"Checksums match for pid/guid: {pid_guid} -"
-                + f" Digest calcualted from stream: {digest}."
-                + f" Checksum from metacata db: {checksum}."
+                + f" Digest calculated from stream: {digest}."
+                + f" Checksum from metacat db: {checksum}."
             )
             print(info_msg)
 

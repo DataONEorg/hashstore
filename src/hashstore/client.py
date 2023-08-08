@@ -113,12 +113,15 @@ class HashStoreClient:
         start_time = datetime.now()
 
         # Setup pool and processes
-        pool = multiprocessing.Pool()
+        # pool = multiprocessing.Pool()
         # num_processes = os.cpu_count() - 2
         # pool = multiprocessing.Pool(processes=num_processes)
 
-        if obj_type == "object":
-            results = pool.map(self.validate, checked_obj_list)
+        # https://pythonspeed.com/articles/python-multiprocessing/
+        multiprocessing.set_start_method("spawn")
+        with multiprocessing.get_context("spawn").Pool() as pool:
+            if obj_type == "object":
+                results = pool.map(self.validate, checked_obj_list)
         # if obj_type == "metadata":
         # TODO
 
@@ -164,11 +167,7 @@ class HashStoreClient:
             logging.error(err_msg)
             print(err_msg)
         else:
-            info_msg = (
-                f"Checksums match for pid/guid: {pid_guid} -"
-                + f" Digest calculated from stream: {digest}."
-                + f" Checksum from metacat db: {checksum}."
-            )
+            info_msg = f"Checksums match for pid/guid: {pid_guid}!"
             print(info_msg)
 
     def get_obj_hex_digest_from_store(self, pid_guid, obj_algo):

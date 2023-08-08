@@ -92,6 +92,7 @@ class HashStoreClient:
 
     def retrieve_and_validate_from_hashstore(self, origin_dir, obj_type, num):
         """Retrieve objects or metadata from a Hashstore and validate the content."""
+        logging.info("HashStore Client - Begin retrieving and validating objects.")
         checked_num_of_files = None
         # Check number of files to store
         if num is not None:
@@ -103,6 +104,7 @@ class HashStoreClient:
         )
 
         # Get list of objects to store from metacat db
+        logging.info("HashStore Client - Refining object list for %s", obj_type)
         if obj_type == "object":
             checked_obj_list = self.metacatdb.refine_list_for_objects(
                 metacat_obj_list, "retrieve"
@@ -113,15 +115,11 @@ class HashStoreClient:
         start_time = datetime.now()
 
         # Setup pool and processes
-        # pool = multiprocessing.Pool()
         # num_processes = os.cpu_count() - 2
         # pool = multiprocessing.Pool(processes=num_processes)
-
-        # https://pythonspeed.com/articles/python-multiprocessing/
-        multiprocessing.set_start_method("spawn")
-        with multiprocessing.get_context("spawn").Pool() as pool:
-            if obj_type == "object":
-                results = pool.map(self.validate, checked_obj_list)
+        pool = multiprocessing.Pool()
+        if obj_type == "object":
+            results = pool.imap(self.validate, checked_obj_list)
         # if obj_type == "metadata":
         # TODO
 
@@ -152,12 +150,12 @@ class HashStoreClient:
         pid_guid = obj_tuple[0]
         algo = obj_tuple[4]
         checksum = obj_tuple[3]
+
+        print(f"Validating pid: {pid_guid}")
         with self.hashstore.retrieve_object(pid_guid) as obj_stream:
             digest = self.hashstore.computehash(obj_stream, algo)
             obj_stream.close()
 
-        # Check algorithm
-        print(f"Validating pid: {pid_guid}")
         if digest != checksum:
             err_msg = (
                 f"Assertion Error for pid/guid: {pid_guid} -"

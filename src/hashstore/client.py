@@ -216,17 +216,7 @@ class HashStoreClient:
         if obj_type == "metadata":
             results = pool.starmap(self.hashstore.store_metadata, checked_obj_list)
 
-        # Log exceptions
-        # TODO: This process does not properly get logged.
-        cleanup_msg = "Checking results and logging exceptions"
-        logging.info(cleanup_msg)
-        exception_list = []
-        for result in results:
-            if isinstance(result, Exception):
-                exception_list.append(result)
-                # logging.error(result)
-        for exception in exception_list:
-            logging.error(exception)
+        # TODO: Log exceptions from starmap()
 
         # Close the pool and wait for all processes to complete
         pool.close()

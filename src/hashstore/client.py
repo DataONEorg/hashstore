@@ -220,11 +220,9 @@ class HashStoreClient:
 
         # Log exceptions
         cleanup_msg = "Checking results and logging exceptions"
-        print(cleanup_msg)
         logging.info(cleanup_msg)
         for result in results:
             if isinstance(result, Exception):
-                print(result)
                 logging.error(result)
 
         # Close the pool and wait for all processes to complete
@@ -275,11 +273,9 @@ class HashStoreClient:
 
         # Log exceptions
         cleanup_msg = "Checking results and logging exceptions"
-        print(cleanup_msg)
         logging.info(cleanup_msg)
         for result in results:
             if isinstance(result, Exception):
-                print(result)
                 logging.error(result)
 
         # Close the pool and wait for all processes to complete

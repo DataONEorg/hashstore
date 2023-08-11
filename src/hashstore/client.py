@@ -90,6 +90,12 @@ class HashStoreParser:
 
         # Individual API call related arguments
         self.parser.add_argument(
+            "-getchecksum",
+            dest="client_getchecksum",
+            action="store_true",
+            help="Flag to call ",
+        )
+        self.parser.add_argument(
             "-pid",
             dest="object_pid",
             help="Pid/Guid of object to work with",
@@ -142,24 +148,6 @@ class HashStoreParser:
         """Get command line arguments"""
         return self.parser.parse_args()
 
-    def initialize_logging(self, hashstore_path):
-        """Initialize logging for HashStore client."""
-        hashstore_py_log = hashstore_path + "/logs/python_hashstore.log"
-        python_log_file_path = Path(hashstore_py_log)
-
-        if not os.path.exists(python_log_file_path):
-            python_log_file_path.parent.mkdir(parents=True, exist_ok=True)
-            open(python_log_file_path, "w", encoding="utf-8").close()
-        logging.basicConfig(
-            filename=python_log_file_path,
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-
-        for handler in logging.root.handlers[:]:
-            print(handler)
-
 
 class HashStoreClient:
     """Create a HashStore to use through the command line."""
@@ -179,7 +167,6 @@ class HashStoreClient:
 
         # Instance attributes
         self.hashstore = factory.get_hashstore(module_name, class_name, properties)
-        # ClientLogger(properties["store_path"])
         logging.info("HashStoreClient - HashStore initialized.")
 
         # Setup access to Metacat postgres db
@@ -314,7 +301,6 @@ class HashStoreClient:
         algo = obj_tuple[4]
         checksum = obj_tuple[3]
 
-        print(f"Validating pid: {pid_guid}")
         with self.hashstore.retrieve_object(pid_guid) as obj_stream:
             digest = self.hashstore.computehash(obj_stream, algo)
             obj_stream.close()
@@ -327,9 +313,7 @@ class HashStoreClient:
             )
             logging.error(err_msg)
             print(err_msg)
-        else:
-            info_msg = f"Checksums match for pid/guid: {pid_guid}!"
-            print(info_msg)
+        return
 
     def get_obj_hex_digest_from_store(self, pid_guid, obj_algo):
         """Given a pid and algorithm, get the hex digest of the object"""
@@ -471,12 +455,10 @@ class MetacatDB:
                         )
                         refined_object_list.append(store_object_tuple_item)
                 if action == "retrieve":
-                    print(f"Checking for pid: {pid_guid} in HashStore")
                     if self.hashstore.exists(
                         "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
                     ):
                         refined_object_list.append(tuple_item)
-                        print("Found! Adding to refined list")
 
         return refined_object_list
 
@@ -497,22 +479,6 @@ class MetacatDB:
         return refined_metadta_list
 
 
-def initialize_logging(hashstore_path):
-    """Initialize logging for HashStore client."""
-    hashstore_py_log = hashstore_path + "/python_hashstore.log"
-    python_log_file_path = Path(hashstore_py_log)
-
-    if not os.path.exists(python_log_file_path):
-        python_log_file_path.parent.mkdir(parents=True, exist_ok=True)
-        open(python_log_file_path, "w", encoding="utf-8").close()
-    logging.basicConfig(
-        filename=python_log_file_path,
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-
 if __name__ == "__main__":
     # Parse arguments
     parser = HashStoreParser()
@@ -530,73 +496,70 @@ if __name__ == "__main__":
         }
         HashStoreClient(props)
 
-    else:
-        # Initialize HashStore
-        store_path = getattr(args, "store_path")
-        store_path_config_yaml = store_path + "/hashstore.yaml"
-        if not os.path.exists(store_path_config_yaml):
+    # Client setup process
+    # Can't use client app without first initializing HashStore
+    store_path = getattr(args, "store_path")
+    store_path_config_yaml = store_path + "/hashstore.yaml"
+    if not os.path.exists(store_path_config_yaml):
+        raise FileNotFoundError(
+            f"Missing config file (hashstore.yaml) at store path: {store_path}."
+            + " HashStore must first be initialized, use `--help` for more information."
+        )
+    # Setup logging
+    # Create log file if it doesn't already exist
+    hashstore_py_log = store_path + "/python_hashstore.log"
+    python_log_file_path = Path(hashstore_py_log)
+    if not os.path.exists(python_log_file_path):
+        python_log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        open(python_log_file_path, "w", encoding="utf-8").close()
+    logging.basicConfig(
+        filename=python_log_file_path,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    # Instantiate HashStore Client
+    props = parser.load_store_properties(store_path_config_yaml)
+    hs = HashStoreClient(props, getattr(args, "knbvm_flag"))
+
+    # Client entry point
+    if getattr(args, "convert_directory") is not None:
+        directory_to_convert = getattr(args, "convert_directory")
+        # Check if the directory to convert exists
+        if os.path.exists(directory_to_convert):
+            # If -nobj is supplied, limit the objects we work with
+            number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
+            # Determine if we are working with objects or metadata
+            directory_type = getattr(args, "convert_directory_type")
+            accepted_directory_types = ["object", "metadata"]
+            if directory_type not in accepted_directory_types:
+                raise ValueError(
+                    "Directory `-cvt` cannot be empty, must be 'object' or 'metadata'."
+                    + f" convert_directory_type: {directory_type}"
+                )
+            if getattr(args, "retrieve_and_validate"):
+                hs.retrieve_and_validate_from_hashstore(
+                    directory_to_convert,
+                    directory_type,
+                    number_of_objects_to_convert,
+                )
+            else:
+                hs.store_to_hashstore_from_list(
+                    directory_to_convert,
+                    directory_type,
+                    number_of_objects_to_convert,
+                )
+        else:
             raise FileNotFoundError(
-                f"Missing config file (hashstore.yaml) at store path: {store_path}."
-                + " HashStore must be initialized, use `--help` for more information."
+                f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."
             )
-        initialize_logging(getattr(args, "store_path"))
 
-        props = parser.load_store_properties(store_path_config_yaml)
-        hs = HashStoreClient(props, getattr(args, "knbvm_flag"))
-
-        if getattr(args, "convert_directory") is not None:
-            directory_to_convert = getattr(args, "convert_directory")
-            # Check if the directory to convert exists
-            if os.path.exists(directory_to_convert):
-                # If -nobj is supplied, limit the objects we work with
-                number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
-                # Determine if we are working with objects or metadata
-                directory_type = getattr(args, "convert_directory_type")
-                accepted_directory_types = ["object", "metadata"]
-                if directory_type not in accepted_directory_types:
-                    raise ValueError(
-                        "Directory `-cvt` cannot be empty, must be 'object' or 'metadata'."
-                        + f" convert_directory_type: {directory_type}"
-                    )
-                # HashStore can only be called if a configuration file is present
-                if os.path.exists(store_path_config_yaml):
-                    if getattr(args, "retrieve_and_validate"):
-                        hs.retrieve_and_validate_from_hashstore(
-                            directory_to_convert,
-                            directory_type,
-                            number_of_objects_to_convert,
-                        )
-                    else:
-                        hs.store_to_hashstore_from_list(
-                            directory_to_convert,
-                            directory_type,
-                            number_of_objects_to_convert,
-                        )
-                else:
-                    # If HashStore does not exist, raise exception
-                    # Calling app must create HashStore first before calling methods
-                    raise FileNotFoundError(
-                        f"Missing config file (hashstore.yaml) at store path: {store_path}."
-                        + " HashStore must be initialized, use `--help` for more information."
-                    )
-            else:
-                raise FileNotFoundError(
-                    f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."
-                )
-
-        elif (
-            getattr(args, "object_pid") is not None
-            and getattr(args, "object_algorithm") is not None
-        ):
-            # Calculate the hex digest of a given pid with algorithm supplied
-            pid = getattr(args, "object_pid")
-            algorithm = getattr(args, "object_algorithm")
-
-            if os.path.exists(store_path_config_yaml):
-                hs.get_obj_hex_digest_from_store(pid, algorithm)
-            else:
-                # Calling app must initialize HashStore first before calling methods
-                raise FileNotFoundError(
-                    f"Missing config file (hashstore.yaml) at store path: {store_path}."
-                    + " HashStore must be initialized, use `--help` for more information."
-                )
+    elif (
+        getattr(args, "client_getchecksum")
+        and getattr(args, "object_pid") is not None
+        and getattr(args, "object_algorithm") is not None
+    ):
+        # Calculate the hex digest of a given pid with algorithm supplied
+        pid = getattr(args, "object_pid")
+        algorithm = getattr(args, "object_algorithm")
+        hs.get_obj_hex_digest_from_store(pid, algorithm)

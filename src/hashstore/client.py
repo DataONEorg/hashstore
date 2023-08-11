@@ -499,7 +499,7 @@ class MetacatDB:
 
 def initialize_logging(hashstore_path):
     """Initialize logging for HashStore client."""
-    hashstore_py_log = hashstore_path + "/logs/python_hashstore.log"
+    hashstore_py_log = hashstore_path + "/python_hashstore.log"
     python_log_file_path = Path(hashstore_py_log)
 
     if not os.path.exists(python_log_file_path):
@@ -534,9 +534,15 @@ if __name__ == "__main__":
         # Initialize HashStore
         store_path = getattr(args, "store_path")
         store_path_config_yaml = store_path + "/hashstore.yaml"
+        if not os.path.exists(store_path_config_yaml):
+            raise FileNotFoundError(
+                f"Missing config file (hashstore.yaml) at store path: {store_path}."
+                + " HashStore must be initialized, use `--help` for more information."
+            )
+        initialize_logging(getattr(args, "store_path"))
+
         props = parser.load_store_properties(store_path_config_yaml)
         hs = HashStoreClient(props, getattr(args, "knbvm_flag"))
-        initialize_logging(store_path)
 
         if getattr(args, "convert_directory") is not None:
             directory_to_convert = getattr(args, "convert_directory")

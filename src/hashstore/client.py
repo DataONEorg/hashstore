@@ -212,15 +212,12 @@ class HashStoreClient:
 
         # Call 'obj_type' respective public API methods
         if obj_type == "object":
-            try:
-                results = pool.starmap(self.hashstore.store_object, checked_obj_list)
-            # pylint: disable=W0718
-            except Exception as pool_exception:
-                logging.error(pool_exception)
+            results = pool.starmap(self.hashstore.store_object, checked_obj_list)
         if obj_type == "metadata":
             results = pool.starmap(self.hashstore.store_metadata, checked_obj_list)
 
         # Log exceptions
+        # TODO: This process does not properly get logged.
         cleanup_msg = "Checking results and logging exceptions"
         logging.info(cleanup_msg)
         for result in results:
@@ -272,13 +269,6 @@ class HashStoreClient:
             results = pool.imap(self.validate_object, checked_obj_list)
         # if obj_type == "metadata":
         # TODO
-
-        # Log exceptions
-        cleanup_msg = "Checking results and logging exceptions"
-        logging.info(cleanup_msg)
-        for result in results:
-            if isinstance(result, Exception):
-                logging.error(result)
 
         # Close the pool and wait for all processes to complete
         pool.close()
@@ -505,6 +495,8 @@ if __name__ == "__main__":
         )
     # Setup logging
     # Create log file if it doesn't already exist
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
     hashstore_py_log = store_path + "/python_hashstore.log"
     python_log_file_path = Path(hashstore_py_log)
     if not os.path.exists(python_log_file_path):

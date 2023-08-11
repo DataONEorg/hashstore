@@ -212,10 +212,12 @@ class HashStoreClient:
 
         # Call 'obj_type' respective public API methods
         if obj_type == "object":
-            logging.info("Storing objects")
-            results = pool.starmap(self.hashstore.store_object, checked_obj_list)
+            try:
+                results = pool.starmap(self.hashstore.store_object, checked_obj_list)
+            # pylint: disable=W0718
+            except Exception as pool_exception:
+                logging.error(pool_exception)
         if obj_type == "metadata":
-            logging.info("Storing metadata")
             results = pool.starmap(self.hashstore.store_metadata, checked_obj_list)
 
         # Log exceptions

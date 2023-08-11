@@ -151,20 +151,6 @@ class HashStoreClient:
         # Instance attributes
         self.hashstore = factory.get_hashstore(module_name, class_name, properties)
 
-        # Setup logging
-        python_log_file_path = getattr(args, "store_path") + "/python_hashstore.log"
-        if not os.path.exists(python_log_file_path):
-            Path(python_log_file_path).parent.mkdir(parents=True, exist_ok=True)
-            open(python_log_file_path, "w", encoding="utf-8").close()
-
-        # Create log if it doesn't exist
-        logging.basicConfig(
-            filename=python_log_file_path,
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-
         # Setup access to Metacat postgres db
         self.metacatdb = MetacatDB(properties["store_path"], self.hashstore)
         logging.info("HashStoreClient - HashStore, Logger and MetacatDB initialized.")
@@ -483,6 +469,18 @@ if __name__ == "__main__":
     # Parse arguments
     parser = HashStoreParser()
     args = parser.get_parser_args()
+
+    # Setup logging
+    python_log_file_path = getattr(args, "store_path") + "/logs/python_hashstore.log"
+    if not os.path.exists(python_log_file_path):
+        Path(python_log_file_path).parent.mkdir(parents=True, exist_ok=True)
+        open(python_log_file_path, "w", encoding="utf-8").close()
+    logging.basicConfig(
+        filename=python_log_file_path,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     if getattr(args, "create_hashstore"):
         # Create HashStore if -chs flag is true in a given directory

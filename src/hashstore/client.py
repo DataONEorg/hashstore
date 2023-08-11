@@ -35,6 +35,12 @@ class HashStoreParser:
 
         # Add optional arguments
         self.parser.add_argument(
+            "-knbvm",
+            dest="knbvm_flag",
+            action="store_true",
+            help="Flag for testing with knbvm",
+        )
+        self.parser.add_argument(
             "-chs",
             dest="create_hashstore",
             action="store_true",
@@ -136,12 +142,35 @@ class HashStoreParser:
         """Get command line arguments"""
         return self.parser.parse_args()
 
+    def initialize_logging(self, hashstore_path):
+        """Initialize logging for HashStore client."""
+        hashstore_py_log = hashstore_path + "/logs/python_hashstore.log"
+        python_log_file_path = Path(hashstore_py_log)
+
+        if not os.path.exists(python_log_file_path):
+            python_log_file_path.parent.mkdir(parents=True, exist_ok=True)
+            open(python_log_file_path, "w", encoding="utf-8").close()
+        logging.basicConfig(
+            filename=python_log_file_path,
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+        for handler in logging.root.handlers[:]:
+            print(handler)
+
 
 class HashStoreClient:
     """Create a HashStore to use through the command line."""
 
-    def __init__(self, properties):
-        """Initialize HashStore and MetacatDB adapters"""
+    def __init__(self, properties, testflag=None):
+        """Initialize HashStore and MetacatDB
+
+        Args:
+            properties: See FileHashStore for dictionary example
+            testflag (str): "knbvm" to initialize MetacatDB
+        """
         factory = HashStoreFactory()
 
         # Get HashStore from factory
@@ -150,10 +179,13 @@ class HashStoreClient:
 
         # Instance attributes
         self.hashstore = factory.get_hashstore(module_name, class_name, properties)
+        # ClientLogger(properties["store_path"])
+        logging.info("HashStoreClient - HashStore initialized.")
 
         # Setup access to Metacat postgres db
-        self.metacatdb = MetacatDB(properties["store_path"], self.hashstore)
-        logging.info("HashStoreClient - HashStore, Logger and MetacatDB initialized.")
+        if testflag:
+            self.metacatdb = MetacatDB(properties["store_path"], self.hashstore)
+            logging.info("HashStoreClient - MetacatDB initialized.")
 
     def store_to_hashstore_from_list(self, origin_dir, obj_type, num):
         """Store objects in a given directory into HashStore
@@ -250,7 +282,7 @@ class HashStoreClient:
         # pool = multiprocessing.Pool(processes=num_processes)
         pool = multiprocessing.Pool()
         if obj_type == "object":
-            results = pool.imap(self.validate, checked_obj_list)
+            results = pool.imap(self.validate_object, checked_obj_list)
         # if obj_type == "metadata":
         # TODO
 
@@ -276,8 +308,8 @@ class HashStoreClient:
         )
         logging.info(content)
 
-    def validate(self, obj_tuple):
-        """Retrieve and validate a list of objects."""
+    def validate_object(self, obj_tuple):
+        """Retrieves an object from HashStore and validates its checksum."""
         pid_guid = obj_tuple[0]
         algo = obj_tuple[4]
         checksum = obj_tuple[3]
@@ -465,15 +497,13 @@ class MetacatDB:
         return refined_metadta_list
 
 
-if __name__ == "__main__":
-    # Parse arguments
-    parser = HashStoreParser()
-    args = parser.get_parser_args()
+def initialize_logging(hashstore_path):
+    """Initialize logging for HashStore client."""
+    hashstore_py_log = hashstore_path + "/logs/python_hashstore.log"
+    python_log_file_path = Path(hashstore_py_log)
 
-    # Setup logging
-    python_log_file_path = getattr(args, "store_path") + "/logs/python_hashstore.log"
     if not os.path.exists(python_log_file_path):
-        Path(python_log_file_path).parent.mkdir(parents=True, exist_ok=True)
+        python_log_file_path.parent.mkdir(parents=True, exist_ok=True)
         open(python_log_file_path, "w", encoding="utf-8").close()
     logging.basicConfig(
         filename=python_log_file_path,
@@ -481,6 +511,12 @@ if __name__ == "__main__":
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+
+
+if __name__ == "__main__":
+    # Parse arguments
+    parser = HashStoreParser()
+    args = parser.get_parser_args()
 
     if getattr(args, "create_hashstore"):
         # Create HashStore if -chs flag is true in a given directory
@@ -499,7 +535,8 @@ if __name__ == "__main__":
         store_path = getattr(args, "store_path")
         store_path_config_yaml = store_path + "/hashstore.yaml"
         props = parser.load_store_properties(store_path_config_yaml)
-        hs = HashStoreClient(props)
+        hs = HashStoreClient(props, getattr(args, "knbvm_flag"))
+        initialize_logging(store_path)
 
         if getattr(args, "convert_directory") is not None:
             directory_to_convert = getattr(args, "convert_directory")

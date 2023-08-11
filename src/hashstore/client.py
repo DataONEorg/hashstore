@@ -4,13 +4,141 @@ import os
 from argparse import ArgumentParser
 from datetime import datetime
 import multiprocessing
+from pathlib import Path
 import yaml
 import pg8000
 from hashstore import HashStoreFactory
 
 
+class HashStoreParser:
+    """Class to setup client arguments"""
+
+    PROGRAM_NAME = "HashStore Command Line Client"
+    DESCRIPTION = (
+        "A command-line tool to convert a directory of data objects"
+        + " into a hashstore and perform operations to store, retrieve,"
+        + " and delete the objects."
+    )
+    EPILOG = "Created for DataONE (NCEAS)"
+
+    parser = ArgumentParser(
+        prog=PROGRAM_NAME,
+        description=DESCRIPTION,
+        epilog=EPILOG,
+    )
+
+    def __init__(self):
+        """Initialize the argparse 'parser'."""
+
+        # Add positional argument
+        self.parser.add_argument("store_path", help="Path of the HashStore")
+
+        # Add optional arguments
+        self.parser.add_argument(
+            "-chs",
+            dest="create_hashstore",
+            action="store_true",
+            help="Create a HashStore",
+        )
+        self.parser.add_argument(
+            "-dp", "-store_depth", dest="depth", help="Depth of HashStore"
+        )
+        self.parser.add_argument(
+            "-wp", "-store_width", dest="width", help="Width of HashStore"
+        )
+        self.parser.add_argument(
+            "-ap",
+            "-store_algorithm",
+            dest="algorithm",
+            help="Algorithm to use when calculating object address",
+        )
+        self.parser.add_argument(
+            "-nsp",
+            "-store_namespace",
+            dest="formatid",
+            help="Default metadata namespace for metadata",
+        )
+
+        # Testing related arguments
+        self.parser.add_argument(
+            "-cvd",
+            dest="convert_directory",
+            help="Directory of objects to convert to a HashStore",
+        )
+        self.parser.add_argument(
+            "-cvt",
+            dest="convert_directory_type",
+            help="Type of directory to convert (ex. 'objects' or 'metadata')",
+        )
+        self.parser.add_argument(
+            "-nobj",
+            dest="num_obj_to_convert",
+            help="Number of objects to convert",
+        )
+        self.parser.add_argument(
+            "-rav",
+            dest="retrieve_and_validate",
+            action="store_true",
+            help="Retrieve and validate objects in HashStore",
+        )
+
+        # Individual API call related arguments
+        self.parser.add_argument(
+            "-pid",
+            dest="object_pid",
+            help="Pid/Guid of object to work with",
+        )
+        self.parser.add_argument(
+            "-algo",
+            dest="object_algorithm",
+            help="Algorithm to work with",
+        )
+
+    def load_store_properties(self, hashstore_yaml):
+        """Get and return the contents of the current HashStore configuration.
+
+        Returns:
+            hashstore_yaml_dict (dict): HashStore properties with the following keys (and values):
+                store_path (str): Path to the HashStore directory.
+                store_depth (int): Depth when sharding an object's hex digest.
+                store_width (int): Width of directories when sharding an object's hex digest.
+                store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+                store_metadata_namespace (str): Namespace for the HashStore's system metadata.
+        """
+        property_required_keys = [
+            "store_path",
+            "store_depth",
+            "store_width",
+            "store_algorithm",
+            "store_metadata_namespace",
+        ]
+
+        if not os.path.exists(hashstore_yaml):
+            exception_string = (
+                "HashStoreParser - load_store_properties: hashstore.yaml not found"
+                + " in store root path."
+            )
+            raise FileNotFoundError(exception_string)
+        # Open file
+        with open(hashstore_yaml, "r", encoding="utf-8") as file:
+            yaml_data = yaml.safe_load(file)
+
+        # Get hashstore properties
+        hashstore_yaml_dict = {}
+        for key in property_required_keys:
+            checked_property = yaml_data[key]
+            if key == "store_depth" or key == "store_width":
+                checked_property = int(yaml_data[key])
+            hashstore_yaml_dict[key] = checked_property
+        return hashstore_yaml_dict
+
+    def get_parser_args(self):
+        """Get command line arguments"""
+        return self.parser.parse_args()
+
+
 class HashStoreClient:
-    """Create a HashStore Client to use through the command line."""
+    """Create a HashStore to use through the command line."""
 
     def __init__(self, properties):
         """Initialize HashStore and MetacatDB adapters"""
@@ -20,9 +148,26 @@ class HashStoreClient:
         module_name = "filehashstore"
         class_name = "FileHashStore"
 
-        # Class variables
+        # Instance attributes
         self.hashstore = factory.get_hashstore(module_name, class_name, properties)
+
+        # Setup logging
+        python_log_file_path = getattr(args, "store_path") + "/python_hashstore.log"
+        if not os.path.exists(python_log_file_path):
+            Path(python_log_file_path).parent.mkdir(parents=True, exist_ok=True)
+            open(python_log_file_path, "w", encoding="utf-8").close()
+
+        # Create log if it doesn't exist
+        logging.basicConfig(
+            filename=python_log_file_path,
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+        # Setup access to Metacat postgres db
         self.metacatdb = MetacatDB(properties["store_path"], self.hashstore)
+        logging.info("HashStoreClient - HashStore, Logger and MetacatDB initialized.")
 
     def store_to_hashstore_from_list(self, origin_dir, obj_type, num):
         """Store objects in a given directory into HashStore
@@ -334,137 +479,10 @@ class MetacatDB:
         return refined_metadta_list
 
 
-def _add_client_optional_arguments(argp):
-    """Adds the optional arguments for the HashStore Client.
-
-    Args:
-        argp (parser): argparse Parser object
-
-    """
-    argp.add_argument(
-        "-chs",
-        dest="create_hashstore",
-        action="store_true",
-        help="Create a HashStore",
-    )
-    argp.add_argument("-dp", "-store_depth", dest="depth", help="Depth of HashStore")
-    argp.add_argument("-wp", "-store_width", dest="width", help="Width of HashStore")
-    argp.add_argument(
-        "-ap",
-        "-store_algorithm",
-        dest="algorithm",
-        help="Algorithm to use when calculating object address",
-    )
-    argp.add_argument(
-        "-nsp",
-        "-store_namespace",
-        dest="formatid",
-        help="Default metadata namespace for metadata",
-    )
-
-    # Directory to convert into a HashStore
-    argp.add_argument(
-        "-cvd",
-        dest="convert_directory",
-        help="Directory of objects to convert to a HashStore",
-    )
-    argp.add_argument(
-        "-cvt",
-        dest="convert_directory_type",
-        help="Type of directory to convert (ex. 'objects' or 'metadata')",
-    )
-    argp.add_argument(
-        "-nobj",
-        dest="num_obj_to_convert",
-        help="Number of objects to convert",
-    )
-    argp.add_argument(
-        "-rav",
-        dest="retrieve_and_validate",
-        action="store_true",
-        help="Retrieve and validate objects in HashStore",
-    )
-
-    # Individual API calls
-    argp.add_argument(
-        "-pid",
-        dest="object_pid",
-        help="Pid/Guid of object to work with",
-    )
-    argp.add_argument(
-        "-algo",
-        dest="object_algorithm",
-        help="Algorithm to work with",
-    )
-
-
-def _load_store_properties(hashstore_yaml):
-    """Get and return the contents of the current HashStore configuration.
-
-    Returns:
-        hashstore_yaml_dict (dict): HashStore properties with the following keys (and values):
-            store_path (str): Path to the HashStore directory.
-            store_depth (int): Depth when sharding an object's hex digest.
-            store_width (int): Width of directories when sharding an object's hex digest.
-            store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
-            store_metadata_namespace (str): Namespace for the HashStore's system metadata.
-    """
-    property_required_keys = [
-        "store_path",
-        "store_depth",
-        "store_width",
-        "store_algorithm",
-        "store_metadata_namespace",
-    ]
-
-    if not os.path.exists(hashstore_yaml):
-        exception_string = (
-            "HashStore CLI Client - _load_store_properties: hashstore.yaml not found"
-            + " in store root path."
-        )
-        raise FileNotFoundError(exception_string)
-    # Open file
-    with open(hashstore_yaml, "r", encoding="utf-8") as file:
-        yaml_data = yaml.safe_load(file)
-
-    # Get hashstore properties
-    hashstore_yaml_dict = {}
-    for key in property_required_keys:
-        checked_property = yaml_data[key]
-        if key == "store_depth" or key == "store_width":
-            checked_property = int(yaml_data[key])
-        hashstore_yaml_dict[key] = checked_property
-    return hashstore_yaml_dict
-
-
 if __name__ == "__main__":
-    PROGRAM_NAME = "HashStore Command Line Client"
-    DESCRIPTION = (
-        "A command-line tool to convert a directory of data objects"
-        + " into a hashstore and perform operations to store, retrieve,"
-        + " and delete the objects."
-    )
-    EPILOG = "Created for DataONE (NCEAS)"
-    parser = ArgumentParser(
-        prog=PROGRAM_NAME,
-        description=DESCRIPTION,
-        epilog=EPILOG,
-    )
-    ### Add Positional and Optional Arguments
-    parser.add_argument("store_path", help="Path of the HashStore")
-    _add_client_optional_arguments(parser)
-
-    # Client entry point
-    args = parser.parse_args()
-
-    ### Initialize Logging
-    python_log_file_path = getattr(args, "store_path") + "/python_store.log"
-    logging.basicConfig(
-        filename=python_log_file_path,
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    # Parse arguments
+    parser = HashStoreParser()
+    args = parser.get_parser_args()
 
     if getattr(args, "create_hashstore"):
         # Create HashStore if -chs flag is true in a given directory
@@ -482,7 +500,7 @@ if __name__ == "__main__":
         # Initialize HashStore
         store_path = getattr(args, "store_path")
         store_path_config_yaml = store_path + "/hashstore.yaml"
-        props = _load_store_properties(store_path_config_yaml)
+        props = parser.load_store_properties_(store_path_config_yaml)
         hs = HashStoreClient(props)
 
         if getattr(args, "convert_directory") is not None:

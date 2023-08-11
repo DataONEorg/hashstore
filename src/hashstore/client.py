@@ -500,7 +500,7 @@ if __name__ == "__main__":
         # Initialize HashStore
         store_path = getattr(args, "store_path")
         store_path_config_yaml = store_path + "/hashstore.yaml"
-        props = parser.load_store_properties_(store_path_config_yaml)
+        props = parser.load_store_properties(store_path_config_yaml)
         hs = HashStoreClient(props)
 
         if getattr(args, "convert_directory") is not None:

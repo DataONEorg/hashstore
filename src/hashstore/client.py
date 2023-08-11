@@ -220,9 +220,13 @@ class HashStoreClient:
         # TODO: This process does not properly get logged.
         cleanup_msg = "Checking results and logging exceptions"
         logging.info(cleanup_msg)
+        exception_list = []
         for result in results:
             if isinstance(result, Exception):
-                logging.error(result)
+                exception_list.append(result)
+                # logging.error(result)
+        for exception in exception_list:
+            logging.error(exception)
 
         # Close the pool and wait for all processes to complete
         pool.close()
@@ -495,8 +499,6 @@ if __name__ == "__main__":
         )
     # Setup logging
     # Create log file if it doesn't already exist
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
     hashstore_py_log = store_path + "/python_hashstore.log"
     python_log_file_path = Path(hashstore_py_log)
     if not os.path.exists(python_log_file_path):

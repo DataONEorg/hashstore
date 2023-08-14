@@ -216,18 +216,11 @@ class HashStoreClient:
         if obj_type == "metadata":
             results = pool.starmap(self.hashstore.store_metadata, checked_obj_list)
 
-        # TODO: Log exceptions from starmap()
-        while True:
-            try:
-                yield next(results)
-            except StopIteration:
-                break
-            except Exception as exception_in_iterator:
-                logging.error(exception_in_iterator)
-
         # Close the pool and wait for all processes to complete
         pool.close()
         pool.join()
+
+        # TODO: Log exceptions from starmap()
 
         end_time = datetime.now()
         content = (
@@ -267,7 +260,7 @@ class HashStoreClient:
         # pool = multiprocessing.Pool(processes=num_processes)
         pool = multiprocessing.Pool()
         if obj_type == "object":
-            results = pool.imap(self.validate_object, checked_obj_list)
+            results = pool.map(self.validate_object, checked_obj_list)
         # if obj_type == "metadata":
         # TODO
 
@@ -503,7 +496,7 @@ if __name__ == "__main__":
         open(python_log_file_path, "w", encoding="utf-8").close()
     logging.basicConfig(
         filename=python_log_file_path,
-        level=logging.INFO,
+        level=logging.WARNING,
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )

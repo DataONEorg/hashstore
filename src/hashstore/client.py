@@ -211,16 +211,17 @@ class HashStoreClient:
         pool = multiprocessing.Pool()
 
         # Call 'obj_type' respective public API methods
+        info_msg = f"HashStoreClient - Request to Store {len(checked_obj_list)} Objs"
+        logging.info(info_msg)
         if obj_type == "object":
-            results = pool.starmap(self.hashstore.store_object, checked_obj_list)
+            # results = pool.starmap(self.hashstore.store_object, checked_obj_list)
+            results = pool.imap(self.store_object_to_hashstore, checked_obj_list)
         if obj_type == "metadata":
             results = pool.starmap(self.hashstore.store_metadata, checked_obj_list)
 
         # Close the pool and wait for all processes to complete
         pool.close()
         pool.join()
-
-        # TODO: Log exceptions from starmap()
 
         end_time = datetime.now()
         content = (
@@ -230,6 +231,13 @@ class HashStoreClient:
             + f" Objects: {end_time - start_time}\n"
         )
         logging.info(content)
+
+    def store_object_to_hashstore(self, obj_tuple):
+        """Store an object to HashStore and log exceptions as warning."""
+        try:
+            self.hashstore.store_object(*obj_tuple)
+        except Exception as so_exception:
+            logging.warning(so_exception)
 
     def retrieve_and_validate_from_hashstore(self, origin_dir, obj_type, num):
         """Retrieve objects or metadata from a Hashstore and validate the content."""
@@ -370,7 +378,7 @@ class MetacatDB:
         query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
                 systemmetadata.object_format, systemmetadata.checksum,
                 systemmetadata.checksum_algorithm FROM identifier INNER JOIN systemmetadata
-                ON identifier.guid = systemmetadata.guid{limit_query};"""
+                ON identifier.guid = systemmetadata.guid ORDER BY identifier.guid{limit_query};"""
         cursor.execute(query)
 
         # Fetch all rows from the result set

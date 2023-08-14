@@ -217,6 +217,13 @@ class HashStoreClient:
             results = pool.starmap(self.hashstore.store_metadata, checked_obj_list)
 
         # TODO: Log exceptions from starmap()
+        while True:
+            try:
+                yield next(results)
+            except StopIteration:
+                break
+            except Exception as exception_in_iterator:
+                logging.error(exception_in_iterator)
 
         # Close the pool and wait for all processes to complete
         pool.close()

@@ -1122,7 +1122,7 @@ class FileHashStore(HashStore):
                     "FileHashStore - _move_and_get_checksums: Hex digest and checksum"
                     + f" do not match - file not stored for pid: {pid}. Algorithm:"
                     + f" {checksum_algorithm}. Checksum provided: {checksum} !="
-                    + f"HexDigest: {hex_digest_stored}. Tmp file deleted."
+                    + f" HexDigest: {hex_digest_stored}. Tmp file deleted."
                 )
                 logging.error(exception_string)
                 raise ValueError(exception_string)

@@ -90,20 +90,70 @@ class HashStoreParser:
 
         # Individual API call related arguments
         self.parser.add_argument(
-            "-getchecksum",
-            dest="client_getchecksum",
-            action="store_true",
-            help="Flag to call ",
-        )
-        self.parser.add_argument(
             "-pid",
             dest="object_pid",
             help="Pid/Guid of object to work with",
         )
         self.parser.add_argument(
+            "-path",
+            dest="object_path",
+            help="Path of the data or metadata object",
+        )
+        self.parser.add_argument(
             "-algo",
             dest="object_algorithm",
             help="Algorithm to work with",
+        )
+        self.parser.add_argument(
+            "-checksum",
+            dest="object_checksum",
+            help="Checksum of data object to validate",
+        )
+        self.parser.add_argument(
+            "-checksum_algo",
+            dest="object_checksum_algorithm",
+            help="Algorithm of checksum to validate",
+        )
+        self.parser.add_argument(
+            "-checksum_algo",
+            dest="object_checksum_algorithm",
+            help="Size of data object to validate",
+        )
+        self.parser.add_argument(
+            "-formatid",
+            dest="object_formatid",
+            help="Format/namespace of the metadata",
+        )
+        # Public API Flags
+        self.parser.add_argument(
+            "-getchecksum",
+            dest="client_getchecksum",
+            action="store_true",
+            help="Flag to get the hex digest of a data object in HashStore",
+        )
+        self.parser.add_argument(
+            "-storeobject",
+            dest="client_storeobject",
+            action="store_true",
+            help="Flag to store an object to a HashStore",
+        )
+        self.parser.add_argument(
+            "-storemetadata",
+            dest="client_storemetadata",
+            action="store_true",
+            help="Flag to store a metadata document to a HashStore",
+        )
+        self.parser.add_argument(
+            "-deleteobject",
+            dest="client_deleteobject",
+            action="store_true",
+            help="Flag to delete on object from a HashStore",
+        )
+        self.parser.add_argument(
+            "-deletemetadata",
+            dest="client_deletemetadata",
+            action="store_true",
+            help="Flag to dlete a metadata document from a HashStore",
         )
 
     def load_store_properties(self, hashstore_yaml):
@@ -173,6 +223,8 @@ class HashStoreClient:
         if testflag:
             self.metacatdb = MetacatDB(properties["store_path"], self.hashstore)
             logging.info("HashStoreClient - MetacatDB initialized.")
+
+    # Methods relating to testing HashStore with knbvm (test.arcticdata.io)
 
     def store_to_hashstore_from_list(self, origin_dir, obj_type, num):
         """Store objects in a given directory into HashStore
@@ -289,28 +341,21 @@ class HashStoreClient:
         """Retrieves an object from HashStore and validates its checksum."""
         pid_guid = obj_tuple[0]
         algo = obj_tuple[4]
-        checksum = obj_tuple[3]
+        obj_db_checksum = obj_tuple[3]
 
         with self.hashstore.retrieve_object(pid_guid) as obj_stream:
             digest = self.hashstore.computehash(obj_stream, algo)
             obj_stream.close()
 
-        if digest != checksum:
+        if digest != obj_db_checksum:
             err_msg = (
                 f"Assertion Error for pid/guid: {pid_guid} -"
                 + f" Digest calculated from stream ({digest}) does not match"
-                + f" checksum from metacat db: {checksum}"
+                + f" checksum from metacat db: {obj_db_checksum}"
             )
             logging.error(err_msg)
             print(err_msg)
         return
-
-    def get_obj_hex_digest_from_store(self, pid_guid, obj_algo):
-        """Given a pid and algorithm, get the hex digest of the object"""
-        digest = self.hashstore.get_hex_digest(pid, algorithm)
-        print(f"guid/pid: {pid_guid}")
-        print(f"algorithm: {obj_algo}")
-        print(f"digest: {digest}")
 
 
 class MetacatDB:
@@ -543,7 +588,7 @@ if __name__ == "__main__":
             raise FileNotFoundError(
                 f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."
             )
-
+    # Get hex digest of an object
     elif (
         getattr(args, "client_getchecksum")
         and getattr(args, "object_pid") is not None
@@ -552,4 +597,57 @@ if __name__ == "__main__":
         # Calculate the hex digest of a given pid with algorithm supplied
         pid = getattr(args, "object_pid")
         algorithm = getattr(args, "object_algorithm")
-        hs.get_obj_hex_digest_from_store(pid, algorithm)
+        digest = hs.hashstore.get_hex_digest(pid, algorithm)
+        print(f"guid/pid: {pid}")
+        print(f"algorithm: {algorithm}")
+        print(f"Checksum/Hex Digest: {digest}")
+
+    elif (
+        getattr(args, "client_storeobject")
+        and getattr(args, "object_pid") is not None
+        and getattr(args, "object_path") is not None
+    ):
+        # Store object to HashStore
+        pid = getattr(args, "object_pid")
+        path = getattr(args, "object_path")
+        algorithm = getattr(args, "object_algorithm")
+        checksum = getattr(args, "checksum")
+        checksum_algorithm = getattr(args, "checksum_algo")
+        size = getattr(args, "object_size")
+        object_metadata = hs.hashstore.store_object(
+            pid, path, algorithm, checksum, checksum_algorithm, size
+        )
+        print(f"Object Metadata:\n{object_metadata}")
+
+    elif (
+        getattr(args, "client_metadata")
+        and getattr(args, "object_pid") is not None
+        and getattr(args, "object_path") is not None
+    ):
+        # Store metadata to HashStore
+        pid = getattr(args, "object_pid")
+        path = getattr(args, "object_path")
+        formatid = getattr(args, "object_formatid")
+        metadata_cid = hs.hashstore.store_metadata(pid, path, formatid)
+        print(f"Metadata ID: {metadata_cid}")
+
+    elif (
+        getattr(args, "client_deleteobject") and getattr(args, "object_pid") is not None
+    ):
+        # Delete object from HashStore
+        pid = getattr(args, "object_pid")
+        delete_status = hs.hashstore.delete_object(pid)
+        if delete_status:
+            print("Object for pid: {pid} has been deleted.")
+
+    elif (
+        getattr(args, "client_deletemetadata")
+        and getattr(args, "object_pid") is not None
+        and getattr(args, "object_formatid") is not None
+    ):
+        # Delete metadata from HashStore
+        pid = getattr(args, "object_pid")
+        formatid = getattr(args, "object_formatid")
+        delete_status = hs.hashstore.delete_metadata(pid, formatid)
+        if delete_status:
+            print("Metadata for pid: {pid} with formatid: {formatid} has been deleted.")

@@ -127,8 +127,8 @@ class HashStoreParser:
             help="Algorithm of checksum to validate",
         )
         self.parser.add_argument(
-            "-checksum_algo",
-            dest="object_checksum_algorithm",
+            "-obj_size",
+            dest="object_size",
             help="Size of data object to validate",
         )
         self.parser.add_argument(

@@ -232,7 +232,6 @@ class HashStoreClient:
         Args:
             origin_dir (str): Directory to convert
             obj_type (str): 'object' or 'metadata'
-            config_yaml (str): Path to HashStore config file `hashstore.yaml`
             num (int): Number of files to store
         """
         # Get list of files from directory
@@ -258,8 +257,6 @@ class HashStoreClient:
         start_time = datetime.now()
 
         # Setup pool and processes
-        # num_processes = os.cpu_count() - 2
-        # pool = multiprocessing.Pool(processes=num_processes)
         pool = multiprocessing.Pool()
 
         # Call 'obj_type' respective public API methods
@@ -284,14 +281,24 @@ class HashStoreClient:
         logging.info(content)
 
     def try_store_object(self, obj_tuple):
-        """Store an object to HashStore and log exceptions as warning."""
+        """Store an object to HashStore and log exceptions as warning.
+
+        Args:
+            obj_tuple: See HashStore store_object signature for details.
+        """
         try:
             return self.hashstore.store_object(*obj_tuple)
         except Exception as so_exception:
             logging.warning(so_exception)
 
     def retrieve_and_validate_from_hashstore(self, origin_dir, obj_type, num):
-        """Retrieve objects or metadata from a Hashstore and validate the content."""
+        """Retrieve objects or metadata from a Hashstore and validate the content.
+
+        Args:
+            origin_dir (str): Directory to convert
+            obj_type (str): 'object' or 'metadata'
+            num (int): Number of files to store
+        """
         logging.info("HashStore Client - Begin retrieving and validating objects.")
         checked_num_of_files = None
         # Check number of files to store
@@ -315,8 +322,6 @@ class HashStoreClient:
         start_time = datetime.now()
 
         # Setup pool and processes
-        # num_processes = os.cpu_count() - 2
-        # pool = multiprocessing.Pool(processes=num_processes)
         pool = multiprocessing.Pool()
         if obj_type == "object":
             pool.map(self.validate_object, checked_obj_list)
@@ -336,10 +341,14 @@ class HashStoreClient:
         logging.info(content)
 
     def validate_object(self, obj_tuple):
-        """Retrieves an object from HashStore and validates its checksum."""
+        """Retrieves an object from HashStore and validates its checksum.
+
+        Args:
+            obj_tuple: pid_guid, obj_checksum_algo, obj_checksum
+        """
         pid_guid = obj_tuple[0]
-        algo = obj_tuple[4]
-        obj_db_checksum = obj_tuple[3]
+        algo = obj_tuple[1]
+        obj_db_checksum = obj_tuple[2]
 
         with self.hashstore.retrieve_object(pid_guid) as obj_stream:
             computed_digest = self.hashstore.computehash(obj_stream, algo)
@@ -356,6 +365,66 @@ class HashStoreClient:
 
         return
 
+    def delete_objects_from_list(self, origin_dir, obj_type, num):
+        """Store objects in a given directory into HashStore
+        Args:
+            origin_dir (str): Directory to convert
+            obj_type (str): 'object' or 'metadata'
+            num (int): Number of files to store
+        """
+        # Get list of files from directory
+        file_list = os.listdir(origin_dir)
+        checked_num_of_files = len(file_list)
+        # Check number of files to store
+        if num is not None:
+            checked_num_of_files = int(num)
+
+        # Object and Metadata list
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(
+            origin_dir, checked_num_of_files
+        )
+
+        # Get list of objects to store from metacat db
+        if obj_type == "object":
+            checked_obj_list = self.metacatdb.refine_list_for_objects(
+                metacat_obj_list, "delete"
+            )
+        if obj_type == "metadata":
+            checked_obj_list = self.metacatdb.refine_list_for_metadata(metacat_obj_list)
+
+        start_time = datetime.now()
+
+        # Setup pool and processes
+        pool = multiprocessing.Pool()
+
+        # Call 'obj_type' respective public API methods
+        info_msg = f"HashStoreClient - Request to delete {len(checked_obj_list)} Objs"
+        logging.info(info_msg)
+        if obj_type == "object":
+            # results = pool.starmap(self.hashstore.store_object, checked_obj_list)
+            pool.imap(self.try_delete_object, checked_obj_list)
+        # TODO: if obj_type == "metadata":
+
+        # Close the pool and wait for all processes to complete
+        pool.close()
+        pool.join()
+
+        end_time = datetime.now()
+        content = (
+            f"HashStoreClient (delete_objects_from_list):\n"
+            f"Start Time: {start_time}\nEnd Time: {end_time}\n"
+            + f"Total Time to Store {len(checked_obj_list)} {obj_type}"
+            + f" Objects: {end_time - start_time}\n"
+        )
+        logging.info(content)
+
+    def try_delete_object(self, obj_pid):
+        """Delete an object to HashStore and log exceptions as warning."""
+        try:
+            return self.hashstore.delete_object(obj_pid)
+        except Exception as do_exception:
+            logging.warning(do_exception)
+
 
 class MetacatDB:
     """Class to interact with Metacat's Postgres DB"""
@@ -370,6 +439,7 @@ class MetacatDB:
             "db_name",
         ]
 
+        # Note, 'pgdb.yaml' config file must be manually created for security
         pgyaml_path = hashstore_path + "/pgdb.yaml"
         if not os.path.exists(pgyaml_path):
             exception_string = (
@@ -390,7 +460,7 @@ class MetacatDB:
             self.db_yaml_dict[key] = checked_property
 
     def get_object_metadata_list(self, origin_directory, num):
-        """Query the metacat db for the full obj and metadata list.
+        """Query the metacat db for the full obj and metadata list and order by guid.
 
         Args:
             origin_directory (string): 'var/metacat/data' or 'var/metacat/documents'
@@ -457,14 +527,14 @@ class MetacatDB:
         """Refine a list of objects by checking for file existence and removing duplicates.
 
         Args:
-            store (HashStore): HashStore object
             metacat_obj_list (List): List of tuple objects representing rows from metacat db
             action (string): "store" or "retrieve".
                 "store" will create a list of objects to store that do not exist in HashStore.
-                "retrieve" will create a list of objects that exist in HashStore.
+                "retrieve" will create a list of objects (tuples) that exist in HashStore.
+                "delete" will create a list of object pids
 
         Returns:
-            refine_list (List): List of tuple objects based on "action"
+            refined_object_list (List): List of tuple objects based on "action"
         """
         refined_object_list = []
         for tuple_item in metacat_obj_list:
@@ -492,7 +562,17 @@ class MetacatDB:
                     if self.hashstore.exists(
                         "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
                     ):
-                        refined_object_list.append(tuple_item)
+                        retrieve_object_tuple_item = (
+                            pid_guid,
+                            item_checksum_algorithm,
+                            item_checksum,
+                        )
+                        refined_object_list.append(retrieve_object_tuple_item)
+                if action == "delete":
+                    if self.hashstore.exists(
+                        "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
+                    ):
+                        refined_object_list.append(pid_guid)
 
         return refined_object_list
 

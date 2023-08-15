@@ -67,14 +67,14 @@ class HashStoreParser:
 
         # Testing related arguments
         self.parser.add_argument(
-            "-cvd",
-            dest="convert_directory",
-            help="Directory of objects to convert to a HashStore",
+            "-sdir",
+            dest="source_directory",
+            help="Source directory of objects to work with",
         )
         self.parser.add_argument(
-            "-cvt",
-            dest="convert_directory_type",
-            help="Type of directory to convert (ex. 'objects' or 'metadata')",
+            "-stype",
+            dest="source_directory_type",
+            help="Source directory type (ex. 'objects' or 'metadata')",
         )
         self.parser.add_argument(
             "-nobj",
@@ -82,8 +82,20 @@ class HashStoreParser:
             help="Number of objects to convert",
         )
         self.parser.add_argument(
+            "-sts",
+            dest="store_to_hashstore",
+            action="store_true",
+            help="Retrieve and validate objects in HashStore",
+        )
+        self.parser.add_argument(
             "-rav",
             dest="retrieve_and_validate",
+            action="store_true",
+            help="Retrieve and validate objects in HashStore",
+        )
+        self.parser.add_argument(
+            "-dfs",
+            dest="delete_from_hashstore",
             action="store_true",
             help="Retrieve and validate objects in HashStore",
         )
@@ -637,19 +649,25 @@ if __name__ == "__main__":
     hs = HashStoreClient(props, getattr(args, "knbvm_flag"))
 
     # HashStore client entry point
-    if getattr(args, "convert_directory") is not None:
-        directory_to_convert = getattr(args, "convert_directory")
+    if getattr(args, "source_directory") is not None:
+        directory_to_convert = getattr(args, "source_directory")
         # Check if the directory to convert exists
         if os.path.exists(directory_to_convert):
             # If -nobj is supplied, limit the objects we work with
             number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
             # Determine if we are working with objects or metadata
-            directory_type = getattr(args, "convert_directory_type")
+            directory_type = getattr(args, "source_directory_type")
             accepted_directory_types = ["object", "metadata"]
             if directory_type not in accepted_directory_types:
                 raise ValueError(
-                    "Directory `-cvt` cannot be empty, must be 'object' or 'metadata'."
-                    + f" convert_directory_type: {directory_type}"
+                    "Directory `-stype` cannot be empty, must be 'object' or 'metadata'."
+                    + f" source_directory_type: {directory_type}"
+                )
+            if getattr(args, "store_to_hashstore"):
+                hs.store_to_hashstore_from_list(
+                    directory_to_convert,
+                    directory_type,
+                    number_of_objects_to_convert,
                 )
             if getattr(args, "retrieve_and_validate"):
                 hs.retrieve_and_validate_from_hashstore(
@@ -657,12 +675,13 @@ if __name__ == "__main__":
                     directory_type,
                     number_of_objects_to_convert,
                 )
-            else:
-                hs.store_to_hashstore_from_list(
+            if getattr(args, "delete_from_hashstore"):
+                hs.delete_objects_from_list(
                     directory_to_convert,
                     directory_type,
                     number_of_objects_to_convert,
                 )
+
         else:
             raise FileNotFoundError(
                 f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."

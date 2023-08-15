@@ -267,9 +267,8 @@ class HashStoreClient:
         logging.info(info_msg)
         if obj_type == "object":
             # results = pool.starmap(self.hashstore.store_object, checked_obj_list)
-            results = pool.imap(self.store_object_to_hashstore, checked_obj_list)
-        if obj_type == "metadata":
-            results = pool.starmap(self.hashstore.store_metadata, checked_obj_list)
+            pool.imap(self.try_store_object, checked_obj_list)
+        # TODO: if obj_type == "metadata":
 
         # Close the pool and wait for all processes to complete
         pool.close()
@@ -284,10 +283,10 @@ class HashStoreClient:
         )
         logging.info(content)
 
-    def store_object_to_hashstore(self, obj_tuple):
+    def try_store_object(self, obj_tuple):
         """Store an object to HashStore and log exceptions as warning."""
         try:
-            self.hashstore.store_object(*obj_tuple)
+            return self.hashstore.store_object(*obj_tuple)
         except Exception as so_exception:
             logging.warning(so_exception)
 
@@ -320,9 +319,8 @@ class HashStoreClient:
         # pool = multiprocessing.Pool(processes=num_processes)
         pool = multiprocessing.Pool()
         if obj_type == "object":
-            results = pool.map(self.validate_object, checked_obj_list)
-        # if obj_type == "metadata":
-        # TODO
+            pool.map(self.validate_object, checked_obj_list)
+        # TODO: if obj_type == "metadata":
 
         # Close the pool and wait for all processes to complete
         pool.close()
@@ -344,17 +342,18 @@ class HashStoreClient:
         obj_db_checksum = obj_tuple[3]
 
         with self.hashstore.retrieve_object(pid_guid) as obj_stream:
-            digest = self.hashstore.computehash(obj_stream, algo)
+            computed_digest = self.hashstore.computehash(obj_stream, algo)
             obj_stream.close()
 
         if digest != obj_db_checksum:
             err_msg = (
                 f"Assertion Error for pid/guid: {pid_guid} -"
-                + f" Digest calculated from stream ({digest}) does not match"
+                + f" Digest calculated from stream ({computed_digest}) does not match"
                 + f" checksum from metacat db: {obj_db_checksum}"
             )
             logging.error(err_msg)
             print(err_msg)
+
         return
 
 
@@ -437,14 +436,14 @@ class MetacatDB:
             pid_guid = row[0]
             metadatapath_docid_rev = origin_directory + "/" + row[1] + "." + str(row[2])
             metadata_namespace = row[3]
-            checksum = row[4]
-            checksum_algorithm = row[5]
+            row_checksum = row[4]
+            row_checksum_algorithm = row[5]
             tuple_item = (
                 pid_guid,
                 metadatapath_docid_rev,
                 metadata_namespace,
-                checksum,
-                checksum_algorithm,
+                row_checksum,
+                row_checksum_algorithm,
             )
             object_metadata_list.append(tuple_item)
 
@@ -471,8 +470,8 @@ class MetacatDB:
         for tuple_item in metacat_obj_list:
             pid_guid = tuple_item[0]
             filepath_docid_rev = tuple_item[1]
-            checksum = tuple_item[3]
-            checksum_algorithm = tuple_item[4]
+            item_checksum = tuple_item[3]
+            item_checksum_algorithm = tuple_item[4]
             if os.path.exists(filepath_docid_rev):
                 if action == "store":
                     # If the file has already been stored, skip it
@@ -485,8 +484,8 @@ class MetacatDB:
                             pid_guid,
                             filepath_docid_rev,
                             None,
-                            checksum,
-                            checksum_algorithm,
+                            item_checksum,
+                            item_checksum_algorithm,
                         )
                         refined_object_list.append(store_object_tuple_item)
                 if action == "retrieve":
@@ -557,7 +556,7 @@ if __name__ == "__main__":
     props = parser.load_store_properties(store_path_config_yaml)
     hs = HashStoreClient(props, getattr(args, "knbvm_flag"))
 
-    # Client entry point
+    # HashStore client entry point
     if getattr(args, "convert_directory") is not None:
         directory_to_convert = getattr(args, "convert_directory")
         # Check if the directory to convert exists
@@ -588,64 +587,58 @@ if __name__ == "__main__":
             raise FileNotFoundError(
                 f"Directory to convert does not exist: {getattr(args, 'convert_directory')}."
             )
-    # Get hex digest of an object
+    # Calculate the hex digest of a given pid with algorithm supplied
     elif (
         getattr(args, "client_getchecksum")
         and getattr(args, "object_pid") is not None
         and getattr(args, "object_algorithm") is not None
     ):
-        # Calculate the hex digest of a given pid with algorithm supplied
         pid = getattr(args, "object_pid")
         algorithm = getattr(args, "object_algorithm")
         digest = hs.hashstore.get_hex_digest(pid, algorithm)
         print(f"guid/pid: {pid}")
         print(f"algorithm: {algorithm}")
         print(f"Checksum/Hex Digest: {digest}")
-
+    # Store object to HashStore
     elif (
         getattr(args, "client_storeobject")
         and getattr(args, "object_pid") is not None
         and getattr(args, "object_path") is not None
     ):
-        # Store object to HashStore
         pid = getattr(args, "object_pid")
         path = getattr(args, "object_path")
         algorithm = getattr(args, "object_algorithm")
         checksum = getattr(args, "checksum")
         checksum_algorithm = getattr(args, "checksum_algo")
         size = getattr(args, "object_size")
-        object_metadata = hs.hashstore.store_object(
-            pid, path, algorithm, checksum, checksum_algorithm, size
-        )
+        object_info_tuple = (pid, path, algorithm, checksum, checksum_algorithm, size)
+        object_metadata = hs.hashstore.store_object(*object_info_tuple)
         print(f"Object Metadata:\n{object_metadata}")
-
+    # Store metadata to HashStore
     elif (
         getattr(args, "client_metadata")
         and getattr(args, "object_pid") is not None
         and getattr(args, "object_path") is not None
     ):
-        # Store metadata to HashStore
         pid = getattr(args, "object_pid")
         path = getattr(args, "object_path")
         formatid = getattr(args, "object_formatid")
         metadata_cid = hs.hashstore.store_metadata(pid, path, formatid)
         print(f"Metadata ID: {metadata_cid}")
-
+    # Delete object from HashStore
     elif (
         getattr(args, "client_deleteobject") and getattr(args, "object_pid") is not None
     ):
-        # Delete object from HashStore
         pid = getattr(args, "object_pid")
         delete_status = hs.hashstore.delete_object(pid)
         if delete_status:
             print("Object for pid: {pid} has been deleted.")
-
+    # Delete metadata from HashStore
     elif (
         getattr(args, "client_deletemetadata")
         and getattr(args, "object_pid") is not None
         and getattr(args, "object_formatid") is not None
     ):
-        # Delete metadata from HashStore
         pid = getattr(args, "object_pid")
         formatid = getattr(args, "object_formatid")
         delete_status = hs.hashstore.delete_metadata(pid, formatid)

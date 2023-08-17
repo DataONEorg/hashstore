@@ -196,8 +196,8 @@ class FileHashStore(HashStore):
             checked_store_algoritm = store_algorithm
         else:
             exception_string = (
-                "FileHashStore - write_properties: algorithm supplied cannot"
-                + " be used as default for HashStore. Must be one of:"
+                f"FileHashStore - write_properties: algorithm supplied ({store_algorithm})"
+                + " cannot be used as default for HashStore. Must be one of:"
                 + " MD5, SHA-1, SHA-256, SHA-384, SHA-512 which are DataONE"
                 + " controlled algorithm values"
             )

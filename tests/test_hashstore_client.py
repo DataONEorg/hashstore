@@ -1,5 +1,4 @@
 """Test module for the Python client (Public API calls only)"""
-import multiprocessing
 import sys
 import os
 from pathlib import Path
@@ -28,10 +27,8 @@ def test_create_hashstore(tmp_path):
 
     # Add file path of HashStore to sys so modules can be discovered
     sys.path.append(client_directory)
-
     # Manually change sys args to simulate command line arguments
     sys.argv = chs_args
-
     client.main()
 
     hashstore_yaml = Path(client_test_store + "/hashstore.yaml")
@@ -44,34 +41,122 @@ def test_create_hashstore(tmp_path):
     assert os.path.exists(hashstore_client_python_log)
 
 
-def test_store_object_two(store):
-    """Test storing an object to HashStore through client app."""
+def test_store_object(store, pids):
+    """Test storing objects to HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
-    client_module_path = f"{client_directory}/client.py"
     test_dir = "tests/testdata/"
-    test_store = store.root
-    store_object_flag = "-storeobject"
-    pid = "jtao.1700.1"
-    client_pid_arg = f"-pid={pid}"
-    path = f'-path={test_dir + pid.replace("/", "_")}'
-    chs_args = [
-        client_module_path,
-        test_store,
-        store_object_flag,
-        client_pid_arg,
-        path,
-    ]
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        client_module_path = f"{client_directory}/client.py"
+        test_store = store.root
+        store_object_flag = "-storeobject"
+        client_pid_arg = f"-pid={pid}"
+        path = f'-path={test_dir + pid.replace("/", "_")}'
+        chs_args = [
+            client_module_path,
+            test_store,
+            store_object_flag,
+            client_pid_arg,
+            path,
+        ]
 
-    # Add file path of HashStore to sys so modules can be discovered
-    sys.path.append(client_directory)
+        # Add file path of HashStore to sys so modules can be discovered
+        sys.path.append(client_directory)
+        # Manually change sys args to simulate command line arguments
+        sys.argv = chs_args
+        client.main()
 
-    # Manually change sys args to simulate command line arguments
-    sys.argv = chs_args
+        assert store.exists("objects", pids[pid]["object_cid"])
 
-    client.main()
 
-    pid_sharded_path = (
-        "a8/24/19/25740d5dcd719596639e780e0a090c9d55a5d0372b0eaf55ed711d4edf"
-    )
-    expected_pid_abs_path = Path(test_store + f"/objects/{pid_sharded_path}")
-    assert os.path.exists(expected_pid_abs_path)
+def test_store_metadata(store, pids):
+    """Test storing metadata to HashStore through client."""
+    client_directory = os.getcwd() + "/src/hashstore"
+    test_dir = "tests/testdata/"
+    namespace = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        client_module_path = f"{client_directory}/client.py"
+        test_store = store.root
+        store_metadata_flag = "-storemetadata"
+        client_pid_arg = f"-pid={pid}"
+        path = f"-path={syspath}"
+        format_id = f"-formatid={namespace}"
+        chs_args = [
+            client_module_path,
+            test_store,
+            store_metadata_flag,
+            client_pid_arg,
+            path,
+            format_id,
+        ]
+
+        # Add file path of HashStore to sys so modules can be discovered
+        sys.path.append(client_directory)
+        # Manually change sys args to simulate command line arguments
+        sys.argv = chs_args
+        client.main()
+
+        assert store.exists("metadata", pids[pid]["metadata_cid"])
+
+
+def test_delete_objects(pids, store):
+    """Test deleting objects from a HashStore through client."""
+    client_directory = os.getcwd() + "/src/hashstore"
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        _object_metadata = store.store_object(pid, path)
+
+        client_module_path = f"{client_directory}/client.py"
+        test_store = store.root
+        delete_object_flag = "-deleteobject"
+        client_pid_arg = f"-pid={pid}"
+        chs_args = [
+            client_module_path,
+            test_store,
+            delete_object_flag,
+            client_pid_arg,
+        ]
+
+        # Add file path of HashStore to sys so modules can be discovered
+        sys.path.append(client_directory)
+        # Manually change sys args to simulate command line arguments
+        sys.argv = chs_args
+        client.main()
+
+        assert not store.exists("objects", pids[pid]["object_cid"])
+
+
+def test_delete_metadata(pids, store):
+    """Test deleting metadata from a HashStore through client."""
+    client_directory = os.getcwd() + "/src/hashstore"
+    test_dir = "tests/testdata/"
+    namespace = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _metadata_cid = store.store_metadata(pid, syspath, namespace)
+
+        client_module_path = f"{client_directory}/client.py"
+        test_store = store.root
+        delete_metadata_flag = "-deletemetadata"
+        client_pid_arg = f"-pid={pid}"
+        format_id = f"-formatid={namespace}"
+        chs_args = [
+            client_module_path,
+            test_store,
+            delete_metadata_flag,
+            client_pid_arg,
+            format_id,
+        ]
+
+        # Add file path of HashStore to sys so modules can be discovered
+        sys.path.append(client_directory)
+        # Manually change sys args to simulate command line arguments
+        sys.argv = chs_args
+        client.main()
+
+        assert not store.exists("metadata", pids[pid]["metadata_cid"])

@@ -13,22 +13,22 @@ from hashstore import HashStoreFactory
 class HashStoreParser:
     """Class to setup parsing arguments via argparse."""
 
-    PROGRAM_NAME = "HashStore Command Line Client"
-    DESCRIPTION = (
-        "Command-line tool to convert a directory of data objects"
-        + " into a hashstore and perform operations to store, retrieve,"
-        + " and delete the objects."
-    )
-    EPILOG = "Created for DataONE (NCEAS)"
-
-    parser = ArgumentParser(
-        prog=PROGRAM_NAME,
-        description=DESCRIPTION,
-        epilog=EPILOG,
-    )
-
     def __init__(self):
         """Initialize the argparse 'parser'."""
+
+        program_name = "HashStore Command Line Client"
+        description = (
+            "Command-line tool to convert a directory of data objects"
+            + " into a hashstore and perform operations to store, retrieve,"
+            + " and delete the objects."
+        )
+        epilog = "Created for DataONE (NCEAS)"
+
+        self.parser = ArgumentParser(
+            prog=program_name,
+            description=description,
+            epilog=epilog,
+        )
 
         # Add positional argument
         self.parser.add_argument("store_path", help="Path of the HashStore")
@@ -627,6 +627,7 @@ class MetacatDB:
 
 def main():
     """Main function of the HashStore client."""
+
     parser = HashStoreParser()
     args = parser.get_parser_args()
 

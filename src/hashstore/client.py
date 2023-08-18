@@ -18,9 +18,9 @@ class HashStoreParser:
 
         program_name = "HashStore Command Line Client"
         description = (
-            "Command-line tool to convert a directory of data objects"
-            + " into a hashstore and perform operations to store, retrieve,"
-            + " and delete the objects."
+            "Command line tool to call store, retrieve and delete with a HashStore."
+            + " Additionally, methods are available to test functionality with a"
+            + " metacat postgres db."
         )
         epilog = "Created for DataONE (NCEAS)"
 
@@ -320,7 +320,8 @@ class HashStoreClient:
             obj_tuple: See HashStore store_object signature for details.
         """
         try:
-            return self.hashstore.store_object(*obj_tuple)
+            self.hashstore.store_object(*obj_tuple)
+            return
         # pylint: disable=W0718
         except Exception as so_exception:
             print(so_exception)
@@ -332,7 +333,8 @@ class HashStoreClient:
             obj_tuple: See HashStore store_object signature for details.
         """
         try:
-            return self.hashstore.store_metadata(*obj_tuple)
+            self.hashstore.store_metadata(*obj_tuple)
+            return
         # pylint: disable=W0718
         except Exception as so_exception:
             print(so_exception)
@@ -418,7 +420,7 @@ class HashStoreClient:
         """Retrieves a metadata from HashStore and validates its checksum
 
         Args:
-            obj_tuple: pid_guid, obj_checksum_algo, obj_checksum
+            obj_tuple: pid_guid, format_id, obj_checksum, obj_algorithm
         """
         pid_guid = obj_tuple[0]
         namespace = obj_tuple[1]
@@ -497,7 +499,11 @@ class HashStoreClient:
         logging.info(content)
 
     def try_delete_object(self, obj_pid):
-        """Delete an object to HashStore and log exceptions as warning."""
+        """Delete an object to HashStore and log exceptions as warning.
+
+        Args:
+            obj_pid (str): Pid of object to delete
+        """
         try:
             self.hashstore.delete_object(obj_pid)
             return
@@ -506,7 +512,11 @@ class HashStoreClient:
             print(do_exception)
 
     def try_delete_metadata(self, obj_tuple):
-        """Delete an object to HashStore and log exceptions as warning."""
+        """Delete an object to HashStore and log exceptions as warning.
+
+        Args:
+            obj_tuple: pid_guid, format_id (namespace)
+        """
         pid_guid = obj_tuple[0]
         namespace = obj_tuple[1]
         try:
@@ -621,7 +631,7 @@ class MetacatDB:
             metacat_obj_list (List): List of tuple objects representing rows from metacat db
             action (string): "store", "retrieve" or "delete".
                 "store" will create a list of objects to store that do not exist in HashStore.
-                "retrieve" will create a list of objects (tuples) that exist in HashStore.
+                "retrieve" will create a list of objects that exist in HashStore.
                 "delete" will create a list of object pids
 
         Returns:
@@ -668,7 +678,18 @@ class MetacatDB:
         return refined_object_list
 
     def refine_list_for_metadata(self, metacat_obj_list, action):
-        """Refine a list of metadata by checking for file existence and removing duplicates."""
+        """Refine a list of metadata by checking for file existence and removing duplicates.
+
+        Args:
+            metacat_obj_list (List): List of tuple objects representing rows from metacat db
+            action (string): "store", "retrieve" or "delete".
+                "store" will create a list of metadata to store that do not exist in HashStore.
+                "retrieve" will create a list of metadata that exist in HashStore.
+                "delete" will create a list of metadata pids with their format_ids
+
+        Returns:
+            refined_object_list (List): List of tuple metadata based on "action"
+        """
         refined_metadata_list = []
         for tuple_item in metacat_obj_list:
             pid_guid = tuple_item[0]
@@ -680,7 +701,10 @@ class MetacatDB:
                 if action == "store":
                     # If the file has already been stored, skip it
                     if not self.hashstore.exists(
-                        "metadata", self.hashstore.get_sha256_hex_digest(pid_guid)
+                        "metadata",
+                        self.hashstore.get_sha256_hex_digest(
+                            pid_guid + metadata_namespace
+                        ),
                     ):
                         tuple_item = (pid_guid, filepath_docid_rev, metadata_namespace)
                         refined_metadata_list.append(tuple_item)
@@ -714,7 +738,7 @@ class MetacatDB:
 
 
 def main():
-    """Main function of the HashStore client."""
+    """Entry point of the HashStore client."""
 
     parser = HashStoreParser()
     args = parser.get_parser_args()
@@ -758,7 +782,7 @@ def main():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # HashStore client entry point
+    # Collect arguments to process
     pid = getattr(args, "object_pid")
     path = getattr(args, "object_path")
     algorithm = getattr(args, "object_algorithm")

@@ -741,6 +741,26 @@ def main():
         metadata_cid = hashstore_c.hashstore.store_metadata(pid, path, formatid)
         print(f"Metadata ID: {metadata_cid}")
 
+    elif getattr(args, "client_retrieveobject") and pid is not None:
+        # Retrieve object from HashStore and display the first 1000 bytes
+        object_stream = hashstore_c.hashstore.retrieve_object(pid)
+        object_content = object_stream.read(1000).decode("utf-8")
+        object_stream.close()
+        print(f"Preview of object (pid: {pid}) content:")
+        print(object_content)
+
+    elif (
+        getattr(args, "client_retrievemetadata")
+        and pid is not None
+        and formatid is not None
+    ):
+        # Retrieve metadata from HashStore and display the first 1000 bytes
+        metadata_stream = hashstore_c.hashstore.retrieve_metadata(pid, formatid)
+        metadata_content = metadata_stream.read(1000).decode("utf-8")
+        metadata_stream.close()
+        print(f"Preview of metadata (pid: {pid}) content:")
+        print(metadata_content)
+
     elif getattr(args, "client_deleteobject") and pid is not None:
         # Delete object from HashStore
         delete_status = hashstore_c.hashstore.delete_object(pid)

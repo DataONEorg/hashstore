@@ -81,6 +81,12 @@ How to use HashStore client (command line app)
 # Store a metadata object
 > python './src/hashstore/client.py' /path/to/store/ "-storemetadata" -pid=content_identifier  -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
 
+# Retrieve a data object
+> python './src/hashstore/client.py' /path/to/store/ "-retrieveobject" -pid=content_identifier
+
+# Retrieve a metadata object
+> python './src/hashstore/client.py' /path/to/store/ "-retrieveobject" -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+
 # Delete a data object
 > python './src/hashstore/client.py' /path/to/store/ "-deleteobject" -pid=content_identifier
 

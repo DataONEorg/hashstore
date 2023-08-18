@@ -74,10 +74,9 @@ def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory)
         factory.get_hashstore(module_name, class_name, properties)
 
 
-def test_hashaddress():
+def test_objectmetadata():
     """Test class returns correct values via dot notation."""
     ab_id = "hashstoretest"
-    is_duplicate = "false"
     obj_size = 1234
     hex_digest_dict = {
         "md5": "md5value",
@@ -86,10 +85,9 @@ def test_hashaddress():
         "sha256": "sha256value",
         "sha512": "sha512value",
     }
-    object_metadata = ObjectMetadata(ab_id, obj_size, is_duplicate, hex_digest_dict)
+    object_metadata = ObjectMetadata(ab_id, obj_size, hex_digest_dict)
     assert object_metadata.id == ab_id
     assert object_metadata.obj_size == obj_size
-    assert object_metadata.is_duplicate == is_duplicate
     assert object_metadata.hex_digests.get("md5") == hex_digest_dict["md5"]
     assert object_metadata.hex_digests.get("sha1") == hex_digest_dict["sha1"]
     assert object_metadata.hex_digests.get("sha224") == hex_digest_dict["sha224"]

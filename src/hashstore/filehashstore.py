@@ -668,7 +668,6 @@ class FileHashStore(HashStore):
             (
                 object_cid,
                 obj_file_size,
-                is_duplicate,
                 hex_digest_dict,
             ) = self._move_and_get_checksums(
                 pid,
@@ -680,9 +679,7 @@ class FileHashStore(HashStore):
                 file_size_to_validate,
             )
 
-        object_metadata = ObjectMetadata(
-            object_cid, obj_file_size, is_duplicate, hex_digest_dict
-        )
+        object_metadata = ObjectMetadata(object_cid, obj_file_size, hex_digest_dict)
         logging.debug(
             "FileHashStore - put_object: Successfully put object for pid: %s",
             pid,
@@ -703,8 +700,7 @@ class FileHashStore(HashStore):
         extension appended. The copy process uses a temporary file to store the
         initial contents and returns a dictionary of algorithms and their
         hex digest values. If the file already exists, the method will immediately
-        return with is_duplicate: True and "None" for the remaining HashAddress
-        attributes. If an algorithm and checksum is provided, it will proceed to
+        raise an exception. If an algorithm and checksum is provided, it will proceed to
         validate the object (and delete the tmpFile if the hex digest stored does
         not match what is provided).
 
@@ -753,7 +749,6 @@ class FileHashStore(HashStore):
 
         # Only move file if it doesn't exist.
         # Files are stored once and only once
-        is_object_duplicate = False
         if not os.path.isfile(abs_file_path):
             self._validate_object(
                 pid,
@@ -821,10 +816,9 @@ class FileHashStore(HashStore):
                 + " deleting temporary file."
             )
             logging.warning(warning_msg)
-            is_object_duplicate = True
             self.delete(entity, tmp_file_name)
 
-        return (object_cid, tmp_file_size, is_object_duplicate, hex_digests)
+        return (object_cid, tmp_file_size, hex_digests)
 
     def _mktmpfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
         """Create a named temporary file from a `Stream` object and return its filename

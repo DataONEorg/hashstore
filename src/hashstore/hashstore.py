@@ -210,23 +210,16 @@ class HashStoreFactory:
         )
 
 
-class ObjectMetadata(
-    namedtuple("ObjectMetadata", ["id", "obj_size", "is_duplicate", "hex_digests"])
-):
+class ObjectMetadata(namedtuple("ObjectMetadata", ["id", "obj_size", "hex_digests"])):
     """File address containing file's path on disk and its content hash ID.
 
     Args:
         ab_id (str): Hash ID (hexdigest) of file contents.
         obj_size (bytes): Size of the object
-        is_duplicate (boolean, optional): Whether the hash address created was
-            a duplicate of a previously existing file. Can only be ``True``
-            after a put operation. Defaults to ``False``.
         hex_digests (dict, optional): A list of hex digests to validate objects
             (md5, sha1, sha256, sha384, sha512)
     """
 
     # Default value to prevent dangerous default value
-    def __new__(cls, ab_id, obj_size, is_duplicate=False, hex_digests=None):
-        return super(ObjectMetadata, cls).__new__(
-            cls, ab_id, obj_size, is_duplicate, hex_digests
-        )
+    def __new__(cls, ab_id, obj_size, hex_digests=None):
+        return super(ObjectMetadata, cls).__new__(cls, ab_id, obj_size, hex_digests)

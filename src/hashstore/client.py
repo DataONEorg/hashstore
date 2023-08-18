@@ -746,7 +746,6 @@ def main():
         object_stream = hashstore_c.hashstore.retrieve_object(pid)
         object_content = object_stream.read(1000).decode("utf-8")
         object_stream.close()
-        print(f"Preview of object (pid: {pid}) content:")
         print(object_content)
 
     elif (
@@ -758,7 +757,6 @@ def main():
         metadata_stream = hashstore_c.hashstore.retrieve_metadata(pid, formatid)
         metadata_content = metadata_stream.read(1000).decode("utf-8")
         metadata_stream.close()
-        print(f"Preview of metadata (pid: {pid}) content:")
         print(metadata_content)
 
     elif getattr(args, "client_deleteobject") and pid is not None:

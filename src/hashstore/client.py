@@ -282,7 +282,9 @@ class HashStoreClient:
                 metacat_obj_list, "store"
             )
         if obj_type == "metadata":
-            checked_obj_list = self.metacatdb.refine_list_for_metadata(metacat_obj_list)
+            checked_obj_list = self.metacatdb.refine_list_for_metadata(
+                metacat_obj_list, "store"
+            )
 
         start_time = datetime.now()
 
@@ -295,7 +297,8 @@ class HashStoreClient:
         if obj_type == "object":
             # results = pool.starmap(self.hashstore.store_object, checked_obj_list)
             pool.imap(self.try_store_object, checked_obj_list)
-        # TODO: if obj_type == "metadata":
+        if obj_type == "metadata":
+            pool.imap(self.try_store_metadata, checked_obj_list)
 
         # Close the pool and wait for all processes to complete
         pool.close()
@@ -318,6 +321,18 @@ class HashStoreClient:
         """
         try:
             return self.hashstore.store_object(*obj_tuple)
+        # pylint: disable=W0718
+        except Exception as so_exception:
+            print(so_exception)
+
+    def try_store_metadata(self, obj_tuple):
+        """Store an object to HashStore and log exceptions as warning.
+
+        Args:
+            obj_tuple: See HashStore store_object signature for details.
+        """
+        try:
+            return self.hashstore.store_metadata(*obj_tuple)
         # pylint: disable=W0718
         except Exception as so_exception:
             print(so_exception)
@@ -348,7 +363,9 @@ class HashStoreClient:
                 metacat_obj_list, "retrieve"
             )
         if obj_type == "metadata":
-            checked_obj_list = self.metacatdb.refine_list_for_metadata(metacat_obj_list)
+            checked_obj_list = self.metacatdb.refine_list_for_metadata(
+                metacat_obj_list, "retrieve"
+            )
 
         start_time = datetime.now()
 
@@ -356,7 +373,8 @@ class HashStoreClient:
         pool = multiprocessing.Pool()
         if obj_type == "object":
             pool.map(self.validate_object, checked_obj_list)
-        # TODO: if obj_type == "metadata":
+        if obj_type == "metadata":
+            pool.map(self.validate_metadata, checked_obj_list)
 
         # Close the pool and wait for all processes to complete
         pool.close()
@@ -396,6 +414,32 @@ class HashStoreClient:
 
         return
 
+    def validate_metadata(self, obj_tuple):
+        """Retrieves a metadata from HashStore and validates its checksum
+
+        Args:
+            obj_tuple: pid_guid, obj_checksum_algo, obj_checksum
+        """
+        pid_guid = obj_tuple[0]
+        namespace = obj_tuple[1]
+        metadata_db_checksum = obj_tuple[2]
+        algo = obj_tuple[3]
+
+        with self.hashstore.retrieve_metadata(pid_guid, namespace) as metadata_stream:
+            computed_digest = self.hashstore.computehash(metadata_stream, algo)
+            metadata_stream.close()
+
+        if computed_digest != metadata_db_checksum:
+            err_msg = (
+                f"Assertion Error for pid/guid: {pid_guid} -"
+                + f" Digest calculated from stream ({computed_digest}) does not match"
+                + f" checksum from metacat db: {metadata_db_checksum}"
+            )
+            logging.error(err_msg)
+            print(err_msg)
+
+        return
+
     def delete_objects_from_list(self, origin_dir, obj_type, num):
         """Store objects in a given directory into HashStore
         Args:
@@ -421,7 +465,9 @@ class HashStoreClient:
                 metacat_obj_list, "delete"
             )
         if obj_type == "metadata":
-            checked_obj_list = self.metacatdb.refine_list_for_metadata(metacat_obj_list)
+            checked_obj_list = self.metacatdb.refine_list_for_metadata(
+                metacat_obj_list, "delete"
+            )
 
         start_time = datetime.now()
 
@@ -434,7 +480,8 @@ class HashStoreClient:
         if obj_type == "object":
             # results = pool.starmap(self.hashstore.store_object, checked_obj_list)
             pool.imap(self.try_delete_object, checked_obj_list)
-        # TODO: if obj_type == "metadata":
+        if obj_type == "metadata":
+            pool.imap(self.try_delete_metadata, checked_obj_list)
 
         # Close the pool and wait for all processes to complete
         pool.close()
@@ -453,6 +500,14 @@ class HashStoreClient:
         """Delete an object to HashStore and log exceptions as warning."""
         try:
             return self.hashstore.delete_object(obj_pid)
+        # pylint: disable=W0718
+        except Exception as do_exception:
+            print(do_exception)
+
+    def try_delete_metadata(self, obj_pid, format_id):
+        """Delete an object to HashStore and log exceptions as warning."""
+        try:
+            return self.hashstore.delete_metadata(obj_pid, format_id)
         # pylint: disable=W0718
         except Exception as do_exception:
             print(do_exception)
@@ -608,20 +663,45 @@ class MetacatDB:
 
         return refined_object_list
 
-    def refine_list_for_metadata(self, metacat_obj_list):
+    def refine_list_for_metadata(self, metacat_obj_list, action):
         """Refine a list of metadata by checking for file existence and removing duplicates."""
         refined_metadta_list = []
-        for obj in metacat_obj_list:
-            pid_guid = obj[0]
-            filepath_docid_rev = obj[1]
-            metadata_namespace = obj[2]
+        for tuple_item in metacat_obj_list:
+            pid_guid = tuple_item[0]
+            filepath_docid_rev = tuple_item[1]
+            metadata_namespace = tuple_item[2]
+            item_checksum = tuple_item[3]
+            item_checksum_algorithm = tuple_item[4]
             if os.path.exists(filepath_docid_rev):
-                # If the file has already been stored, skip it
-                if not self.hashstore.exists(
-                    "metadata", self.hashstore.get_sha256_hex_digest(pid_guid)
-                ):
-                    tuple_item = (pid_guid, metadata_namespace, filepath_docid_rev)
-                    refined_metadta_list.append(tuple_item)
+                if action == "store":
+                    # If the file has already been stored, skip it
+                    if not self.hashstore.exists(
+                        "metadata", self.hashstore.get_sha256_hex_digest(pid_guid)
+                    ):
+                        tuple_item = (pid_guid, filepath_docid_rev, metadata_namespace)
+                        refined_metadta_list.append(tuple_item)
+                if action == "retrieve":
+                    # If the file has already been stored, skip it
+                    if not self.hashstore.exists(
+                        "metadata", self.hashstore.get_sha256_hex_digest(pid_guid)
+                    ):
+                        tuple_item = (
+                            pid_guid,
+                            metadata_namespace,
+                            item_checksum,
+                            item_checksum_algorithm,
+                        )
+                        refined_metadta_list.append(tuple_item)
+                if action == "delete":
+                    # If the file has already been stored, skip it
+                    if not self.hashstore.exists(
+                        "metadata", self.hashstore.get_sha256_hex_digest(pid_guid)
+                    ):
+                        tuple_item = (
+                            pid_guid,
+                            metadata_namespace,
+                        )
+                        refined_metadta_list.append(tuple_item)
         return refined_metadta_list
 
 

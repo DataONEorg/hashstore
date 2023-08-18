@@ -105,15 +105,6 @@ def test_store_object_obj_size(pids, store):
         assert object_size == pids[pid]["file_size_bytes"]
 
 
-def test_store_object_is_duplicate(pids, store):
-    """Test store object returns expected is_duplicate boolean."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        assert object_metadata.is_duplicate is False
-
-
 def test_store_object_hex_digests(pids, store):
     """Test store object returns expected hex digests dictionary."""
     test_dir = "tests/testdata/"

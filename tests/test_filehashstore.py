@@ -220,16 +220,6 @@ def test_put_object_file_size(pids, store):
         assert object_size == pids[pid]["file_size_bytes"]
 
 
-def test_put_object_is_duplicate(pids, store):
-    """Check put returns expected is_duplicate boolean value."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.put_object(pid, path)
-        object_metadata_is_duplicate = object_metadata.is_duplicate
-        assert object_metadata_is_duplicate is False
-
-
 def test_put_object_hex_digests(pids, store):
     """Check put successfully generates hex digests dictionary."""
     test_dir = "tests/testdata/"
@@ -291,7 +281,6 @@ def test_move_and_get_checksums_id(pids, store):
             move_id,
             _,
             _,
-            _,
         ) = store._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         object_cid = store.get_sha256_hex_digest(pid)
@@ -309,7 +298,6 @@ def test_move_and_get_checksums_file_size(pids, store):
             _,
             tmp_file_size,
             _,
-            _,
         ) = store._move_and_get_checksums(pid, input_stream)
         input_stream.close()
         assert tmp_file_size == pids[pid]["file_size_bytes"]
@@ -323,7 +311,6 @@ def test_move_and_get_checksums_hex_digests(pids, store):
         input_stream = io.open(path, "rb")
         # pylint: disable=W0212
         (
-            _,
             _,
             _,
             hex_digests,

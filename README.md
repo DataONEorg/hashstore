@@ -73,7 +73,7 @@ metadata_cid = my_store.store_metadata(pid, metadata, format_id)
 How to use HashStore client (command line app)
 ```
 # Step 1: Create a HashStore
-> python './src/hashstore/client.py' /path/to/store/ -chs -dp=3 -wp=2 -ap="SHA-256" -nsp="http://www.ns.test/v1"
+> python './src/hashstore/client.py' /path/to/store/ -chs -dp=3 -wp=2 -ap=SHA-256 -nsp="http://www.ns.test/v1"
 
 # Get the checksum of a data object
 > python './src/hashstore/client.py' /path/to/store/ "-getchecksum" -pid=content_identifier -algorithm=SHA-256

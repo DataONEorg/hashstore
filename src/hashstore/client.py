@@ -372,9 +372,9 @@ class HashStoreClient:
         # Setup pool and processes
         pool = multiprocessing.Pool()
         if obj_type == "object":
-            pool.map(self.validate_object, checked_obj_list)
+            pool.imap(self.validate_object, checked_obj_list)
         if obj_type == "metadata":
-            pool.map(self.validate_metadata, checked_obj_list)
+            pool.imap(self.validate_metadata, checked_obj_list)
 
         # Close the pool and wait for all processes to complete
         pool.close()
@@ -491,7 +491,7 @@ class HashStoreClient:
         content = (
             f"HashStoreClient (delete_objects_from_list):\n"
             f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-            + f"Total Time to Store {len(checked_obj_list)} {obj_type}"
+            + f"Total Time to Delete {len(checked_obj_list)} {obj_type}"
             + f" Objects: {end_time - start_time}\n"
         )
         logging.info(content)
@@ -499,15 +499,19 @@ class HashStoreClient:
     def try_delete_object(self, obj_pid):
         """Delete an object to HashStore and log exceptions as warning."""
         try:
-            return self.hashstore.delete_object(obj_pid)
+            self.hashstore.delete_object(obj_pid)
+            return
         # pylint: disable=W0718
         except Exception as do_exception:
             print(do_exception)
 
-    def try_delete_metadata(self, obj_pid, format_id):
+    def try_delete_metadata(self, obj_tuple):
         """Delete an object to HashStore and log exceptions as warning."""
+        pid_guid = obj_tuple[0]
+        namespace = obj_tuple[1]
         try:
-            return self.hashstore.delete_metadata(obj_pid, format_id)
+            self.hashstore.delete_metadata(pid_guid, namespace)
+            return
         # pylint: disable=W0718
         except Exception as do_exception:
             print(do_exception)
@@ -665,7 +669,7 @@ class MetacatDB:
 
     def refine_list_for_metadata(self, metacat_obj_list, action):
         """Refine a list of metadata by checking for file existence and removing duplicates."""
-        refined_metadta_list = []
+        refined_metadata_list = []
         for tuple_item in metacat_obj_list:
             pid_guid = tuple_item[0]
             filepath_docid_rev = tuple_item[1]
@@ -679,11 +683,13 @@ class MetacatDB:
                         "metadata", self.hashstore.get_sha256_hex_digest(pid_guid)
                     ):
                         tuple_item = (pid_guid, filepath_docid_rev, metadata_namespace)
-                        refined_metadta_list.append(tuple_item)
+                        refined_metadata_list.append(tuple_item)
                 if action == "retrieve":
-                    # If the file has already been stored, skip it
-                    if not self.hashstore.exists(
-                        "metadata", self.hashstore.get_sha256_hex_digest(pid_guid)
+                    if self.hashstore.exists(
+                        "metadata",
+                        self.hashstore.get_sha256_hex_digest(
+                            pid_guid + metadata_namespace
+                        ),
                     ):
                         tuple_item = (
                             pid_guid,
@@ -691,18 +697,20 @@ class MetacatDB:
                             item_checksum,
                             item_checksum_algorithm,
                         )
-                        refined_metadta_list.append(tuple_item)
+                        refined_metadata_list.append(tuple_item)
                 if action == "delete":
-                    # If the file has already been stored, skip it
-                    if not self.hashstore.exists(
-                        "metadata", self.hashstore.get_sha256_hex_digest(pid_guid)
+                    if self.hashstore.exists(
+                        "metadata",
+                        self.hashstore.get_sha256_hex_digest(
+                            pid_guid + metadata_namespace
+                        ),
                     ):
                         tuple_item = (
                             pid_guid,
                             metadata_namespace,
                         )
-                        refined_metadta_list.append(tuple_item)
-        return refined_metadta_list
+                        refined_metadata_list.append(tuple_item)
+        return refined_metadata_list
 
 
 def main():

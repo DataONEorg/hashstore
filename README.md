@@ -70,6 +70,24 @@ format_id = "http://custom.metadata.com/json/type/v1.0"
 metadata_cid = my_store.store_metadata(pid, metadata, format_id)
 ```
 
+How to use HashStore client (command line app)
+```
+# Step 1: Create a HashStore
+> python './src/hashstore/client.py' /path/to/store/ -chs -dp=3 -wp=2 -ap="SHA-256" -nsp="http://www.ns.test/v1"
+
+# Store a data object
+> python './src/hashstore/client.py' /path/to/store/ "-storeobject" -pid=content_identifier -path=/path/to/object
+
+# Store a metadata object
+> python './src/hashstore/client.py' /path/to/store/ "-storemetadata" -pid=content_identifier  -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
+
+# Delete a data object
+> python './src/hashstore/client.py' /path/to/store/ "-deleteobject" -pid=content_identifier
+
+# Delete a metadata file
+> python './src/hashstore/client.py' /path/to/store/ "-deleteobject" -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+```
+
 ## License
 ```
 Copyright [2022] [Regents of the University of California]

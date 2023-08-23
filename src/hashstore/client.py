@@ -264,17 +264,10 @@ class HashStoreClient:
             obj_type (str): 'object' or 'metadata'
             num (int): Number of files to store
         """
-        # Get list of files from directory
-        file_list = os.listdir(origin_dir)
-        checked_num_of_files = len(file_list)
-        # Check number of files to store
-        if num is not None:
-            checked_num_of_files = int(num)
-
+        info_msg = f"HashStore Client - Begin storing {obj_type} objects."
+        logging.info(info_msg)
         # Object and Metadata list
-        metacat_obj_list = self.metacatdb.get_object_metadata_list(
-            origin_dir, checked_num_of_files
-        )
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
 
         # Get list of objects to store from metacat db
         if obj_type == "object":
@@ -347,16 +340,12 @@ class HashStoreClient:
             obj_type (str): 'object' or 'metadata'
             num (int): Number of files to store
         """
-        logging.info("HashStore Client - Begin retrieving and validating objects.")
-        checked_num_of_files = None
-        # Check number of files to store
-        if num is not None:
-            checked_num_of_files = int(num)
-
-        # Object and Metadata list
-        metacat_obj_list = self.metacatdb.get_object_metadata_list(
-            origin_dir, checked_num_of_files
+        info_msg = (
+            f"HashStore Client - Begin retrieving and validating {obj_type} objects."
         )
+        logging.info(info_msg)
+        # Object and Metadata list
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
 
         # Get list of objects to store from metacat db
         logging.info("HashStore Client - Refining object list for %s", obj_type)
@@ -449,17 +438,10 @@ class HashStoreClient:
             obj_type (str): 'object' or 'metadata'
             num (int): Number of files to store
         """
-        # Get list of files from directory
-        file_list = os.listdir(origin_dir)
-        checked_num_of_files = len(file_list)
-        # Check number of files to store
-        if num is not None:
-            checked_num_of_files = int(num)
-
+        info_msg = f"HashStore Client - Begin deleting {obj_type} objects."
+        logging.info(info_msg)
         # Object and Metadata list
-        metacat_obj_list = self.metacatdb.get_object_metadata_list(
-            origin_dir, checked_num_of_files
-        )
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
 
         # Get list of objects to store from metacat db
         if obj_type == "object":

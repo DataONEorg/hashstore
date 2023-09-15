@@ -66,7 +66,7 @@ metadata_cid = my_store.store_metadata(pid, sysmeta)
 ```
 
 If you want to store other types of metadata, add an additional `format_id`.
-```
+```py
 pid = "j.tao.1700.1"
 metadata = "/path/to/your/metadata/document.json"
 format_id = "http://custom.metadata.com/json/type/v1.0"
@@ -121,7 +121,7 @@ limitations under the License.
 Work on this package was supported by:
 
 - DataONE Network
-- Arctic Data Center: NSF-PLR grant #2042102 to M. B. Jones,  A. Budden, M. Schildhauer, and  J. Dozier
+- Arctic Data Center: NSF-PLR grant #2042102 to M. B. Jones, A. Budden, M. Schildhauer, and J. Dozier
 
 Additional support was provided for collaboration by the National Center for Ecological Analysis and Synthesis, a Center funded by the University of California, Santa Barbara, and the State of California.
 

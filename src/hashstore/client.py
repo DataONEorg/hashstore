@@ -232,6 +232,9 @@ class HashStoreParser:
 class HashStoreClient:
     """Create a HashStore to use through the command line."""
 
+    OBJ_TYPE = "object"
+    MET_TYPE = "metadata"
+
     def __init__(self, properties, testflag=None):
         """Initialize HashStore and MetacatDB
 
@@ -270,11 +273,11 @@ class HashStoreClient:
         metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
 
         # Get list of objects to store from metacat db
-        if obj_type == "object":
+        if obj_type == self.OBJ_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_objects(
                 metacat_obj_list, "store"
             )
-        if obj_type == "metadata":
+        if obj_type == self.MET_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_metadata(
                 metacat_obj_list, "store"
             )
@@ -287,10 +290,10 @@ class HashStoreClient:
         # Call 'obj_type' respective public API methods
         info_msg = f"HashStoreClient - Request to Store {len(checked_obj_list)} Objs"
         logging.info(info_msg)
-        if obj_type == "object":
+        if obj_type == self.OBJ_TYPE:
             # results = pool.starmap(self.hashstore.store_object, checked_obj_list)
             pool.imap(self.try_store_object, checked_obj_list)
-        if obj_type == "metadata":
+        if obj_type == self.MET_TYPE:
             pool.imap(self.try_store_metadata, checked_obj_list)
 
         # Close the pool and wait for all processes to complete
@@ -349,11 +352,11 @@ class HashStoreClient:
 
         # Get list of objects to store from metacat db
         logging.info("HashStore Client - Refining object list for %s", obj_type)
-        if obj_type == "object":
+        if obj_type == self.OBJ_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_objects(
                 metacat_obj_list, "retrieve"
             )
-        if obj_type == "metadata":
+        if obj_type == self.MET_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_metadata(
                 metacat_obj_list, "retrieve"
             )
@@ -444,11 +447,11 @@ class HashStoreClient:
         metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
 
         # Get list of objects to store from metacat db
-        if obj_type == "object":
+        if obj_type == self.OBJ_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_objects(
                 metacat_obj_list, "delete"
             )
-        if obj_type == "metadata":
+        if obj_type == self.MET_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_metadata(
                 metacat_obj_list, "delete"
             )
@@ -461,10 +464,10 @@ class HashStoreClient:
         # Call 'obj_type' respective public API methods
         info_msg = f"HashStoreClient - Request to delete {len(checked_obj_list)} Objs"
         logging.info(info_msg)
-        if obj_type == "object":
+        if obj_type == self.OBJ_TYPE:
             # results = pool.starmap(self.hashstore.store_object, checked_obj_list)
             pool.imap(self.try_delete_object, checked_obj_list)
-        if obj_type == "metadata":
+        if obj_type == self.MET_TYPE:
             pool.imap(self.try_delete_metadata, checked_obj_list)
 
         # Close the pool and wait for all processes to complete

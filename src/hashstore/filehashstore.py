@@ -188,11 +188,11 @@ class FileHashStore(HashStore):
         ]
 
         # Standardize algorithm value for cross-language compatibility
-        checked_store_algoritm = None
+        checked_store_algorithm = None
         # Note, this must be declared here because HashStore has not yet been initialized
         accepted_store_algorithms = ["MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512"]
         if store_algorithm in accepted_store_algorithms:
-            checked_store_algoritm = store_algorithm
+            checked_store_algorithm = store_algorithm
         else:
             exception_string = (
                 f"FileHashStore - write_properties: algorithm supplied ({store_algorithm})"
@@ -208,7 +208,7 @@ class FileHashStore(HashStore):
             store_path,
             store_depth,
             store_width,
-            checked_store_algoritm,
+            checked_store_algorithm,
             store_metadata_namespace,
         )
         # Write 'hashstore.yaml'
@@ -1093,7 +1093,7 @@ class FileHashStore(HashStore):
         Args:
             pid: For logging purposes
             checksum: Value of checksum
-            checksum_algoritm: Algorithm of checksum
+            checksum_algorithm: Algorithm of checksum
             entity: Type of object
             hex_digests: Dictionary of hex digests to select from
             tmp_file_name: Name of tmp file

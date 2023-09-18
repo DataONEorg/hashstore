@@ -654,7 +654,8 @@ class FileHashStore(HashStore):
                 when returning hex digests. \n
             checksum (str, optional): Optional checksum to validate object
                 against hex digest before moving to permanent location. \n
-            checksum_algorithm (str, optional): Algorithm value of given checksum.
+            checksum_algorithm (str, optional): Algorithm value of given checksum. \n
+            file_size_to_validate (bytes, optional): Expected size of object
 
         Returns:
             object_metadata (ObjectMetadata): object that contains the object id,
@@ -715,6 +716,7 @@ class FileHashStore(HashStore):
             checksum (str, optional): Optional checksum to validate object
                 against hex digest before moving to permanent location. \n
             checksum_algorithm (str, optional): Algorithm value of given checksum. \n
+            file_size_to_validate (bytes, optional): Expected size of object
 
         Returns:
             object_metadata (tuple): object id, object file size, duplicate file

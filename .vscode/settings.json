@@ -1,6 +1,5 @@
 {
     "python.terminal.activateEnvInCurrentTerminal": true,
-    "python.formatting.provider": "none",
     "python.testing.pytestArgs": [
         "tests"
     ],

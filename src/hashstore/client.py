@@ -11,7 +11,7 @@ from hashstore import HashStoreFactory
 
 
 class HashStoreParser:
-    """Class to setup parsing arguments via argparse."""
+    """Class to set up parsing arguments via argparse."""
 
     def __init__(self):
         """Initialize the argparse 'parser'."""
@@ -183,7 +183,7 @@ class HashStoreParser:
             "-deletemetadata",
             dest="client_deletemetadata",
             action="store_true",
-            help="Flag to dlete a metadata document from a HashStore",
+            help="Flag to delete a metadata document from a HashStore",
         )
 
     def load_store_properties(self, hashstore_yaml):
@@ -249,7 +249,7 @@ class HashStoreClient:
         self.hashstore = factory.get_hashstore(module_name, class_name, properties)
         logging.info("HashStoreClient - HashStore initialized.")
 
-        # Setup access to Metacat postgres db
+        # Set up access to Metacat postgres db
         if testflag:
             self.metacatdb = MetacatDB(properties["store_path"], self.hashstore)
             logging.info("HashStoreClient - MetacatDB initialized.")
@@ -281,7 +281,7 @@ class HashStoreClient:
 
         start_time = datetime.now()
 
-        # Setup pool and processes
+        # Set up pool and processes
         pool = multiprocessing.Pool()
 
         # Call 'obj_type' respective public API methods
@@ -360,7 +360,7 @@ class HashStoreClient:
 
         start_time = datetime.now()
 
-        # Setup pool and processes
+        # Set up pool and processes
         pool = multiprocessing.Pool()
         if obj_type == "object":
             pool.imap(self.validate_object, checked_obj_list)

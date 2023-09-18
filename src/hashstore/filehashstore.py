@@ -71,7 +71,7 @@ class FileHashStore(HashStore):
                 prop_store_path,
                 prop_store_depth,
                 prop_store_width,
-                prop_store_algorithm,
+                _,
                 prop_store_metadata_namespace,
             ) = [
                 checked_properties[property_name]
@@ -89,7 +89,6 @@ class FileHashStore(HashStore):
                 self.create_path(self.root)
             self.depth = prop_store_depth
             self.width = prop_store_width
-            self.algorithm = prop_store_algorithm
             self.sysmeta_ns = prop_store_metadata_namespace
             # Write 'hashstore.yaml' to store path
             if not os.path.exists(self.hashstore_configuration_yaml):
@@ -392,6 +391,8 @@ class FileHashStore(HashStore):
         with open(self.hashstore_configuration_yaml, "r", encoding="utf-8") as file:
             yaml_data = yaml.safe_load(file)
 
+        # Set default store algorithm
+        self.algorithm = lookup_algo(yaml_data["store_algorithm"])
         # Takes DataOne controlled algorithm values and translates to hashlib supported values
         yaml_store_default_algo_list = yaml_data["store_default_algo_list"]
         translated_default_algo_list = []

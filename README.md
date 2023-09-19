@@ -79,25 +79,25 @@ How to use HashStore client (command line app)
 $ python './src/hashstore/client.py' /path/to/store/ -chs -dp=3 -wp=2 -ap=SHA-256 -nsp="http://www.ns.test/v1"
 
 # Get the checksum of a data object
-$ python './src/hashstore/client.py' /path/to/store/ "-getchecksum" -pid=content_identifier -algorithm=SHA-256
+$ python './src/hashstore/client.py' /path/to/store/ -getchecksum -pid=content_identifier -algo=SHA-256
 
 # Store a data object
-$ python './src/hashstore/client.py' /path/to/store/ "-storeobject" -pid=content_identifier -path=/path/to/object
+$ python './src/hashstore/client.py' /path/to/store/ -storeobject -pid=content_identifier -path=/path/to/object
 
 # Store a metadata object
-$ python './src/hashstore/client.py' /path/to/store/ "-storemetadata" -pid=content_identifier  -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
+$ python './src/hashstore/client.py' /path/to/store/ -storemetadata -pid=content_identifier  -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
 
 # Retrieve a data object
-$ python './src/hashstore/client.py' /path/to/store/ "-retrieveobject" -pid=content_identifier
+$ python './src/hashstore/client.py' /path/to/store/ -retrieveobject -pid=content_identifier
 
 # Retrieve a metadata object
-$ python './src/hashstore/client.py' /path/to/store/ "-retrievemetadata" -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ python './src/hashstore/client.py' /path/to/store/ -retrievemetadata -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
 
 # Delete a data object
-$ python './src/hashstore/client.py' /path/to/store/ "-deleteobject" -pid=content_identifier
+$ python './src/hashstore/client.py' /path/to/store/ -deleteobject -pid=content_identifier
 
 # Delete a metadata file
-$ python './src/hashstore/client.py' /path/to/store/ "-deletemetadata" -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ python './src/hashstore/client.py' /path/to/store/ -deletemetadata -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
 ```
 
 ## License

@@ -1,4 +1,5 @@
 """Core module for FileHashStore"""
+import atexit
 import io
 import shutil
 import threading
@@ -843,6 +844,14 @@ class FileHashStore(HashStore):
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
         tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
+
+        # Delete tmp file if python interpreter crashes or thread is interrupted
+        # when store_object is called
+        def delete_tmp_file():
+            if os.path.exists(tmp.name):
+                os.remove(tmp.name)
+
+        atexit.register(delete_tmp_file)
 
         # Ensure tmp file is created with desired permissions
         if self.fmode is not None:

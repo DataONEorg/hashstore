@@ -875,15 +875,35 @@ class FileHashStore(HashStore):
         ]
 
         # tmp is a file-like object that is already opened for writing by default
-        with tmp as tmp_file:
-            for data in stream:
-                tmp_file.write(self._to_bytes(data))
-                for hash_algorithm in hash_algorithms:
-                    hash_algorithm.update(self._to_bytes(data))
-        logging.debug(
-            "FileHashStore - _mktempfile: Object stream successfully written to tmp file: %s",
-            tmp.name,
-        )
+        tmp_file_completion_flag = False
+        try:
+            with tmp as tmp_file:
+                for data in stream:
+                    tmp_file.write(self._to_bytes(data))
+                    for hash_algorithm in hash_algorithms:
+                        hash_algorithm.update(self._to_bytes(data))
+            tmp_file_completion_flag = True
+            logging.debug(
+                "FileHashStore - _mktempfile: Object stream successfully written to tmp file: %s",
+                tmp.name,
+            )
+        # pylint: disable=W0718
+        except Exception as err:
+            exception_string = (
+                f"FileHashStore - _mktempfile: Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+        finally:
+            if not tmp_file_completion_flag:
+                try:
+                    os.remove(tmp.name)
+                # pylint: disable=W0718
+                except Exception as err:
+                    exception_string = (
+                        f"FileHashStore - _mktempfile: Unexpected {err=} while attempting to"
+                        + f" delete tmp file: {tmp.name}, {type(err)=}"
+                    )
+                    logging.error(exception_string)
 
         hex_digest_list = [
             hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms

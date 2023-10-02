@@ -1,8 +1,11 @@
 """Test module for FileHashStore HashStore interface methods"""
 import io
+import os
 from pathlib import Path
 from threading import Thread
 import random
+import threading
+import time
 import pytest
 
 # Define a mark to be used to label slow tests
@@ -442,6 +445,52 @@ def test_store_object_duplicates_threads(store):
     object_cid = store.get_sha256_hex_digest(pid)
     assert store.exists(entity, object_cid)
     assert file_exists_error_flag
+
+
+@slow_test
+def test_store_object_interrupt_process(store):
+    """Test that tmp file created when storing a large object (2GB) and
+    interrupting the process is cleaned up.
+    """
+    file_size = 2 * 1024 * 1024 * 1024  # 2GB
+    file_path = store.root + "random_file_2.bin"
+
+    pid = "Testpid"
+    # Generate a random file with the specified size
+    with open(file_path, "wb") as file:
+        remaining_bytes = file_size
+        buffer_size = 1024 * 1024  # 1MB buffer size (adjust as needed)
+
+        while remaining_bytes > 0:
+            # Generate random data for the buffer
+            buffer = bytearray(random.getrandbits(8) for _ in range(buffer_size))
+            # Write the buffer to the file
+            bytes_to_write = min(buffer_size, remaining_bytes)
+            file.write(buffer[:bytes_to_write])
+            remaining_bytes -= bytes_to_write
+
+    interrupt_flag = False
+
+    def store_object_wrapper(pid, path):
+        print(store.root)
+        while not interrupt_flag:
+            store.store_object(pid, path)  # Call store_object inside the thread
+
+    # Create/start the thread
+    thread = threading.Thread(target=store_object_wrapper, args=(pid, file_path))
+    thread.start()
+
+    # Sleep for 5 seconds to let the thread run
+    time.sleep(5)
+
+    # Interrupt the thread
+    interrupt_flag = True
+
+    # Wait for the thread to finish
+    thread.join()
+
+    # Confirm no tmp objects found in objects/tmp directory
+    assert len(os.listdir(store.root + "/objects/tmp")) == 0
 
 
 @slow_test

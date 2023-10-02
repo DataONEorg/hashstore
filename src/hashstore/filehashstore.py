@@ -1,4 +1,6 @@
 """Core module for FileHashStore"""
+import atexit
+import atexit
 import io
 import shutil
 import threading
@@ -838,11 +840,24 @@ class FileHashStore(HashStore):
                 hex_digest_dict (dictionary): Algorithms and their hex digests.
                 tmp.name: Name of temporary file created and written into.
         """
+        # Review additional hash object to digest and create new list
+        algorithm_list_to_calculate = self._refine_algorithm_list(
+            additional_algorithm, checksum_algorithm
+        )
+
         tmp_root_path = self.get_store_path("objects") / "tmp"
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
         tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
+
+        # Delete tmp file if python interpreter crashes or thread is interrupted
+        # when store_object is called
+        def delete_tmp_file():
+            if os.path.exists(tmp.name):
+                os.remove(tmp.name)
+
+        atexit.register(delete_tmp_file)
 
         # Ensure tmp file is created with desired permissions
         if self.fmode is not None:
@@ -852,38 +867,63 @@ class FileHashStore(HashStore):
             finally:
                 os.umask(oldmask)
 
-        # Additional hash objects to digest
-        algorithm_list_to_calculate = self._refine_algorithm_list(
-            additional_algorithm, checksum_algorithm
-        )
-
         logging.debug(
             "FileHashStore - _mktempfile: tmp file created: %s, calculating hex digests.",
             tmp.name,
         )
-        hash_algorithms = [
-            hashlib.new(algorithm) for algorithm in algorithm_list_to_calculate
-        ]
 
-        # tmp is a file-like object that is already opened for writing by default
-        with tmp as tmp_file:
-            for data in stream:
-                tmp_file.write(self._to_bytes(data))
-                for hash_algorithm in hash_algorithms:
-                    hash_algorithm.update(self._to_bytes(data))
-        logging.debug(
-            "FileHashStore - _mktempfile: Object stream successfully written to tmp file: %s",
-            tmp.name,
-        )
+        tmp_file_completion_flag = False
+        try:
+            hash_algorithms = [
+                hashlib.new(algorithm) for algorithm in algorithm_list_to_calculate
+            ]
 
-        hex_digest_list = [
-            hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
-        ]
-        hex_digest_dict = dict(zip(algorithm_list_to_calculate, hex_digest_list))
-        tmp_file_size = os.path.getsize(tmp.name)
+            # tmp is a file-like object that is already opened for writing by default
+            with tmp as tmp_file:
+                for data in stream:
+                    tmp_file.write(self._to_bytes(data))
+                    for hash_algorithm in hash_algorithms:
+                        hash_algorithm.update(self._to_bytes(data))
+            logging.debug(
+                "FileHashStore - _mktempfile: Object stream successfully written to tmp file: %s",
+                tmp.name,
+            )
 
-        logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
-        return hex_digest_dict, tmp.name, tmp_file_size
+            hex_digest_list = [
+                hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
+            ]
+            hex_digest_dict = dict(zip(algorithm_list_to_calculate, hex_digest_list))
+            tmp_file_size = os.path.getsize(tmp.name)
+            # Ready for validation and atomic move
+            tmp_file_completion_flag = True
+
+            logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
+            return hex_digest_dict, tmp.name, tmp_file_size
+        # pylint: disable=W0718
+        except Exception as err:
+            exception_string = (
+                f"FileHashStore - _mktempfile: Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+        except KeyboardInterrupt:
+            exception_string = (
+                "FileHashStore - _mktempfile: Keyboard interruption by user."
+            )
+            logging.error(exception_string)
+            if os.path.exists(tmp.name):
+                os.remove(tmp.name)
+        finally:
+            if not tmp_file_completion_flag:
+                try:
+                    if os.path.exists(tmp.name):
+                        os.remove(tmp.name)
+                # pylint: disable=W0718
+                except Exception as err:
+                    exception_string = (
+                        f"FileHashStore - _mktempfile: Unexpected {err=} while attempting to"
+                        + f" delete tmp file: {tmp.name}, {type(err)=}"
+                    )
+                    logging.error(exception_string)
 
     def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the

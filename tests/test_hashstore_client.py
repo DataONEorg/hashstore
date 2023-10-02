@@ -128,7 +128,12 @@ def test_retrieve_objects(capsys, pids, store):
         client.main()
 
         object_stream = store.retrieve_object(pid)
-        object_content = object_stream.read(1000).decode("utf-8") + "\n"
+        object_content = (
+            object_stream.read(1000).decode("utf-8")
+            + "\n"
+            + "...\n<-- Truncated for Display Purposes -->"
+            + "\n"
+        )
         object_stream.close()
 
         capsystext = capsys.readouterr().out
@@ -165,7 +170,12 @@ def test_retrieve_metadata(capsys, pids, store):
         client.main()
 
         metadata_stream = store.retrieve_metadata(pid, namespace)
-        metadata_content = metadata_stream.read(1000).decode("utf-8") + "\n"
+        metadata_content = (
+            metadata_stream.read(1000).decode("utf-8")
+            + "\n"
+            + "...\n<-- Truncated for Display Purposes -->"
+            + "\n"
+        )
         metadata_stream.close()
 
         capsystext = capsys.readouterr().out

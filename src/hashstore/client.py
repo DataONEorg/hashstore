@@ -815,57 +815,67 @@ def main():
             raise FileNotFoundError(
                 f"Directory to convert is None or does not exist: {directory_to_convert}."
             )
-    elif (
-        getattr(args, "client_getchecksum")
-        and pid is not None
-        and algorithm is not None
-    ):
+    elif getattr(args, "client_getchecksum"):
+        if pid is None:
+            raise ValueError("'-pid' option is required")
+        if algorithm is None:
+            raise ValueError("'-algo' option is required")
         # Calculate the hex digest of a given pid with algorithm supplied
         digest = hashstore_c.hashstore.get_hex_digest(pid, algorithm)
         print(f"guid/pid: {pid}")
         print(f"algorithm: {algorithm}")
         print(f"Checksum/Hex Digest: {digest}")
 
-    elif getattr(args, "client_storeobject") and pid is not None and path is not None:
+    elif getattr(args, "client_storeobject"):
+        if pid is None:
+            raise ValueError("'-pid' option is required")
+        if path is None:
+            raise ValueError("'-path' option is required")
         # Store object to HashStore
         object_metadata = hashstore_c.hashstore.store_object(
             pid, path, algorithm, checksum, checksum_algorithm, size
         )
         print(f"Object Metadata:\n{object_metadata}")
 
-    elif getattr(args, "client_storemetadata") and pid is not None and path is not None:
+    elif getattr(args, "client_storemetadata"):
+        if pid is None:
+            raise ValueError("'-pid' option is required")
+        if path is None:
+            raise ValueError("'-path' option is required")
         # Store metadata to HashStore
         metadata_cid = hashstore_c.hashstore.store_metadata(pid, path, formatid)
         print(f"Metadata ID: {metadata_cid}")
 
-    elif getattr(args, "client_retrieveobject") and pid is not None:
+    elif getattr(args, "client_retrieveobject"):
+        if pid is None:
+            raise ValueError("'-pid' option is required")
         # Retrieve object from HashStore and display the first 1000 bytes
         object_stream = hashstore_c.hashstore.retrieve_object(pid)
         object_content = object_stream.read(1000).decode("utf-8")
         object_stream.close()
         print(object_content)
+        print("...\n<-- Truncated for Display Purposes -->")
 
-    elif (
-        getattr(args, "client_retrievemetadata")
-        and pid is not None
-        and formatid is not None
-    ):
+    elif getattr(args, "client_retrievemetadata"):
+        if pid is None:
+            raise ValueError("'-pid' option is required")
         # Retrieve metadata from HashStore and display the first 1000 bytes
         metadata_stream = hashstore_c.hashstore.retrieve_metadata(pid, formatid)
         metadata_content = metadata_stream.read(1000).decode("utf-8")
         metadata_stream.close()
         print(metadata_content)
+        print("...\n<-- Truncated for Display Purposes -->")
 
-    elif getattr(args, "client_deleteobject") and pid is not None:
+    elif getattr(args, "client_deleteobject"):
+        if pid is None:
+            raise ValueError("'-pid' option is required")
         # Delete object from HashStore
         delete_status = hashstore_c.hashstore.delete_object(pid)
         print(f"Object Deleted (T/F): {delete_status}")
 
-    elif (
-        getattr(args, "client_deletemetadata")
-        and pid is not None
-        and formatid is not None
-    ):
+    elif getattr(args, "client_deletemetadata"):
+        if pid is None:
+            raise ValueError("'-pid' option is required")
         # Delete metadata from HashStore
         delete_status = hashstore_c.hashstore.delete_metadata(pid, formatid)
         print(

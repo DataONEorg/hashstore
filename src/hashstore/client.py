@@ -844,6 +844,7 @@ def main():
         object_content = object_stream.read(1000).decode("utf-8")
         object_stream.close()
         print(object_content)
+        print("...\n<-- Truncated for Display Purposes -->")
 
     elif (
         getattr(args, "client_retrievemetadata")
@@ -855,6 +856,7 @@ def main():
         metadata_content = metadata_stream.read(1000).decode("utf-8")
         metadata_stream.close()
         print(metadata_content)
+        print("...\n<-- Truncated for Display Purposes -->")
 
     elif getattr(args, "client_deleteobject") and pid is not None:
         # Delete object from HashStore

@@ -905,6 +905,8 @@ class FileHashStore(HashStore):
                 f"FileHashStore - _mktempfile: Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
+            # pylint: disable=W0707,W0719
+            raise Exception(exception_string)
         except KeyboardInterrupt:
             exception_string = (
                 "FileHashStore - _mktempfile: Keyboard interruption by user."

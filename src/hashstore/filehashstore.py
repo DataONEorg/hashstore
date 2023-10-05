@@ -727,7 +727,6 @@ class FileHashStore(HashStore):
         entity = "objects"
         object_cid = self.get_sha256_hex_digest(pid)
         abs_file_path = self.build_abs_path(entity, object_cid, extension)
-        self.create_path(os.path.dirname(abs_file_path))
 
         # Only create tmp file to be moved if target destination doesn't exist
         if os.path.isfile(abs_file_path):
@@ -765,7 +764,7 @@ class FileHashStore(HashStore):
                 tmp_file_size,
                 file_size_to_validate,
             )
-
+            self.create_path(os.path.dirname(abs_file_path))
             try:
                 debug_msg = (
                     "FileHashStore - _move_and_get_checksums: Moving temp file to permanent"

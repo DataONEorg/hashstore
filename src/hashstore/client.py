@@ -191,14 +191,12 @@ class HashStoreParser:
 
         Returns:
             hashstore_yaml_dict (dict): HashStore properties with the following keys (and values):
-                store_path (str): Path to the HashStore directory.
                 store_depth (int): Depth when sharding an object's hex digest.
                 store_width (int): Width of directories when sharding an object's hex digest.
                 store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
                 store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         """
         property_required_keys = [
-            "store_path",
             "store_depth",
             "store_width",
             "store_algorithm",
@@ -778,6 +776,8 @@ def main():
     knbvm_test = getattr(args, "knbvm_flag")
     # Instantiate HashStore Client
     props = parser.load_store_properties(store_path_config_yaml)
+    # Reminder: 'hashstore.yaml' only contains 4 of the required 5 properties
+    props["store_path"] = store_path
     hashstore_c = HashStoreClient(props, knbvm_test)
     if knbvm_test:
         directory_to_convert = getattr(args, "source_directory")

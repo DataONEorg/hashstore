@@ -38,9 +38,8 @@ from hashstore import HashStoreFactory
 hashstore_factory = HashStoreFactory()
 
 # Create a properties dictionary with the required fields
-hashstore_path = "/path/to/your/store"
 properties = {
-    "store_path": hashstore_path,
+    "store_path": "/path/to/your/store",
     "store_depth": 3,
     "store_width": 2,
     "store_algorithm": "sha256",

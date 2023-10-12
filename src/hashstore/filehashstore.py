@@ -1,6 +1,5 @@
 """Core module for FileHashStore"""
 import atexit
-import atexit
 import io
 import shutil
 import threading
@@ -207,7 +206,6 @@ class FileHashStore(HashStore):
 
         # .yaml file to write
         hashstore_configuration_yaml = self._build_hashstore_yaml_string(
-            store_path,
             store_depth,
             store_width,
             checked_store_algorithm,
@@ -227,7 +225,7 @@ class FileHashStore(HashStore):
 
     @staticmethod
     def _build_hashstore_yaml_string(
-        store_path, store_depth, store_width, store_algorithm, store_metadata_namespace
+        store_depth, store_width, store_algorithm, store_metadata_namespace
     ):
         """Build a YAML string representing the configuration for a HashStore.
 
@@ -244,10 +242,6 @@ class FileHashStore(HashStore):
         """
         hashstore_configuration_yaml = f"""
         # Default configuration variables for HashStore
-
-        ############### Store Path ###############
-        # Default path for `FileHashStore` if no path is provided
-        store_path: "{store_path}"
 
         ############### Directory Structure ###############
         # Desired amount of directories when sharding an object to form the permanent address
@@ -305,10 +299,10 @@ class FileHashStore(HashStore):
             # If 'hashstore.yaml' is found, verify given properties before init
             hashstore_yaml_dict = self.load_properties()
             for key in self.property_required_keys:
-                checked_key = properties[key]
+                supplied_key = properties[key]
                 if key == "store_depth" or key == "store_width":
-                    checked_key = int(properties[key])
-                if hashstore_yaml_dict[key] != checked_key:
+                    supplied_key = int(properties[key])
+                if hashstore_yaml_dict[key] != supplied_key:
                     exception_string = (
                         f"FileHashStore - Given properties ({key}: {properties[key]}) does not"
                         + f" match. HashStore configuration ({key}: {hashstore_yaml_dict[key]})"

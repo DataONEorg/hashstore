@@ -51,7 +51,7 @@ def test_init_write_properties_hashstore_yaml_exists(store):
     assert os.path.exists(store.hashstore_configuration_yaml)
 
 
-def test_init_with_existing_hashstore_mismatched_config(store):
+def test_init_with_existing_hashstore_mismatched_config_depth(store):
     """Test init with existing HashStore raises ValueError with mismatching properties."""
     properties = {
         "store_path": store.root,
@@ -59,6 +59,45 @@ def test_init_with_existing_hashstore_mismatched_config(store):
         "store_width": 2,
         "store_algorithm": "SHA-256",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    with pytest.raises(ValueError):
+        FileHashStore(properties)
+
+
+def test_init_with_existing_hashstore_mismatched_config_width(store):
+    """Test init with existing HashStore raises ValueError with mismatching properties."""
+    properties = {
+        "store_path": store.root,
+        "store_depth": 3,
+        "store_width": 1,
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    with pytest.raises(ValueError):
+        FileHashStore(properties)
+
+
+def test_init_with_existing_hashstore_mismatched_config_algo(store):
+    """Test init with existing HashStore raises ValueError with mismatching properties."""
+    properties = {
+        "store_path": store.root,
+        "store_depth": 3,
+        "store_width": 1,
+        "store_algorithm": "SHA-512",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    with pytest.raises(ValueError):
+        FileHashStore(properties)
+
+
+def test_init_with_existing_hashstore_mismatched_config_metadata_ns(store):
+    """Test init with existing HashStore raises ValueError with mismatching properties."""
+    properties = {
+        "store_path": store.root,
+        "store_depth": 3,
+        "store_width": 1,
+        "store_algorithm": "SHA-512",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v5.0",
     }
     with pytest.raises(ValueError):
         FileHashStore(properties)

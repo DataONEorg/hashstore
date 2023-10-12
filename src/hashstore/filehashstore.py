@@ -127,7 +127,6 @@ class FileHashStore(HashStore):
 
         Returns:
             hashstore_yaml_dict (dict): HashStore properties with the following keys (and values):
-                store_path (str): Path to the HashStore directory.
                 store_depth (int): Depth when sharding an object's hex digest.
                 store_width (int): Width of directories when sharding an object's hex digest.
                 store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
@@ -147,7 +146,8 @@ class FileHashStore(HashStore):
         # Get hashstore properties
         hashstore_yaml_dict = {}
         for key in self.property_required_keys:
-            hashstore_yaml_dict[key] = yaml_data[key]
+            if key is not "store_path":
+                hashstore_yaml_dict[key] = yaml_data[key]
         logging.debug(
             "FileHashStore - load_properties: Successfully retrieved 'hashstore.yaml' properties."
         )
@@ -159,7 +159,6 @@ class FileHashStore(HashStore):
 
         Args:
             properties (dict): A python dictionary with the following keys (and values):
-                store_path (str): Path to the HashStore directory.
                 store_depth (int): Depth when sharding an object's hex digest.
                 store_width (int): Width of directories when sharding an object's hex digest.
                 store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
@@ -178,7 +177,7 @@ class FileHashStore(HashStore):
 
         # Collect configuration properties from validated & supplied dictionary
         (
-            store_path,
+            _,
             store_depth,
             store_width,
             store_algorithm,
@@ -299,17 +298,19 @@ class FileHashStore(HashStore):
             # If 'hashstore.yaml' is found, verify given properties before init
             hashstore_yaml_dict = self.load_properties()
             for key in self.property_required_keys:
-                supplied_key = properties[key]
-                if key == "store_depth" or key == "store_width":
-                    supplied_key = int(properties[key])
-                if hashstore_yaml_dict[key] != supplied_key:
-                    exception_string = (
-                        f"FileHashStore - Given properties ({key}: {properties[key]}) does not"
-                        + f" match. HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
-                        + f" found at: {self.hashstore_configuration_yaml}"
-                    )
-                    logging.critical(exception_string)
-                    raise ValueError(exception_string)
+                # 'store_path' is required to init HashStore but not saved in `hashstore.yaml`
+                if key is not "store_path":
+                    supplied_key = properties[key]
+                    if key == "store_depth" or key == "store_width":
+                        supplied_key = int(properties[key])
+                    if hashstore_yaml_dict[key] != supplied_key:
+                        exception_string = (
+                            f"FileHashStore - Given properties ({key}: {properties[key]}) does not"
+                            + f" match. HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
+                            + f" found at: {self.hashstore_configuration_yaml}"
+                        )
+                        logging.critical(exception_string)
+                        raise ValueError(exception_string)
         else:
             if os.path.exists(prop_store_path):
                 # Check if HashStore exists and throw exception if found

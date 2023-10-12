@@ -125,7 +125,6 @@ def test_init_with_existing_hashstore_missing_yaml(store, pids):
 def test_load_properties(store):
     """Verify dictionary returned from load_properties matches initialization."""
     hashstore_yaml_dict = store.load_properties()
-    assert hashstore_yaml_dict.get("store_path") == store.root
     assert hashstore_yaml_dict.get("store_depth") == 3
     assert hashstore_yaml_dict.get("store_width") == 2
     assert hashstore_yaml_dict.get("store_algorithm") == "SHA-256"

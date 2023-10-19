@@ -1,5 +1,6 @@
 """Hashstore Interface"""
 from abc import ABC, abstractmethod
+from collections import namedtuple
 import importlib.metadata
 
 
@@ -22,14 +23,15 @@ class HashStore(ABC):
         additional_algorithm,
         checksum,
         checksum_algorithm,
+        expected_object_size,
     ):
         """The `store_object` method is responsible for the atomic storage of objects to
         disk using a given InputStream and a persistent identifier (pid). Upon
-        successful storage, the method returns a HashAddress object containing
-        relevant file information, such as the file's id, relative path, absolute
-        path, duplicate object status, and hex digest map of algorithms and
-        checksums. `store_object` also ensures that an object is stored only once by
-        synchronizing multiple calls and rejecting calls to store duplicate objects.
+        successful storage, the method returns a ObjectMetadata object containing
+        relevant file information, such as the file's id (which can be used to locate the
+        object on disk), the file's size, and a hex digest map of algorithms and checksums.
+        `store_object` also ensures that an object is stored only once by synchronizing
+        multiple calls and rejecting calls to store duplicate objects.
 
         The file's id is determined by calculating the SHA-256 hex digest of the
         provided pid, which is also used as the permanent address of the file. The
@@ -45,8 +47,8 @@ class HashStore(ABC):
         with its corresponding hex digest. An algorithm is considered "supported" if it
         is recognized as a valid hash algorithm in the `hashlib` library.
 
-        Similarly, if a checksum and a checksumAlgorithm value are provided,
-        `store_object` validates the object to ensure it matches what is provided
+        Similarly, if a file size and/or checksum & checksumAlgorithm value are provided,
+        `store_object` validates the object to ensure it matches the given arguments
         before moving the file to its permanent address.
 
         Args:
@@ -55,33 +57,32 @@ class HashStore(ABC):
             additional_algorithm (string): Additional hex digest to include.
             checksum (string): Checksum to validate against.
             checksum_algorithm (string): Algorithm of supplied checksum.
+            expected_object_size (int): Size of object to verify
 
         Returns:
-            address (HashAddress): Object that contains the permanent address, relative
-            file path, absolute file path, duplicate file boolean and hex digest dictionary.
+            object_metadata (ObjectMetadata): Object that contains the permanent address,
+            file size, duplicate file boolean and hex digest dictionary.
         """
         raise NotImplementedError()
 
     @abstractmethod
-    def store_sysmeta(self, pid, sysmeta):
-        """The `store_sysmeta` method is responsible for adding and/or updating metadata
-        (`sysmeta`) to disk using a given InputStream and a persistent identifier
-        (pid). The metadata object consists of a header and body portion. The header
-        is formed by writing the namespace/format (utf-8) of the metadata document
-        followed by a null character `\x00` and the body follows immediately after.
+    def store_metadata(self, pid, metadata, format_id):
+        """The `store_metadata` method is responsible for adding and/or updating metadata
+        (ex. `sysmeta`) to disk using a given path/stream, a persistent identifier `pid`
+        and a metadata `format_id`. The metadata object's permanent address, which is
+        determined by calculating the SHA-256 hex digest of the provided `pid` + `format_id`.
 
-        Upon successful storage of sysmeta, the method returns a String that
-        represents the file's permanent address, and similarly to 'store_object', this
-        permanent address is determined by calculating the SHA-256 hex digest of the
-        provided pid. Finally, sysmeta are stored in parallel to objects in the
-        `/store_directory/sysmeta/` directory.
+        Upon successful storage of metadata, `store_metadata` returns a string that
+        represents the file's permanent address. Lastly, the metadata objects are stored
+        in parallel to objects in the `/store_directory/metadata/` directory.
 
         Args:
             pid (string): Authority-based identifier.
-            sysmeta (mixed): String or path to sysmeta document.
+            format_id (string): Metadata format
+            metadata (mixed): String or path to metadata document.
 
         Returns:
-            sysmeta_cid (string): Address of the sysmeta document.
+            metadata_cid (string): Address of the metadata document.
         """
         raise NotImplementedError()
 
@@ -96,20 +97,24 @@ class HashStore(ABC):
             pid (string): Authority-based identifier.
 
         Returns:
-            obj_stream (io.BufferedReader): A buffered stream of an ab_id object.
+            obj_stream (io.BufferedReader): A buffered stream of a data object.
         """
         raise NotImplementedError()
 
     @abstractmethod
-    def retrieve_sysmeta(self, pid):
-        """The 'retrieve_sysmeta' method retrieves the metadata content from disk and
-        returns it in the form of a String using a given persistent identifier.
+    def retrieve_metadata(self, pid, format_id):
+        """The 'retrieve_metadata' method retrieves the metadata object from disk using
+        a given persistent identifier (pid) and metadata namespace (format_id).
+        If the object exists (determined by calculating the metadata object's permanent
+        address using the SHA-256 hash of the given pid+format_id), the method will open
+        and return a buffered metadata stream ready to read from.
 
         Args:
-            pid (string): Authority-based identifier.
+            pid (string): Authority-based identifier
+            format_id (string): Metadata format
 
         Returns:
-            sysmeta (string): Sysmeta content.
+            metadata_stream (io.BufferedReader): A buffered stream of a metadata object.
         """
         raise NotImplementedError()
 
@@ -127,12 +132,13 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_sysmeta(self, pid):
-        """The 'delete_sysmeta' method deletes a metadata document (sysmeta) permanently
-        from disk using a given persistent identifier.
+    def delete_metadata(self, pid, format_id):
+        """The 'delete_metadata' method deletes a metadata document permanently
+        from disk using a given persistent identifier and format_id.
 
         Args:
-            pid (string): Authority-based identifier.
+            pid (string): Authority-based identifier
+            format_id (string): Metadata format
 
         Returns:
             boolean: `True` upon successful deletion.
@@ -152,3 +158,68 @@ class HashStore(ABC):
             hex_digest (string): Hex digest of the object.
         """
         raise NotImplementedError()
+
+
+class HashStoreFactory:
+    """A factory class for creating `HashStore`-like objects (classes
+    that implement the 'HashStore' abstract methods)
+
+    This factory class provides a method to retrieve a `HashStore` object
+    based on a given module (ex. "hashstore.filehashstore.filehashstore")
+    and class name (ex. "FileHashStore").
+    """
+
+    @staticmethod
+    def get_hashstore(module_name, class_name, properties=None):
+        """Get a `HashStore`-like object based on the specified `module_name` and `class_name`.
+
+        Args:
+            module_name (str): Name of package (ex. "hashstore.filehashstore") \n
+            class_name (str): Name of class in the given module (ex. "FileHashStore") \n
+            properties (dict, optional): Desired HashStore properties, if 'None', default values
+            will be used. \n
+                Example Properties Dictionary:
+                {
+                    "store_path": "var/metacat",\n
+                    "store_depth": 3,\n
+                    "store_width": 2,\n
+                    "store_algorithm": "sha256",\n
+                    "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0"\n
+                }
+
+        Returns:
+            HashStore: A hash store object based on the given `module_name` and `class_name`
+
+        Raises:
+            ModuleNotFoundError: If module is not found
+            AttributeError: If class does not exist within the module
+        """
+        # Validate module
+        if importlib.util.find_spec(module_name) is None:
+            raise ModuleNotFoundError(f"No module found for '{module_name}'")
+
+        # Get HashStore
+        imported_module = importlib.import_module(module_name)
+
+        # If class is not part of module, raise error
+        if hasattr(imported_module, class_name):
+            hashstore_class = getattr(imported_module, class_name)
+            return hashstore_class(properties=properties)
+        raise AttributeError(
+            f"Class name '{class_name}' is not an attribute of module '{module_name}'"
+        )
+
+
+class ObjectMetadata(namedtuple("ObjectMetadata", ["id", "obj_size", "hex_digests"])):
+    """File address containing file's path on disk and its content hash ID.
+
+    Args:
+        ab_id (str): Hash ID (hexdigest) of file contents.
+        obj_size (bytes): Size of the object
+        hex_digests (dict, optional): A list of hex digests to validate objects
+            (md5, sha1, sha256, sha384, sha512)
+    """
+
+    # Default value to prevent dangerous default value
+    def __new__(cls, ab_id, obj_size, hex_digests=None):
+        return super(ObjectMetadata, cls).__new__(cls, ab_id, obj_size, hex_digests)

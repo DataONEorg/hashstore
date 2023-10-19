@@ -23,6 +23,82 @@ HashStore is a python package, and built using the [Python Poetry](https://pytho
 To install `hashstore` locally, create a virtual environment for python 3.9+, 
 install poetry, and then install or build the package with `poetry install` or `poetry build`, respectively.
 
+To run tests, navigate to the root directory and run `pytest -s`. The test suite contains tests that
+take a longer time to run (relating to the storage of large files) - to execute all tests, run
+`pytest --run-slow`. To see detailed
+
+## Usage Example
+
+To view more details about the Public API - see 'hashstore.py` interface documentation
+
+```py
+from hashstore import HashStoreFactory
+
+# Instantiate a factory
+hashstore_factory = HashStoreFactory()
+
+# Create a properties dictionary with the required fields
+properties = {
+    "store_path": "/path/to/your/store",
+    "store_depth": 3,
+    "store_width": 2,
+    "store_algorithm": "sha256",
+    "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+}
+
+# Get HashStore from factory
+module_name = "hashstore.filehashstore.filehashstore"
+class_name = "FileHashStore"
+my_store = factory.get_hashstore(module_name, class_name, properties)
+
+# Store objects (.../[hashstore_path]/objects/)
+pid = "j.tao.1700.1"
+object = "/path/to/your/object.data"
+hash_address = my_store.store_object(pid, object)
+object_cid = hash_address.id
+
+# Store metadata (.../[hashstore_path]/metadata/)
+# By default, storing metadata will use the given properties namespace `format_id`
+pid = "j.tao.1700.1"
+sysmeta = "/path/to/your/sysmeta/document.xml"
+metadata_cid = my_store.store_metadata(pid, sysmeta)
+```
+
+If you want to store other types of metadata, add an additional `format_id`.
+```py
+pid = "j.tao.1700.1"
+metadata = "/path/to/your/metadata/document.json"
+format_id = "http://custom.metadata.com/json/type/v1.0"
+metadata_cid = my_store.store_metadata(pid, metadata, format_id)
+```
+
+How to use HashStore client (command line app)
+```sh
+# Step 1: Create a HashStore
+$ python './src/hashstore/client.py' /path/to/store/ -chs -dp=3 -wp=2 -ap=SHA-256 -nsp="http://www.ns.test/v1"
+
+# Get the checksum of a data object
+$ python './src/hashstore/client.py' /path/to/store/ -getchecksum -pid=content_identifier -algo=SHA-256
+
+# Store a data object
+$ python './src/hashstore/client.py' /path/to/store/ -storeobject -pid=content_identifier -path=/path/to/object
+
+# Store a metadata object
+$ python './src/hashstore/client.py' /path/to/store/ -storemetadata -pid=content_identifier  -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
+
+# Retrieve a data object
+$ python './src/hashstore/client.py' /path/to/store/ -retrieveobject -pid=content_identifier
+
+# Retrieve a metadata object
+$ python './src/hashstore/client.py' /path/to/store/ -retrievemetadata -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+
+# Delete a data object
+$ python './src/hashstore/client.py' /path/to/store/ -deleteobject -pid=content_identifier
+
+# Delete a metadata file
+$ python './src/hashstore/client.py' /path/to/store/ -deletemetadata -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+```
+
 ## License
 ```
 Copyright [2022] [Regents of the University of California]
@@ -44,7 +120,7 @@ limitations under the License.
 Work on this package was supported by:
 
 - DataONE Network
-- Arctic Data Center: NSF-PLR grant #2042102 to M. B. Jones,  A. Budden, M. Schildhauer, and  J. Dozier
+- Arctic Data Center: NSF-PLR grant #2042102 to M. B. Jones, A. Budden, M. Schildhauer, and J. Dozier
 
 Additional support was provided for collaboration by the National Center for Ecological Analysis and Synthesis, a Center funded by the University of California, Santa Barbara, and the State of California.
 

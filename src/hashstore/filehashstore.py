@@ -467,6 +467,43 @@ class FileHashStore(HashStore):
 
         return object_metadata
 
+    def _store_data(self, data):
+        """Store a temporary object to HashStore that is ready to be tagged, and return the
+        tmp file name and a hex digest dictionary of the default algorithms.
+        """
+        logging.debug("FileHashStore - store_object: Request to store object.")
+
+        # Step 1: Store data
+        try:
+            # Ensure the data is a stream
+            stream = Stream(data)
+
+            # Get the hex digest dictionary
+            with closing(stream):
+                (
+                    object_ref_pid_location,
+                    obj_file_size,
+                    hex_digest_dict,
+                ) = self._move_and_get_checksums(None, stream)
+
+            object_metadata = ObjectMetadata(
+                object_ref_pid_location, obj_file_size, hex_digest_dict
+            )
+            # The permanent address of the data stored is based on the data's checksum
+            cid = hex_digest_dict.get(self.algorithm)
+            logging.debug(
+                "FileHashStore - store_object: Successfully stored object with cid: %s",
+                cid,
+            )
+            return object_metadata
+        # pylint: disable=W0718
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - store_object: failed to store object."
+                + f" Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid

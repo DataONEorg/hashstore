@@ -404,8 +404,8 @@ class FileHashStore(HashStore):
 
     def store_object(
         self,
-        pid,
-        data,
+        pid=None,
+        data=None,
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,

@@ -444,14 +444,17 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_object: Attempting to store object for pid: %s",
                 pid,
             )
-            object_metadata = self.put_object(
-                pid,
-                data,
-                additional_algorithm=additional_algorithm_checked,
-                checksum=checksum,
-                checksum_algorithm=checksum_algorithm_checked,
-                file_size_to_validate=expected_object_size,
-            )
+            if pid is None:
+                object_metadata = self._store_data(data)
+            else:
+                object_metadata = self.put_object(
+                    pid,
+                    data,
+                    additional_algorithm=additional_algorithm_checked,
+                    checksum=checksum,
+                    checksum_algorithm=checksum_algorithm_checked,
+                    file_size_to_validate=expected_object_size,
+                )
         finally:
             # Release pid
             with self.object_lock:

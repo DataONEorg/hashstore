@@ -866,8 +866,8 @@ def test_build_abs_path(store, pids):
         path = test_dir + pid.replace("/", "_")
         _ = store.store_and_validate_data(pid, path)
         # pylint: disable=W0212
-        abs_path = store.build_abs_path(entity, pids[pid]["object_cid"])
-        assert abs_path
+        abs_path = store.build_abs_path(entity, pids[pid][store.algorithm])
+        assert os.path.exists(abs_path)
 
 
 def test_count(pids, store):

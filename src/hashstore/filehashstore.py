@@ -61,8 +61,10 @@ class FileHashStore(HashStore):
     time_out_sec = 1
     object_lock = threading.Lock()
     metadata_lock = threading.Lock()
+    reference_lock = threading.Lock()
     object_locked_pids = []
     metadata_locked_pids = []
+    reference_locked_cids = []
 
     def __init__(self, properties=None):
         if properties:
@@ -475,14 +477,39 @@ class FileHashStore(HashStore):
         return object_metadata
 
     def tag_object(self, pid, cid):
-        # Synchronize tag_object with a lock
-        # Acquire system-wide file lock on the cid to be evaluated
-        # Check to see if reference file already exists for the cid
-        # If it does, read the file and add the new pid on its own line
-        # If not, create the cid ref file '.../refs/cid' with the first line being the pid
-        # Then create the pid ref file in '.../refs/pid' with the cid as its content
-        # Release system-wide file lock on the cid
-        # Release initial lock
+        # Wait for the cid to release if it's being tagged
+        while cid in self.reference_locked_cids:
+            logging.debug(
+                "FileHashStore - tag_object: (cid) %s is currently being tagged. Waiting.",
+                cid,
+            )
+            time.sleep(self.time_out_sec)
+        # Modify reference_locked_cids consecutively
+        with self.reference_lock:
+            logging.debug(
+                "FileHashStore - tag_object: Adding cid: %s to reference_locked_cids.",
+                cid,
+            )
+            self.reference_locked_cids.append(cid)
+        try:
+            # Acquire system-wide file lock on the cid to be evaluated
+            # Check to see if reference file already exists for the cid
+            # If it does, read the file and add the new pid on its own line
+            # If not, create the cid ref file '.../refs/cid' with the first line being the pid
+            # Then create the pid ref file in '.../refs/pid' with the cid as its content
+            # Release system-wide file lock on the cid
+            # Release initial lock
+            print("Tag object")
+        finally:
+            # Release pid
+            with self.reference_lock:
+                logging.debug(
+                    "FileHashStore - tag_object: Removing cid: %s from reference_locked_cids.",
+                    cid,
+                )
+                self.reference_locked_cids.remove(cid)
+            info_msg = f"FileHashStore - tag_object: Successfully tagged cid: {cid} with pid: {pid}"
+            logging.info(info_msg)
         return
 
     def find_object(self, pid):

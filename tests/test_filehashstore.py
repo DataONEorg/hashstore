@@ -634,6 +634,14 @@ def test_get_store_path_metadata(store):
     assert path_metadata_string.endswith("/metacat/metadata")
 
 
+def test_get_store_path_refs(store):
+    """Check get_store_path for refs path."""
+    # pylint: disable=W0212
+    path_metadata = store.get_store_path("refs")
+    path_metadata_string = str(path_metadata)
+    assert path_metadata_string.endswith("/metacat/refs")
+
+
 def test_exists_with_object_metadata_id(pids, store):
     """Test exists method with an absolute file path."""
     test_dir = "tests/testdata/"

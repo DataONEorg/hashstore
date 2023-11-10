@@ -492,16 +492,18 @@ class FileHashStore(HashStore):
             )
             self.reference_locked_cids.append(cid)
         try:
-            # Acquire system-wide file lock on the cid to be evaluated
             # Check to see if reference file already exists for the cid
-            # If it does, read the file and add the new pid on its own line
-            # If not, create the cid ref file '.../refs/cid' with the first line being the pid
-            # Then create the pid ref file in '.../refs/pid' with the cid as its content
-            # Release system-wide file lock on the cid
-            # Release initial lock
-            print("Tag object")
+            entity = "refs"
+            ref_abs_path = self.build_abs_path(entity, cid)
+            if os.path.isfile(ref_abs_path):
+                # If it does, read the file and add the new pid on its own line
+                print("Add pid to reference file")
+            else:
+                # If not, create the cid ref file '.../refs/cid' with the first line being the pid
+                # Then create the pid ref file in '.../refs/pid' with the cid as its content
+                print("Create and tag reference file")
         finally:
-            # Release pid
+            # Release cid
             with self.reference_lock:
                 logging.debug(
                     "FileHashStore - tag_object: Removing cid: %s from reference_locked_cids.",
@@ -1030,6 +1032,16 @@ class FileHashStore(HashStore):
                     )
                     logging.error(exception_string)
 
+    def _write_cid_reference(self, pid, cid):
+        """Write the reference file for the given content identifier (cid). A reference
+        file contains every pid that references a cid on a new line.
+
+        Args:
+            pid (string): Authority-based or persistent identifier of object
+            cid (string): Content identifier of object
+        """
+        print("Writing reference")
+
     def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the
         given pid and format_id as the permanent address.
@@ -1381,9 +1393,11 @@ class FileHashStore(HashStore):
             return Path(self.objects)
         elif entity == "metadata":
             return Path(self.metadata)
+        elif entity == "refs":
+            return Path(self.refs)
         else:
             raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
+                f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
             )
 
     def exists(self, entity, file):
@@ -1554,18 +1568,18 @@ class FileHashStore(HashStore):
         # Could not determine a match.
         return None
 
-    def build_abs_path(self, entity, cid, extension=""):
+    def build_abs_path(self, entity, hash_id, extension=""):
         """Build the absolute file path for a given hash id with an optional file extension.
 
         Args:
             entity (str): Desired entity type (ex. "objects", "metadata"). \n
-            cid (str): A hash id to build a file path for. \n
+            hash_id (str): A hash id to build a file path for. \n
             extension (str): An optional file extension to append to the file path.
 
         Returns:
             absolute_path (str): An absolute file path for the specified hash id.
         """
-        paths = self.shard(cid)
+        paths = self.shard(hash_id)
         root_dir = self.get_store_path(entity)
 
         if extension and not extension.startswith(os.extsep):

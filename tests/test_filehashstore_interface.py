@@ -41,7 +41,7 @@ def test_store_object(pids, store):
         syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        assert object_metadata.id == pids[pid]["object_cid"]
+        assert object_metadata.id == pids[pid][store.algorithm]
     assert store.count(entity) == 3
 
 
@@ -56,7 +56,7 @@ def test_store_object_files_path(pids, store):
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        assert store.exists(entity, pids[pid]["object_cid"])
+        assert store.exists(entity, pids[pid][store.algorithm])
     assert store.count(entity) == 3
 
 
@@ -71,7 +71,7 @@ def test_store_object_files_string(pids, store):
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path_string)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        assert store.exists(entity, pids[pid]["object_cid"])
+        assert store.exists(entity, pids[pid][store.algorithm])
     assert store.count(entity) == 3
 
 
@@ -84,18 +84,17 @@ def test_store_object_files_input_stream(pids, store):
         input_stream = io.open(path, "rb")
         _object_metadata = store.store_object(pid, input_stream)
         input_stream.close()
-        object_cid = store.get_sha256_hex_digest(pid)
-        assert store.exists(entity, object_cid)
+        assert store.exists(entity, pids[pid][store.algorithm])
     assert store.count(entity) == 3
 
 
 def test_store_object_id(pids, store):
-    """Test store object returns expected id (object_cid)."""
+    """Test store object returns expected id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        assert object_metadata.id == pids[pid]["object_cid"]
+        assert object_metadata.id == pids[pid][store.algorithm]
 
 
 def test_store_object_obj_size(pids, store):
@@ -192,11 +191,10 @@ def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
     object_metadata = store.store_object(pid, path, algorithm_with_hyphen_and_upper)
     sha256_cid = object_metadata.hex_digests.get("sha384")
     assert sha256_cid == pids[pid]["sha384"]
-    object_cid = store.get_sha256_hex_digest(pid)
-    assert store.exists(entity, object_cid)
+    assert store.exists(entity, pids[pid][store.algorithm])
 
 
-def test_store_object_additional_algorithm_hyphen_lowercase(store):
+def test_store_object_additional_algorithm_hyphen_lowercase(pids, store):
     """Test store object with additional algorithm in lowercase."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -209,11 +207,10 @@ def test_store_object_additional_algorithm_hyphen_lowercase(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     assert additional_sha3_256_hex_digest == sha3_256_checksum
-    object_cid = store.get_sha256_hex_digest(pid)
-    assert store.exists(entity, object_cid)
+    assert store.exists(entity, pids[pid][store.algorithm])
 
 
-def test_store_object_additional_algorithm_underscore(store):
+def test_store_object_additional_algorithm_underscore(pids, store):
     """Test store object with additional algorithm with underscore."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -226,8 +223,7 @@ def test_store_object_additional_algorithm_underscore(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     assert additional_sha3_256_hex_digest == sha3_256_checksum
-    pid_hash = store.get_sha256_hex_digest(pid)
-    assert store.exists(entity, pid_hash)
+    assert store.exists(entity, pids[pid][store.algorithm])
 
 
 def test_store_object_checksum_correct(store):
@@ -356,7 +352,7 @@ def test_store_object_checksum_incorrect_checksum(store):
         )
 
 
-def test_store_object_duplicate_raises_error(store):
+def test_store_object_duplicate_raises_error(pids, store):
     """Test store duplicate object throws FileExistsError."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -368,8 +364,7 @@ def test_store_object_duplicate_raises_error(store):
     with pytest.raises(FileExistsError):
         _object_metadata_two = store.store_object(pid, path)
     assert store.count(entity) == 1
-    object_cid = store.get_sha256_hex_digest(pid)
-    assert store.exists(entity, object_cid)
+    assert store.exists(entity, pids[pid][store.algorithm])
 
 
 def test_store_object_with_obj_file_size(store, pids):
@@ -415,7 +410,7 @@ def test_store_object_with_obj_file_size_zero(store, pids):
             store.store_object(pid, path, expected_object_size=obj_file_size)
 
 
-def test_store_object_duplicates_threads(store):
+def test_store_object_duplicates_threads(pids, store):
     """Test store object thread lock."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -442,8 +437,7 @@ def test_store_object_duplicates_threads(store):
     thread3.join()
     # One thread will succeed, file count must still be 1
     assert store.count(entity) == 1
-    object_cid = store.get_sha256_hex_digest(pid)
-    assert store.exists(entity, object_cid)
+    assert store.exists(entity, pids[pid][store.algorithm])
     assert file_exists_error_flag
 
 

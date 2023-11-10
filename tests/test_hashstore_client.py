@@ -66,7 +66,7 @@ def test_store_object(store, pids):
         sys.argv = chs_args
         client.main()
 
-        assert store.exists("objects", pids[pid]["object_cid"])
+        assert store.exists("objects", pids[pid][store.algorithm])
 
 
 def test_store_metadata(store, pids):

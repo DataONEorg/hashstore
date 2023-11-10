@@ -245,7 +245,7 @@ def test_put_object_cid(pids, store):
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.put_object(pid, path)
         object_metadata_id = object_metadata.id
-        assert object_metadata_id == pids[pid]["object_cid"]
+        assert object_metadata_id == pids[pid][store.algorithm]
 
 
 def test_put_object_file_size(pids, store):
@@ -321,8 +321,7 @@ def test_move_and_get_checksums_id(pids, store):
             _,
         ) = store._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-        object_cid = store.get_sha256_hex_digest(pid)
-        assert move_id == object_cid
+        assert move_id == pids[pid][store.algorithm]
 
 
 def test_move_and_get_checksums_file_size(pids, store):

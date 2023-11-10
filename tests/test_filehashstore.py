@@ -543,6 +543,31 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         input_stream.close()
 
 
+def test_write_cid_reference(pids, store):
+    """Test that write_cid_reference writes a reference file"""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.build_abs_path(entity, cid).replace(
+            "/refs/", "/refs/cid/"
+        )
+        store.create_path(os.path.dirname(cid_ref_abs_path))
+        store.write_cid_reference(cid_ref_abs_path, pid)
+        assert os.path.exists(cid_ref_abs_path)
+
+
+def test_write_cid_reference_content(pids, store):
+    """Test that write_cid_reference writes the expected content"""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.build_abs_path(entity, cid).replace(
+            "/refs/", "/refs/cid/"
+        )
+        store.create_path(os.path.dirname(cid_ref_abs_path))
+        store.write_cid_reference(cid_ref_abs_path, pid)
+
+
 def test_put_metadata_with_path(pids, store):
     """Test put_metadata with path object."""
     entity = "metadata"

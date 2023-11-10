@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
+import fcntl
 import yaml
 from hashstore import HashStore, ObjectMetadata
 
@@ -494,14 +495,18 @@ class FileHashStore(HashStore):
         try:
             # Check to see if reference file already exists for the cid
             entity = "refs"
-            ref_abs_path = self.build_abs_path(entity, cid)
-            if os.path.isfile(ref_abs_path):
+            cid_ref_abs_path = self.build_abs_path(entity, cid).replace(
+                "/refs/", "/refs/cid/"
+            )
+            if os.path.exists(cid_ref_abs_path):
                 # If it does, read the file and add the new pid on its own line
                 print("Add pid to reference file")
             else:
-                # If not, create the cid ref file '.../refs/cid' with the first line being the pid
+                # If not, create the cid ref file in '.../refs/cid' and write the pid
+                self.create_path(os.path.dirname(cid_ref_abs_path))
+                self.write_cid_reference(cid_ref_abs_path, pid)
                 # Then create the pid ref file in '.../refs/pid' with the cid as its content
-                print("Create and tag reference file")
+                # TODO: Write the pid ref file that contains the cid
         finally:
             # Release cid
             with self.reference_lock:
@@ -1032,15 +1037,35 @@ class FileHashStore(HashStore):
                     )
                     logging.error(exception_string)
 
-    def _write_cid_reference(self, pid, cid):
+    def write_cid_reference(self, cid_ref_abs_path, pid):
         """Write the reference file for the given content identifier (cid). A reference
         file contains every pid that references a cid on a new line.
 
         Args:
+            cid_ref_abs_path (string): Absolute path to the cid ref file
             pid (string): Authority-based or persistent identifier of object
-            cid (string): Content identifier of object
         """
-        print("Writing reference")
+        info_msg = (
+            f"FileHashStore - _write_cid_reference: Writing pid ({pid}) into cid reference"
+            + f" file: {cid_ref_abs_path}"
+        )
+        logging.info(info_msg)
+
+        try:
+            with open(cid_ref_abs_path, "w", encoding="utf8") as cid_ref_file:
+                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                cid_ref_file.write(pid + "\n")
+                # The context manager will take care of releasing the lock
+                # But the code to explicitly release the lock if desired is below
+                # fcntl.flock(f, fcntl.LOCK_UN)
+            return
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - _write_cid_reference: failed to write reference for cid:"
+                + f" {cid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise IOError(exception_string) from err
 
     def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the

@@ -470,43 +470,6 @@ class FileHashStore(HashStore):
 
         return object_metadata
 
-    def _store_data(self, data):
-        """Store a temporary object to HashStore that is ready to be tagged, and return the
-        tmp file name and a hex digest dictionary of the default algorithms.
-        """
-        logging.debug("FileHashStore - store_object: Request to store object.")
-
-        # Step 1: Store data
-        try:
-            # Ensure the data is a stream
-            stream = Stream(data)
-
-            # Get the hex digest dictionary
-            with closing(stream):
-                (
-                    object_ref_pid_location,
-                    obj_file_size,
-                    hex_digest_dict,
-                ) = self._move_and_get_checksums(None, stream)
-
-            object_metadata = ObjectMetadata(
-                object_ref_pid_location, obj_file_size, hex_digest_dict
-            )
-            # The permanent address of the data stored is based on the data's checksum
-            cid = hex_digest_dict.get(self.algorithm)
-            logging.debug(
-                "FileHashStore - store_object: Successfully stored object with cid: %s",
-                cid,
-            )
-            return object_metadata
-        # pylint: disable=W0718
-        except Exception as err:
-            exception_string = (
-                "FileHashStore - store_object: failed to store object."
-                + f" Unexpected {err=}, {type(err)=}"
-            )
-            logging.error(exception_string)
-
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
@@ -696,7 +659,7 @@ class FileHashStore(HashStore):
 
         Returns:
             object_metadata (ObjectMetadata): object that contains the object id,
-            object file size, duplicate file boolean and hex digest dictionary.
+            object file size and hex digest dictionary.
         """
         stream = Stream(file)
 
@@ -724,6 +687,61 @@ class FileHashStore(HashStore):
             pid,
         )
         return object_metadata
+
+    def _store_data(self, data):
+        """Store an object to HashStore and return the tmp file name and a hex digest
+        dictionary of the default algorithms.
+
+        Args:
+            data (mixed): String or path to object.
+
+        Raises:
+            IOError: If object fails to store
+            FileExistsError: If file already exists
+
+        Returns:
+            object_metadata (ObjectMetadata): object that contains the object id,
+            object file size and hex digest dictionary.
+        """
+        logging.debug("FileHashStore - store_object: Request to store object.")
+
+        # TODO: Missing Tests
+        # - Test that this method returns hex digests and that they are correct
+        # - Test that objects are actually stored with their cid
+        # - Test that exception is raised when object fails to store
+        # - Test that exception is raised when object already exists
+        # - Test providing the data as a file path
+        # - Test providing the data as a stream
+        try:
+            # Ensure the data is a stream
+            stream = Stream(data)
+
+            # Get the hex digest dictionary
+            with closing(stream):
+                (
+                    object_ref_pid_location,
+                    obj_file_size,
+                    hex_digest_dict,
+                ) = self._move_and_get_checksums(None, stream)
+
+            object_metadata = ObjectMetadata(
+                object_ref_pid_location, obj_file_size, hex_digest_dict
+            )
+            # The permanent address of the data stored is based on the data's checksum
+            cid = hex_digest_dict.get(self.algorithm)
+            logging.debug(
+                "FileHashStore - store_object: Successfully stored object with cid: %s",
+                cid,
+            )
+            return object_metadata
+        # pylint: disable=W0718
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - store_object: failed to store object."
+                + f" Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise IOError(exception_string) from err
 
     def _move_and_get_checksums(
         self,
@@ -756,21 +774,11 @@ class FileHashStore(HashStore):
             file_size_to_validate (bytes, optional): Expected size of object
 
         Returns:
-            object_metadata (tuple): object id, object file size, duplicate file
-            boolean and hex digest dictionary.
+            object_metadata (tuple): object id, object file size and hex digest dictionary.
         """
-        entity = "objects"
-        object_cid = self.get_sha256_hex_digest(pid)
-        abs_file_path = self.build_abs_path(entity, object_cid, extension)
-
-        # Only create tmp file to be moved if target destination doesn't exist
-        if os.path.isfile(abs_file_path):
-            exception_string = (
-                "FileHashStore - _move_and_get_checksums: File already exists"
-                + f" for pid: {pid} at {abs_file_path}"
-            )
-            logging.error(exception_string)
-            raise FileExistsError(exception_string)
+        # If the checksum algorithm is the same as the store algorithm, then we can
+        # determine whether the object exists or not to be efficient
+        # TODO
 
         # Create temporary file and calculate hex digests
         debug_msg = (
@@ -785,6 +793,11 @@ class FileHashStore(HashStore):
             "FileHashStore - _move_and_get_checksums: Temp file created: %s",
             tmp_file_name,
         )
+
+        # Objects are stored with their content identifier based on the store algorithm
+        entity = "objects"
+        object_cid = hex_digests.get(self.algorithm)
+        abs_file_path = self.build_abs_path(entity, object_cid, extension)
 
         # Only move file if it doesn't exist.
         # Files are stored once and only once
@@ -850,12 +863,13 @@ class FileHashStore(HashStore):
                 raise
         else:
             # Else delete temporary file
-            warning_msg = (
+            exception_string = (
                 f"FileHashStore - _move_and_get_checksums: Object exists at: {abs_file_path},"
                 + " deleting temporary file."
             )
-            logging.warning(warning_msg)
+            logging.error(exception_string)
             self.delete(entity, tmp_file_name)
+            raise FileExistsError(exception_string)
 
         return (object_cid, tmp_file_size, hex_digests)
 

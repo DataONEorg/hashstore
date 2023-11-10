@@ -64,6 +64,35 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def tag_object(self, pid, cid):
+        """The `tag_object` method creates references that allow objects stored in HashStore
+        to be discoverable. Retrieving, deleting or calculating a hex digest of an object is
+        based on a pid argument; and to proceed, we must be able to find the object associated
+        with the pid.
+
+        Args:
+            pid (string): Authority-based or persistent identifier of object
+            cid (string): Content identifier of object
+
+        Returns:
+            boolean: `True` upon successful tagging.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def find_object(self, pid):
+        """The `find_object` method checks whether an object referenced by a pid exists
+        and returns the content identifier.
+
+        Args:
+            pid (string): Authority-based or persistent identifier of object
+
+        Returns:
+            cid (string): Content identifier of the object
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
     def store_metadata(self, pid, metadata, format_id):
         """The `store_metadata` method is responsible for adding and/or updating metadata
         (ex. `sysmeta`) to disk using a given path/stream, a persistent identifier `pid`
@@ -87,9 +116,8 @@ class HashStore(ABC):
     @abstractmethod
     def retrieve_object(self, pid):
         """The `retrieve_object` method retrieves an object from disk using a given
-        persistent identifier (pid). If the object exists (determined by calculating
-        the object's permanent address using the SHA-256 hash of the given pid), the
-        method will open and return a buffered object stream ready to read from.
+        persistent identifier (pid). If the object exists, the method will open and return
+        a buffered object stream ready to read from.
 
         Args:
             pid (string): Authority-based identifier.

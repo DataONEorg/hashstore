@@ -449,9 +449,9 @@ class FileHashStore(HashStore):
                 pid,
             )
             if pid is None:
-                object_metadata = self._store_data(data)
+                object_metadata = self.store_data_only(data)
             else:
-                object_metadata = self.put_object(
+                object_metadata = self.store_and_validate_data(
                     pid,
                     data,
                     additional_algorithm=additional_algorithm_checked,
@@ -661,7 +661,7 @@ class FileHashStore(HashStore):
 
     # FileHashStore Core Methods
 
-    def put_object(
+    def store_and_validate_data(
         self,
         pid,
         file,
@@ -671,7 +671,8 @@ class FileHashStore(HashStore):
         checksum_algorithm=None,
         file_size_to_validate=None,
     ):
-        """Store contents of `file` on disk using the hash of the given pid
+        """Store contents of `file` on disk using, validate the object's parameters if
+        provided and tag/reference the object.
 
         Args:
             pid (string): Authority-based identifier. \n
@@ -716,8 +717,8 @@ class FileHashStore(HashStore):
         )
         return object_metadata
 
-    def _store_data(self, data):
-        """Store an object to HashStore and return the tmp file name and a hex digest
+    def store_data_only(self, data):
+        """Store an object to HashStore and return the id and a hex digest
         dictionary of the default algorithms.
 
         Args:

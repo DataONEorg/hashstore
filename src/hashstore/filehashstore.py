@@ -110,8 +110,8 @@ class FileHashStore(HashStore):
             if not os.path.exists(self.metadata):
                 self.create_path(self.metadata + "/tmp")
             if not os.path.exists(self.refs):
-                self.create_path(self.refs + "/pids")
-                self.create_path(self.refs + "/cids")
+                self.create_path(self.refs + "/pid")
+                self.create_path(self.refs + "/cid")
             logging.debug(
                 "FileHashStore - Initialization success. Store root: %s", self.root
             )
@@ -475,9 +475,19 @@ class FileHashStore(HashStore):
         return object_metadata
 
     def tag_object(self, pid, cid):
+        # Synchronize tag_object with a lock
+        # Acquire system-wide file lock on the cid to be evaluated
+        # Check to see if reference file already exists for the cid
+        # If it does, read the file and add the new pid on its own line
+        # If not, create the cid ref file '.../refs/cid' with the first line being the pid
+        # Then create the pid ref file in '.../refs/pid' with the cid as its content
+        # Release system-wide file lock on the cid
+        # Release initial lock
         return
 
     def find_object(self, pid):
+        # Get the path to the pid reference by calculating its hash in '.../refs/pid'
+        # Read the file to get the cid from the pid reference and return it
         return
 
     def store_metadata(self, pid, metadata, format_id=None):
@@ -533,6 +543,8 @@ class FileHashStore(HashStore):
         )
         self._is_string_none_or_empty(pid, "pid", "retrieve_object")
 
+        # TODO: Find object from the pid reference file
+
         entity = "objects"
         object_cid = self.get_sha256_hex_digest(pid)
         object_exists = self.exists(entity, object_cid)
@@ -586,6 +598,10 @@ class FileHashStore(HashStore):
         )
         self._is_string_none_or_empty(pid, "pid", "delete_object")
 
+        # TODO: Also find the reference file and delete it if there's only one ref
+        # Else delete the pid in the cid refs file
+        # Also delete the pid ref file
+
         entity = "objects"
         object_cid = self.get_sha256_hex_digest(pid)
         self.delete(entity, object_cid)
@@ -621,6 +637,8 @@ class FileHashStore(HashStore):
         )
         self._is_string_none_or_empty(pid, "pid", "get_hex_digest")
         self._is_string_none_or_empty(algorithm, "algorithm", "get_hex_digest")
+
+        # TODO: Find object from the pid reference file
 
         entity = "objects"
         algorithm = self.clean_algorithm(algorithm)
@@ -786,9 +804,8 @@ class FileHashStore(HashStore):
         Returns:
             object_metadata (tuple): object id, object file size and hex digest dictionary.
         """
-        # If the checksum algorithm is the same as the store algorithm, then we can
+        # TODO: If the checksum algorithm is the same as the store algorithm, then we can
         # determine whether the object exists or not to be efficient
-        # TODO
 
         # Create temporary file and calculate hex digests
         debug_msg = (

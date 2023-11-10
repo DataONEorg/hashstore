@@ -104,10 +104,14 @@ class FileHashStore(HashStore):
             # Complete initialization/instantiation by setting and creating store directories
             self.objects = self.root + "/objects"
             self.metadata = self.root + "/metadata"
+            self.refs = self.root + "/refs"
             if not os.path.exists(self.objects):
                 self.create_path(self.objects + "/tmp")
             if not os.path.exists(self.metadata):
                 self.create_path(self.metadata + "/tmp")
+            if not os.path.exists(self.refs):
+                self.create_path(self.refs + "/pids")
+                self.create_path(self.refs + "/cids")
             logging.debug(
                 "FileHashStore - Initialization success. Store root: %s", self.root
             )
@@ -469,6 +473,12 @@ class FileHashStore(HashStore):
             )
 
         return object_metadata
+
+    def tag_object(self, pid, cid):
+        return
+
+    def find_object(self, pid):
+        return
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(

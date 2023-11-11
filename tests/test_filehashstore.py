@@ -658,6 +658,50 @@ def test_delete_cid_ref_pid_pid_not_found(pids, store):
             store.delete_cid_refs_pid(cid_ref_abs_path, "dou.not.found.1")
 
 
+def test_delete_cid_ref_pid_file(pids, store):
+    """Test that delete_cid_refs_file deletes a reference file."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.build_abs_path(entity, cid).replace(
+            "/refs/", "/refs/cid/"
+        )
+        store.create_path(os.path.dirname(cid_ref_abs_path))
+        store.write_cid_refs_file(cid_ref_abs_path, pid)
+        store.delete_cid_refs_pid(cid_ref_abs_path, pid)
+        store.delete_cid_refs_file(cid_ref_abs_path)
+
+        assert not os.path.exists(cid_ref_abs_path)
+
+
+def test_delete_cid_ref_pid_file_not_empty(pids, store):
+    """Test that delete_cid_refs_file raises an exception when refs file not empty."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.build_abs_path(entity, cid).replace(
+            "/refs/", "/refs/cid/"
+        )
+        store.create_path(os.path.dirname(cid_ref_abs_path))
+        store.write_cid_refs_file(cid_ref_abs_path, pid)
+
+        with pytest.raises(OSError):
+            store.delete_cid_refs_file(cid_ref_abs_path)
+
+
+def test_delete_cid_ref_pid_file_not_found(pids, store):
+    """Test that delete_cid_refs_file raises an exception when refs file not found."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.build_abs_path(entity, cid).replace(
+            "/refs/", "/refs/cid/"
+        )
+
+        with pytest.raises(FileNotFoundError):
+            store.delete_cid_refs_file(cid_ref_abs_path)
+
+
 def test_put_metadata_with_path(pids, store):
     """Test put_metadata with path object."""
     entity = "metadata"

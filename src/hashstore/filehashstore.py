@@ -1062,7 +1062,47 @@ class FileHashStore(HashStore):
         except Exception as err:
             exception_string = (
                 "FileHashStore - _write_cid_reference: failed to write reference for cid:"
-                + f" {cid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
+                + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise IOError(exception_string) from err
+
+    def update_cid_reference(self, cid_ref_abs_path, pid):
+        """Update an existing cid reference file with the given pid. Every pid in a reference
+        file is found on its own line.
+
+        Args:
+            cid_ref_abs_path (string): Absolute path to the cid ref file
+            pid (string): Authority-based or persistent identifier of object
+        """
+        info_msg = (
+            f"FileHashStore - update_cid_reference: Adding pid ({pid}) into cid reference"
+            + f" file: {cid_ref_abs_path}"
+        )
+        logging.info(info_msg)
+
+        try:
+            with open(cid_ref_abs_path, "a+", encoding="utf8") as cid_ref_file:
+                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                # Read the ref file to see if the pid is already referencing the cid
+                cid_ref_file_content = cid_ref_file.read()
+
+                if pid in cid_ref_file_content:
+                    err_msg = (
+                        f"FileHashStore - update_cid_reference: pid ({pid}) already reference in"
+                        + f" cid reference file: {cid_ref_abs_path} "
+                    )
+                    raise ValueError(err_msg)
+                else:
+                    cid_ref_file.write(pid + "\n")
+                # The context manager will take care of releasing the lock
+                # But the code to explicitly release the lock if desired is below
+                # fcntl.flock(f, fcntl.LOCK_UN)
+            return
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - update_cid_reference: failed to update reference for cid:"
+                + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise IOError(exception_string) from err

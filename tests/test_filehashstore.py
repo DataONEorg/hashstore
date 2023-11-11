@@ -734,6 +734,42 @@ def test_write_pid_refs_file_content(pids, store):
         assert cid == pid_refs_cid
 
 
+def test_write_pid_refs_file_exists(pids, store):
+    """Test that write_pid_refs_file returns when ref already exists and the
+    cid given is the same."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        pid_hash = store.computehash(pid, store.algorithm)
+        pid_ref_abs_path = store.build_abs_path(entity, pid_hash).replace(
+            "/refs/", "/refs/pid/"
+        )
+        store.create_path(os.path.dirname(pid_ref_abs_path))
+        store.write_pid_refs_file(pid_ref_abs_path, cid)
+        # This should not write and return
+        store.write_pid_refs_file(pid_ref_abs_path, cid)
+
+        with open(pid_ref_abs_path, "r", encoding="utf8") as f:
+            pid_refs_cid = f.read()
+
+        assert cid == pid_refs_cid
+
+
+def test_write_pid_refs_file_exists_different_cid(pids, store):
+    """Test that write_pid_refs_file returns when ref already exists and the
+    cid given is the same."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        pid_hash = store.computehash(pid, store.algorithm)
+        pid_ref_abs_path = store.build_abs_path(entity, pid_hash).replace(
+            "/refs/", "/refs/pid/"
+        )
+        store.create_path(os.path.dirname(pid_ref_abs_path))
+        store.write_pid_refs_file(pid_ref_abs_path, cid)
+        with pytest.raises(ValueError):
+            store.write_pid_refs_file(pid_ref_abs_path, "abc123")
+
 def test_put_metadata_with_path(pids, store):
     """Test put_metadata with path object."""
     entity = "metadata"

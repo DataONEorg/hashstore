@@ -504,7 +504,7 @@ class FileHashStore(HashStore):
             else:
                 # If not, create the cid ref file in '.../refs/cid' and write the pid
                 self.create_path(os.path.dirname(cid_ref_abs_path))
-                self.write_cid_reference(cid_ref_abs_path, pid)
+                self.write_cid_ref_file(cid_ref_abs_path, pid)
                 # Then create the pid ref file in '.../refs/pid' with the cid as its content
                 # TODO: Write the pid ref file that contains the cid
         finally:
@@ -1037,7 +1037,7 @@ class FileHashStore(HashStore):
                     )
                     logging.error(exception_string)
 
-    def write_cid_reference(self, cid_ref_abs_path, pid):
+    def write_cid_refs_file(self, cid_ref_abs_path, pid):
         """Write the reference file for the given content identifier (cid). A reference
         file contains every pid that references a cid on a new line.
 
@@ -1046,7 +1046,7 @@ class FileHashStore(HashStore):
             pid (string): Authority-based or persistent identifier of object
         """
         info_msg = (
-            f"FileHashStore - _write_cid_reference: Writing pid ({pid}) into cid reference"
+            f"FileHashStore - write_cid_refs_file: Writing pid ({pid}) into cid reference"
             + f" file: {cid_ref_abs_path}"
         )
         logging.info(info_msg)
@@ -1062,22 +1062,21 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - _write_cid_reference: failed to write reference for cid:"
+                "FileHashStore - write_cid_refs_file: failed to write reference for cid:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
 
-    def update_cid_reference(self, cid_ref_abs_path, pid):
-        """Update an existing cid reference file with the given pid. Every pid in a reference
-        file is found on its own line.
+    def update_cid_refs(self, cid_ref_abs_path, pid):
+        """Update an existing cid reference file with the given pid.
 
         Args:
             cid_ref_abs_path (string): Absolute path to the cid ref file
             pid (string): Authority-based or persistent identifier of object
         """
         info_msg = (
-            f"FileHashStore - update_cid_reference: Adding pid ({pid}) into cid reference"
+            f"FileHashStore - update_cid_refs: Adding pid ({pid}) into cid reference"
             + f" file: {cid_ref_abs_path}"
         )
         logging.info(info_msg)
@@ -1090,7 +1089,7 @@ class FileHashStore(HashStore):
 
                 if pid in cid_ref_file_content:
                     err_msg = (
-                        f"FileHashStore - update_cid_reference: pid ({pid}) already reference in"
+                        f"FileHashStore - update_cid_refs: pid ({pid}) already reference in"
                         + f" cid reference file: {cid_ref_abs_path} "
                     )
                     raise ValueError(err_msg)
@@ -1103,21 +1102,21 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - update_cid_reference: failed to update reference for cid:"
+                "FileHashStore - update_cid_refs: failed to update reference for cid:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
 
-    def delete_cid_reference_pid(self, cid_ref_abs_path, pid):
-        """Delete a pid in a cid reference file.
+    def delete_cid_refs_pid(self, cid_ref_abs_path, pid):
+        """Delete a pid from a cid reference file.
 
         Args:
             cid_ref_abs_path (string): Absolute path to the cid ref file
             pid (string): Authority-based or persistent identifier of object
         """
         info_msg = (
-            f"FileHashStore - delete_cid_reference_pid: Deleting pid ({pid}) from cid reference"
+            f"FileHashStore - delete_cid_refs_pid: Deleting pid ({pid}) from cid reference"
             + f" file: {cid_ref_abs_path}"
         )
         logging.info(info_msg)
@@ -1130,7 +1129,7 @@ class FileHashStore(HashStore):
 
                 if pid not in cid_ref_file_content:
                     err_msg = (
-                        f"FileHashStore - delete_cid_reference_pid: pid ({pid}) does not exist in"
+                        f"FileHashStore - delete_cid_refs_pid: pid ({pid}) does not exist in"
                         + f" cid reference file: {cid_ref_abs_path} "
                     )
                     raise ValueError(err_msg)
@@ -1146,7 +1145,7 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - delete_cid_reference_pid: failed to update reference for cid:"
+                "FileHashStore - delete_cid_refs_pid: failed to update reference for cid:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)

@@ -478,6 +478,12 @@ class FileHashStore(HashStore):
         return object_metadata
 
     def tag_object(self, pid, cid):
+        """Tag an object that has been stored with a pid reference.
+
+        Args:
+            pid (string): Authority-based or persistent identifier of object
+            cid (string): Content identifier
+        """
         # Wait for the cid to release if it's being tagged
         while cid in self.reference_locked_cids:
             logging.debug(
@@ -500,7 +506,7 @@ class FileHashStore(HashStore):
             )
             if os.path.exists(cid_ref_abs_path):
                 # If it does, read the file and add the new pid on its own line
-                print("Add pid to reference file")
+                self.update_cid_refs(cid_ref_abs_path, pid)
             else:
                 # If not, create the cid ref file in '.../refs/cid' and write the pid
                 self.create_path(os.path.dirname(cid_ref_abs_path))

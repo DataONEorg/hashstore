@@ -884,7 +884,8 @@ def test_get_hex_digest(store):
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    _object_metadata = store.store_object(pid, path)
+    object_metadata = store.store_object(pid, path)
+    store.tag_object(pid, object_metadata.id)
     _metadata_cid = store.store_metadata(pid, syspath, format_id)
     sha3_256_hex_digest = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
@@ -898,7 +899,7 @@ def test_get_hex_digest_pid_not_found(store):
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
     algorithm = "sha256"
-    with pytest.raises(ValueError):
+    with pytest.raises(FileNotFoundError):
         store.get_hex_digest(pid_does_not_exist, algorithm)
 
 

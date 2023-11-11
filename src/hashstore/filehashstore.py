@@ -702,11 +702,9 @@ class FileHashStore(HashStore):
         self._is_string_none_or_empty(pid, "pid", "get_hex_digest")
         self._is_string_none_or_empty(algorithm, "algorithm", "get_hex_digest")
 
-        # TODO: Find object from the pid reference file
-
         entity = "objects"
         algorithm = self.clean_algorithm(algorithm)
-        object_cid = self.get_sha256_hex_digest(pid)
+        object_cid = self.find_object(pid)
         if not self.exists(entity, object_cid):
             exception_string = (
                 f"FileHashStore - get_hex_digest: No object found for pid: {pid}"

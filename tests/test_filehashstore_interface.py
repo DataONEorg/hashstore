@@ -511,8 +511,7 @@ def test_store_object_large_file(store):
     pid = "testfile_filehashstore"
     object_metadata = store.store_object(pid, file_path)
     object_metadata_id = object_metadata.id
-    pid_sha256_hex_digest = store.get_sha256_hex_digest(pid)
-    assert object_metadata_id == pid_sha256_hex_digest
+    assert object_metadata_id == object_metadata.hex_digests.get("sha256")
 
 
 @slow_test
@@ -531,8 +530,7 @@ def test_store_object_sparse_large_file(store):
     pid = "testfile_filehashstore"
     object_metadata = store.store_object(pid, file_path)
     object_metadata_id = object_metadata.id
-    pid_sha256_hex_digest = store.get_sha256_hex_digest(pid)
-    assert object_metadata_id == pid_sha256_hex_digest
+    assert object_metadata_id == object_metadata.hex_digests.get("sha256")
 
 
 def test_store_metadata(pids, store):

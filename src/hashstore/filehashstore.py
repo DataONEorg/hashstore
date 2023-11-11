@@ -517,6 +517,7 @@ class FileHashStore(HashStore):
                 pid_ref_abs_path = self.build_abs_path(entity, pid_hash).replace(
                     "/refs/", "/refs/pid/"
                 )
+                self.create_path(os.path.dirname(pid_ref_abs_path))
                 self.write_pid_refs_file(pid_ref_abs_path, cid)
         finally:
             # Release cid
@@ -609,13 +610,10 @@ class FileHashStore(HashStore):
         )
         self._is_string_none_or_empty(pid, "pid", "retrieve_object")
 
-        # TODO: Find object from the pid reference file
-
+        object_cid = self.find_object(pid)
         entity = "objects"
-        object_cid = self.get_sha256_hex_digest(pid)
-        object_exists = self.exists(entity, object_cid)
 
-        if object_exists:
+        if object_cid:
             logging.debug(
                 "FileHashStore - retrieve_object: Metadata exists for pid: %s, retrieving object.",
                 pid,

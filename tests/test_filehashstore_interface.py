@@ -705,6 +705,7 @@ def test_retrieve_object(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
+        store.tag_object(pid, object_metadata.id)
         store.store_metadata(pid, syspath, format_id)
         obj_stream = store.retrieve_object(pid)
         sha256_hex = store.computehash(obj_stream)
@@ -723,7 +724,7 @@ def test_retrieve_object_pid_invalid(store):
     """Test retrieve_object raises error when supplied with bad pid."""
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
-    with pytest.raises(ValueError):
+    with pytest.raises(FileNotFoundError):
         store.retrieve_object(pid_does_not_exist)
 
 

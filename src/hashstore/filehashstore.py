@@ -531,9 +531,30 @@ class FileHashStore(HashStore):
         return
 
     def find_object(self, pid):
+        logging.debug(
+            "FileHashStore - find_object: Request to find object for for pid: %s", pid
+        )
+        # TODO: Write tests for this method
+        self._is_string_none_or_empty(pid, "pid", "find_object")
+
         # Get the path to the pid reference by calculating its hash in '.../refs/pid'
-        # Read the file to get the cid from the pid reference and return it
-        return
+        entity = "refs"
+        pid_hash = self.computehash(pid, self.algorithm)
+        pid_ref_abs_path = self.build_abs_path(entity, pid_hash).replace(
+            "/refs/", "/refs/pid/"
+        )
+        if not os.path.exists(pid_ref_abs_path):
+            err_msg = (
+                f"FileHashStore - find_object: pid ({pid}) reference file not found: "
+                + pid_ref_abs_path,
+            )
+            raise FileNotFoundError(err_msg)
+        else:
+            # Read the file to get the cid from the pid reference
+            with open(pid_ref_abs_path, "r", encoding="utf8") as f:
+                pid_refs_cid = f.read()
+
+        return pid_refs_cid
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(

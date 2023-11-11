@@ -567,6 +567,11 @@ def test_write_cid_reference_content(pids, store):
         store.create_path(os.path.dirname(cid_ref_abs_path))
         store.write_cid_reference(cid_ref_abs_path, pid)
 
+        with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+            cid_ref_file_pid = f.read()
+
+        assert pid == cid_ref_file_pid.replace("\n", "")
+
 
 def test_put_metadata_with_path(pids, store):
     """Test put_metadata with path object."""

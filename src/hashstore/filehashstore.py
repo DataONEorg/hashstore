@@ -1059,13 +1059,14 @@ class FileHashStore(HashStore):
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
             return
+
         except Exception as err:
             exception_string = (
                 "FileHashStore - _write_cid_reference: failed to write reference for cid:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
-            raise IOError(exception_string) from err
+            raise err
 
     def update_cid_reference(self, cid_ref_abs_path, pid):
         """Update an existing cid reference file with the given pid. Every pid in a reference
@@ -1099,13 +1100,57 @@ class FileHashStore(HashStore):
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
             return
+
         except Exception as err:
             exception_string = (
                 "FileHashStore - update_cid_reference: failed to update reference for cid:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
-            raise IOError(exception_string) from err
+            raise err
+
+    def delete_cid_reference_pid(self, cid_ref_abs_path, pid):
+        """Delete a pid in a cid reference file.
+
+        Args:
+            cid_ref_abs_path (string): Absolute path to the cid ref file
+            pid (string): Authority-based or persistent identifier of object
+        """
+        info_msg = (
+            f"FileHashStore - delete_cid_reference_pid: Deleting pid ({pid}) from cid reference"
+            + f" file: {cid_ref_abs_path}"
+        )
+        logging.info(info_msg)
+
+        try:
+            with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
+                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                # Read the ref file to see if the pid is already referencing the cid
+                cid_ref_file_content = cid_ref_file.read()
+
+                if pid not in cid_ref_file_content:
+                    err_msg = (
+                        f"FileHashStore - delete_cid_reference_pid: pid ({pid}) does not exist in"
+                        + f" cid reference file: {cid_ref_abs_path} "
+                    )
+                    raise ValueError(err_msg)
+
+            with open(cid_ref_abs_path, "w", encoding="utf8") as cid_ref_file:
+                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                cid_ref_file.write(cid_ref_file_content.replace(pid + "\n", ""))
+                # The context manager will take care of releasing the lock
+                # But the code to explicitly release the lock if desired is below
+                # fcntl.flock(f, fcntl.LOCK_UN)
+
+            return
+
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - delete_cid_reference_pid: failed to update reference for cid:"
+                + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
 
     def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the

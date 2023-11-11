@@ -544,7 +544,7 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
 
 
 def test_write_cid_reference(pids, store):
-    """Test that write_cid_reference writes a reference file"""
+    """Test that write_cid_reference writes a reference file."""
     for pid in pids.keys():
         entity = "refs"
         cid = pids[pid]["sha256"]
@@ -557,7 +557,7 @@ def test_write_cid_reference(pids, store):
 
 
 def test_write_cid_reference_content(pids, store):
-    """Test that write_cid_reference writes the expected content"""
+    """Test that write_cid_reference writes the expected content."""
     for pid in pids.keys():
         entity = "refs"
         cid = pids[pid]["sha256"]
@@ -574,7 +574,7 @@ def test_write_cid_reference_content(pids, store):
 
 
 def test_update_cid_reference_content(pids, store):
-    """Test that update_cid_reference updates the ref file as expected"""
+    """Test that update_cid_reference updates the ref file as expected."""
     for pid in pids.keys():
         entity = "refs"
         cid = pids[pid]["sha256"]
@@ -594,7 +594,7 @@ def test_update_cid_reference_content(pids, store):
 
 
 def test_update_cid_reference_content_multiple(pids, store):
-    """Test that update_cid_reference multiple updates"""
+    """Test that update_cid_reference adds multiple references successfully."""
     for pid in pids.keys():
         entity = "refs"
         cid = pids[pid]["sha256"]
@@ -617,6 +617,45 @@ def test_update_cid_reference_content_multiple(pids, store):
                 assert value in cid_reference_list
 
         assert line_count == 6
+
+
+def test_delete_cid_reference_pid(pids, store):
+    """Test that delete_cid_reference deletes the given pid from the ref file."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.build_abs_path(entity, cid).replace(
+            "/refs/", "/refs/cid/"
+        )
+        store.create_path(os.path.dirname(cid_ref_abs_path))
+        store.write_cid_reference(cid_ref_abs_path, pid)
+
+        pid_other = "dou.test.1"
+        store.update_cid_reference(cid_ref_abs_path, pid_other)
+        store.delete_cid_reference_pid(cid_ref_abs_path, pid)
+
+        with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+            for _, line in enumerate(f, start=1):
+                value = line.strip()
+                print(value)
+                assert value == pid_other
+
+
+def test_delete_cid_reference_pid_not_found(pids, store):
+    """Test that delete_cid_reference raises exception when pid not found."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.build_abs_path(entity, cid).replace(
+            "/refs/", "/refs/cid/"
+        )
+        store.create_path(os.path.dirname(cid_ref_abs_path))
+        store.write_cid_reference(cid_ref_abs_path, pid)
+
+        pid_other = "dou.test.1"
+        store.update_cid_reference(cid_ref_abs_path, pid_other)
+        with pytest.raises(ValueError):
+            store.delete_cid_reference_pid(cid_ref_abs_path, "dou.not.found.1")
 
 
 def test_put_metadata_with_path(pids, store):

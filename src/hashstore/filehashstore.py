@@ -1167,7 +1167,6 @@ class FileHashStore(HashStore):
 
         Args:
             cid_ref_abs_path (string): Absolute path to the cid ref file
-            pid (string): Authority-based or persistent identifier of object
         """
         info_msg = (
             "FileHashStore - delete_cid_refs_file: Deleting reference file: %s",
@@ -1244,6 +1243,37 @@ class FileHashStore(HashStore):
                 )
                 logging.error(exception_string)
                 raise err
+
+    def delete_pid_refs_file(self, pid_ref_abs_path):
+        """Delete a pid reference file.
+
+        Args:
+            pid_ref_abs_path (string): Absolute path to the pid ref file
+        """
+        info_msg = (
+            "FileHashStore - delete_pid_refs_file: Deleting reference file: %s",
+            pid_ref_abs_path,
+        )
+        logging.info(info_msg)
+
+        try:
+            if not os.path.exists(pid_ref_abs_path):
+                err_msg = (
+                    "FileHashStore - delete_pid_refs_file: pid reference file not found: %s",
+                    pid_ref_abs_path,
+                )
+                raise FileNotFoundError(err_msg)
+            else:
+                os.remove(pid_ref_abs_path)
+                return
+
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - delete_pid_refs_file: failed to delete reference file:"
+                + f" {pid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
 
     def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the

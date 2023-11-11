@@ -770,6 +770,36 @@ def test_write_pid_refs_file_exists_different_cid(pids, store):
         with pytest.raises(ValueError):
             store.write_pid_refs_file(pid_ref_abs_path, "abc123")
 
+
+def test_delete_pid_refs_file(pids, store):
+    """Test that delete_pid_refs_file deletes a reference file."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        pid_hash = store.computehash(pid, store.algorithm)
+        pid_ref_abs_path = store.build_abs_path(entity, pid_hash).replace(
+            "/refs/", "/refs/pid/"
+        )
+        store.create_path(os.path.dirname(pid_ref_abs_path))
+        store.write_pid_refs_file(pid_ref_abs_path, cid)
+        store.delete_pid_refs_file(pid_ref_abs_path)
+
+        assert not os.path.exists(pid_ref_abs_path)
+
+
+def test_delete_pid_refs_file_file_not_found(pids, store):
+    """Test that delete_pid_refs_file raises an exception when refs file not found."""
+    for pid in pids.keys():
+        entity = "refs"
+        pid_hash = store.computehash(pid, store.algorithm)
+        pid_ref_abs_path = store.build_abs_path(entity, pid_hash).replace(
+            "/refs/", "/refs/pid/"
+        )
+
+        with pytest.raises(FileNotFoundError):
+            store.delete_cid_refs_file(pid_ref_abs_path)
+
+
 def test_put_metadata_with_path(pids, store):
     """Test put_metadata with path object."""
     entity = "metadata"

@@ -484,6 +484,7 @@ class FileHashStore(HashStore):
             pid (string): Authority-based or persistent identifier of object
             cid (string): Content identifier
         """
+        # TODO: Write tests for this method
         # Wait for the cid to release if it's being tagged
         while cid in self.reference_locked_cids:
             logging.debug(
@@ -512,7 +513,11 @@ class FileHashStore(HashStore):
                 self.create_path(os.path.dirname(cid_ref_abs_path))
                 self.write_cid_refs_file(cid_ref_abs_path, pid)
                 # Then create the pid ref file in '.../refs/pid' with the cid as its content
-                # TODO: Write the pid ref file that contains the cid
+                pid_hash = self.computehash(pid, self.algorithm)
+                pid_ref_abs_path = self.build_abs_path(entity, pid_hash).replace(
+                    "/refs/", "/refs/pid/"
+                )
+                self.write_pid_refs_file(pid_ref_abs_path, cid)
         finally:
             # Release cid
             with self.reference_lock:
@@ -1194,6 +1199,51 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise err
+
+    def write_pid_refs_file(self, pid_ref_abs_path, cid):
+        """Write the reference file for the given pid (persistent identifier). A reference
+        file for a pid contains the cid that it references. Its permanent address is the pid
+        hash with HashStore's default store algorithm and follows its directory structure.
+
+        Args:
+            pid_ref_abs_path (string): Absolute path to the pid ref file
+            cid (string): Content identifier
+        """
+        info_msg = (
+            f"FileHashStore - write_pid_refs_file: Writing cid ({cid}) into pid reference"
+            + f" file: {pid_ref_abs_path}"
+        )
+        logging.info(info_msg)
+
+        if os.path.exists(pid_ref_abs_path):
+            with open(pid_ref_abs_path, "r", encoding="utf8") as f:
+                pid_refs_cid = f.read()
+                if pid_refs_cid == cid:
+                    return
+                else:
+                    exception_string = (
+                        "FileHashStore - write_pid_refs_file: pid reference file exists but"
+                        + f" cid ({cid}) is different from cid stored ({pid_refs_cid})."
+                    )
+                    logging.error(exception_string)
+                    raise ValueError(exception_string)
+        else:
+            try:
+                with open(pid_ref_abs_path, "w", encoding="utf8") as pid_ref_file:
+                    fcntl.flock(pid_ref_file, fcntl.LOCK_EX)
+                    pid_ref_file.write(cid)
+                    # The context manager will take care of releasing the lock
+                    # But the code to explicitly release the lock if desired is below
+                    # fcntl.flock(f, fcntl.LOCK_UN)
+                return
+
+            except Exception as err:
+                exception_string = (
+                    "FileHashStore - write_pid_refs_file: failed to write pid reference file:"
+                    + f" {pid_ref_abs_path} for cid: {cid}. Unexpected {err=}, {type(err)=}"
+                )
+                logging.error(exception_string)
+                raise err
 
     def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the

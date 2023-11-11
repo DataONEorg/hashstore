@@ -543,7 +543,7 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         input_stream.close()
 
 
-def test_write_cid_ref_file(pids, store):
+def test_write_cid_refs_file(pids, store):
     """Test that write_cid_reference writes a reference file."""
     for pid in pids.keys():
         entity = "refs"
@@ -556,7 +556,7 @@ def test_write_cid_ref_file(pids, store):
         assert os.path.exists(cid_ref_abs_path)
 
 
-def test_write_cid_ref_file_content(pids, store):
+def test_write_cid_refs_file_content(pids, store):
     """Test that write_cid_ref_file writes the expected content."""
     for pid in pids.keys():
         entity = "refs"
@@ -573,7 +573,7 @@ def test_write_cid_ref_file_content(pids, store):
         assert pid == cid_ref_file_pid.replace("\n", "")
 
 
-def test_update_cid_ref_content(pids, store):
+def test_update_cid_refs_content(pids, store):
     """Test that update_cid_ref updates the ref file as expected."""
     for pid in pids.keys():
         entity = "refs"
@@ -593,8 +593,8 @@ def test_update_cid_ref_content(pids, store):
                 assert value == pid or value == pid_other
 
 
-def test_update_cid_ref_content_multiple(pids, store):
-    """Test that update_cid_ref adds multiple references successfully."""
+def test_update_cid_refs_content_multiple(pids, store):
+    """Test that update_cid_refs adds multiple references successfully."""
     for pid in pids.keys():
         entity = "refs"
         cid = pids[pid]["sha256"]
@@ -619,8 +619,8 @@ def test_update_cid_ref_content_multiple(pids, store):
         assert line_count == 6
 
 
-def test_delete_cid_ref_pid(pids, store):
-    """Test that delete_cid_reference deletes the given pid from the ref file."""
+def test_delete_cid_refs_pid(pids, store):
+    """Test that delete_cid_refs_pid deletes the given pid from the ref file."""
     for pid in pids.keys():
         entity = "refs"
         cid = pids[pid]["sha256"]
@@ -641,8 +641,8 @@ def test_delete_cid_ref_pid(pids, store):
                 assert value == pid_other
 
 
-def test_delete_cid_ref_pid_pid_not_found(pids, store):
-    """Test that delete_cid_reference raises exception when pid not found."""
+def test_delete_cid_refs_pid_pid_not_found(pids, store):
+    """Test that delete_cid_refs_pid raises exception when pid not found."""
     for pid in pids.keys():
         entity = "refs"
         cid = pids[pid]["sha256"]
@@ -658,7 +658,7 @@ def test_delete_cid_ref_pid_pid_not_found(pids, store):
             store.delete_cid_refs_pid(cid_ref_abs_path, "dou.not.found.1")
 
 
-def test_delete_cid_ref_pid_file(pids, store):
+def test_delete_cid_refs_pid_file(pids, store):
     """Test that delete_cid_refs_file deletes a reference file."""
     for pid in pids.keys():
         entity = "refs"
@@ -674,7 +674,7 @@ def test_delete_cid_ref_pid_file(pids, store):
         assert not os.path.exists(cid_ref_abs_path)
 
 
-def test_delete_cid_ref_pid_file_not_empty(pids, store):
+def test_delete_cid_refs_pid_file_not_empty(pids, store):
     """Test that delete_cid_refs_file raises an exception when refs file not empty."""
     for pid in pids.keys():
         entity = "refs"
@@ -689,7 +689,7 @@ def test_delete_cid_ref_pid_file_not_empty(pids, store):
             store.delete_cid_refs_file(cid_ref_abs_path)
 
 
-def test_delete_cid_ref_pid_file_not_found(pids, store):
+def test_delete_cid_refs_pid_file_not_found(pids, store):
     """Test that delete_cid_refs_file raises an exception when refs file not found."""
     for pid in pids.keys():
         entity = "refs"
@@ -700,6 +700,38 @@ def test_delete_cid_ref_pid_file_not_found(pids, store):
 
         with pytest.raises(FileNotFoundError):
             store.delete_cid_refs_file(cid_ref_abs_path)
+
+
+def test_write_pid_refs_file(pids, store):
+    """Test that write_pid_refs_file writes a reference file."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        pid_hash = store.computehash(pid, store.algorithm)
+        pid_ref_abs_path = store.build_abs_path(entity, pid_hash).replace(
+            "/refs/", "/refs/pid/"
+        )
+        store.create_path(os.path.dirname(pid_ref_abs_path))
+        store.write_pid_refs_file(pid_ref_abs_path, cid)
+        assert os.path.exists(pid_ref_abs_path)
+
+
+def test_write_pid_refs_file_content(pids, store):
+    """Test that write_pid_refs_file writes the expected content."""
+    for pid in pids.keys():
+        entity = "refs"
+        cid = pids[pid]["sha256"]
+        pid_hash = store.computehash(pid, store.algorithm)
+        pid_ref_abs_path = store.build_abs_path(entity, pid_hash).replace(
+            "/refs/", "/refs/pid/"
+        )
+        store.create_path(os.path.dirname(pid_ref_abs_path))
+        store.write_pid_refs_file(pid_ref_abs_path, cid)
+
+        with open(pid_ref_abs_path, "r", encoding="utf8") as f:
+            pid_refs_cid = f.read()
+
+        assert cid == pid_refs_cid
 
 
 def test_put_metadata_with_path(pids, store):

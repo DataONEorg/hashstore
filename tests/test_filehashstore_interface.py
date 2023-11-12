@@ -795,7 +795,7 @@ def test_retrieve_metadata_format_id_empty_spaces(store):
 
 
 def test_delete_objects(pids, store):
-    """Test delete_object successfully deletes objects."""
+    """Test delete_object successfully deletes objects from /objects."""
     test_dir = "tests/testdata/"
     entity = "objects"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -808,6 +808,58 @@ def test_delete_objects(pids, store):
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
     assert store.count(entity) == 0
+
+
+def test_delete_objects_pid_refs_file(pids, store):
+    """Test delete_object deletes the pid refs file containing the cid."""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        object_metadata = store.store_object(pid, path)
+        store.tag_object(pid, object_metadata.id)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        store.delete_object(pid)
+        pid_refs_file_path = store.get_refs_abs_path("pid", pid)
+        assert not os.path.exists(pid_refs_file_path)
+
+
+def test_delete_objects_cid_refs_file(pids, store):
+    """Test delete_object deletes the cid refs file containing the cid."""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        store.delete_object(pid)
+        cid_refs_file_path = store.get_refs_abs_path("cid", cid)
+        assert not os.path.exists(cid_refs_file_path)
+
+
+def test_delete_objects_cid_refs_file_with_pid_refs_remaining(pids, store):
+    """Test delete_object does not delete the cid refs file that still contains ref."""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        cid_refs_abs_path = store.get_refs_abs_path("cid", cid)
+        store.update_cid_refs(cid_refs_abs_path, "dou.test.1")
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        store.delete_object(pid)
+        cid_refs_file_path = store.get_refs_abs_path("cid", cid)
+        assert os.path.exists(cid_refs_file_path)
 
 
 def test_delete_object_pid_empty(store):

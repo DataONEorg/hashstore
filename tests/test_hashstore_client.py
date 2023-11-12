@@ -189,7 +189,8 @@ def test_delete_objects(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        _object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(pid, path)
+        store.tag_object(pid, object_metadata.id)
 
         client_module_path = f"{client_directory}/client.py"
         test_store = store.root

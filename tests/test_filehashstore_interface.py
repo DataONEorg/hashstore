@@ -803,7 +803,8 @@ def test_delete_objects(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(pid, path)
+        store.tag_object(pid, object_metadata.id)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
     assert store.count(entity) == 0

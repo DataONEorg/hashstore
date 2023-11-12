@@ -662,12 +662,8 @@ class FileHashStore(HashStore):
         )
         self._is_string_none_or_empty(pid, "pid", "delete_object")
 
-        # TODO: Also find the reference file and delete it if there's only one ref
-        # Else delete the pid in the cid refs file
-        # Also delete the pid ref file
-
         entity = "objects"
-        object_cid = self.get_sha256_hex_digest(pid)
+        object_cid = self.find_object(pid)
         self.delete(entity, object_cid)
 
         logging.info(

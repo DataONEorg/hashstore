@@ -533,6 +533,35 @@ def test_store_object_sparse_large_file(store):
     assert object_metadata_id == object_metadata.hex_digests.get("sha256")
 
 
+def test_find_object(pids, store):
+    """Test find object returns the correct content identifier (cid)."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+        store.tag_object(pid, object_metadata.id)
+        cid = store.find_object(pid)
+        assert cid == object_metadata.hex_digests.get("sha256")
+
+
+def test_find_object_pid_object_does_not_exist(store):
+    """Test find object throws exception when object doesn't exist."""
+    with pytest.raises(FileNotFoundError):
+        store.find_object("dou.test.1")
+
+
+def test_find_object_pid_none(store):
+    """Test find object throws exception when pid is None."""
+    with pytest.raises(ValueError):
+        store.find_object(None)
+
+
+def test_find_object_pid_empty(store):
+    """Test find object throws exception when pid is empty."""
+    with pytest.raises(ValueError):
+        store.find_object("")
+
+
 def test_store_metadata(pids, store):
     """Test store metadata."""
     test_dir = "tests/testdata/"

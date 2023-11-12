@@ -523,7 +523,6 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - find_object: Request to find object for for pid: %s", pid
         )
-        # TODO: Write tests for this method
         self._is_string_none_or_empty(pid, "pid", "find_object")
 
         pid_ref_abs_path = self.get_refs_abs_path("pid", pid)

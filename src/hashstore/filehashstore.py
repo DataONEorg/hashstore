@@ -478,17 +478,11 @@ class FileHashStore(HashStore):
         return object_metadata
 
     def tag_object(self, pid, cid):
-        """Tag an object that has been stored with a pid reference.
-
-        Args:
-            pid (string): Authority-based or persistent identifier of object
-            cid (string): Content identifier
-        """
         # TODO: Write tests for this method
         # Wait for the cid to release if it's being tagged
         while cid in self.reference_locked_cids:
             logging.debug(
-                "FileHashStore - tag_object: (cid) %s is currently being tagged. Waiting.",
+                "FileHashStore - tag_object: (cid) %s is currently locked. Waiting.",
                 cid,
             )
             time.sleep(self.time_out_sec)
@@ -650,27 +644,49 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_object: Request to delete object for pid: %s", pid
         )
         self._is_string_none_or_empty(pid, "pid", "delete_object")
-
-        # Remove pid from cid reference file
         cid = self.find_object(pid)
-        cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
-        self.delete_cid_refs_pid(cid_ref_abs_path, pid)
-        # Delete cid reference file
-        # If the file is not empty, it will not be deleted.
-        cid_refs_deleted = self.delete_cid_refs_file(cid_ref_abs_path)
-        # Delete pid reference file
-        pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
-        self.delete_pid_refs_file(pid_ref_abs_path)
-        # Finally, delete the object
-        if cid_refs_deleted:
-            entity = "objects"
-            self.delete(entity, cid)
 
-        logging.info(
-            "FileHashStore - delete_object: Successfully deleted object for pid: %s",
-            pid,
-        )
-        return True
+        while cid in self.reference_locked_cids:
+            logging.debug(
+                "FileHashStore - delete_object: (cid) %s is currently locked. Waiting",
+                cid,
+            )
+            time.sleep(self.time_out_sec)
+        # Modify reference_locked_cids consecutively
+        with self.reference_lock:
+            logging.debug(
+                "FileHashStore - delete_object: Adding cid: %s to reference_locked_cids.",
+                cid,
+            )
+            self.reference_locked_cids.append(cid)
+        try:
+            # Remove pid from cid reference file
+            cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+            self.delete_cid_refs_pid(cid_ref_abs_path, pid)
+            # Delete cid reference file
+            # If the file is not empty, it will not be deleted.
+            cid_refs_deleted = self.delete_cid_refs_file(cid_ref_abs_path)
+            # Delete pid reference file
+            pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+            self.delete_pid_refs_file(pid_ref_abs_path)
+            # Finally, delete the object
+            if cid_refs_deleted:
+                entity = "objects"
+                self.delete(entity, cid)
+            return True
+        finally:
+            # Release cid
+            with self.reference_lock:
+                logging.debug(
+                    "FileHashStore - delete_object: Removing cid: %s from reference_locked_cids.",
+                    cid,
+                )
+                self.reference_locked_cids.remove(cid)
+            info_msg = (
+                "FileHashStore - delete_object: Successfully deleted references and/or"
+                + f" objects associated with pid: {pid}"
+            )
+            logging.info(info_msg)
 
     def delete_metadata(self, pid, format_id=None):
         logging.debug(
@@ -1063,7 +1079,7 @@ class FileHashStore(HashStore):
 
     def write_cid_refs_file(self, cid_ref_abs_path, pid):
         """Write the reference file for the given content identifier (cid). A reference
-        file contains every pid that references a cid on a new line.
+        file contains every pid that references a cid each on its own line.
 
         Args:
             cid_ref_abs_path (string): Absolute path to the cid ref file
@@ -1164,7 +1180,6 @@ class FileHashStore(HashStore):
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
-
             return
 
         except Exception as err:

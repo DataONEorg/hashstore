@@ -478,7 +478,13 @@ class FileHashStore(HashStore):
         return object_metadata
 
     def tag_object(self, pid, cid):
-        # TODO: Write tests for this method
+        logging.debug(
+            "FileHashStore - tag_object: Tagging object cid: {%s} with pid: {%s}.",
+            cid,
+            pid,
+        )
+        self._is_string_none_or_empty(pid, "pid", "tag_object")
+        self._is_string_none_or_empty(cid, "cid", "tag_object")
         # Wait for the cid to release if it's being tagged
         while cid in self.reference_locked_cids:
             logging.debug(
@@ -494,19 +500,21 @@ class FileHashStore(HashStore):
             )
             self.reference_locked_cids.append(cid)
         try:
-            # Check to see if reference file already exists for the cid
+            # TODO: Review process and test what happens when specific pieces fail
+            # We cannot have a pid ref file whose pid is not referenced in the cid refs file
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
             if os.path.exists(cid_ref_abs_path):
                 # If it does, read the file and add the new pid on its own line
                 self.update_cid_refs(cid_ref_abs_path, pid)
             else:
-                # If not, create the cid ref file in '.../refs/cid' and write the pid
-                self.create_path(os.path.dirname(cid_ref_abs_path))
-                self.write_cid_refs_file(cid_ref_abs_path, pid)
-                # Then create the pid ref file in '.../refs/pid' with the cid as its content
+                # If not, create the pid ref file in '.../refs/pid' with the cid as its content
                 pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
                 self.create_path(os.path.dirname(pid_ref_abs_path))
                 self.write_pid_refs_file(pid_ref_abs_path, cid)
+                # Then create the cid ref file in '.../refs/cid' and write the pid
+                self.create_path(os.path.dirname(cid_ref_abs_path))
+                self.write_cid_refs_file(cid_ref_abs_path, pid)
+                return True
         finally:
             # Release cid
             with self.reference_lock:
@@ -517,7 +525,6 @@ class FileHashStore(HashStore):
                 self.reference_locked_cids.remove(cid)
             info_msg = f"FileHashStore - tag_object: Successfully tagged cid: {cid} with pid: {pid}"
             logging.info(info_msg)
-        return
 
     def find_object(self, pid):
         logging.debug(
@@ -843,7 +850,7 @@ class FileHashStore(HashStore):
                 + f" Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
-            raise IOError(exception_string) from err
+            raise err
 
     def _move_and_get_checksums(
         self,
@@ -1521,6 +1528,7 @@ class FileHashStore(HashStore):
             tmp_file_size: Size of the tmp file
             file_size_to_validate: Expected size of the object
         """
+        # TODO: Refactor this method and/or create a new method for Metacat client to call
         if file_size_to_validate is not None and file_size_to_validate > 0:
             if file_size_to_validate != tmp_file_size:
                 self.delete(entity, tmp_file_name)

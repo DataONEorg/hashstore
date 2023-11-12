@@ -629,7 +629,7 @@ class FileHashStore(HashStore):
         checked_format_id = self._validate_format_id(format_id, "retrieve_metadata")
 
         entity = "metadata"
-        metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
+        metadata_cid = self.computehash(pid + checked_format_id)
         metadata_exists = self.exists(entity, metadata_cid)
         if metadata_exists:
             metadata_stream = self.open(entity, metadata_cid)
@@ -674,7 +674,7 @@ class FileHashStore(HashStore):
         checked_format_id = self._validate_format_id(format_id, "delete_metadata")
 
         entity = "metadata"
-        metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
+        metadata_cid = self.computehash(pid + checked_format_id)
         self.delete(entity, metadata_cid)
 
         logging.info(
@@ -1302,7 +1302,7 @@ class FileHashStore(HashStore):
             metadata_tmp = self._mktmpmetadata(metadata_stream)
 
         # Get target and related paths (permanent location)
-        metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+        metadata_cid = self.computehash(pid + format_id)
         rel_path = "/".join(self.shard(metadata_cid))
         full_path = self.get_store_path("metadata") / rel_path
 
@@ -1602,11 +1602,12 @@ class FileHashStore(HashStore):
         return cleaned_string
 
     def computehash(self, stream, algorithm=None):
-        """Compute hash of a file-like object using :attr:`algorithm` by default
-        or with optional algorithm supported.
+        """Compute the hash of a file-like object (or string) using :attr:`algorithm` by
+        default or with optional algorithm supported.
 
         Args:
-            stream (io.BufferedReader): A buffered stream of an object_cid object. \n
+            stream (mixed): A buffered stream (io.BufferedReader) of an object. A string is
+                also acceptable as they are a sequence of characters (Python only).\n
             algorithm (string): Algorithm of hex digest to generate.
 
         Returns:
@@ -1925,19 +1926,6 @@ class FileHashStore(HashStore):
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")
         return text
-
-    @staticmethod
-    def get_sha256_hex_digest(string):
-        """Calculate the SHA-256 digest of a UTF-8 encoded string.
-
-        Args:
-            string (string): String to convert.
-
-        Returns:
-            hex (string): Hexadecimal string.
-        """
-        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
-        return hex_digest
 
 
 class Stream(object):

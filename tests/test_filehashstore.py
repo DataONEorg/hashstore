@@ -1090,10 +1090,3 @@ def test_to_bytes(store):
     # pylint: disable=W0212
     string_bytes = store._to_bytes(string)
     assert isinstance(string_bytes, bytes)
-
-
-def test_get_sha256_hex_digest(pids, store):
-    """Test for correct sha256 return value."""
-    for pid in pids:
-        hash_val = store.get_sha256_hex_digest(pid)
-        assert hash_val == pids[pid]["object_cid"]

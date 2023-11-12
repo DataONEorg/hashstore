@@ -34,13 +34,9 @@ def test_store_object(pids, store):
     """Test store object."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = Path(test_dir + pid.replace("/", "_"))
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert object_metadata.id == pids[pid][store.algorithm]
     assert store.count(entity) == 3
 
@@ -49,13 +45,9 @@ def test_store_object_files_path(pids, store):
     """Test store object when given a path."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = Path(test_dir + pid.replace("/", "_"))
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, pids[pid][store.algorithm])
     assert store.count(entity) == 3
 
@@ -64,13 +56,9 @@ def test_store_object_files_string(pids, store):
     """Test store object when given a string."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path_string = test_dir + pid.replace("/", "_")
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path_string)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, pids[pid][store.algorithm])
     assert store.count(entity) == 3
 
@@ -567,10 +555,8 @@ def test_store_metadata(pids, store):
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert metadata_cid == pids[pid]["metadata_cid"]
 
@@ -579,10 +565,8 @@ def test_store_metadata_default_format_id(pids, store):
     """Test store metadata returns expected id when storing with default format_id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath)
         assert metadata_cid == pids[pid]["metadata_cid"]
 
@@ -593,10 +577,8 @@ def test_store_metadata_files_path(pids, store):
     entity = "metadata"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath, format_id)
         assert store.exists(entity, metadata_cid)
         assert metadata_cid == pids[pid]["metadata_cid"]
@@ -609,10 +591,8 @@ def test_store_metadata_files_string(pids, store):
     entity = "metadata"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
-        path_string = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
-        _object_metadata = store.store_object(pid, path_string)
         metadata_cid = store.store_metadata(pid, syspath_string, format_id)
         assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
@@ -624,8 +604,6 @@ def test_store_metadata_files_input_stream(pids, store):
     entity = "metadata"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        _object_metadata = store.store_object(pid, path)
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
         syspath_stream = io.open(syspath_string, "rb")

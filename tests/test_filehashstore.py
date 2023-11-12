@@ -648,21 +648,22 @@ def test_delete_cid_refs_pid_file(pids, store):
         store.create_path(os.path.dirname(cid_ref_abs_path))
         store.write_cid_refs_file(cid_ref_abs_path, pid)
         store.delete_cid_refs_pid(cid_ref_abs_path, pid)
-        store.delete_cid_refs_file(cid_ref_abs_path)
+        cid_refs_deleted = store.delete_cid_refs_file(cid_ref_abs_path)
 
+        assert cid_refs_deleted
         assert not os.path.exists(cid_ref_abs_path)
 
 
 def test_delete_cid_refs_pid_file_not_empty(pids, store):
-    """Test that delete_cid_refs_file raises an exception when refs file not empty."""
+    """Test that delete_cid_refs_file does not raise an exception when refs file
+    is not empty."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
         store.write_cid_refs_file(cid_ref_abs_path, pid)
-
-        with pytest.raises(OSError):
-            store.delete_cid_refs_file(cid_ref_abs_path)
+        cid_refs_deleted = store.delete_cid_refs_file(cid_ref_abs_path)
+        assert not cid_refs_deleted
 
 
 def test_delete_cid_refs_pid_file_not_found(pids, store):

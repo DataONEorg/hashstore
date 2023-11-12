@@ -652,12 +652,19 @@ class FileHashStore(HashStore):
         self._is_string_none_or_empty(pid, "pid", "delete_object")
 
         # Remove pid from cid reference file
-        # self.delete_cid_refs_pid(, pid)
-        # Delete cid reference file if it's empty
+        cid = self.find_object(pid)
+        cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+        self.delete_cid_refs_pid(cid_ref_abs_path, pid)
+        # Delete cid reference file
+        # If the file is not empty, it will not be deleted.
+        cid_refs_deleted = self.delete_cid_refs_file(cid_ref_abs_path)
         # Delete pid reference file
-        entity = "objects"
-        object_cid = self.find_object(pid)
-        self.delete(entity, object_cid)
+        pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+        self.delete_pid_refs_file(pid_ref_abs_path)
+        # Finally, delete the object
+        if cid_refs_deleted:
+            entity = "objects"
+            self.delete(entity, cid)
 
         logging.info(
             "FileHashStore - delete_object: Successfully deleted object for pid: %s",
@@ -1173,6 +1180,9 @@ class FileHashStore(HashStore):
 
         Args:
             cid_ref_abs_path (string): Absolute path to the cid ref file
+
+        Returns:
+            boolean: True if deleted, False if not
         """
         info_msg = (
             "FileHashStore - delete_cid_refs_file: Deleting reference file: %s",
@@ -1188,14 +1198,15 @@ class FileHashStore(HashStore):
                 )
                 raise FileNotFoundError(err_msg)
             if os.path.getsize(cid_ref_abs_path) != 0:
-                err_msg = (
+                warn_msg = (
                     "FileHashStore - delete_cid_refs_file: Failed to delete cid reference file."
                     + f" File is not empty: {cid_ref_abs_path} "
                 )
-                raise OSError(err_msg)
+                logging.warning(warn_msg)
+                return False
             else:
                 os.remove(cid_ref_abs_path)
-                return
+                return True
 
         except Exception as err:
             exception_string = (
@@ -1830,19 +1841,20 @@ class FileHashStore(HashStore):
         absolute_path = os.path.join(root_dir, *paths) + extension
         return absolute_path
 
-    def get_refs_abs_path(self, ref_type, pid):
+    def get_refs_abs_path(self, ref_type, hash_id):
         """Get the absolute path to the reference file for the given pid.
 
         Args:
             ref_type (string): 'pid' or 'cid'
-            pid (string): Authority-based or persistent identifier
+            hash_id (string): Authority-based, persistent or hash identifier
 
         Returns:
             ref_file_abs_path (string): Path to the ref file for the given type and pid
         """
         entity = "refs"
-        pid_hash = self.computehash(pid, self.algorithm)
-        ref_file_abs_path = self.build_abs_path(entity, pid_hash).replace(
+        if ref_type is "pid":
+            hash_id = self.computehash(hash_id, self.algorithm)
+        ref_file_abs_path = self.build_abs_path(entity, hash_id).replace(
             "/refs/", f"/refs/{ref_type}/"
         )
         return ref_file_abs_path

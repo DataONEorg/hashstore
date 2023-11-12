@@ -501,10 +501,7 @@ class FileHashStore(HashStore):
             self.reference_locked_cids.append(cid)
         try:
             # Check to see if reference file already exists for the cid
-            entity = "refs"
-            cid_ref_abs_path = self.build_abs_path(entity, cid).replace(
-                "/refs/", "/refs/cid/"
-            )
+            cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
             if os.path.exists(cid_ref_abs_path):
                 # If it does, read the file and add the new pid on its own line
                 self.update_cid_refs(cid_ref_abs_path, pid)
@@ -513,10 +510,7 @@ class FileHashStore(HashStore):
                 self.create_path(os.path.dirname(cid_ref_abs_path))
                 self.write_cid_refs_file(cid_ref_abs_path, pid)
                 # Then create the pid ref file in '.../refs/pid' with the cid as its content
-                pid_hash = self.computehash(pid, self.algorithm)
-                pid_ref_abs_path = self.build_abs_path(entity, pid_hash).replace(
-                    "/refs/", "/refs/pid/"
-                )
+                pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
                 self.create_path(os.path.dirname(pid_ref_abs_path))
                 self.write_pid_refs_file(pid_ref_abs_path, cid)
         finally:
@@ -538,12 +532,7 @@ class FileHashStore(HashStore):
         # TODO: Write tests for this method
         self._is_string_none_or_empty(pid, "pid", "find_object")
 
-        # Get the path to the pid reference by calculating its hash in '.../refs/pid'
-        entity = "refs"
-        pid_hash = self.computehash(pid, self.algorithm)
-        pid_ref_abs_path = self.build_abs_path(entity, pid_hash).replace(
-            "/refs/", "/refs/pid/"
-        )
+        pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
         if not os.path.exists(pid_ref_abs_path):
             err_msg = (
                 f"FileHashStore - find_object: pid ({pid}) reference file not found: "
@@ -662,6 +651,10 @@ class FileHashStore(HashStore):
         )
         self._is_string_none_or_empty(pid, "pid", "delete_object")
 
+        # Remove pid from cid reference file
+        # self.delete_cid_refs_pid(, pid)
+        # Delete cid reference file if it's empty
+        # Delete pid reference file
         entity = "objects"
         object_cid = self.find_object(pid)
         self.delete(entity, object_cid)
@@ -1835,6 +1828,23 @@ class FileHashStore(HashStore):
 
         absolute_path = os.path.join(root_dir, *paths) + extension
         return absolute_path
+
+    def get_refs_abs_path(self, ref_type, pid):
+        """Get the absolute path to the reference file for the given pid.
+
+        Args:
+            ref_type (string): 'pid' or 'cid'
+            pid (string): Authority-based or persistent identifier
+
+        Returns:
+            ref_file_abs_path (string): Path to the ref file for the given type and pid
+        """
+        entity = "refs"
+        pid_hash = self.computehash(pid, self.algorithm)
+        ref_file_abs_path = self.build_abs_path(entity, pid_hash).replace(
+            "/refs/", f"/refs/{ref_type}/"
+        )
+        return ref_file_abs_path
 
     def count(self, entity):
         """Return count of the number of files in the `root` directory.

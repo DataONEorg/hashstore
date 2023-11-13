@@ -551,6 +551,15 @@ def test_write_to_tmp_file_and_get_hex_digests_with_unsupported_algorithm(pids, 
         input_stream.close()
 
 
+def test_mktmpfile(store):
+    """Test that _mktmpfile creates and returns a tmp file."""
+    path = store.root + "/doutest/tmp/"
+    store.create_path(path)
+    # pylint: disable=W0212
+    tmp = store._mktmpfile(path)
+    assert os.path.exists(tmp.name)
+
+
 def test_write_cid_refs_file(pids, store):
     """Test that write_cid_reference writes a reference file."""
     for pid in pids.keys():

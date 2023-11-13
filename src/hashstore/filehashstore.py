@@ -1011,26 +1011,11 @@ class FileHashStore(HashStore):
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
-        tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
-
-        # Delete tmp file if python interpreter crashes or thread is interrupted
-        # when store_object is called
-        def delete_tmp_file():
-            if os.path.exists(tmp.name):
-                os.remove(tmp.name)
-
-        atexit.register(delete_tmp_file)
-
-        # Ensure tmp file is created with desired permissions
-        if self.fmode is not None:
-            oldmask = os.umask(0)
-            try:
-                os.chmod(tmp.name, self.fmode)
-            finally:
-                os.umask(oldmask)
+        tmp = self._mktmpfile(tmp_root_path)
 
         logging.debug(
-            "FileHashStore - _mktempfile: tmp file created: %s, calculating hex digests.",
+            "FileHashStore - _write_to_tmp_file_and_get_hex_digests: tmp file created:"
+            + " %s, calculating hex digests.",
             tmp.name,
         )
 
@@ -1047,7 +1032,8 @@ class FileHashStore(HashStore):
                     for hash_algorithm in hash_algorithms:
                         hash_algorithm.update(self._to_bytes(data))
             logging.debug(
-                "FileHashStore - _mktempfile: Object stream successfully written to tmp file: %s",
+                "FileHashStore - _write_to_tmp_file_and_get_hex_digests: Object stream"
+                + " successfully written to tmp file: %s",
                 tmp.name,
             )
 
@@ -1059,19 +1045,23 @@ class FileHashStore(HashStore):
             # Ready for validation and atomic move
             tmp_file_completion_flag = True
 
-            logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
+            logging.debug(
+                "FileHashStore - _write_to_tmp_file_and_get_hex_digests: Hex digests calculated."
+            )
             return hex_digest_dict, tmp.name, tmp_file_size
         # pylint: disable=W0718
         except Exception as err:
             exception_string = (
-                f"FileHashStore - _mktempfile: Unexpected {err=}, {type(err)=}"
+                "FileHashStore - _write_to_tmp_file_and_get_hex_digests:"
+                + f" Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             # pylint: disable=W0707,W0719
             raise Exception(exception_string)
         except KeyboardInterrupt:
             exception_string = (
-                "FileHashStore - _mktempfile: Keyboard interruption by user."
+                "FileHashStore - _write_to_tmp_file_and_get_hex_digests:"
+                + " Keyboard interruption by user."
             )
             logging.error(exception_string)
             if os.path.exists(tmp.name):
@@ -1084,10 +1074,38 @@ class FileHashStore(HashStore):
                 # pylint: disable=W0718
                 except Exception as err:
                     exception_string = (
-                        f"FileHashStore - _mktempfile: Unexpected {err=} while attempting to"
+                        "FileHashStore - _write_to_tmp_file_and_get_hex_digests:"
+                        + f"Unexpected {err=} while attempting to"
                         + f" delete tmp file: {tmp.name}, {type(err)=}"
                     )
                     logging.error(exception_string)
+
+    def _mktmpfile(self, path):
+        """Create a temporary file at the given path ready to be written.
+
+        Args:
+            path (string): Path to the file location
+
+        Returns:
+            tmp (file object): object with file-like interface
+        """
+        tmp = NamedTemporaryFile(dir=path, delete=False)
+
+        # Delete tmp file if python interpreter crashes or thread is interrupted
+        def delete_tmp_file():
+            if os.path.exists(tmp.name):
+                os.remove(tmp.name)
+
+        atexit.register(delete_tmp_file)
+
+        # Ensure tmp file is created with desired permissions
+        if self.fmode is not None:
+            oldmask = os.umask(0)
+            try:
+                os.chmod(tmp.name, self.fmode)
+            finally:
+                os.umask(oldmask)
+        return tmp
 
     def write_cid_refs_file(self, cid_ref_abs_path, pid):
         """Write the reference file for the given content identifier (cid). A reference

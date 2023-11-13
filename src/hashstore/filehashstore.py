@@ -502,13 +502,20 @@ class FileHashStore(HashStore):
         try:
             # TODO: Review process and test what happens when specific pieces fail
             # We cannot have a pid ref file whose pid is not referenced in the cid refs file
+            pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
-            if os.path.exists(cid_ref_abs_path):
+            if os.path.exists(pid_ref_abs_path):
+                exception_string = (
+                    "FileHashStore - write_pid_refs_file: pid ref file already exists for %s",
+                    pid_ref_abs_path,
+                )
+                logging.error(exception_string)
+                raise FileExistsError(exception_string)
+            elif os.path.exists(cid_ref_abs_path):
                 # If it does, read the file and add the new pid on its own line
                 self.update_cid_refs(cid_ref_abs_path, pid)
             else:
                 # If not, create the pid ref file in '.../refs/pid' with the cid as its content
-                pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
                 self.create_path(os.path.dirname(pid_ref_abs_path))
                 self.write_pid_refs_file(pid_ref_abs_path, cid)
                 # Then create the cid ref file in '.../refs/cid' and write the pid
@@ -1153,19 +1160,19 @@ class FileHashStore(HashStore):
         logging.info(info_msg)
 
         try:
+            with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+                for _, line in enumerate(f, start=1):
+                    value = line.strip()
+                    if pid == value:
+                        err_msg = (
+                            f"FileHashStore - update_cid_refs: pid ({pid}) already reference in"
+                            + f" cid reference file: {cid_ref_abs_path} "
+                        )
+                        raise ValueError(err_msg)
+
             with open(cid_ref_abs_path, "a+", encoding="utf8") as cid_ref_file:
                 fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
-                # Read the ref file to see if the pid is already referencing the cid
-                cid_ref_file_content = cid_ref_file.read()
-
-                if pid in cid_ref_file_content:
-                    err_msg = (
-                        f"FileHashStore - update_cid_refs: pid ({pid}) already reference in"
-                        + f" cid reference file: {cid_ref_abs_path} "
-                    )
-                    raise ValueError(err_msg)
-                else:
-                    cid_ref_file.write(pid + "\n")
+                cid_ref_file.write(pid + "\n")
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
@@ -1262,45 +1269,37 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
-    def write_pid_refs_file(self, pid_ref_abs_path, cid):
+    def write_pid_refs_file(self, path, cid):
         """Write the reference file for the given pid (persistent identifier). A reference
         file for a pid contains the cid that it references. Its permanent address is the pid
         hash with HashStore's default store algorithm and follows its directory structure.
 
         Args:
-            pid_ref_abs_path (string): Absolute path to the pid ref file
+            path (string): Path to file to be written into
             cid (string): Content identifier
         """
         info_msg = (
             f"FileHashStore - write_pid_refs_file: Writing cid ({cid}) into pid reference"
-            + f" file: {pid_ref_abs_path}"
+            + f" file: {path}"
         )
         logging.info(info_msg)
 
-        if os.path.exists(pid_ref_abs_path):
+        try:
+            with open(path, "w", encoding="utf8") as pid_ref_file:
+                fcntl.flock(pid_ref_file, fcntl.LOCK_EX)
+                pid_ref_file.write(cid)
+                # The context manager will take care of releasing the lock
+                # But the code to explicitly release the lock if desired is below
+                # fcntl.flock(f, fcntl.LOCK_UN)
+            return
+
+        except Exception as err:
             exception_string = (
-                "FileHashStore - write_pid_refs_file: pid ref file already exists for %s",
-                pid_ref_abs_path,
+                "FileHashStore - write_pid_refs_file: failed to write pid reference file:"
+                + f" {path} for cid: {cid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
-            raise FileExistsError(exception_string)
-        else:
-            try:
-                with open(pid_ref_abs_path, "w", encoding="utf8") as pid_ref_file:
-                    fcntl.flock(pid_ref_file, fcntl.LOCK_EX)
-                    pid_ref_file.write(cid)
-                    # The context manager will take care of releasing the lock
-                    # But the code to explicitly release the lock if desired is below
-                    # fcntl.flock(f, fcntl.LOCK_UN)
-                return
-
-            except Exception as err:
-                exception_string = (
-                    "FileHashStore - write_pid_refs_file: failed to write pid reference file:"
-                    + f" {pid_ref_abs_path} for cid: {cid}. Unexpected {err=}, {type(err)=}"
-                )
-                logging.error(exception_string)
-                raise err
+            raise err
 
     def delete_pid_refs_file(self, pid_ref_abs_path):
         """Delete a pid reference file.

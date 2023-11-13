@@ -894,7 +894,11 @@ class FileHashStore(HashStore):
             + f" file and calculating checksums for pid: {pid}"
         )
         logging.debug(debug_msg)
-        hex_digests, tmp_file_name, tmp_file_size = self._mktmpfile(
+        (
+            hex_digests,
+            tmp_file_name,
+            tmp_file_size,
+        ) = self._write_to_tmp_file_and_get_hex_digests(
             stream, additional_algorithm, checksum_algorithm
         )
         logging.debug(
@@ -981,7 +985,9 @@ class FileHashStore(HashStore):
 
         return (object_cid, tmp_file_size, hex_digests)
 
-    def _mktmpfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
+    def _write_to_tmp_file_and_get_hex_digests(
+        self, stream, additional_algorithm=None, checksum_algorithm=None
+    ):
         """Create a named temporary file from a `Stream` object and return its filename
         and a dictionary of its algorithms and hex digests. If an additionak and/or checksum
         algorithm is provided, it will add the respective hex digest to the dictionary.

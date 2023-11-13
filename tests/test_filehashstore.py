@@ -409,8 +409,8 @@ def test_move_and_get_checksums_file_size_raises_error(pids, store):
             input_stream.close()
 
 
-def test_mktempfile_additional_algo(store):
-    """Test _mktempfile returns correct hex digests for additional algorithm."""
+def test_write_to_tmp_file_and_get_hex_digests_additional_algo(store):
+    """Test _write...hex_digests returns correct hex digests for additional algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -420,15 +420,15 @@ def test_mktempfile_additional_algo(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     # pylint: disable=W0212
-    hex_digests, _, _ = store._mktmpfile(
+    hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
         input_stream, additional_algorithm=checksum_algo
     )
     input_stream.close()
     assert hex_digests.get("sha3_256") == checksum_correct
 
 
-def test_mktempfile_checksum_algo(store):
-    """Test _mktempfile returns correct hex digests for checksum algorithm."""
+def test_write_to_tmp_file_and_get_hex_digests_checksum_algo(store):
+    """Test _write...hex_digests returns correct hex digests for checksum algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -438,13 +438,15 @@ def test_mktempfile_checksum_algo(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     # pylint: disable=W0212
-    hex_digests, _, _ = store._mktmpfile(input_stream, checksum_algorithm=checksum_algo)
+    hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+        input_stream, checksum_algorithm=checksum_algo
+    )
     input_stream.close()
     assert hex_digests.get("sha3_256") == checksum_correct
 
 
-def test_mktempfile_checksum_and_additional_algo(store):
-    """Test _mktempfile returns correct hex digests for checksum algorithm."""
+def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo(store):
+    """Test _write...hex_digests returns correct hex digests for checksum algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -458,7 +460,7 @@ def test_mktempfile_checksum_and_additional_algo(store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     # pylint: disable=W0212
-    hex_digests, _, _ = store._mktmpfile(
+    hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
         input_stream,
         additional_algorithm=additional_algo,
         checksum_algorithm=checksum_algo,
@@ -468,8 +470,10 @@ def test_mktempfile_checksum_and_additional_algo(store):
     assert hex_digests.get("sha224") == additional_algo_checksum
 
 
-def test_mktempfile_checksum_and_additional_algo_duplicate(store):
-    """Test _mktempfile succeeds with duplicate algorithms (de-duplicates)."""
+def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo_duplicate(
+    store,
+):
+    """Test _write...hex_digests succeeds with duplicate algorithms (de-duplicates)."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -478,7 +482,7 @@ def test_mktempfile_checksum_and_additional_algo_duplicate(store):
     checksum_algo = "sha224"
     checksum_correct = "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
     # pylint: disable=W0212
-    hex_digests, _, _ = store._mktmpfile(
+    hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
         input_stream,
         additional_algorithm=additional_algo,
         checksum_algorithm=checksum_algo,
@@ -487,26 +491,26 @@ def test_mktempfile_checksum_and_additional_algo_duplicate(store):
     assert hex_digests.get("sha224") == checksum_correct
 
 
-def test_mktempfile_file_size(pids, store):
-    """Test _mktempfile returns correct file size."""
+def test_write_to_tmp_file_and_get_hex_digests_file_size(pids, store):
+    """Test _write...hex_digests returns correct file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         # pylint: disable=W0212
-        _, _, tmp_file_size = store._mktmpfile(input_stream)
+        _, _, tmp_file_size = store._write_to_tmp_file_and_get_hex_digests(input_stream)
         input_stream.close()
         assert tmp_file_size == pids[pid]["file_size_bytes"]
 
 
-def test_mktempfile_hex_digests(pids, store):
-    """Test _mktempfile returns correct hex digests."""
+def test_write_to_tmp_file_and_get_hex_digests_hex_digests(pids, store):
+    """Test _write...hex_digests returns correct hex digests."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         # pylint: disable=W0212
-        hex_digests, _, _ = store._mktmpfile(input_stream)
+        hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(input_stream)
         input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
@@ -515,20 +519,20 @@ def test_mktempfile_hex_digests(pids, store):
         assert hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
-def test_mktempfile_tmpfile_object(pids, store):
-    """Test _mktempfile creates file successfully."""
+def test_write_to_tmp_file_and_get_hex_digests_tmpfile_object(pids, store):
+    """Test _write...hex_digests creates file successfully."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         # pylint: disable=W0212
-        _, tmp_file_name, _ = store._mktmpfile(input_stream)
+        _, tmp_file_name, _ = store._write_to_tmp_file_and_get_hex_digests(input_stream)
         input_stream.close()
         assert os.path.isfile(tmp_file_name) is True
 
 
-def test_mktempfile_with_unsupported_algorithm(pids, store):
-    """Test _mktempfile raises error when bad algorithm supplied."""
+def test_write_to_tmp_file_and_get_hex_digests_with_unsupported_algorithm(pids, store):
+    """Test _write...hex_digests raises error when bad algorithm supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -536,10 +540,14 @@ def test_mktempfile_with_unsupported_algorithm(pids, store):
         algo = "md2"
         with pytest.raises(ValueError):
             # pylint: disable=W0212
-            _, _, _ = store._mktmpfile(input_stream, additional_algorithm=algo)
+            _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+                input_stream, additional_algorithm=algo
+            )
         with pytest.raises(ValueError):
             # pylint: disable=W0212
-            _, _, _ = store._mktmpfile(input_stream, checksum_algorithm=algo)
+            _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+                input_stream, checksum_algorithm=algo
+            )
         input_stream.close()
 
 

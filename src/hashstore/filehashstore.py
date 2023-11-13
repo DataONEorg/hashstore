@@ -538,9 +538,9 @@ class FileHashStore(HashStore):
                 # Move both files
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 shutil.move(cid_tmp_file_path, cid_ref_abs_path)
+                self._validate_references(pid, cid)
                 return True
         finally:
-            # TODO: Verify that the reference files have been written as expected.
             # Release cid
             with self.reference_lock:
                 logging.debug(
@@ -1577,6 +1577,56 @@ class FileHashStore(HashStore):
                 )
                 logging.error(exception_string)
                 raise ValueError(exception_string)
+
+    def _validate_references(self, pid, cid):
+        """Verifies that the supplied pid and pid reference file and content have been
+        written successfully.
+
+        Args:
+            pid (string): Authority-based or persistent identifier
+            cid (string): Content identifier
+        """
+        # Check that reference files were created
+        pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+        cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+        if not os.path.exists(pid_ref_abs_path):
+            exception_string = (
+                "FileHashStore - _validate_references: Pid refs file missing: %s",
+                pid_ref_abs_path,
+            )
+            logging.error(exception_string)
+            raise FileNotFoundError(exception_string)
+        if not os.path.exists(cid_ref_abs_path):
+            exception_string = (
+                "FileHashStore - _validate_references: Cid refs file missing: %s",
+                cid_ref_abs_path,
+            )
+            logging.error(exception_string)
+            raise FileNotFoundError(exception_string)
+        # Check the content of the reference files
+        # Start with the cid
+        retrieved_cid = self.find_object(pid)
+        if retrieved_cid != cid:
+            exception_string = (
+                f"FileHashStore - _validate_references: Pid refs file exists ({pid_ref_abs_path})"
+                + f" but cid ({cid}) does not match."
+            )
+            logging.error(exception_string)
+            raise ValueError(exception_string)
+        # Then the pid
+        pid_found = False
+        with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+            for _, line in enumerate(f, start=1):
+                value = line.strip()
+                if value == pid:
+                    pid_found = True
+        if not pid_found:
+            exception_string = (
+                f"FileHashStore - _validate_references: Cid refs file exists ({cid_ref_abs_path})"
+                + f" but pid ({pid}) not found."
+            )
+            logging.error(exception_string)
+            raise ValueError(exception_string)
 
     def _validate_metadata_to_store(self, metadata):
         """Evaluates a metadata argument to ensure that it is either a string, path or

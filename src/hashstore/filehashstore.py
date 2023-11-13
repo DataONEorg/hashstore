@@ -515,12 +515,29 @@ class FileHashStore(HashStore):
                 # If it does, read the file and add the new pid on its own line
                 self.update_cid_refs(cid_ref_abs_path, pid)
             else:
-                # If not, create the pid ref file in '.../refs/pid' with the cid as its content
+                # All ref files begin as tmp files and get moved sequentially at once
+                # Ensure refs tmp folder exists
+                tmp_root_path = self.get_store_path("refs") / "tmp"
+                # Physically create directory if it doesn't exist
+                if os.path.exists(tmp_root_path) is False:
+                    self.create_path(tmp_root_path)
+
+                # Then write pid_refs_file content into tmp file
+                pid_tmp_file = self._mktmpfile(tmp_root_path)
+                pid_tmp_file_path = pid_tmp_file.name
+                self._write_pid_refs_file(pid_tmp_file_path, cid)
+                # Then write cid_refs_file content into tmp file
+                cid_tmp_file = self._mktmpfile(tmp_root_path)
+                cid_tmp_file_path = cid_tmp_file.name
+                self._write_cid_refs_file(cid_tmp_file_path, pid)
+
+                # Create path for pid ref file in '.../refs/pid'
                 self.create_path(os.path.dirname(pid_ref_abs_path))
-                self.write_pid_refs_file(pid_ref_abs_path, cid)
-                # Then create the cid ref file in '.../refs/cid' and write the pid
+                # Create path for cid ref file in '.../refs/cid'
                 self.create_path(os.path.dirname(cid_ref_abs_path))
-                self.write_cid_refs_file(cid_ref_abs_path, pid)
+                # Move both files
+                shutil.move(pid_tmp_file_path, pid_ref_abs_path)
+                shutil.move(cid_tmp_file_path, cid_ref_abs_path)
                 return True
         finally:
             # TODO: Verify that the reference files have been written as expected.
@@ -676,13 +693,13 @@ class FileHashStore(HashStore):
         try:
             # Remove pid from cid reference file
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
-            self.delete_cid_refs_pid(cid_ref_abs_path, pid)
+            self._delete_cid_refs_pid(cid_ref_abs_path, pid)
             # Delete cid reference file
             # If the file is not empty, it will not be deleted.
-            cid_refs_deleted = self.delete_cid_refs_file(cid_ref_abs_path)
+            cid_refs_deleted = self._delete_cid_refs_file(cid_ref_abs_path)
             # Delete pid reference file
             pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
-            self.delete_pid_refs_file(pid_ref_abs_path)
+            self._delete_pid_refs_file(pid_ref_abs_path)
             # Finally, delete the object
             if cid_refs_deleted:
                 entity = "objects"
@@ -1115,22 +1132,20 @@ class FileHashStore(HashStore):
                 os.umask(oldmask)
         return tmp
 
-    def write_cid_refs_file(self, cid_ref_abs_path, pid):
-        """Write the reference file for the given content identifier (cid). A reference
-        file contains every pid that references a cid each on its own line.
+    def _write_cid_refs_file(self, path, pid):
+        """Write the reference file in the supplied path for the given content
+        identifier (cid). A reference file contains every pid that references a
+        cid each on its own line.
 
         Args:
-            cid_ref_abs_path (string): Absolute path to the cid ref file
+            path (string): Path of file to be written into
             pid (string): Authority-based or persistent identifier of object
         """
-        info_msg = (
-            f"FileHashStore - write_cid_refs_file: Writing pid ({pid}) into cid reference"
-            + f" file: {cid_ref_abs_path}"
-        )
+        info_msg = f"FileHashStore - write_cid_refs_file: Writing pid ({pid}) into file: {path}"
         logging.info(info_msg)
 
         try:
-            with open(cid_ref_abs_path, "w", encoding="utf8") as cid_ref_file:
+            with open(path, "w", encoding="utf8") as cid_ref_file:
                 fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
                 cid_ref_file.write(pid + "\n")
                 # The context manager will take care of releasing the lock
@@ -1140,13 +1155,13 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - write_cid_refs_file: failed to write reference for cid:"
-                + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
+                f"FileHashStore - write_cid_refs_file: failed to write pid ({pid})"
+                + f" into path: {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
 
-    def update_cid_refs(self, cid_ref_abs_path, pid):
+    def _update_cid_refs(self, cid_ref_abs_path, pid):
         """Update an existing cid reference file with the given pid.
 
         Args:
@@ -1186,7 +1201,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
-    def delete_cid_refs_pid(self, cid_ref_abs_path, pid):
+    def _delete_cid_refs_pid(self, cid_ref_abs_path, pid):
         """Delete a pid from a cid reference file.
 
         Args:
@@ -1228,7 +1243,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
-    def delete_cid_refs_file(self, cid_ref_abs_path):
+    def _delete_cid_refs_file(self, cid_ref_abs_path):
         """Delete a cid reference file. There must be no references remaining.
 
         Args:
@@ -1269,19 +1284,17 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
-    def write_pid_refs_file(self, path, cid):
-        """Write the reference file for the given pid (persistent identifier). A reference
-        file for a pid contains the cid that it references. Its permanent address is the pid
-        hash with HashStore's default store algorithm and follows its directory structure.
+    def _write_pid_refs_file(self, path, cid):
+        """Write the reference file in the supplied path for the given pid (persistent
+        identifier). A reference file for a pid contains the cid that it references.
+        Its permanent address is the pid hash using HashStore's default store algorithm
+        and follows its directory structure.
 
         Args:
-            path (string): Path to file to be written into
+            path (string): Path of file to be written into
             cid (string): Content identifier
         """
-        info_msg = (
-            f"FileHashStore - write_pid_refs_file: Writing cid ({cid}) into pid reference"
-            + f" file: {path}"
-        )
+        info_msg = f"FileHashStore - write_pid_refs_file: Writing cid ({cid}) into file: {path}"
         logging.info(info_msg)
 
         try:
@@ -1295,13 +1308,13 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - write_pid_refs_file: failed to write pid reference file:"
-                + f" {path} for cid: {cid}. Unexpected {err=}, {type(err)=}"
+                f"FileHashStore - write_pid_refs_file: failed to write cid ({cid})"
+                + f" into path: {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
 
-    def delete_pid_refs_file(self, pid_ref_abs_path):
+    def _delete_pid_refs_file(self, pid_ref_abs_path):
         """Delete a pid reference file.
 
         Args:
@@ -1498,7 +1511,7 @@ class FileHashStore(HashStore):
             self.clean_algorithm(checksum_algorithm)
             if checksum_algorithm in self.other_algo_list:
                 debug_additional_other_algo_str = (
-                    f"FileHashStore - _mktempfile: checksum algorithm: {checksum_algorithm}"
+                    f"FileHashStore - _refine_algorithm_list: checksum algo: {checksum_algorithm}"
                     + " found in other_algo_lists, adding to list of algorithms to calculate."
                 )
                 logging.debug(debug_additional_other_algo_str)
@@ -1507,7 +1520,7 @@ class FileHashStore(HashStore):
             self.clean_algorithm(additional_algorithm)
             if additional_algorithm in self.other_algo_list:
                 debug_additional_other_algo_str = (
-                    f"FileHashStore - _mktempfile: additional algorithm: {additional_algorithm}"
+                    f"FileHashStore - _refine_algorithm_list: addit algo: {additional_algorithm}"
                     + " found in other_algo_lists, adding to list of algorithms to calculate."
                 )
                 logging.debug(debug_additional_other_algo_str)
@@ -1764,9 +1777,9 @@ class FileHashStore(HashStore):
         except OSError:
             pass
         else:
-            self.remove_empty(os.path.dirname(realpath))
+            self._remove_empty(os.path.dirname(realpath))
 
-    def remove_empty(self, subpath):
+    def _remove_empty(self, subpath):
         """Successively remove all empty folders starting with `subpath` and
         proceeding "up" through directory tree until reaching the `root`
         folder.

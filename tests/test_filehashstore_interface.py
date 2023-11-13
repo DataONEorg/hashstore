@@ -953,7 +953,8 @@ def test_delete_objects_cid_refs_file_with_pid_refs_remaining(pids, store):
         cid = object_metadata.id
         store.tag_object(pid, cid)
         cid_refs_abs_path = store.get_refs_abs_path("cid", cid)
-        store.update_cid_refs(cid_refs_abs_path, "dou.test.1")
+        # pylint: disable=W0212
+        store._update_cid_refs(cid_refs_abs_path, "dou.test.1")
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
         cid_refs_file_path = store.get_refs_abs_path("cid", cid)

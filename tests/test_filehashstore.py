@@ -738,9 +738,10 @@ def test_remove_empty_removes_empty_folders_string(store):
     assert os.path.exists(os.path.join(store.root, three_dirs))
     assert os.path.exists(os.path.join(store.root, two_dirs))
     assert os.path.exists(os.path.join(store.root, one_dir))
-    store.remove_empty(os.path.join(store.root, three_dirs))
-    store.remove_empty(os.path.join(store.root, two_dirs))
-    store.remove_empty(os.path.join(store.root, one_dir))
+    # pylint: disable=W0212
+    store._remove_empty(os.path.join(store.root, three_dirs))
+    store._remove_empty(os.path.join(store.root, two_dirs))
+    store._remove_empty(os.path.join(store.root, one_dir))
     assert not os.path.exists(os.path.join(store.root, three_dirs))
     assert not os.path.exists(os.path.join(store.root, two_dirs))
     assert not os.path.exists(os.path.join(store.root, one_dir))
@@ -757,9 +758,10 @@ def test_remove_empty_removes_empty_folders_path(store):
     assert (store.root / three_dirs).exists()
     assert (store.root / two_dirs).exists()
     assert (store.root / one_dir).exists()
-    store.remove_empty(store.root / three_dirs)
-    store.remove_empty(store.root / two_dirs)
-    store.remove_empty(store.root / one_dir)
+    # pylint: disable=W0212
+    store._remove_empty(store.root / three_dirs)
+    store._remove_empty(store.root / two_dirs)
+    store._remove_empty(store.root / one_dir)
     assert not (store.root / three_dirs).exists()
     assert not (store.root / two_dirs).exists()
     assert not (store.root / one_dir).exists()
@@ -776,7 +778,8 @@ def test_remove_empty_does_not_remove_nonempty_folders(pids, store):
         # Get parent directory of the relative path
         parent_dir = os.path.dirname(object_metadata_shard_path)
         # Attempt to remove the parent directory
-        store.remove_empty(parent_dir)
+        # pylint: disable=W0212
+        store._remove_empty(parent_dir)
         abs_parent_dir = store.objects + "/" + parent_dir
         assert os.path.exists(abs_parent_dir)
 

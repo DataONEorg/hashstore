@@ -2,6 +2,8 @@
 import os
 import pytest
 
+# pylint: disable=W0212
+
 
 def test_write_cid_refs_file(pids, store):
     """Test that write_cid_reference writes a reference file."""
@@ -9,7 +11,7 @@ def test_write_cid_refs_file(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
-        store.write_cid_refs_file(cid_ref_abs_path, pid)
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
         assert os.path.exists(cid_ref_abs_path)
 
 
@@ -19,7 +21,7 @@ def test_write_cid_refs_file_content(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
-        store.write_cid_refs_file(cid_ref_abs_path, pid)
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
 
         with open(cid_ref_abs_path, "r", encoding="utf8") as f:
             cid_ref_file_pid = f.read()
@@ -33,10 +35,10 @@ def test_update_cid_refs_content(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
-        store.write_cid_refs_file(cid_ref_abs_path, pid)
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
 
         pid_other = "dou.test.1"
-        store.update_cid_refs(cid_ref_abs_path, pid_other)
+        store._update_cid_refs(cid_ref_abs_path, pid_other)
 
         with open(cid_ref_abs_path, "r", encoding="utf8") as f:
             for _, line in enumerate(f, start=1):
@@ -50,11 +52,11 @@ def test_update_cid_refs_content_multiple(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
-        store.write_cid_refs_file(cid_ref_abs_path, pid)
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
 
         cid_reference_list = [pid]
         for i in range(0, 5):
-            store.update_cid_refs(cid_ref_abs_path, f"dou.test.{i}")
+            store._update_cid_refs(cid_ref_abs_path, f"dou.test.{i}")
             cid_reference_list.append(f"dou.test.{i}")
 
         line_count = 0
@@ -73,9 +75,9 @@ def test_update_cid_refs_content_pid_exists(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
-        store.write_cid_refs_file(cid_ref_abs_path, pid)
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
         with pytest.raises(ValueError):
-            store.update_cid_refs(cid_ref_abs_path, pid)
+            store._update_cid_refs(cid_ref_abs_path, pid)
 
 
 def test_delete_cid_refs_pid(pids, store):
@@ -84,11 +86,11 @@ def test_delete_cid_refs_pid(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
-        store.write_cid_refs_file(cid_ref_abs_path, pid)
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
 
         pid_other = "dou.test.1"
-        store.update_cid_refs(cid_ref_abs_path, pid_other)
-        store.delete_cid_refs_pid(cid_ref_abs_path, pid)
+        store._update_cid_refs(cid_ref_abs_path, pid_other)
+        store._delete_cid_refs_pid(cid_ref_abs_path, pid)
 
         with open(cid_ref_abs_path, "r", encoding="utf8") as f:
             for _, line in enumerate(f, start=1):
@@ -103,12 +105,12 @@ def test_delete_cid_refs_pid_pid_not_found(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
-        store.write_cid_refs_file(cid_ref_abs_path, pid)
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
 
         pid_other = "dou.test.1"
-        store.update_cid_refs(cid_ref_abs_path, pid_other)
+        store._update_cid_refs(cid_ref_abs_path, pid_other)
         with pytest.raises(ValueError):
-            store.delete_cid_refs_pid(cid_ref_abs_path, "dou.not.found.1")
+            store._delete_cid_refs_pid(cid_ref_abs_path, "dou.not.found.1")
 
 
 def test_delete_cid_refs_pid_file(pids, store):
@@ -117,9 +119,9 @@ def test_delete_cid_refs_pid_file(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
-        store.write_cid_refs_file(cid_ref_abs_path, pid)
-        store.delete_cid_refs_pid(cid_ref_abs_path, pid)
-        cid_refs_deleted = store.delete_cid_refs_file(cid_ref_abs_path)
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
+        store._delete_cid_refs_pid(cid_ref_abs_path, pid)
+        cid_refs_deleted = store._delete_cid_refs_file(cid_ref_abs_path)
 
         assert cid_refs_deleted
         assert not os.path.exists(cid_ref_abs_path)
@@ -132,8 +134,8 @@ def test_delete_cid_refs_pid_file_not_empty(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
-        store.write_cid_refs_file(cid_ref_abs_path, pid)
-        cid_refs_deleted = store.delete_cid_refs_file(cid_ref_abs_path)
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
+        cid_refs_deleted = store._delete_cid_refs_file(cid_ref_abs_path)
         assert not cid_refs_deleted
 
 
@@ -143,7 +145,7 @@ def test_delete_cid_refs_pid_file_not_found(pids, store):
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         with pytest.raises(FileNotFoundError):
-            store.delete_cid_refs_file(cid_ref_abs_path)
+            store._delete_cid_refs_file(cid_ref_abs_path)
 
 
 def test_write_pid_refs_file(pids, store):
@@ -152,7 +154,7 @@ def test_write_pid_refs_file(pids, store):
         cid = pids[pid]["sha256"]
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
-        store.write_pid_refs_file(pid_ref_abs_path, cid)
+        store._write_pid_refs_file(pid_ref_abs_path, cid)
         assert os.path.exists(pid_ref_abs_path)
 
 
@@ -162,7 +164,7 @@ def test_write_pid_refs_file_content(pids, store):
         cid = pids[pid]["sha256"]
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
-        store.write_pid_refs_file(pid_ref_abs_path, cid)
+        store._write_pid_refs_file(pid_ref_abs_path, cid)
 
         with open(pid_ref_abs_path, "r", encoding="utf8") as f:
             pid_refs_cid = f.read()
@@ -176,8 +178,8 @@ def test_delete_pid_refs_file(pids, store):
         cid = pids[pid]["sha256"]
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
-        store.write_pid_refs_file(pid_ref_abs_path, cid)
-        store.delete_pid_refs_file(pid_ref_abs_path)
+        store._write_pid_refs_file(pid_ref_abs_path, cid)
+        store._delete_pid_refs_file(pid_ref_abs_path)
 
         assert not os.path.exists(pid_ref_abs_path)
 
@@ -187,4 +189,4 @@ def test_delete_pid_refs_file_file_not_found(pids, store):
     for pid in pids.keys():
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         with pytest.raises(FileNotFoundError):
-            store.delete_cid_refs_file(pid_ref_abs_path)
+            store._delete_cid_refs_file(pid_ref_abs_path)

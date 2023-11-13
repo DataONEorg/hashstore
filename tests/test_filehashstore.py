@@ -717,32 +717,15 @@ def test_write_pid_refs_file_content(pids, store):
 
 
 def test_write_pid_refs_file_exists(pids, store):
-    """Test that write_pid_refs_file returns when ref already exists and the
-    cid given is the same."""
+    """Test that write_pid_refs_file throws exception if ref file already exists."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
         store.write_pid_refs_file(pid_ref_abs_path, cid)
         # This should not write and return
-        store.write_pid_refs_file(pid_ref_abs_path, cid)
-
-        with open(pid_ref_abs_path, "r", encoding="utf8") as f:
-            pid_refs_cid = f.read()
-
-        assert cid == pid_refs_cid
-
-
-def test_write_pid_refs_file_exists_different_cid(pids, store):
-    """Test that write_pid_refs_file returns when ref already exists and the
-    cid given is the same."""
-    for pid in pids.keys():
-        cid = pids[pid]["sha256"]
-        pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
-        store.create_path(os.path.dirname(pid_ref_abs_path))
-        store.write_pid_refs_file(pid_ref_abs_path, cid)
-        with pytest.raises(ValueError):
-            store.write_pid_refs_file(pid_ref_abs_path, "abc123")
+        with pytest.raises(FileExistsError):
+            store.write_pid_refs_file(pid_ref_abs_path, cid)
 
 
 def test_delete_pid_refs_file(pids, store):

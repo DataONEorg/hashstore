@@ -589,7 +589,7 @@ def test_tag_object_with_existing_cid_refs_file(pids, store):
         object_metadata = store.store_object(pid, path)
         store.tag_object(pid, object_metadata.id)
         another_cid = "dou.test.1"
-        with pytest.raises(ValueError):
+        with pytest.raises(FileExistsError):
             store.tag_object(pid, another_cid)
 
         second_cid_hash = store.get_refs_abs_path("cid", another_cid)

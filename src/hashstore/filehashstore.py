@@ -516,6 +516,7 @@ class FileHashStore(HashStore):
                 self.write_cid_refs_file(cid_ref_abs_path, pid)
                 return True
         finally:
+            # TODO: Verify that the reference files have been written as expected.
             # Release cid
             with self.reference_lock:
                 logging.debug(
@@ -1277,17 +1278,12 @@ class FileHashStore(HashStore):
         logging.info(info_msg)
 
         if os.path.exists(pid_ref_abs_path):
-            with open(pid_ref_abs_path, "r", encoding="utf8") as f:
-                pid_refs_cid = f.read()
-                if pid_refs_cid == cid:
-                    return
-                else:
-                    exception_string = (
-                        "FileHashStore - write_pid_refs_file: pid reference file exists but"
-                        + f" cid ({cid}) is different from cid stored ({pid_refs_cid})."
-                    )
-                    logging.error(exception_string)
-                    raise ValueError(exception_string)
+            exception_string = (
+                "FileHashStore - write_pid_refs_file: pid ref file already exists for %s",
+                pid_ref_abs_path,
+            )
+            logging.error(exception_string)
+            raise FileExistsError(exception_string)
         else:
             try:
                 with open(pid_ref_abs_path, "w", encoding="utf8") as pid_ref_file:

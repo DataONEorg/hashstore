@@ -1411,14 +1411,7 @@ class FileHashStore(HashStore):
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
 
-        tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
-        # Ensure tmp file is created with desired permissions
-        if self.fmode is not None:
-            oldmask = os.umask(0)
-            try:
-                os.chmod(tmp.name, self.fmode)
-            finally:
-                os.umask(oldmask)
+        tmp = self._mktmpfile(tmp_root_path)
 
         # tmp is a file-like object that is already opened for writing by default
         logging.debug(

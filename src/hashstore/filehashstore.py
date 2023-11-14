@@ -477,6 +477,46 @@ class FileHashStore(HashStore):
 
         return object_metadata
 
+    def verify_object(
+        self, object_metadata, checksum, checksum_algorithm, expected_file_size
+    ):
+        """Confirms that a object_metadata's content is equal to the given values.
+
+        Args:
+            object_metadata (ObjectMetadata): object_metadata object
+            checksum (string): Value of checksum
+            checksum_algorithm (string): Algorithm of checksum
+            expected_file_size (int): Size of the tmp file
+        """
+        logging.debug(
+            "FileHashStore - verify_object: Called to verify object with id: %s",
+            object_metadata.id,
+        )
+        self._is_string_none_or_empty(checksum, "checksum", "verify_object")
+        self._is_string_none_or_empty(
+            checksum_algorithm, "checksum_algorithm", "verify_object"
+        )
+        self._validate_file_size(expected_file_size)
+        if object_metadata is None or not isinstance(ObjectMetadata):
+            raise ValueError(
+                "FileHashStore - verify_object: 'object_metadata' cannot be None."
+                + " Must be a 'ObjectMetadata' object."
+            )
+        else:
+            object_metadata_hex_digests = object_metadata.hex_digests
+            object_metadata_file_size = object_metadata.obj_size
+            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
+            self._validate_object(
+                pid=None,
+                checksum=checksum,
+                checksum_algorithm=checksum_algorithm_checked,
+                entity=None,
+                hex_digests=object_metadata_hex_digests,
+                tmp_file_name=None,
+                tmp_file_size=object_metadata_file_size,
+                file_size_to_validate=expected_file_size,
+            )
+
     def tag_object(self, pid, cid):
         logging.debug(
             "FileHashStore - tag_object: Tagging object cid: {%s} with pid: {%s}.",
@@ -1994,7 +2034,7 @@ class FileHashStore(HashStore):
 
     @staticmethod
     def _validate_file_size(file_size):
-        """Checks whether a file size is > 0 and an int and throws exception if not.
+        """Checks whether a given argument is an integer and > 0 and throws exception if not.
 
         Args:
             file_size (int): file size to check

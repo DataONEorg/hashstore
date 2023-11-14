@@ -501,7 +501,6 @@ class FileHashStore(HashStore):
             self.reference_locked_cids.append(cid)
         try:
             # TODO: Review process and test what happens when specific pieces fail
-            # We cannot have a pid ref file whose pid is not referenced in the cid refs file
             pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
             if os.path.exists(pid_ref_abs_path):
@@ -839,13 +838,6 @@ class FileHashStore(HashStore):
         """
         logging.debug("FileHashStore - store_object: Request to store object.")
 
-        # TODO: Missing Tests
-        # - Test that this method returns hex digests and that they are correct
-        # - Test that objects are actually stored with their cid
-        # - Test that exception is raised when object fails to store
-        # - Test that exception is raised when object already exists
-        # - Test providing the data as a file path
-        # - Test providing the data as a stream
         try:
             # Ensure the data is a stream
             stream = Stream(data)

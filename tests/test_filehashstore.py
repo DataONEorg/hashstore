@@ -206,7 +206,7 @@ def test_set_default_algorithms_missing_yaml(store, pids):
 
 
 def test_store_and_validate_data_files_path(pids, store):
-    """Test put objects with path object."""
+    """Test store_and_validate_data objects with path object."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -217,7 +217,7 @@ def test_store_and_validate_data_files_path(pids, store):
 
 
 def test_store_and_validate_data_files_string(pids, store):
-    """Test put objects with string."""
+    """Test store_and_validate_data objects with string."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -228,7 +228,7 @@ def test_store_and_validate_data_files_string(pids, store):
 
 
 def test_store_and_validate_data_files_stream(pids, store):
-    """Test put objects with stream."""
+    """Test store_and_validate_data objects with stream."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -242,7 +242,7 @@ def test_store_and_validate_data_files_stream(pids, store):
 
 
 def test_store_and_validate_data_cid(pids, store):
-    """Check put returns correct id."""
+    """Check store_and_validate_data returns correct id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -252,7 +252,7 @@ def test_store_and_validate_data_cid(pids, store):
 
 
 def test_store_and_validate_data_file_size(pids, store):
-    """Check put returns correct file size."""
+    """Check store_and_validate_data returns correct file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -262,7 +262,7 @@ def test_store_and_validate_data_file_size(pids, store):
 
 
 def test_store_and_validate_data_hex_digests(pids, store):
-    """Check put successfully generates hex digests dictionary."""
+    """Check store_and_validate_data successfully generates hex digests dictionary."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -303,7 +303,7 @@ def test_store_and_validate_data_with_correct_checksums(pids, store):
 
 
 def test_store_and_validate_data_with_incorrect_checksum(pids, store):
-    """Check put fails when bad checksum supplied."""
+    """Check store_and_validate_data fails when bad checksum supplied."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -315,6 +315,40 @@ def test_store_and_validate_data_with_incorrect_checksum(pids, store):
                 pid, path, checksum=algo_checksum, checksum_algorithm=algo
             )
     assert store.count(entity) == 0
+
+
+def test_store_data_only_cid(pids, store):
+    """Check store_data_only returns correct id."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_data_only(path)
+        object_metadata_id = object_metadata.id
+        assert object_metadata_id == pids[pid][store.algorithm]
+
+
+def test_store_data_only_file_size(pids, store):
+    """Check store_data_only returns correct file size."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_data_only(path)
+        object_size = object_metadata.obj_size
+        assert object_size == pids[pid]["file_size_bytes"]
+
+
+def test_store_data_only_hex_digests(pids, store):
+    """Check store_data_only generates hex digests dictionary."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_data_only(path)
+        object_metadata_hex_digests = object_metadata.hex_digests
+        assert object_metadata_hex_digests.get("md5") == pids[pid]["md5"]
+        assert object_metadata_hex_digests.get("sha1") == pids[pid]["sha1"]
+        assert object_metadata_hex_digests.get("sha256") == pids[pid]["sha256"]
+        assert object_metadata_hex_digests.get("sha384") == pids[pid]["sha384"]
+        assert object_metadata_hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
 def test_move_and_get_checksums_id(pids, store):

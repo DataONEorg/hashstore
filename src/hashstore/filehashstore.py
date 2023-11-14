@@ -18,8 +18,7 @@ from hashstore import HashStore, ObjectMetadata
 class FileHashStore(HashStore):
     """FileHashStore is a content addressable file manager based on Derrick
     Gilland's 'hashfs' library. It supports the storage of objects on disk using
-    an authority-based identifier's hex digest with a given hash algorithm value
-    to address files.
+    a content identifier to address files.
 
     FileHashStore initializes using a given properties dictionary containing the
     required keys (see Args). Upon initialization, FileHashStore verifies the provided
@@ -113,6 +112,7 @@ class FileHashStore(HashStore):
             if not os.path.exists(self.metadata):
                 self.create_path(self.metadata + "/tmp")
             if not os.path.exists(self.refs):
+                self.create_path(self.refs + "/tmp")
                 self.create_path(self.refs + "/pid")
                 self.create_path(self.refs + "/cid")
             logging.debug(
@@ -488,6 +488,7 @@ class FileHashStore(HashStore):
             checksum_algorithm (string): Algorithm of checksum
             expected_file_size (int): Size of the tmp file
         """
+        # TODO: Write tests
         logging.debug(
             "FileHashStore - verify_object: Called to verify object with id: %s",
             object_metadata.id,
@@ -540,10 +541,10 @@ class FileHashStore(HashStore):
             )
             self.reference_locked_cids.append(cid)
         try:
-            # TODO: Review process and test what happens when specific pieces fail
             pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
             if os.path.exists(pid_ref_abs_path):
+                # A pid reference file can only contain one cid
                 exception_string = (
                     "FileHashStore - write_pid_refs_file: pid ref file already exists for %s",
                     pid_ref_abs_path,
@@ -551,13 +552,12 @@ class FileHashStore(HashStore):
                 logging.error(exception_string)
                 raise FileExistsError(exception_string)
             elif os.path.exists(cid_ref_abs_path):
-                # If it does, read the file and add the new pid on its own line
+                # Update cid ref files if it already exists
                 self.update_cid_refs(cid_ref_abs_path, pid)
             else:
                 # All ref files begin as tmp files and get moved sequentially at once
                 # Ensure refs tmp folder exists
                 tmp_root_path = self.get_store_path("refs") / "tmp"
-                # Physically create directory if it doesn't exist
                 if os.path.exists(tmp_root_path) is False:
                     self.create_path(tmp_root_path)
 
@@ -565,7 +565,7 @@ class FileHashStore(HashStore):
                 pid_tmp_file = self._mktmpfile(tmp_root_path)
                 pid_tmp_file_path = pid_tmp_file.name
                 self._write_pid_refs_file(pid_tmp_file_path, cid)
-                # Then write cid_refs_file content into tmp file
+                # Then write cid_refs_file content into another tmp file
                 cid_tmp_file = self._mktmpfile(tmp_root_path)
                 cid_tmp_file_path = cid_tmp_file.name
                 self._write_cid_refs_file(cid_tmp_file_path, pid)
@@ -577,6 +577,8 @@ class FileHashStore(HashStore):
                 # Move both files
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 shutil.move(cid_tmp_file_path, cid_ref_abs_path)
+                # Ensure that the reference files have been written as expected
+                # If there is an issue, client or user will have to manually review
                 self._validate_references(pid, cid)
                 return True
         finally:
@@ -967,9 +969,10 @@ class FileHashStore(HashStore):
         object_cid = hex_digests.get(self.algorithm)
         abs_file_path = self.build_abs_path(entity, object_cid, extension)
 
-        # Only move file if it doesn't exist.
-        # Files are stored once and only once
+        # Only move file if it doesn't exist. We do not check before we create the tmp
+        # file and calculate the hex digests because the given checksum could be incorrect.
         if not os.path.isfile(abs_file_path):
+            # Files are stored once and only once
             self._validate_object(
                 pid,
                 checksum,
@@ -1164,9 +1167,8 @@ class FileHashStore(HashStore):
         return tmp
 
     def _write_cid_refs_file(self, path, pid):
-        """Write the reference file in the supplied path for the given content
-        identifier (cid). A reference file contains every pid that references a
-        cid each on its own line.
+        """Write the cid reference file in the supplied path. A reference file contains
+        every pid that references a cid each on its own line.
 
         Args:
             path (string): Path of file to be written into
@@ -1177,6 +1179,11 @@ class FileHashStore(HashStore):
             pid,
             path,
         )
+
+        # TODO: Check that the given path does not contain any data before writing
+        # This method only writes a new cid refs file and should not overwrite
+        # an existing one.
+        # TODO: Write test to confirm exception is thrown when path contains data
 
         try:
             with open(path, "w", encoding="utf8") as cid_ref_file:
@@ -1207,6 +1214,10 @@ class FileHashStore(HashStore):
             pid,
             cid_ref_abs_path,
         )
+
+        # TODO: Throw exception if the file doesn't exist. This method should only
+        # proceed when there is an existing cid refs file.
+        # TODO: Write test to check for exception thrown
 
         try:
             with open(cid_ref_abs_path, "r", encoding="utf8") as f:
@@ -1319,10 +1330,8 @@ class FileHashStore(HashStore):
             raise err
 
     def _write_pid_refs_file(self, path, cid):
-        """Write the reference file in the supplied path for the given pid (persistent
+        """Write the pid reference file in the supplied path for the given cid (content
         identifier). A reference file for a pid contains the cid that it references.
-        Its permanent address is the pid hash using HashStore's default store algorithm
-        and follows its directory structure.
 
         Args:
             path (string): Path of file to be written into
@@ -1988,7 +1997,11 @@ class FileHashStore(HashStore):
         return absolute_path
 
     def get_refs_abs_path(self, ref_type, hash_id):
-        """Get the absolute path to the reference file for the given pid.
+        """Get the absolute path to the reference file for the given ref_type. If a
+        'pid' is provided, this method will calculate the pid's hash based on the store
+        algorithm, and return the expected address of the pid reference file. If a
+        'cid' is provided, this method will return the expected address by sharding the
+        cid based on HashStore's configuration.
 
         Args:
             ref_type (string): 'pid' or 'cid'
@@ -2060,7 +2073,7 @@ class FileHashStore(HashStore):
 
         Args:
             string (string): Value to check
-            arg (): Name of argument to check
+            arg (string): Name of argument to check
             method (string): Calling method for logging purposes
         """
         if string is None or string.replace(" ", "") == "":

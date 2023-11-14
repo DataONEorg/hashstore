@@ -127,7 +127,7 @@ def test_delete_cid_refs_pid_file(pids, store):
         assert not os.path.exists(cid_ref_abs_path)
 
 
-def test_delete_cid_refs_pid_file_not_empty(pids, store):
+def test_delete_cid_refs_file_file_not_empty(pids, store):
     """Test that delete_cid_refs_file raises an exception when refs file is not empty."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
@@ -138,7 +138,7 @@ def test_delete_cid_refs_pid_file_not_empty(pids, store):
             store._delete_cid_refs_file(cid_ref_abs_path)
 
 
-def test_delete_cid_refs_pid_file_not_found(pids, store):
+def test_delete_cid_refs_file_file_not_found(pids, store):
     """Test that delete_cid_refs_file raises an exception when refs file not found."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]

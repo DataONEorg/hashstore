@@ -1537,42 +1537,55 @@ class FileHashStore(HashStore):
         tmp_file_size,
         file_size_to_validate,
     ):
-        """Evaluates an object's integrity
+        """Evaluates an object's integrity and throws exception if there is a mismatch.
 
         Args:
-            pid: For logging purposes
-            checksum: Value of checksum
-            checksum_algorithm: Algorithm of checksum
-            entity: Type of object
-            hex_digests: Dictionary of hex digests to select from
-            tmp_file_name: Name of tmp file
-            tmp_file_size: Size of the tmp file
-            file_size_to_validate: Expected size of the object
+            pid (string): For logging purposes
+            checksum (string): Value of checksum to check
+            checksum_algorithm (string): Algorithm of checksum
+            entity (string): Type of object ('objects' or 'metadata')
+            hex_digests (dictionary): Dictionary of hex digests to parse
+            tmp_file_name (string): Name of tmp file
+            tmp_file_size (int): Size of the tmp file
+            file_size_to_validate (int): Expected size of the object
         """
-        # TODO: Refactor this method and/or create a new method for Metacat client to call
         if file_size_to_validate is not None and file_size_to_validate > 0:
             if file_size_to_validate != tmp_file_size:
-                self.delete(entity, tmp_file_name)
                 exception_string = (
                     "FileHashStore - _validate_object: Object file size calculated: "
                     + f" {tmp_file_size} does not match with expected size:"
-                    + f"{file_size_to_validate}. Tmp file deleted and file not stored for"
-                    + f" pid: {pid}"
+                    + f"{file_size_to_validate}."
                 )
-                logging.error(exception_string)
-                raise ValueError(exception_string)
+                if pid is not None:
+                    self.delete(entity, tmp_file_name)
+                    exception_string_for_pid = (
+                        exception_string
+                        + f" Tmp file deleted and file not stored for pid: {pid}"
+                    )
+                    logging.error(exception_string_for_pid)
+                    raise ValueError(exception_string_for_pid)
+                else:
+                    logging.error(exception_string)
+                    raise ValueError(exception_string)
         if checksum_algorithm is not None and checksum is not None:
             hex_digest_stored = hex_digests[checksum_algorithm]
             if hex_digest_stored != checksum:
-                self.delete(entity, tmp_file_name)
                 exception_string = (
                     "FileHashStore - _validate_object: Hex digest and checksum"
                     + f" do not match - file not stored for pid: {pid}. Algorithm:"
                     + f" {checksum_algorithm}. Checksum provided: {checksum} !="
-                    + f" HexDigest: {hex_digest_stored}. Tmp file deleted."
+                    + f" HexDigest: {hex_digest_stored}."
                 )
-                logging.error(exception_string)
-                raise ValueError(exception_string)
+                if pid is not None:
+                    self.delete(entity, tmp_file_name)
+                    exception_string_for_pid = (
+                        exception_string + f"Tmp file ({tmp_file_name}) deleted."
+                    )
+                    logging.error(exception_string_for_pid)
+                    raise ValueError(exception_string_for_pid)
+                else:
+                    logging.error(exception_string)
+                    raise ValueError(exception_string)
 
     def _validate_references(self, pid, cid):
         """Verifies that the supplied pid and pid reference file and content have been

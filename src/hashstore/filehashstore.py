@@ -823,7 +823,8 @@ class FileHashStore(HashStore):
 
     def store_data_only(self, data):
         """Store an object to HashStore and return the id and a hex digest
-        dictionary of the default algorithms.
+        dictionary of the default algorithms. This method does not validate the
+        object and writes directly to /objects after the hex digests are calculated.
 
         Args:
             data (mixed): String or path to object.
@@ -836,7 +837,9 @@ class FileHashStore(HashStore):
             object_metadata (ObjectMetadata): object that contains the object id,
             object file size and hex digest dictionary.
         """
-        logging.debug("FileHashStore - store_object: Request to store object.")
+        logging.debug(
+            "FileHashStore - store_object: Request to store data object only."
+        )
 
         try:
             # Ensure the data is a stream
@@ -902,10 +905,6 @@ class FileHashStore(HashStore):
         Returns:
             object_metadata (tuple): object id, object file size and hex digest dictionary.
         """
-        # TODO: If the checksum algorithm is the same as the store algorithm, then we can
-        # determine whether the object exists or not to be efficient
-
-        # Create temporary file and calculate hex digests
         debug_msg = (
             "FileHashStore - _move_and_get_checksums: Creating temp"
             + f" file and calculating checksums for pid: {pid}"
@@ -993,8 +992,8 @@ class FileHashStore(HashStore):
         else:
             # Else delete temporary file
             exception_string = (
-                f"FileHashStore - _move_and_get_checksums: Object exists at: {abs_file_path},"
-                + " deleting temporary file."
+                "FileHashStore - _move_and_get_checksums: Object already exists at:"
+                + f" {abs_file_path}, deleting temporary file."
             )
             logging.error(exception_string)
             self.delete(entity, tmp_file_name)
@@ -1133,8 +1132,11 @@ class FileHashStore(HashStore):
             path (string): Path of file to be written into
             pid (string): Authority-based or persistent identifier of object
         """
-        info_msg = f"FileHashStore - write_cid_refs_file: Writing pid ({pid}) into file: {path}"
-        logging.info(info_msg)
+        logging.debug(
+            "FileHashStore - write_cid_refs_file: Writing pid (%s) into file: %s",
+            pid,
+            path,
+        )
 
         try:
             with open(path, "w", encoding="utf8") as cid_ref_file:
@@ -1160,11 +1162,11 @@ class FileHashStore(HashStore):
             cid_ref_abs_path (string): Absolute path to the cid ref file
             pid (string): Authority-based or persistent identifier of object
         """
-        info_msg = (
-            f"FileHashStore - update_cid_refs: Adding pid ({pid}) into cid reference"
-            + f" file: {cid_ref_abs_path}"
+        logging.debug(
+            "FileHashStore - update_cid_refs: Adding pid (%s) into cid reference file: %s",
+            pid,
+            cid_ref_abs_path,
         )
-        logging.info(info_msg)
 
         try:
             with open(cid_ref_abs_path, "r", encoding="utf8") as f:
@@ -1200,11 +1202,11 @@ class FileHashStore(HashStore):
             cid_ref_abs_path (string): Absolute path to the cid ref file
             pid (string): Authority-based or persistent identifier of object
         """
-        info_msg = (
-            f"FileHashStore - delete_cid_refs_pid: Deleting pid ({pid}) from cid reference"
-            + f" file: {cid_ref_abs_path}"
+        logging.debug(
+            "FileHashStore - delete_cid_refs_pid: Deleting pid (%s) from cid reference file: %s",
+            pid,
+            cid_ref_abs_path,
         )
-        logging.info(info_msg)
 
         try:
             with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
@@ -1244,11 +1246,10 @@ class FileHashStore(HashStore):
         Returns:
             boolean: True if deleted, False if not
         """
-        info_msg = (
+        logging.debug(
             "FileHashStore - delete_cid_refs_file: Deleting reference file: %s",
             cid_ref_abs_path,
         )
-        logging.info(info_msg)
 
         try:
             if not os.path.exists(cid_ref_abs_path):
@@ -1287,8 +1288,11 @@ class FileHashStore(HashStore):
             path (string): Path of file to be written into
             cid (string): Content identifier
         """
-        info_msg = f"FileHashStore - write_pid_refs_file: Writing cid ({cid}) into file: {path}"
-        logging.info(info_msg)
+        logging.debug(
+            "FileHashStore - write_pid_refs_file: Writing cid (%s) into file: %s",
+            cid,
+            path,
+        )
 
         try:
             with open(path, "w", encoding="utf8") as pid_ref_file:
@@ -1313,11 +1317,10 @@ class FileHashStore(HashStore):
         Args:
             pid_ref_abs_path (string): Absolute path to the pid ref file
         """
-        info_msg = (
+        logging.debug(
             "FileHashStore - delete_pid_refs_file: Deleting reference file: %s",
             pid_ref_abs_path,
         )
-        logging.info(info_msg)
 
         try:
             if not os.path.exists(pid_ref_abs_path):
@@ -1551,7 +1554,7 @@ class FileHashStore(HashStore):
             if file_size_to_validate != tmp_file_size:
                 self.delete(entity, tmp_file_name)
                 exception_string = (
-                    "FileHashStore - _move_and_get_checksums: Object file size calculated: "
+                    "FileHashStore - _validate_object: Object file size calculated: "
                     + f" {tmp_file_size} does not match with expected size:"
                     + f"{file_size_to_validate}. Tmp file deleted and file not stored for"
                     + f" pid: {pid}"
@@ -1563,7 +1566,7 @@ class FileHashStore(HashStore):
             if hex_digest_stored != checksum:
                 self.delete(entity, tmp_file_name)
                 exception_string = (
-                    "FileHashStore - _move_and_get_checksums: Hex digest and checksum"
+                    "FileHashStore - _validate_object: Hex digest and checksum"
                     + f" do not match - file not stored for pid: {pid}. Algorithm:"
                     + f" {checksum_algorithm}. Checksum provided: {checksum} !="
                     + f" HexDigest: {hex_digest_stored}. Tmp file deleted."

@@ -424,7 +424,7 @@ class FileHashStore(HashStore):
         # Validate input parameters
         self._is_string_none_or_empty(pid, "pid", "store_object")
         self._validate_data_to_store(data)
-        self._validate_file_size(expected_object_size)
+        self._is_int_and_non_negative(expected_object_size)
         (
             additional_algorithm_checked,
             checksum_algorithm_checked,
@@ -497,7 +497,7 @@ class FileHashStore(HashStore):
         self._is_string_none_or_empty(
             checksum_algorithm, "checksum_algorithm", "verify_object"
         )
-        self._validate_file_size(expected_file_size)
+        self._is_int_and_non_negative(expected_file_size)
         if object_metadata is None or not isinstance(ObjectMetadata):
             raise ValueError(
                 "FileHashStore - verify_object: 'object_metadata' cannot be None."
@@ -2049,7 +2049,7 @@ class FileHashStore(HashStore):
     # Other Static Methods
 
     @staticmethod
-    def _validate_file_size(file_size):
+    def _is_int_and_non_negative(file_size):
         """Checks whether a given argument is an integer and > 0 and throws exception if not.
 
         Args:
@@ -2058,14 +2058,14 @@ class FileHashStore(HashStore):
         if file_size is not None:
             if not isinstance(file_size, int):
                 exception_string = (
-                    "FileHashStore - _is_file_size_valid: size given must be an integer."
+                    "FileHashStore - _is_int_and_non_negative: size given must be an integer."
                     + f" File size: {file_size}. Arg Type: {type(file_size)}."
                 )
                 logging.error(exception_string)
                 raise TypeError(exception_string)
             if file_size < 1 or not isinstance(file_size, int):
                 exception_string = (
-                    "FileHashStore - _is_file_size_valid: size given must be > 0"
+                    "FileHashStore - _is_int_and_non_negative: size given must be > 0"
                 )
                 logging.error(exception_string)
                 raise ValueError(exception_string)

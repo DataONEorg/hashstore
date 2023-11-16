@@ -1,4 +1,4 @@
-"""Test module for FileHashStore HashStore interface methods"""
+"""Test module for FileHashStore HashStore interface methods."""
 import io
 import os
 from pathlib import Path
@@ -519,97 +519,6 @@ def test_store_object_sparse_large_file(store):
     object_metadata = store.store_object(pid, file_path)
     object_metadata_id = object_metadata.id
     assert object_metadata_id == object_metadata.hex_digests.get("sha256")
-
-
-def test_tag_object(pids, store):
-    """Test tag object returns boolean."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        object_tagged = store.tag_object(pid, object_metadata.id)
-        assert object_tagged
-
-
-def test_tag_object_pid_refs_file(pids, store):
-    """Test tag object creates the pid reference file."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
-        pid_refs_file_path = store.get_refs_abs_path("pid", pid)
-        assert os.path.exists(pid_refs_file_path)
-
-
-def test_tag_object_pid_refs_file_exists(pids, store):
-    """Test tag object throws exception when pid refs file already exists."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
-        pid_refs_file_path = store.get_refs_abs_path("pid", pid)
-        assert os.path.exists(pid_refs_file_path)
-        cid_refs_file_path = store.get_refs_abs_path("cid", cid)
-        assert os.path.exists(cid_refs_file_path)
-        with pytest.raises(FileExistsError):
-            store.tag_object(pid, cid)
-
-
-def test_tag_object_pid_refs_file_content(pids, store):
-    """Test tag object creates the pid reference file contains the correct cid."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
-        pid_refs_file_path = store.get_refs_abs_path("pid", pid)
-        with open(pid_refs_file_path, "r", encoding="utf8") as f:
-            pid_refs_cid = f.read()
-        assert pid_refs_cid == object_metadata.id
-
-
-def test_tag_object_cid_refs_file(pids, store):
-    """Test tag object creates the cid reference file."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        cid = object_metadata.id
-        store.tag_object(pid, object_metadata.id)
-        cid_refs_file_path = store.get_refs_abs_path("cid", cid)
-        assert os.path.exists(cid_refs_file_path)
-
-
-def test_tag_object_cid_refs_file_content(pids, store):
-    """Test tag object tags cid reference file successfully with pid."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
-        cid_refs_file_path = store.get_refs_abs_path("cid", object_metadata.id)
-        with open(cid_refs_file_path, "r", encoding="utf8") as f:
-            pid_refs_cid = f.read().strip()
-        assert pid_refs_cid == pid
-
-
-def test_tag_object_cid_refs_file_exists(pids, store):
-    """Test tag object raises exception when trying to add another cid to an
-    existing pid reference file and that a cid reference file is not created."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
-        another_cid = "dou.test.1"
-        with pytest.raises(FileExistsError):
-            store.tag_object(pid, another_cid)
-
-        second_cid_hash = store.get_refs_abs_path("cid", another_cid)
-        assert not os.path.exists(second_cid_hash)
 
 
 def test_find_object(pids, store):

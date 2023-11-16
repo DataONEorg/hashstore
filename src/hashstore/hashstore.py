@@ -33,7 +33,7 @@ class HashStore(ABC):
 
         The file's id is determined by calculating the object's content identifier based on
         the store's default algorithm, which is also used as the permanent address of the file.
-        The file's identifier is then sharded using a depth of 3 and width of 2,
+        The file's identifier is then sharded using the store's configured depth and width,
         delimited by '/' and concatenated to produce the final permanent address
         and is stored in the `/store_directory/objects/` directory.
 

@@ -1,4 +1,4 @@
-"""Test module for FileHashStore core, utility and supporting methods"""
+"""Test module for FileHashStore core, utility and supporting methods."""
 import io
 import os
 from pathlib import Path

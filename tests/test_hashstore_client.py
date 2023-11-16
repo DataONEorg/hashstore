@@ -1,4 +1,4 @@
-"""Test module for the Python client (Public API calls only)"""
+"""Test module for the Python client (Public API calls only)."""
 import sys
 import os
 from pathlib import Path

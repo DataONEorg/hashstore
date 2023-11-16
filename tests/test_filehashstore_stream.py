@@ -1,4 +1,4 @@
-"""Test module for Stream"""
+"""Test module for FileHashStore's Stream class."""
 import hashlib
 import io
 from pathlib import Path

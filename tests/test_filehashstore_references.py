@@ -171,6 +171,15 @@ def test_update_cid_refs_content_pid_exists(pids, store):
             store._update_cid_refs(cid_ref_abs_path, pid)
 
 
+def test_update_cid_refs_content_cid_refs_does_not_exist(pids, store):
+    """Test that update_cid_ref throws exception if cid refs file doesn't exist."""
+    for pid in pids.keys():
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
+        with pytest.raises(FileNotFoundError):
+            store._update_cid_refs(cid_ref_abs_path, pid)
+
+
 def test_delete_cid_refs_pid(pids, store):
     """Test that delete_cid_refs_pid deletes the given pid from the ref file."""
     for pid in pids.keys():

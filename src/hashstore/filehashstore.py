@@ -1214,10 +1214,13 @@ class FileHashStore(HashStore):
             pid,
             cid_ref_abs_path,
         )
-
-        # TODO: Throw exception if the file doesn't exist. This method should only
-        # proceed when there is an existing cid refs file.
-        # TODO: Write test to check for exception thrown
+        if not os.path.exists(cid_ref_abs_path):
+            exception_string = (
+                f"FileHashStore - update_cid_refs: {cid_ref_abs_path} does not exist."
+                + f" Cannot write pid: {[pid]}"
+            )
+            logging.error(exception_string)
+            raise FileNotFoundError(exception_string)
 
         try:
             with open(cid_ref_abs_path, "r", encoding="utf8") as f:

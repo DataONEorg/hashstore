@@ -1167,8 +1167,9 @@ class FileHashStore(HashStore):
         return tmp
 
     def _write_cid_refs_file(self, path, pid):
-        """Write the cid reference file in the supplied path. A reference file contains
-        every pid that references a cid each on its own line.
+        """Write the cid reference file in the supplied path to a file. A reference file
+        contains every pid that references a cid each on its own line. This method will
+        only write into an empty file, and will not write over an an existing one.
 
         Args:
             path (string): Path of file to be written into
@@ -1180,10 +1181,14 @@ class FileHashStore(HashStore):
             path,
         )
 
-        # TODO: Check that the given path does not contain any data before writing
-        # This method only writes a new cid refs file and should not overwrite
-        # an existing one.
-        # TODO: Write test to confirm exception is thrown when path contains data
+        if os.path.isfile(path):
+            if os.path.getsize(path) != 0:
+                err_msg = (
+                    "FileHashStore - _write_cid_refs_file: Failed to write cid reference file."
+                    + f" File is not empty: {path} "
+                )
+                logging.error(err_msg)
+                raise OSError(err_msg)
 
         try:
             with open(path, "w", encoding="utf8") as cid_ref_file:
@@ -1257,7 +1262,7 @@ class FileHashStore(HashStore):
             pid (string): Authority-based or persistent identifier of object
         """
         logging.debug(
-            "FileHashStore - delete_cid_refs_pid: Deleting pid (%s) from cid reference file: %s",
+            "FileHashStore - _delete_cid_refs_pid: Deleting pid (%s) from cid reference file: %s",
             pid,
             cid_ref_abs_path,
         )
@@ -1270,7 +1275,7 @@ class FileHashStore(HashStore):
 
                 if pid not in cid_ref_file_content:
                     err_msg = (
-                        f"FileHashStore - delete_cid_refs_pid: pid ({pid}) does not exist in"
+                        f"FileHashStore - _delete_cid_refs_pid: pid ({pid}) does not exist in"
                         + f" cid reference file: {cid_ref_abs_path} "
                     )
                     raise ValueError(err_msg)
@@ -1285,7 +1290,7 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - delete_cid_refs_pid: failed to update reference for cid:"
+                "FileHashStore - _delete_cid_refs_pid: failed to update reference for cid:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
@@ -1301,21 +1306,21 @@ class FileHashStore(HashStore):
             boolean: True if deleted, False if not
         """
         logging.debug(
-            "FileHashStore - delete_cid_refs_file: Deleting reference file: %s",
+            "FileHashStore - _delete_cid_refs_file: Deleting reference file: %s",
             cid_ref_abs_path,
         )
 
         try:
             if not os.path.exists(cid_ref_abs_path):
                 err_msg = (
-                    "FileHashStore - delete_cid_refs_file: Cid reference file not found: %s",
+                    "FileHashStore - _delete_cid_refs_file: Cid reference file not found: %s",
                     cid_ref_abs_path,
                 )
                 logging.error(err_msg)
                 raise FileNotFoundError(err_msg)
             if os.path.getsize(cid_ref_abs_path) != 0:
                 err_msg = (
-                    "FileHashStore - delete_cid_refs_file: Failed to delete cid reference file."
+                    "FileHashStore - _delete_cid_refs_file: Failed to delete cid reference file."
                     + f" File is not empty: {cid_ref_abs_path} "
                 )
                 logging.error(err_msg)
@@ -1326,7 +1331,7 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - delete_cid_refs_file: failed to delete reference file:"
+                "FileHashStore - _delete_cid_refs_file: failed to delete reference file:"
                 + f" {cid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
@@ -1341,7 +1346,7 @@ class FileHashStore(HashStore):
             cid (string): Content identifier
         """
         logging.debug(
-            "FileHashStore - write_pid_refs_file: Writing cid (%s) into file: %s",
+            "FileHashStore - _write_pid_refs_file: Writing cid (%s) into file: %s",
             cid,
             path,
         )
@@ -1357,7 +1362,7 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                f"FileHashStore - write_pid_refs_file: failed to write cid ({cid})"
+                f"FileHashStore - _write_pid_refs_file: failed to write cid ({cid})"
                 + f" into path: {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
@@ -1370,14 +1375,14 @@ class FileHashStore(HashStore):
             pid_ref_abs_path (string): Absolute path to the pid ref file
         """
         logging.debug(
-            "FileHashStore - delete_pid_refs_file: Deleting reference file: %s",
+            "FileHashStore - _delete_pid_refs_file: Deleting reference file: %s",
             pid_ref_abs_path,
         )
 
         try:
             if not os.path.exists(pid_ref_abs_path):
                 err_msg = (
-                    "FileHashStore - delete_pid_refs_file: pid reference file not found: %s",
+                    "FileHashStore - _delete_pid_refs_file: pid reference file not found: %s",
                     pid_ref_abs_path,
                 )
                 raise FileNotFoundError(err_msg)
@@ -1387,7 +1392,7 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - delete_pid_refs_file: failed to delete reference file:"
+                "FileHashStore - _delete_pid_refs_file: failed to delete reference file:"
                 + f" {pid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)

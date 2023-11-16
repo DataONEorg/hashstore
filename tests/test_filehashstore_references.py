@@ -120,6 +120,29 @@ def test_write_cid_refs_file_content(pids, store):
         assert pid == cid_ref_file_pid.strip()
 
 
+def test_write_cid_refs_file_into_empty_file(pids, store):
+    """Test that write_cid_reference writes an empty file."""
+    for pid in pids.keys():
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
+        store.create_path(os.path.dirname(cid_ref_abs_path))
+        with open(cid_ref_abs_path, "w", encoding="utf8"):
+            pass
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
+        assert os.path.exists(cid_ref_abs_path)
+
+
+def test_write_cid_refs_file_file_not_empty(pids, store):
+    """Test that write_cid_reference does not overwrite an existing file."""
+    for pid in pids.keys():
+        cid = pids[pid]["sha256"]
+        cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
+        store.create_path(os.path.dirname(cid_ref_abs_path))
+        store._write_cid_refs_file(cid_ref_abs_path, pid)
+        with pytest.raises(OSError):
+            store._write_cid_refs_file(cid_ref_abs_path, "other_pid")
+
+
 def test_update_cid_refs_content(pids, store):
     """Test that update_cid_ref updates the ref file as expected."""
     for pid in pids.keys():

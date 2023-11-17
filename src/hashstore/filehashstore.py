@@ -453,6 +453,10 @@ class FileHashStore(HashStore):
             )
             if pid is None:
                 object_metadata = self.store_data_only(data)
+                logging.info(
+                    "FileHashStore - store_object: Successfully stored object for cid: %s",
+                    object_metadata.id,
+                )
             else:
                 object_metadata = self.store_and_validate_data(
                     pid,
@@ -462,6 +466,10 @@ class FileHashStore(HashStore):
                     checksum_algorithm=checksum_algorithm_checked,
                     file_size_to_validate=expected_object_size,
                 )
+                logging.info(
+                    "FileHashStore - store_object: Successfully stored object for pid: %s",
+                    pid,
+                )
         finally:
             # Release pid
             with self.object_lock:
@@ -470,10 +478,6 @@ class FileHashStore(HashStore):
                     pid,
                 )
                 self.object_locked_pids.remove(pid)
-            logging.info(
-                "FileHashStore - store_object: Successfully stored object for pid: %s",
-                pid,
-            )
 
         return object_metadata
 
@@ -499,10 +503,12 @@ class FileHashStore(HashStore):
         )
         self._is_int_and_non_negative(expected_file_size)
         if object_metadata is None or not isinstance(ObjectMetadata):
-            raise ValueError(
+            exception_string = (
                 "FileHashStore - verify_object: 'object_metadata' cannot be None."
                 + " Must be a 'ObjectMetadata' object."
             )
+            logging.error(exception_string)
+            raise ValueError(exception_string)
         else:
             object_metadata_hex_digests = object_metadata.hex_digests
             object_metadata_file_size = object_metadata.obj_size
@@ -580,6 +586,12 @@ class FileHashStore(HashStore):
                 # Ensure that the reference files have been written as expected
                 # If there is an issue, client or user will have to manually review
                 self._validate_references(pid, cid)
+
+                info_msg = (
+                    f"FileHashStore - tag_object: Successfully tagged cid: {cid}"
+                    + f" with pid: {pid}"
+                )
+                logging.info(info_msg)
                 return True
         finally:
             # Release cid
@@ -589,8 +601,6 @@ class FileHashStore(HashStore):
                     cid,
                 )
                 self.reference_locked_cids.remove(cid)
-            info_msg = f"FileHashStore - tag_object: Successfully tagged cid: {cid} with pid: {pid}"
-            logging.info(info_msg)
 
     def find_object(self, pid):
         logging.debug(
@@ -643,6 +653,12 @@ class FileHashStore(HashStore):
                 pid,
             )
             metadata_cid = self.put_metadata(metadata, pid, checked_format_id)
+
+            logging.info(
+                "FileHashStore - store_metadata: Successfully stored metadata for pid: %s",
+                pid,
+            )
+            return metadata_cid
         finally:
             # Release pid
             with self.metadata_lock:
@@ -651,12 +667,6 @@ class FileHashStore(HashStore):
                     pid,
                 )
                 self.metadata_locked_pids.remove(pid)
-            logging.info(
-                "FileHashStore - store_metadata: Successfully stored metadata for pid: %s",
-                pid,
-            )
-
-        return metadata_cid
 
     def retrieve_object(self, pid):
         logging.debug(
@@ -745,6 +755,12 @@ class FileHashStore(HashStore):
             if cid_refs_deleted:
                 entity = "objects"
                 self.delete(entity, cid)
+
+            info_msg = (
+                "FileHashStore - delete_object: Successfully deleted references and/or"
+                + f" objects associated with pid: {pid}"
+            )
+            logging.info(info_msg)
             return True
         finally:
             # Release cid
@@ -754,11 +770,6 @@ class FileHashStore(HashStore):
                     cid,
                 )
                 self.reference_locked_cids.remove(cid)
-            info_msg = (
-                "FileHashStore - delete_object: Successfully deleted references and/or"
-                + f" objects associated with pid: {pid}"
-            )
-            logging.info(info_msg)
 
     def delete_metadata(self, pid, format_id=None):
         logging.debug(

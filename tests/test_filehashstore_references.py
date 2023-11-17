@@ -112,6 +112,22 @@ def test_tag_object_cid_refs_update(pids, store):
         assert "dou.test.1" in cid_ref_file_pid
 
 
+def test_verify_object(pids, store):
+    """Test verify object succeeds given good arguments."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+        store.verify_object(
+            object_metadata, checksum, checksum_algorithm, expected_file_size
+        )
+
+
 def test_write_cid_refs_file(pids, store):
     """Test that write_cid_reference writes a reference file."""
     for pid in pids.keys():

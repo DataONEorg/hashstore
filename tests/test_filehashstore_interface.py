@@ -126,15 +126,6 @@ def test_store_object_pid_empty_spaces(store):
         store.store_object(" ", path)
 
 
-def test_store_object_pid_none(store):
-    """Test store object raises error when supplied with 'None' pid."""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    with pytest.raises(ValueError):
-        store.store_object(None, path)
-
-
 def test_store_object_data_incorrect_type_none(store):
     """Test store object raises error when data is 'None'."""
     pid = "jtao.1700.1"

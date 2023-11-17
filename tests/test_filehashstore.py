@@ -443,6 +443,105 @@ def test_move_and_get_checksums_file_size_raises_error(pids, store):
             input_stream.close()
 
 
+def test_validate_object(pids, store):
+    """Test _validate_object succeeds given good arguments."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        hex_digests = object_metadata.hex_digests
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+        # pylint: disable=W0212
+        store._validate_object(
+            None,
+            checksum,
+            checksum_algorithm,
+            None,
+            hex_digests,
+            None,
+            expected_file_size,
+            expected_file_size,
+        )
+
+
+def test_validate_object_incorrect_size(pids, store):
+    """Test _validate_object throws exception when size is incorrect."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        hex_digests = object_metadata.hex_digests
+        checksum = hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        with pytest.raises(ValueError):
+            # pylint: disable=W0212
+            store._validate_object(
+                None,
+                checksum,
+                checksum_algorithm,
+                None,
+                hex_digests,
+                None,
+                1000,
+                2000,
+            )
+
+
+def test_validate_object_incorrect_size_with_pid(pids, store):
+    """Test _validate_object deletes the expected tmp file if obj size does not match
+    and raises an exception."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        hex_digests = object_metadata.hex_digests
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+
+        objects_tmp_folder = store.objects + "/tmp"
+        # pylint: disable=W0212
+        tmp_file = store._mktmpfile(objects_tmp_folder)
+        assert os.path.isfile(tmp_file.name)
+        with pytest.raises(ValueError):
+            store._validate_object(
+                "Test_Pid",
+                checksum,
+                checksum_algorithm,
+                None,
+                hex_digests,
+                tmp_file.name,
+                1000,
+                expected_file_size,
+            )
+            assert not os.path.isfile(tmp_file.name)
+
+
+def test_validate_object_missing_key_in_hex_digests(pids, store):
+    """Test _validate_object throws exception when algorithm is not found in hex digests."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = "blake2s"
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(KeyError):
+            store.verify_object(
+                object_metadata, checksum, checksum_algorithm, expected_file_size
+            )
+
+
 def test_write_to_tmp_file_and_get_hex_digests_additional_algo(store):
     """Test _write...hex_digests returns correct hex digests for additional algorithm."""
     test_dir = "tests/testdata/"

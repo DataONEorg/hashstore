@@ -418,46 +418,47 @@ class FileHashStore(HashStore):
         checksum_algorithm=None,
         expected_object_size=None,
     ):
-        logging.debug(
-            "FileHashStore - store_object: Request to store object for pid: %s", pid
-        )
-        # Validate input parameters
-        self._is_string_none_or_empty(pid, "pid", "store_object")
-        self._validate_data_to_store(data)
-        self._is_int_and_non_negative(expected_object_size)
-        (
-            additional_algorithm_checked,
-            checksum_algorithm_checked,
-        ) = self._validate_algorithms_and_checksum(
-            additional_algorithm, checksum, checksum_algorithm
-        )
+        if pid is None and self._validate_data_to_store(data):
+            logging.debug("FileHashStore - store_object: Request to store data only.")
+            object_metadata = self.store_data_only(data)
+            logging.info(
+                "FileHashStore - store_object: Successfully stored object for cid: %s",
+                object_metadata.id,
+            )
+        else:
+            logging.debug(
+                "FileHashStore - store_object: Request to store object for pid: %s", pid
+            )
+            # Validate input parameters
+            self._is_string_none_or_empty(pid, "pid", "store_object")
+            self._validate_data_to_store(data)
+            self._is_int_and_non_negative(expected_object_size)
+            (
+                additional_algorithm_checked,
+                checksum_algorithm_checked,
+            ) = self._validate_algorithms_and_checksum(
+                additional_algorithm, checksum, checksum_algorithm
+            )
 
-        # Wait for the pid to release if it's in use
-        while pid in self.object_locked_pids:
-            logging.debug(
-                "FileHashStore - store_object: %s is currently being stored. Waiting.",
-                pid,
-            )
-            time.sleep(self.time_out_sec)
-        # Modify object_locked_pids consecutively
-        with self.object_lock:
-            logging.debug(
-                "FileHashStore - store_object: Adding pid: %s to object_locked_pids.",
-                pid,
-            )
-            self.object_locked_pids.append(pid)
-        try:
-            logging.debug(
-                "FileHashStore - store_object: Attempting to store object for pid: %s",
-                pid,
-            )
-            if pid is None:
-                object_metadata = self.store_data_only(data)
-                logging.info(
-                    "FileHashStore - store_object: Successfully stored object for cid: %s",
-                    object_metadata.id,
+            # Wait for the pid to release if it's in use
+            while pid in self.object_locked_pids:
+                logging.debug(
+                    "FileHashStore - store_object: %s is currently being stored. Waiting.",
+                    pid,
                 )
-            else:
+                time.sleep(self.time_out_sec)
+            # Modify object_locked_pids consecutively
+            with self.object_lock:
+                logging.debug(
+                    "FileHashStore - store_object: Adding pid: %s to object_locked_pids.",
+                    pid,
+                )
+                self.object_locked_pids.append(pid)
+            try:
+                logging.debug(
+                    "FileHashStore - store_object: Attempting to store object for pid: %s",
+                    pid,
+                )
                 object_metadata = self.store_and_validate_data(
                     pid,
                     data,
@@ -466,18 +467,19 @@ class FileHashStore(HashStore):
                     checksum_algorithm=checksum_algorithm_checked,
                     file_size_to_validate=expected_object_size,
                 )
+                # TODO: Tag object afterwards and fix pytests
                 logging.info(
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,
                 )
-        finally:
-            # Release pid
-            with self.object_lock:
-                logging.debug(
-                    "FileHashStore - store_object: Removing pid: %s from object_locked_pids.",
-                    pid,
-                )
-                self.object_locked_pids.remove(pid)
+            finally:
+                # Release pid
+                with self.object_lock:
+                    logging.debug(
+                        "FileHashStore - store_object: Removing pid: %s from object_locked_pids.",
+                        pid,
+                    )
+                    self.object_locked_pids.remove(pid)
 
         return object_metadata
 
@@ -502,7 +504,7 @@ class FileHashStore(HashStore):
             checksum_algorithm, "checksum_algorithm", "verify_object"
         )
         self._is_int_and_non_negative(expected_file_size)
-        if object_metadata is None or not isinstance(ObjectMetadata):
+        if object_metadata is None or not isinstance(object_metadata, ObjectMetadata):
             exception_string = (
                 "FileHashStore - verify_object: 'object_metadata' cannot be None."
                 + " Must be a 'ObjectMetadata' object."
@@ -522,6 +524,10 @@ class FileHashStore(HashStore):
                 tmp_file_name=None,
                 tmp_file_size=object_metadata_file_size,
                 file_size_to_validate=expected_file_size,
+            )
+            logging.info(
+                "FileHashStore - verify_object: object has been validated for cid: %s",
+                object_metadata.id,
             )
 
     def tag_object(self, pid, cid):
@@ -1024,12 +1030,12 @@ class FileHashStore(HashStore):
                     pid_checksum = self.get_hex_digest(pid, self.algorithm)
                     if pid_checksum == hex_digests.get(self.algorithm):
                         # If the checksums match, return and log warning
-                        warning_msg = (
+                        exception_string = (
                             "FileHashStore - _move_and_get_checksums: File moved"
                             + f" successfully but unexpected issue encountered: {exception_string}",
                         )
-                        logging.warning(warning_msg)
-                        return
+                        logging.error(exception_string)
+                        raise err
                     else:
                         debug_msg = (
                             "FileHashStore - _move_and_get_checksums: Permanent file"
@@ -1513,6 +1519,9 @@ class FileHashStore(HashStore):
 
         Args:
             data (string, path, stream): object to validate
+
+        Returns:
+            boolean: True if valid.
         """
         if (
             not isinstance(data, str)
@@ -1532,12 +1541,13 @@ class FileHashStore(HashStore):
                 )
                 logging.error(exception_string)
                 raise TypeError(exception_string)
+        return True
 
     def _validate_algorithms_and_checksum(
         self, additional_algorithm, checksum, checksum_algorithm
     ):
-        """Determines whether calling app has supplied the necessary arguments to validate
-        an object with a checksum value
+        """Determines whether caller has supplied the necessary arguments to validate
+        an object with a checksum value.
 
         Args:
             additional_algorithm: value of additional algorithm to calculate
@@ -1641,24 +1651,32 @@ class FileHashStore(HashStore):
                     logging.error(exception_string)
                     raise ValueError(exception_string)
         if checksum_algorithm is not None and checksum is not None:
-            hex_digest_stored = hex_digests[checksum_algorithm]
-            if hex_digest_stored != checksum:
+            if checksum_algorithm not in hex_digests:
                 exception_string = (
-                    "FileHashStore - _validate_object: Hex digest and checksum"
-                    + f" do not match - file not stored for pid: {pid}. Algorithm:"
-                    + f" {checksum_algorithm}. Checksum provided: {checksum} !="
-                    + f" HexDigest: {hex_digest_stored}."
+                    f"FileHashStore - _validate_object: checksum_algorithm ({checksum_algorithm})"
+                    + " cannot be found in the hex digests dictionary."
                 )
-                if pid is not None:
-                    self.delete(entity, tmp_file_name)
-                    exception_string_for_pid = (
-                        exception_string + f"Tmp file ({tmp_file_name}) deleted."
+                logging.error(exception_string)
+                raise KeyError(exception_string)
+            else:
+                hex_digest_stored = hex_digests[checksum_algorithm]
+                if hex_digest_stored != checksum:
+                    exception_string = (
+                        "FileHashStore - _validate_object: Hex digest and checksum"
+                        + f" do not match - file not stored for pid: {pid}. Algorithm:"
+                        + f" {checksum_algorithm}. Checksum provided: {checksum} !="
+                        + f" HexDigest: {hex_digest_stored}."
                     )
-                    logging.error(exception_string_for_pid)
-                    raise ValueError(exception_string_for_pid)
-                else:
-                    logging.error(exception_string)
-                    raise ValueError(exception_string)
+                    if pid is not None:
+                        self.delete(entity, tmp_file_name)
+                        exception_string_for_pid = (
+                            exception_string + f"Tmp file ({tmp_file_name}) deleted."
+                        )
+                        logging.error(exception_string_for_pid)
+                        raise ValueError(exception_string_for_pid)
+                    else:
+                        logging.error(exception_string)
+                        raise ValueError(exception_string)
 
     def _validate_references(self, pid, cid):
         """Verifies that the supplied pid and pid reference file and content have been

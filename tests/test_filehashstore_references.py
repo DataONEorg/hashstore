@@ -96,6 +96,22 @@ def test_tag_object_cid_refs_file_exists(pids, store):
         assert not os.path.exists(second_cid_hash)
 
 
+def test_tag_object_cid_refs_update(pids, store):
+    """Test tag object updates a cid reference file that already exists."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        store.tag_object("dou.test.1", cid)
+        cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
+        with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+            cid_ref_file_pid = f.read()
+
+        assert "dou.test.1" in cid_ref_file_pid
+
+
 def test_write_cid_refs_file(pids, store):
     """Test that write_cid_reference writes a reference file."""
     for pid in pids.keys():

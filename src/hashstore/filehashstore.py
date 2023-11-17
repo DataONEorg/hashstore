@@ -559,7 +559,12 @@ class FileHashStore(HashStore):
                 raise FileExistsError(exception_string)
             elif os.path.exists(cid_ref_abs_path):
                 # Update cid ref files if it already exists
-                self.update_cid_refs(cid_ref_abs_path, pid)
+                self._update_cid_refs(cid_ref_abs_path, pid)
+                logging.info(
+                    "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
+                    cid,
+                    pid,
+                )
             else:
                 # All ref files begin as tmp files and get moved sequentially at once
                 # Ensure refs tmp folder exists
@@ -587,11 +592,11 @@ class FileHashStore(HashStore):
                 # If there is an issue, client or user will have to manually review
                 self._validate_references(pid, cid)
 
-                info_msg = (
-                    f"FileHashStore - tag_object: Successfully tagged cid: {cid}"
-                    + f" with pid: {pid}"
+                logging.info(
+                    "FileHashStore - tag_object: Successfully tagged cid: %s with pid %s",
+                    cid,
+                    pid,
                 )
-                logging.info(info_msg)
                 return True
         finally:
             # Release cid
@@ -756,11 +761,11 @@ class FileHashStore(HashStore):
                 entity = "objects"
                 self.delete(entity, cid)
 
-            info_msg = (
+            info_string = (
                 "FileHashStore - delete_object: Successfully deleted references and/or"
                 + f" objects associated with pid: {pid}"
             )
-            logging.info(info_msg)
+            logging.info(info_string)
             return True
         finally:
             # Release cid
@@ -809,11 +814,11 @@ class FileHashStore(HashStore):
         cid_stream = self.open(entity, object_cid)
         hex_digest = self.computehash(cid_stream, algorithm=algorithm)
 
-        info_msg = (
+        info_string = (
             f"FileHashStore - get_hex_digest: Successfully calculated hex digest for pid: {pid}."
             + f" Hex Digest: {hex_digest}",
         )
-        logging.info(info_msg)
+        logging.info(info_string)
         return hex_digest
 
     # FileHashStore Core Methods

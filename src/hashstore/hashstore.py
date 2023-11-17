@@ -27,9 +27,10 @@ class HashStore(ABC):
         """The `store_object` method is responsible for the atomic storage of objects to
         disk using a given stream. Upon successful storage, the method returns a ObjectMetadata
         object containing relevant file information, such as the file's id (which can be
-        used to locate the object on disk), the file's size, and a hex digest map of algorithms
+        used to locate the object on disk), the file's size, and a hex digest dict of algorithms
         and checksums. `store_object` also ensures that an object is stored only once by
-        synchronizing multiple calls and rejecting calls to store duplicate objects.
+        synchronizing multiple calls and rejecting calls to store duplicate objects. Lastly,
+        it should call `tag_object` to create the references to allow the object to be found.
 
         The file's id is determined by calculating the object's content identifier based on
         the store's default algorithm, which is also used as the permanent address of the file.
@@ -38,16 +39,19 @@ class HashStore(ABC):
         and is stored in the `/store_directory/objects/` directory.
 
         By default, the hex digest map includes the following hash algorithms:
-        Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512,
-        which are the most commonly used algorithms in dataset submissions to DataONE
-        and the Arctic Data Center. If an additional algorithm is provided, the
-        `store_object` method checks if it is supported and adds it to the map along
-        with its corresponding hex digest. An algorithm is considered "supported" if it
-        is recognized as a valid hash algorithm in the `hashlib` library.
+        md5, sha1, sha256, sha384, sha512 - which are the most commonly used algorithms in
+        dataset submissions to DataONE and the Arctic Data Center. If an additional algorithm
+        is provided, the `store_object` method checks if it is supported and adds it to the
+        hex digests dict along with its corresponding hex digest. An algorithm is considered
+        "supported" if it is recognized as a valid hash algorithm in the `hashlib` library.
 
-        Similarly, if a file size and/or checksum & checksumAlgorithm value are provided,
+        Similarly, if a file size and/or checksum & checksum_algorithm value are provided,
         `store_object` validates the object to ensure it matches the given arguments
         before moving the file to its permanent address.
+
+        Note, calling `store_object` is a possibility, but should only store the object
+        without calling `tag_object`. It is the caller's responsibility to finalize the
+        process by calling `tag_object` after veriftying the correct object is stored.
 
         Args:
             pid (string): Authority-based identifier.

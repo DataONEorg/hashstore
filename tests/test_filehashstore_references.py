@@ -128,6 +128,68 @@ def test_verify_object(pids, store):
         )
 
 
+def test_verify_object_exception_incorrect_object_metadata_type(pids, store):
+    """Test verify object raises exception when incorrect object is given to
+    object_metadata arg."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(ValueError):
+            store.verify_object(
+                "bad_type", checksum, checksum_algorithm, expected_file_size
+            )
+
+
+def test_verify_object_exception_incorrect_size(pids, store):
+    """Test verify object raises exception when incorrect size is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        with pytest.raises(ValueError):
+            store.verify_object(object_metadata, checksum, checksum_algorithm, 1000)
+
+
+def test_verify_object_exception_incorrect_checksum(pids, store):
+    """Test verify object raises exception when incorrect checksum is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(ValueError):
+            store.verify_object(
+                object_metadata, "abc123", checksum_algorithm, expected_file_size
+            )
+
+
+def test_verify_object_exception_incorrect_checksum_algo(pids, store):
+    """Test verify object raises exception when incorrect algorithm is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(ValueError):
+            store.verify_object(object_metadata, checksum, "md2", expected_file_size)
+
+
 def test_write_cid_refs_file(pids, store):
     """Test that write_cid_reference writes a reference file."""
     for pid in pids.keys():

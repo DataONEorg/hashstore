@@ -496,11 +496,6 @@ class FileHashStore(HashStore):
             checksum_algorithm (string): Algorithm of checksum
             expected_file_size (int): Size of the tmp file
         """
-        # TODO: Write tests
-        logging.debug(
-            "FileHashStore - verify_object: Called to verify object with id: %s",
-            object_metadata.id,
-        )
         self._is_string_none_or_empty(checksum, "checksum", "verify_object")
         self._is_string_none_or_empty(
             checksum_algorithm, "checksum_algorithm", "verify_object"
@@ -514,6 +509,10 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise ValueError(exception_string)
         else:
+            logging.info(
+                "FileHashStore - verify_object: Called to verify object with id: %s",
+                object_metadata.id,
+            )
             object_metadata_hex_digests = object_metadata.hex_digests
             object_metadata_file_size = object_metadata.obj_size
             checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)

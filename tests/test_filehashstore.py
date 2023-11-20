@@ -456,7 +456,7 @@ def test_validate_object(pids, store):
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
         # pylint: disable=W0212
-        store._validate_object(
+        store._validate_arg_object(
             None,
             checksum,
             checksum_algorithm,
@@ -481,7 +481,7 @@ def test_validate_object_incorrect_size(pids, store):
         checksum_algorithm = store.algorithm
         with pytest.raises(ValueError):
             # pylint: disable=W0212
-            store._validate_object(
+            store._validate_arg_object(
                 None,
                 checksum,
                 checksum_algorithm,
@@ -512,7 +512,7 @@ def test_validate_object_incorrect_size_with_pid(pids, store):
         tmp_file = store._mktmpfile(objects_tmp_folder)
         assert os.path.isfile(tmp_file.name)
         with pytest.raises(ValueError):
-            store._validate_object(
+            store._validate_arg_object(
                 "Test_Pid",
                 checksum,
                 checksum_algorithm,

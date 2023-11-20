@@ -346,38 +346,38 @@ def test_delete_pid_refs_file_file_not_found(pids, store):
             store._delete_cid_refs_file(pid_ref_abs_path)
 
 
-def test_validate_references_pid_refs_file_missing(pids, store):
-    """Test that validate_references throws exception when pid refs file is missing."""
+def test_verify_hashstore_references_pid_refs_file_missing(pids, store):
+    """Test _verify_hashstore_references throws exception when pid refs file is missing."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         with pytest.raises(FileNotFoundError):
-            store._validate_references(pid, cid)
+            store._verify_hashstore_references(pid, cid)
 
 
-def test_validate_references_pid_refs_incorrect_cid(pids, store):
-    """Test that validate_references throws exception when pid refs file cid is incorrect."""
+def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
+    """Test _verify_hashstore_references throws exception when pid refs file cid is incorrect."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
         store._write_pid_refs_file(pid_ref_abs_path, "bad_cid")
         with pytest.raises(FileNotFoundError):
-            store._validate_references(pid, cid)
+            store._verify_hashstore_references(pid, cid)
 
 
-def test_validate_references_cid_refs_file_missing(pids, store):
-    """Test that validate_references throws exception when cid refs file is missing."""
+def test_verify_hashstore_references_cid_refs_file_missing(pids, store):
+    """Test _verify_hashstore_references throws exception when cid refs file is missing."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
         store._write_pid_refs_file(pid_ref_abs_path, cid)
         with pytest.raises(FileNotFoundError):
-            store._validate_references(pid, cid)
+            store._verify_hashstore_references(pid, cid)
 
 
-def test_validate_references_cid_refs_file_missing_pid(pids, store):
-    """Test that validate_references throws exception when cid refs file does not contain
+def test_verify_hashstore_references_cid_refs_file_missing_pid(pids, store):
+    """Test _verify_hashstore_references throws exception when cid refs file does not contain
     the expected pid."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
@@ -388,11 +388,13 @@ def test_validate_references_cid_refs_file_missing_pid(pids, store):
         store._write_pid_refs_file(pid_ref_abs_path, cid)
         store._write_cid_refs_file(cid_ref_abs_path, "bad_pid")
         with pytest.raises(ValueError):
-            store._validate_references(pid, cid)
+            store._verify_hashstore_references(pid, cid)
 
 
-def test_validate_references_cid_refs_file_with_multiple_refs_missing_pid(pids, store):
-    """Test that validate_references throws exception when cid refs file with multiple
+def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pid(
+    pids, store
+):
+    """Test _verify_hashstore_references throws exception when cid refs file with multiple
     references does not contain the expected pid."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
@@ -410,4 +412,4 @@ def test_validate_references_cid_refs_file_with_multiple_refs_missing_pid(pids, 
             cid_reference_list.append(f"dou.test.{i}")
 
         with pytest.raises(ValueError):
-            store._validate_references(pid, cid)
+            store._verify_hashstore_references(pid, cid)

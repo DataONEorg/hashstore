@@ -15,6 +15,7 @@ def test_stream_reads_file(pids):
         hashobj = hashlib.new("sha256")
         for data in obj_stream:
             hashobj.update(data)
+        obj_stream.close()
         hex_digest = hashobj.hexdigest()
         assert pids[pid]["sha256"] == hex_digest
 
@@ -28,6 +29,7 @@ def test_stream_reads_path_object(pids):
         hashobj = hashlib.new("sha256")
         for data in obj_stream:
             hashobj.update(data)
+        obj_stream.close()
         hex_digest = hashobj.hexdigest()
         assert pids[pid]["sha256"] == hex_digest
 

@@ -59,20 +59,20 @@ def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
         factory.get_hashstore(module_name, class_name, properties)
 
 
-# def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory):
-#     """Check factory raises exception with incorrectly formatted algorithm value."""
-#     module_name = "hashstore.filehashstore"
-#     class_name = "FileHashStore"
+def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory):
+    """Check factory raises exception with incorrectly formatted algorithm value."""
+    module_name = "hashstore.filehashstore"
+    class_name = "FileHashStore"
 
-#     properties = {
-#         "store_path": os.getcwd() + "/metacat/test",
-#         "store_depth": 3,
-#         "store_width": 2,
-#         "store_algorithm": "dou_algo",
-#         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
-#     }
-#     with pytest.raises(ValueError):
-#         factory.get_hashstore(module_name, class_name, properties)
+    properties = {
+        "store_path": os.getcwd() + "/metacat/test",
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "dou_algo",
+        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    }
+    with pytest.raises(ValueError):
+        factory.get_hashstore(module_name, class_name, properties)
 
 
 def test_objectmetadata():

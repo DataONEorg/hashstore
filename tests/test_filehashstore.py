@@ -1,9 +1,12 @@
-"""Test module for FileHashStore core, utility and supporting methods."""
+"""Test module for FileHashStore init, core, utility and supporting methods."""
 import io
 import os
 from pathlib import Path
 import pytest
 from hashstore.filehashstore import FileHashStore
+
+
+# Tests for HashStore Configuration and Related Methods
 
 
 def test_pids_length(pids):
@@ -19,14 +22,16 @@ def test_init_directories_created(store):
     assert os.path.exists(store.metadata)
     assert os.path.exists(store.metadata + "/tmp")
     assert os.path.exists(store.refs)
+    assert os.path.exists(store.refs + "/tmp")
     assert os.path.exists(store.refs + "/pid")
     assert os.path.exists(store.refs + "/cid")
 
 
 def test_init_existing_store_incorrect_algorithm_format(store):
-    """Confirm that exception is thrown when store_algorithm is not a DataONE controlled value"""
+    """Confirm that exception is thrown when store_algorithm is not a DataONE
+    controlled value."""
     properties = {
-        "store_path": store.root,
+        "store_path": store.root + "/incorrect_algo_format",
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
@@ -37,7 +42,7 @@ def test_init_existing_store_incorrect_algorithm_format(store):
 
 
 def test_init_existing_store_correct_algorithm_format(store):
-    """Confirm second instance of HashStore with DataONE controlled value"""
+    """Confirm second instance of HashStore with DataONE controlled value."""
     properties = {
         "store_path": store.root,
         "store_depth": 3,
@@ -55,7 +60,8 @@ def test_init_write_properties_hashstore_yaml_exists(store):
 
 
 def test_init_with_existing_hashstore_mismatched_config_depth(store):
-    """Test init with existing HashStore raises ValueError with mismatching properties."""
+    """Test init with existing HashStore raises a ValueError when supplied with
+    mismatching depth."""
     properties = {
         "store_path": store.root,
         "store_depth": 1,
@@ -68,7 +74,8 @@ def test_init_with_existing_hashstore_mismatched_config_depth(store):
 
 
 def test_init_with_existing_hashstore_mismatched_config_width(store):
-    """Test init with existing HashStore raises ValueError with mismatching properties."""
+    """Test init with existing HashStore raises a ValueError when supplied with
+    mismatching width."""
     properties = {
         "store_path": store.root,
         "store_depth": 3,
@@ -81,7 +88,8 @@ def test_init_with_existing_hashstore_mismatched_config_width(store):
 
 
 def test_init_with_existing_hashstore_mismatched_config_algo(store):
-    """Test init with existing HashStore raises ValueError with mismatching properties."""
+    """Test init with existing HashStore raises a ValueError when supplied with
+    mismatching default algorithm."""
     properties = {
         "store_path": store.root,
         "store_depth": 3,
@@ -94,7 +102,8 @@ def test_init_with_existing_hashstore_mismatched_config_algo(store):
 
 
 def test_init_with_existing_hashstore_mismatched_config_metadata_ns(store):
-    """Test init with existing HashStore raises ValueError with mismatching properties."""
+    """Test init with existing HashStore raises a ValueError when supplied with
+    mismatching default name space."""
     properties = {
         "store_path": store.root,
         "store_depth": 3,
@@ -185,7 +194,7 @@ def test_validate_properties_key_value_is_none(store):
 
 
 def test_validate_properties_incorrect_type(store):
-    """Confirm exception raised when key missing in properties."""
+    """Confirm exception raised when a bad properties value is given."""
     properties = "etc/filehashstore/hashstore.yaml"
     with pytest.raises(ValueError):
         # pylint: disable=W0212
@@ -205,8 +214,11 @@ def test_set_default_algorithms_missing_yaml(store, pids):
         store._set_default_algorithms()
 
 
+# Tests for FileHashStore Core Methods
+
+
 def test_store_and_validate_data_files_path(pids, store):
-    """Test store_and_validate_data objects with path object."""
+    """Test store_and_validate_data objects with path object for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -217,7 +229,7 @@ def test_store_and_validate_data_files_path(pids, store):
 
 
 def test_store_and_validate_data_files_string(pids, store):
-    """Test store_and_validate_data objects with string."""
+    """Test store_and_validate_data objects with string for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -228,7 +240,7 @@ def test_store_and_validate_data_files_string(pids, store):
 
 
 def test_store_and_validate_data_files_stream(pids, store):
-    """Test store_and_validate_data objects with stream."""
+    """Test store_and_validate_data objects with stream for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -290,7 +302,7 @@ def test_store_and_validate_data_additional_algorithm(pids, store):
 
 
 def test_store_and_validate_data_with_correct_checksums(pids, store):
-    """Check store_and_validate_data success with valid checksum and checksum algorithm supplied."""
+    """Check store_and_validate_data with valid checksum and checksum algorithm supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -303,7 +315,7 @@ def test_store_and_validate_data_with_correct_checksums(pids, store):
 
 
 def test_store_and_validate_data_with_incorrect_checksum(pids, store):
-    """Check store_and_validate_data fails when bad checksum supplied."""
+    """Check store_and_validate_data fails when a bad checksum supplied."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -423,8 +435,8 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
     assert store.count(entity) == 3
 
 
-def test_move_and_get_checksums_file_size_raises_error(pids, store):
-    """Test move and get checksum raises error with incorrect file size"""
+def test_move_and_get_checksums_incorrect_file_size(pids, store):
+    """Test move and get checksum raises error with an incorrect file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         with pytest.raises(ValueError):
@@ -443,107 +455,8 @@ def test_move_and_get_checksums_file_size_raises_error(pids, store):
             input_stream.close()
 
 
-def test_validate_object(pids, store):
-    """Test _validate_object succeeds given good arguments."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
-        hex_digests = object_metadata.hex_digests
-        checksum = object_metadata.hex_digests.get(store.algorithm)
-        checksum_algorithm = store.algorithm
-        expected_file_size = object_metadata.obj_size
-        # pylint: disable=W0212
-        store._validate_arg_object(
-            None,
-            checksum,
-            checksum_algorithm,
-            None,
-            hex_digests,
-            None,
-            expected_file_size,
-            expected_file_size,
-        )
-
-
-def test_validate_object_incorrect_size(pids, store):
-    """Test _validate_object throws exception when size is incorrect."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
-        hex_digests = object_metadata.hex_digests
-        checksum = hex_digests.get(store.algorithm)
-        checksum_algorithm = store.algorithm
-        with pytest.raises(ValueError):
-            # pylint: disable=W0212
-            store._validate_arg_object(
-                None,
-                checksum,
-                checksum_algorithm,
-                None,
-                hex_digests,
-                None,
-                1000,
-                2000,
-            )
-
-
-def test_validate_object_incorrect_size_with_pid(pids, store):
-    """Test _validate_object deletes the expected tmp file if obj size does not match
-    and raises an exception."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
-        hex_digests = object_metadata.hex_digests
-        checksum = object_metadata.hex_digests.get(store.algorithm)
-        checksum_algorithm = store.algorithm
-        expected_file_size = object_metadata.obj_size
-
-        objects_tmp_folder = store.objects + "/tmp"
-        # pylint: disable=W0212
-        tmp_file = store._mktmpfile(objects_tmp_folder)
-        assert os.path.isfile(tmp_file.name)
-        with pytest.raises(ValueError):
-            store._validate_arg_object(
-                "Test_Pid",
-                checksum,
-                checksum_algorithm,
-                None,
-                hex_digests,
-                tmp_file.name,
-                1000,
-                expected_file_size,
-            )
-            assert not os.path.isfile(tmp_file.name)
-
-
-def test_validate_object_missing_key_in_hex_digests(pids, store):
-    """Test _validate_object throws exception when algorithm is not found in hex digests."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
-        checksum = object_metadata.hex_digests.get(store.algorithm)
-        checksum_algorithm = "blake2s"
-        expected_file_size = object_metadata.obj_size
-        with pytest.raises(KeyError):
-            store.verify_object(
-                object_metadata, checksum, checksum_algorithm, expected_file_size
-            )
-
-
 def test_write_to_tmp_file_and_get_hex_digests_additional_algo(store):
-    """Test _write...hex_digests returns correct hex digests for additional algorithm."""
+    """Test _write...hex_digests returns correct hex digests with an additional algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -561,7 +474,8 @@ def test_write_to_tmp_file_and_get_hex_digests_additional_algo(store):
 
 
 def test_write_to_tmp_file_and_get_hex_digests_checksum_algo(store):
-    """Test _write...hex_digests returns correct hex digests for checksum algorithm."""
+    """Test _write...hex_digests returns correct hex digests when given a checksum_algorithm
+    is provided."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -579,7 +493,8 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_algo(store):
 
 
 def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo(store):
-    """Test _write...hex_digests returns correct hex digests for checksum algorithm."""
+    """Test _write...hex_digests returns correct hex digests when an additional and
+    checksum algorithm is provided."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -653,7 +568,7 @@ def test_write_to_tmp_file_and_get_hex_digests_hex_digests(pids, store):
 
 
 def test_write_to_tmp_file_and_get_hex_digests_tmpfile_object(pids, store):
-    """Test _write...hex_digests creates file successfully."""
+    """Test _write...hex_digests returns a tmp file successfully."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -665,7 +580,7 @@ def test_write_to_tmp_file_and_get_hex_digests_tmpfile_object(pids, store):
 
 
 def test_write_to_tmp_file_and_get_hex_digests_with_unsupported_algorithm(pids, store):
-    """Test _write...hex_digests raises error when bad algorithm supplied."""
+    """Test _write...hex_digests raises an exception when an unsupported algorithm supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -694,27 +609,27 @@ def test_mktmpfile(store):
 
 
 def test_put_metadata_with_path(pids, store):
-    """Test put_metadata with path object."""
+    """Test put_metadata with path object for the path arg."""
     entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        metadata_cid = store.put_metadata(syspath, pid, format_id)
         assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
 
 
 def test_put_metadata_with_string(pids, store):
-    """Test_put metadata with string."""
+    """Test_put metadata with string for the path arg."""
     entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = str(Path(test_dir) / filename)
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        metadata_cid = store.put_metadata(syspath, pid, format_id)
         assert store.exists(entity, metadata_cid)
     assert store.count(entity) == 3
 
@@ -726,14 +641,13 @@ def test_put_metadata_cid(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        metadata_cid = store.put_metadata(syspath, pid, format_id)
         assert metadata_cid == pids[pid]["metadata_cid"]
 
 
 def test_mktmpmetadata(pids, store):
     """Test mktmpmetadata creates tmpFile."""
     test_dir = "tests/testdata/"
-    entity = "metadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -741,7 +655,117 @@ def test_mktmpmetadata(pids, store):
         # pylint: disable=W0212
         tmp_name = store._mktmpmetadata(sys_stream)
         sys_stream.close()
-        assert store.exists(entity, tmp_name)
+        assert os.path.exists(tmp_name)
+
+
+# Tests for FileHashStore Utility & Supporting Methods
+
+
+def test_validate_arg_object(pids, store):
+    """Test _validate_arg_object succeeds given good arguments."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        hex_digests = object_metadata.hex_digests
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+        # pylint: disable=W0212
+        store._validate_arg_object(
+            None,
+            checksum,
+            checksum_algorithm,
+            None,
+            hex_digests,
+            None,
+            expected_file_size,
+            expected_file_size,
+        )
+
+
+def test_validate_arg_object_incorrect_size(pids, store):
+    """Test _validate_arg_object throws exception when size is incorrect."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        hex_digests = object_metadata.hex_digests
+        checksum = hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        with pytest.raises(ValueError):
+            # pylint: disable=W0212
+            store._validate_arg_object(
+                None,
+                checksum,
+                checksum_algorithm,
+                None,
+                hex_digests,
+                None,
+                1000,
+                2000,
+            )
+
+
+def test_validate_arg_object_incorrect_size_with_pid(pids, store):
+    """Test _validate_arg_object deletes the expected tmp file if obj size does
+    not match and raises an exception."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        hex_digests = object_metadata.hex_digests
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+
+        objects_tmp_folder = store.objects + "/tmp"
+        # pylint: disable=W0212
+        tmp_file = store._mktmpfile(objects_tmp_folder)
+        assert os.path.isfile(tmp_file.name)
+        with pytest.raises(ValueError):
+            store._validate_arg_object(
+                "Test_Pid",
+                checksum,
+                checksum_algorithm,
+                None,
+                hex_digests,
+                tmp_file.name,
+                1000,
+                expected_file_size,
+            )
+            assert not os.path.isfile(tmp_file.name)
+
+
+def test_validate_arg_object_missing_key_in_hex_digests(pids, store):
+    """Test _validate_arg_object throws exception when algorithm is not found in hex digests."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        cid = object_metadata.id
+        store.tag_object(pid, cid)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = "blake2s"
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(KeyError):
+            # pylint: disable=W0212
+            store._validate_arg_object(
+                None,
+                checksum,
+                checksum_algorithm,
+                None,
+                object_metadata.hex_digests,
+                None,
+                expected_file_size,
+                expected_file_size,
+            )
 
 
 def test_clean_algorithm(store):
@@ -849,7 +873,7 @@ def test_open_objects(pids, store):
 
 
 def test_delete_by_object_metadata_id(pids, store):
-    """Check objects are deleted after calling delete with hash address id."""
+    """Check objects are deleted after calling delete with object id."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():

@@ -41,6 +41,43 @@ def test_create_hashstore(tmp_path):
     assert os.path.exists(hashstore_client_python_log)
 
 
+def test_get_checksum(capsys, store, pids):
+    """Test calculating a hash via HashStore through client."""
+    client_directory = os.getcwd() + "/src/hashstore"
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+        store.tag_object(pid, object_metadata.id)
+
+        client_module_path = f"{client_directory}/client.py"
+        test_store = store.root
+        get_checksum_opt = "-getchecksum"
+        client_pid_arg = f"-pid={pid}"
+        algo_arg = f"-algo={store.algorithm}"
+        chs_args = [
+            client_module_path,
+            test_store,
+            get_checksum_opt,
+            client_pid_arg,
+            algo_arg,
+        ]
+
+        # Add file path of HashStore to sys so modules can be discovered
+        sys.path.append(client_directory)
+        # Manually change sys args to simulate command line arguments
+        sys.argv = chs_args
+        client.main()
+
+        capsystext = capsys.readouterr().out
+        expected_output = (
+            f"guid/pid: {pid}\n"
+            + f"algorithm: {store.algorithm}\n"
+            + f"Checksum/Hex Digest: {pids[pid][store.algorithm]}\n"
+        )
+        assert capsystext == expected_output
+
+
 def test_store_object(store, pids):
     """Test storing objects to HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
@@ -209,7 +246,7 @@ def test_delete_objects(pids, store):
         sys.argv = chs_args
         client.main()
 
-        assert not store.exists("objects", pids[pid]["object_cid"])
+        assert not store.exists("objects", pids[pid][store.algorithm])
 
 
 def test_delete_metadata(pids, store):

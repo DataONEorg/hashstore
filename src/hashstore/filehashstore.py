@@ -80,7 +80,6 @@ class FileHashStore(HashStore):
                 checked_properties[property_name]
                 for property_name in self.property_required_keys
             ]
-            # TODO: Ensure that store algorithm in properties is compatible with HashStore
 
             # Check to see if a configuration is present in the given store path
             self.hashstore_configuration_yaml = prop_store_path + "/hashstore.yaml"
@@ -89,8 +88,6 @@ class FileHashStore(HashStore):
             # If no exceptions thrown, FileHashStore ready for initialization
             logging.debug("FileHashStore - Initializing, properties verified.")
             self.root = prop_store_path
-            if not os.path.exists(self.root):
-                self.create_path(self.root)
             self.depth = prop_store_depth
             self.width = prop_store_width
             self.sysmeta_ns = prop_store_metadata_namespace
@@ -154,7 +151,7 @@ class FileHashStore(HashStore):
         # Get hashstore properties
         hashstore_yaml_dict = {}
         for key in self.property_required_keys:
-            if key is not "store_path":
+            if key != "store_path":
                 hashstore_yaml_dict[key] = yaml_data[key]
         logging.debug(
             "FileHashStore - load_properties: Successfully retrieved 'hashstore.yaml' properties."
@@ -210,6 +207,10 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
+
+        # If given store path doesn't exist yet, create it.
+        if not os.path.exists(self.root):
+            self.create_path(self.root)
 
         # .yaml file to write
         hashstore_configuration_yaml = self._build_hashstore_yaml_string(
@@ -307,7 +308,7 @@ class FileHashStore(HashStore):
             hashstore_yaml_dict = self.load_properties()
             for key in self.property_required_keys:
                 # 'store_path' is required to init HashStore but not saved in `hashstore.yaml`
-                if key is not "store_path":
+                if key != "store_path":
                     supplied_key = properties[key]
                     if key == "store_depth" or key == "store_width":
                         supplied_key = int(properties[key])
@@ -1071,8 +1072,9 @@ class FileHashStore(HashStore):
         self, stream, additional_algorithm=None, checksum_algorithm=None
     ):
         """Create a named temporary file from a `Stream` object and return its filename
-        and a dictionary of its algorithms and hex digests. If an additionak and/or checksum
-        algorithm is provided, it will add the respective hex digest to the dictionary.
+        and a dictionary of its algorithms and hex digests. If an additional and/or checksum
+        algorithm is provided, it will add the respective hex digest to the dictionary if
+        it is supported.
 
         Args:
             stream (io.BufferedReader): Object stream.
@@ -2058,7 +2060,7 @@ class FileHashStore(HashStore):
             ref_file_abs_path (string): Path to the ref file for the given type and pid
         """
         entity = "refs"
-        if ref_type is "pid":
+        if ref_type == "pid":
             hash_id = self.computehash(hash_id, self.algorithm)
         ref_file_abs_path = self.build_abs_path(entity, hash_id).replace(
             "/refs/", f"/refs/{ref_type}/"

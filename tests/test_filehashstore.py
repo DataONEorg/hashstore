@@ -667,8 +667,6 @@ def test_validate_arg_object(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
         hex_digests = object_metadata.hex_digests
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
@@ -692,8 +690,6 @@ def test_validate_arg_object_incorrect_size(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
         hex_digests = object_metadata.hex_digests
         checksum = hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
@@ -718,8 +714,6 @@ def test_validate_arg_object_incorrect_size_with_pid(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
         hex_digests = object_metadata.hex_digests
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
@@ -749,8 +743,6 @@ def test_validate_arg_object_missing_key_in_hex_digests(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = "blake2s"
         expected_file_size = object_metadata.obj_size

@@ -10,7 +10,7 @@ def test_tag_object(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(None, path)
         object_tagged = store.tag_object(pid, object_metadata.id)
         assert object_tagged
 
@@ -20,7 +20,7 @@ def test_tag_object_pid_refs_file(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(None, path)
         store.tag_object(pid, object_metadata.id)
         pid_refs_file_path = store.get_refs_abs_path("pid", pid)
         assert os.path.exists(pid_refs_file_path)
@@ -31,7 +31,7 @@ def test_tag_object_pid_refs_file_exists(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(None, path)
         cid = object_metadata.id
         store.tag_object(pid, cid)
         pid_refs_file_path = store.get_refs_abs_path("pid", pid)
@@ -47,7 +47,7 @@ def test_tag_object_pid_refs_file_content(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(None, path)
         store.tag_object(pid, object_metadata.id)
         pid_refs_file_path = store.get_refs_abs_path("pid", pid)
         with open(pid_refs_file_path, "r", encoding="utf8") as f:
@@ -60,7 +60,7 @@ def test_tag_object_cid_refs_file(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(None, path)
         cid = object_metadata.id
         store.tag_object(pid, object_metadata.id)
         cid_refs_file_path = store.get_refs_abs_path("cid", cid)
@@ -72,7 +72,7 @@ def test_tag_object_cid_refs_file_content(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(None, path)
         store.tag_object(pid, object_metadata.id)
         cid_refs_file_path = store.get_refs_abs_path("cid", object_metadata.id)
         with open(cid_refs_file_path, "r", encoding="utf8") as f:
@@ -86,7 +86,7 @@ def test_tag_object_cid_refs_file_exists(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(None, path)
         store.tag_object(pid, object_metadata.id)
         another_cid = "dou.test.1"
         with pytest.raises(FileExistsError):
@@ -101,7 +101,7 @@ def test_tag_object_cid_refs_update(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
+        object_metadata = store.store_object(None, path)
         cid = object_metadata.id
         store.tag_object(pid, cid)
         store.tag_object("dou.test.1", cid)

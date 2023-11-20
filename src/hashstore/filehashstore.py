@@ -421,6 +421,7 @@ class FileHashStore(HashStore):
         expected_object_size=None,
     ):
         if pid is None and self._validate_arg_data(data):
+            # If no pid is supplied, store the object only without tagging
             logging.debug("FileHashStore - store_object: Request to store data only.")
             object_metadata = self.store_data_only(data)
             logging.info(
@@ -428,6 +429,7 @@ class FileHashStore(HashStore):
                 object_metadata.id,
             )
         else:
+            # Else the object will be stored and tagged
             logging.debug(
                 "FileHashStore - store_object: Request to store object for pid: %s", pid
             )
@@ -469,7 +471,7 @@ class FileHashStore(HashStore):
                     checksum_algorithm=checksum_algorithm_checked,
                     file_size_to_validate=expected_object_size,
                 )
-                # TODO: Tag object afterwards and fix pytests
+                self.tag_object(pid, object_metadata.id)
                 logging.info(
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,

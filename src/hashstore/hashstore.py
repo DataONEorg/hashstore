@@ -28,9 +28,14 @@ class HashStore(ABC):
         disk using a given stream. Upon successful storage, the method returns a ObjectMetadata
         object containing relevant file information, such as the file's id (which can be
         used to locate the object on disk), the file's size, and a hex digest dict of algorithms
-        and checksums. `store_object` also ensures that an object is stored only once by
-        synchronizing multiple calls and rejecting calls to store duplicate objects. Lastly,
-        it should call `tag_object` to create the references to allow the object to be found.
+        and checksums. Storing an object with `store_object` also tags an object (creating
+        references) which allow the object to be discoverable.
+
+        `store_object` also ensures that an object is stored only once by synchronizing multiple
+        calls and rejecting calls to store duplicate objects. Note, calling `store_object` without
+        a pid is a possibility, but should only store the object without tagging the object.
+        It is then the caller's responsibility to finalize the process by calling `tag_object`
+        after veriftying the correct object is stored.
 
         The file's id is determined by calculating the object's content identifier based on
         the store's default algorithm, which is also used as the permanent address of the file.
@@ -48,10 +53,6 @@ class HashStore(ABC):
         Similarly, if a file size and/or checksum & checksum_algorithm value are provided,
         `store_object` validates the object to ensure it matches the given arguments
         before moving the file to its permanent address.
-
-        Note, calling `store_object` is a possibility, but should only store the object
-        without calling `tag_object`. It is the caller's responsibility to finalize the
-        process by calling `tag_object` after veriftying the correct object is stored.
 
         Args:
             pid (string): Authority-based identifier.

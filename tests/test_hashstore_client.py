@@ -47,8 +47,7 @@ def test_get_checksum(capsys, store, pids):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
+        store.store_object(pid, path)
 
         client_module_path = f"{client_directory}/client.py"
         test_store = store.root
@@ -145,8 +144,7 @@ def test_retrieve_objects(capsys, pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
+        store.store_object(pid, path)
 
         client_module_path = f"{client_directory}/client.py"
         test_store = store.root
@@ -226,8 +224,7 @@ def test_delete_objects(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
+        store.store_object(pid, path)
 
         client_module_path = f"{client_directory}/client.py"
         test_store = store.root

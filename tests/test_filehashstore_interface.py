@@ -518,7 +518,6 @@ def test_find_object(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
         cid = store.find_object(pid)
         assert cid == object_metadata.hex_digests.get("sha256")
 
@@ -703,7 +702,6 @@ def test_retrieve_object(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
         store.store_metadata(pid, syspath, format_id)
         obj_stream = store.retrieve_object(pid)
         sha256_hex = store.computehash(obj_stream)
@@ -801,8 +799,7 @@ def test_delete_objects(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
+        _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
     assert store.count(entity) == 0
@@ -816,8 +813,7 @@ def test_delete_objects_pid_refs_file(pids, store):
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        object_metadata = store.store_object(pid, path)
-        store.tag_object(pid, object_metadata.id)
+        _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
         pid_refs_file_path = store.get_refs_abs_path("pid", pid)
@@ -833,9 +829,8 @@ def test_delete_objects_cid_refs_file(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        cid = object_metadata.id
         store.delete_object(pid)
         cid_refs_file_path = store.get_refs_abs_path("cid", cid)
         assert not os.path.exists(cid_refs_file_path)
@@ -851,7 +846,6 @@ def test_delete_objects_cid_refs_file_with_pid_refs_remaining(pids, store):
         syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.id
-        store.tag_object(pid, cid)
         cid_refs_abs_path = store.get_refs_abs_path("cid", cid)
         # pylint: disable=W0212
         store._update_cid_refs(cid_refs_abs_path, "dou.test.1")
@@ -937,8 +931,7 @@ def test_get_hex_digest(store):
     path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    object_metadata = store.store_object(pid, path)
-    store.tag_object(pid, object_metadata.id)
+    _object_metadata = store.store_object(pid, path)
     _metadata_cid = store.store_metadata(pid, syspath, format_id)
     sha3_256_hex_digest = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"

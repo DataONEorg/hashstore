@@ -2,12 +2,12 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
 import importlib.metadata
+import importlib.util
 
 
 class HashStore(ABC):
-    """HashStore is a content-addressable file management system that
-    utilizes a persistent identifier (PID) in the form of a hex digest
-    value to address files."""
+    """HashStore is a content-addressable file management system that utilizes
+    an object's content identifier (hex digest/checksum) to address files."""
 
     @staticmethod
     def version():
@@ -26,28 +26,32 @@ class HashStore(ABC):
         expected_object_size,
     ):
         """The `store_object` method is responsible for the atomic storage of objects to
-        disk using a given InputStream and a persistent identifier (pid). Upon
-        successful storage, the method returns a ObjectMetadata object containing
-        relevant file information, such as the file's id (which can be used to locate the
-        object on disk), the file's size, and a hex digest map of algorithms and checksums.
-        `store_object` also ensures that an object is stored only once by synchronizing
-        multiple calls and rejecting calls to store duplicate objects.
+        disk using a given stream. Upon successful storage, the method returns a ObjectMetadata
+        object containing relevant file information, such as the file's id (which can be
+        used to locate the object on disk), the file's size, and a hex digest dict of algorithms
+        and checksums. Storing an object with `store_object` also tags an object (creating
+        references) which allow the object to be discoverable.
 
-        The file's id is determined by calculating the SHA-256 hex digest of the
-        provided pid, which is also used as the permanent address of the file. The
-        file's identifier is then sharded using a depth of 3 and width of 2,
+        `store_object` also ensures that an object is stored only once by synchronizing multiple
+        calls and rejecting calls to store duplicate objects. Note, calling `store_object` without
+        a pid is a possibility, but should only store the object without tagging the object.
+        It is then the caller's responsibility to finalize the process by calling `tag_object`
+        after veriftying the correct object is stored.
+
+        The file's id is determined by calculating the object's content identifier based on
+        the store's default algorithm, which is also used as the permanent address of the file.
+        The file's identifier is then sharded using the store's configured depth and width,
         delimited by '/' and concatenated to produce the final permanent address
         and is stored in the `/store_directory/objects/` directory.
 
         By default, the hex digest map includes the following hash algorithms:
-        Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512,
-        which are the most commonly used algorithms in dataset submissions to DataONE
-        and the Arctic Data Center. If an additional algorithm is provided, the
-        `store_object` method checks if it is supported and adds it to the map along
-        with its corresponding hex digest. An algorithm is considered "supported" if it
-        is recognized as a valid hash algorithm in the `hashlib` library.
+        md5, sha1, sha256, sha384, sha512 - which are the most commonly used algorithms in
+        dataset submissions to DataONE and the Arctic Data Center. If an additional algorithm
+        is provided, the `store_object` method checks if it is supported and adds it to the
+        hex digests dict along with its corresponding hex digest. An algorithm is considered
+        "supported" if it is recognized as a valid hash algorithm in the `hashlib` library.
 
-        Similarly, if a file size and/or checksum & checksumAlgorithm value are provided,
+        Similarly, if a file size and/or checksum & checksum_algorithm value are provided,
         `store_object` validates the object to ensure it matches the given arguments
         before moving the file to its permanent address.
 
@@ -61,7 +65,50 @@ class HashStore(ABC):
 
         Returns:
             object_metadata (ObjectMetadata): Object that contains the permanent address,
-            file size, duplicate file boolean and hex digest dictionary.
+            file size and hex digest dictionary.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def tag_object(self, pid, cid):
+        """The `tag_object` method creates references that allow objects stored in HashStore
+        to be discoverable. Retrieving, deleting or calculating a hex digest of an object is
+        based on a pid argument; and to proceed, we must be able to find the object associated
+        with the pid.
+
+        Args:
+            pid (string): Authority-based or persistent identifier of object
+            cid (string): Content identifier of object
+
+        Returns:
+            boolean: `True` upon successful tagging.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def verify_object(
+        self, object_metadata, checksum, checksum_algorithm, expected_file_size
+    ):
+        """Confirms that an object_metadata's content is equal to the given values.
+
+        Args:
+            object_metadata (ObjectMetadata): object_metadata object
+            checksum (string): Value of checksum
+            checksum_algorithm (string): Algorithm of checksum
+            expected_file_size (int): Size of the tmp file
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def find_object(self, pid):
+        """The `find_object` method checks whether an object referenced by a pid exists
+        and returns the content identifier.
+
+        Args:
+            pid (string): Authority-based or persistent identifier of object
+
+        Returns:
+            cid (string): Content identifier of the object
         """
         raise NotImplementedError()
 
@@ -89,9 +136,8 @@ class HashStore(ABC):
     @abstractmethod
     def retrieve_object(self, pid):
         """The `retrieve_object` method retrieves an object from disk using a given
-        persistent identifier (pid). If the object exists (determined by calculating
-        the object's permanent address using the SHA-256 hash of the given pid), the
-        method will open and return a buffered object stream ready to read from.
+        persistent identifier (pid). If the object exists, the method will open and return
+        a buffered object stream ready to read from.
 
         Args:
             pid (string): Authority-based identifier.
@@ -211,12 +257,12 @@ class HashStoreFactory:
 
 
 class ObjectMetadata(namedtuple("ObjectMetadata", ["id", "obj_size", "hex_digests"])):
-    """File address containing file's path on disk and its content hash ID.
+    """Represents metadata associated with an object.
 
-    Args:
-        ab_id (str): Hash ID (hexdigest) of file contents.
-        obj_size (bytes): Size of the object
-        hex_digests (dict, optional): A list of hex digests to validate objects
+    Attributes:
+        id (str): A unique identifier for the object (Hash ID, hex digest).
+        obj_size (bytes): The size of the object in bytes.
+        hex_digests (list, optional): A list of hex digests to validate objects
             (md5, sha1, sha256, sha384, sha512)
     """
 

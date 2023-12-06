@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
+import fcntl
 import yaml
 from hashstore import HashStore, ObjectMetadata
 
@@ -17,8 +18,7 @@ from hashstore import HashStore, ObjectMetadata
 class FileHashStore(HashStore):
     """FileHashStore is a content addressable file manager based on Derrick
     Gilland's 'hashfs' library. It supports the storage of objects on disk using
-    an authority-based identifier's hex digest with a given hash algorithm value
-    to address files.
+    a content identifier to address files.
 
     FileHashStore initializes using a given properties dictionary containing the
     required keys (see Args). Upon initialization, FileHashStore verifies the provided
@@ -61,8 +61,10 @@ class FileHashStore(HashStore):
     time_out_sec = 1
     object_lock = threading.Lock()
     metadata_lock = threading.Lock()
+    reference_lock = threading.Lock()
     object_locked_pids = []
     metadata_locked_pids = []
+    reference_locked_cids = []
 
     def __init__(self, properties=None):
         if properties:
@@ -86,8 +88,6 @@ class FileHashStore(HashStore):
             # If no exceptions thrown, FileHashStore ready for initialization
             logging.debug("FileHashStore - Initializing, properties verified.")
             self.root = prop_store_path
-            if not os.path.exists(self.root):
-                self.create_path(self.root)
             self.depth = prop_store_depth
             self.width = prop_store_width
             self.sysmeta_ns = prop_store_metadata_namespace
@@ -104,10 +104,15 @@ class FileHashStore(HashStore):
             # Complete initialization/instantiation by setting and creating store directories
             self.objects = self.root + "/objects"
             self.metadata = self.root + "/metadata"
+            self.refs = self.root + "/refs"
             if not os.path.exists(self.objects):
                 self.create_path(self.objects + "/tmp")
             if not os.path.exists(self.metadata):
                 self.create_path(self.metadata + "/tmp")
+            if not os.path.exists(self.refs):
+                self.create_path(self.refs + "/tmp")
+                self.create_path(self.refs + "/pid")
+                self.create_path(self.refs + "/cid")
             logging.debug(
                 "FileHashStore - Initialization success. Store root: %s", self.root
             )
@@ -146,7 +151,7 @@ class FileHashStore(HashStore):
         # Get hashstore properties
         hashstore_yaml_dict = {}
         for key in self.property_required_keys:
-            if key is not "store_path":
+            if key != "store_path":
                 hashstore_yaml_dict[key] = yaml_data[key]
         logging.debug(
             "FileHashStore - load_properties: Successfully retrieved 'hashstore.yaml' properties."
@@ -196,12 +201,15 @@ class FileHashStore(HashStore):
         else:
             exception_string = (
                 f"FileHashStore - write_properties: algorithm supplied ({store_algorithm})"
-                + " cannot be used as default for HashStore. Must be one of:"
-                + " MD5, SHA-1, SHA-256, SHA-384, SHA-512 which are DataONE"
-                + " controlled algorithm values"
+                f" cannot be used as default for HashStore. Must be one of: {', '.join(accepted_store_algorithms)}"
+                f" which are DataONE controlled algorithm values"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
+
+        # If given store path doesn't exist yet, create it.
+        if not os.path.exists(self.root):
+            self.create_path(self.root)
 
         # .yaml file to write
         hashstore_configuration_yaml = self._build_hashstore_yaml_string(
@@ -229,7 +237,6 @@ class FileHashStore(HashStore):
         """Build a YAML string representing the configuration for a HashStore.
 
         Args:
-            store_path (str): Path to the HashStore directory.
             store_depth (int): Depth when sharding an object's hex digest.
             store_width (int): Width of directories when sharding an object's hex digest.
             store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
@@ -299,7 +306,7 @@ class FileHashStore(HashStore):
             hashstore_yaml_dict = self.load_properties()
             for key in self.property_required_keys:
                 # 'store_path' is required to init HashStore but not saved in `hashstore.yaml`
-                if key is not "store_path":
+                if key != "store_path":
                     supplied_key = properties[key]
                     if key == "store_depth" or key == "store_width":
                         supplied_key = int(properties[key])
@@ -365,7 +372,7 @@ class FileHashStore(HashStore):
     def _set_default_algorithms(self):
         """Set the default algorithms to calculate when storing objects."""
 
-        def lookup_algo(algo):
+        def lookup_algo(algo_to_translate):
             """Translate DataONE controlled algorithms to python hashlib values:
             https://dataoneorg.github.io/api-documentation/apis/Types.html#Types.ChecksumAlgorithm
             """
@@ -376,7 +383,7 @@ class FileHashStore(HashStore):
                 "SHA-384": "sha384",
                 "SHA-512": "sha512",
             }
-            return dataone_algo_translation[algo]
+            return dataone_algo_translation[algo_to_translate]
 
         if not os.path.exists(self.hashstore_configuration_yaml):
             exception_string = (
@@ -404,77 +411,227 @@ class FileHashStore(HashStore):
 
     def store_object(
         self,
-        pid,
-        data,
+        pid=None,
+        data=None,
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
         expected_object_size=None,
     ):
-        logging.debug(
-            "FileHashStore - store_object: Request to store object for pid: %s", pid
-        )
-        # Validate input parameters
-        self._is_string_none_or_empty(pid, "pid", "store_object")
-        self._validate_data_to_store(data)
-        self._validate_file_size(expected_object_size)
-        (
-            additional_algorithm_checked,
-            checksum_algorithm_checked,
-        ) = self._validate_algorithms_and_checksum(
-            additional_algorithm, checksum, checksum_algorithm
-        )
+        if pid is None and self._validate_arg_data(data):
+            # If no pid is supplied, store the object only without tagging
+            logging.debug("FileHashStore - store_object: Request to store data only.")
+            object_metadata = self.store_data_only(data)
+            logging.info(
+                "FileHashStore - store_object: Successfully stored object for cid: %s",
+                object_metadata.id,
+            )
+        else:
+            # Else the object will be stored and tagged
+            logging.debug(
+                "FileHashStore - store_object: Request to store object for pid: %s", pid
+            )
+            # Validate input parameters
+            self._validate_string(pid, "pid", "store_object")
+            self._validate_arg_data(data)
+            self._is_int_and_non_negative(expected_object_size)
+            (
+                additional_algorithm_checked,
+                checksum_algorithm_checked,
+            ) = self._validate_arg_algorithms_and_checksum(
+                additional_algorithm, checksum, checksum_algorithm
+            )
 
-        # Wait for the pid to release if it's in use
-        while pid in self.object_locked_pids:
-            logging.debug(
-                "FileHashStore - store_object: %s is currently being stored. Waiting.",
-                pid,
-            )
-            time.sleep(self.time_out_sec)
-        # Modify object_locked_pids consecutively
-        with self.object_lock:
-            logging.debug(
-                "FileHashStore - store_object: Adding pid: %s to object_locked_pids.",
-                pid,
-            )
-            self.object_locked_pids.append(pid)
-        try:
-            logging.debug(
-                "FileHashStore - store_object: Attempting to store object for pid: %s",
-                pid,
-            )
-            object_metadata = self.put_object(
-                pid,
-                data,
-                additional_algorithm=additional_algorithm_checked,
-                checksum=checksum,
-                checksum_algorithm=checksum_algorithm_checked,
-                file_size_to_validate=expected_object_size,
-            )
-        finally:
-            # Release pid
-            with self.object_lock:
+            # Wait for the pid to release if it's in use
+            while pid in self.object_locked_pids:
                 logging.debug(
-                    "FileHashStore - store_object: Removing pid: %s from object_locked_pids.",
+                    "FileHashStore - store_object: %s is currently being stored. Waiting.",
                     pid,
                 )
-                self.object_locked_pids.remove(pid)
-            logging.info(
-                "FileHashStore - store_object: Successfully stored object for pid: %s",
-                pid,
-            )
+                time.sleep(self.time_out_sec)
+            # Modify object_locked_pids consecutively
+            with self.object_lock:
+                logging.debug(
+                    "FileHashStore - store_object: Adding pid: %s to object_locked_pids.",
+                    pid,
+                )
+                self.object_locked_pids.append(pid)
+            try:
+                logging.debug(
+                    "FileHashStore - store_object: Attempting to store object for pid: %s",
+                    pid,
+                )
+                object_metadata = self.store_and_validate_data(
+                    pid,
+                    data,
+                    additional_algorithm=additional_algorithm_checked,
+                    checksum=checksum,
+                    checksum_algorithm=checksum_algorithm_checked,
+                    file_size_to_validate=expected_object_size,
+                )
+                self.tag_object(pid, object_metadata.id)
+                logging.info(
+                    "FileHashStore - store_object: Successfully stored object for pid: %s",
+                    pid,
+                )
+            finally:
+                # Release pid
+                with self.object_lock:
+                    logging.debug(
+                        "FileHashStore - store_object: Removing pid: %s from object_locked_pids.",
+                        pid,
+                    )
+                    self.object_locked_pids.remove(pid)
 
         return object_metadata
+
+    def verify_object(
+        self, object_metadata, checksum, checksum_algorithm, expected_file_size
+    ):
+        self._validate_string(checksum, "checksum", "verify_object")
+        self._validate_string(checksum_algorithm, "checksum_algorithm", "verify_object")
+        self._is_int_and_non_negative(expected_file_size)
+        if object_metadata is None or not isinstance(object_metadata, ObjectMetadata):
+            exception_string = (
+                "FileHashStore - verify_object: 'object_metadata' cannot be None."
+                + " Must be a 'ObjectMetadata' object."
+            )
+            logging.error(exception_string)
+            raise ValueError(exception_string)
+        else:
+            logging.info(
+                "FileHashStore - verify_object: Called to verify object with id: %s",
+                object_metadata.id,
+            )
+            object_metadata_hex_digests = object_metadata.hex_digests
+            object_metadata_file_size = object_metadata.obj_size
+            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
+            self._validate_arg_object(
+                pid=None,
+                checksum=checksum,
+                checksum_algorithm=checksum_algorithm_checked,
+                entity=None,
+                hex_digests=object_metadata_hex_digests,
+                tmp_file_name=None,
+                tmp_file_size=object_metadata_file_size,
+                file_size_to_validate=expected_file_size,
+            )
+            logging.info(
+                "FileHashStore - verify_object: object has been validated for cid: %s",
+                object_metadata.id,
+            )
+
+    def tag_object(self, pid, cid):
+        logging.debug(
+            "FileHashStore - tag_object: Tagging object cid: {%s} with pid: {%s}.",
+            cid,
+            pid,
+        )
+        self._validate_string(pid, "pid", "tag_object")
+        self._validate_string(cid, "cid", "tag_object")
+        # Wait for the cid to release if it's being tagged
+        while cid in self.reference_locked_cids:
+            logging.debug(
+                "FileHashStore - tag_object: (cid) %s is currently locked. Waiting.",
+                cid,
+            )
+            time.sleep(self.time_out_sec)
+        # Modify reference_locked_cids consecutively
+        with self.reference_lock:
+            logging.debug(
+                "FileHashStore - tag_object: Adding cid: %s to reference_locked_cids.",
+                cid,
+            )
+            self.reference_locked_cids.append(cid)
+        try:
+            pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+            cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+            if os.path.exists(pid_ref_abs_path):
+                # A pid reference file can only contain one cid
+                exception_string = (
+                    "FileHashStore - write_pid_refs_file: pid ref file already exists for %s",
+                    pid_ref_abs_path,
+                )
+                logging.error(exception_string)
+                raise FileExistsError(exception_string)
+            elif os.path.exists(cid_ref_abs_path):
+                # Update cid ref files if it already exists
+                self._update_cid_refs(cid_ref_abs_path, pid)
+                logging.info(
+                    "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
+                    cid,
+                    pid,
+                )
+            else:
+                # All ref files begin as tmp files and get moved sequentially at once
+                # Ensure refs tmp folder exists
+                tmp_root_path = self.get_store_path("refs") / "tmp"
+                if os.path.exists(tmp_root_path) is False:
+                    self.create_path(tmp_root_path)
+
+                # Then write pid_refs_file content into tmp file
+                pid_tmp_file = self._mktmpfile(tmp_root_path)
+                pid_tmp_file_path = pid_tmp_file.name
+                self._write_pid_refs_file(pid_tmp_file_path, cid)
+                # Then write cid_refs_file content into another tmp file
+                cid_tmp_file = self._mktmpfile(tmp_root_path)
+                cid_tmp_file_path = cid_tmp_file.name
+                self._write_cid_refs_file(cid_tmp_file_path, pid)
+
+                # Create path for pid ref file in '.../refs/pid'
+                self.create_path(os.path.dirname(pid_ref_abs_path))
+                # Create path for cid ref file in '.../refs/cid'
+                self.create_path(os.path.dirname(cid_ref_abs_path))
+                # Move both files
+                shutil.move(pid_tmp_file_path, pid_ref_abs_path)
+                shutil.move(cid_tmp_file_path, cid_ref_abs_path)
+                # Ensure that the reference files have been written as expected
+                # If there is an issue, client or user will have to manually review
+                self._verify_hashstore_references(pid, cid)
+
+                logging.info(
+                    "FileHashStore - tag_object: Successfully tagged cid: %s with pid %s",
+                    cid,
+                    pid,
+                )
+                return True
+        finally:
+            # Release cid
+            with self.reference_lock:
+                logging.debug(
+                    "FileHashStore - tag_object: Removing cid: %s from reference_locked_cids.",
+                    cid,
+                )
+                self.reference_locked_cids.remove(cid)
+
+    def find_object(self, pid):
+        logging.debug(
+            "FileHashStore - find_object: Request to find object for for pid: %s", pid
+        )
+        self._validate_string(pid, "pid", "find_object")
+
+        pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+        if not os.path.exists(pid_ref_abs_path):
+            err_msg = (
+                f"FileHashStore - find_object: pid ({pid}) reference file not found: "
+                + pid_ref_abs_path,
+            )
+            raise FileNotFoundError(err_msg)
+        else:
+            # Read the file to get the cid from the pid reference
+            with open(pid_ref_abs_path, "r", encoding="utf8") as f:
+                pid_refs_cid = f.read()
+
+        return pid_refs_cid
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
         )
         # Validate input parameters
-        self._is_string_none_or_empty(pid, "pid", "store_metadata")
-        checked_format_id = self._validate_format_id(format_id, "store_metadata")
-        self._validate_metadata_to_store(metadata)
+        self._validate_string(pid, "pid", "store_metadata")
+        checked_format_id = self._validate_arg_format_id(format_id, "store_metadata")
+        self._validate_arg_data(metadata)
 
         # Wait for the pid to release if it's in use
         while pid in self.metadata_locked_pids:
@@ -498,6 +655,12 @@ class FileHashStore(HashStore):
                 pid,
             )
             metadata_cid = self.put_metadata(metadata, pid, checked_format_id)
+
+            logging.info(
+                "FileHashStore - store_metadata: Successfully stored metadata for pid: %s",
+                pid,
+            )
+            return metadata_cid
         finally:
             # Release pid
             with self.metadata_lock:
@@ -506,25 +669,18 @@ class FileHashStore(HashStore):
                     pid,
                 )
                 self.metadata_locked_pids.remove(pid)
-            logging.info(
-                "FileHashStore - store_metadata: Successfully stored metadata for pid: %s",
-                pid,
-            )
-
-        return metadata_cid
 
     def retrieve_object(self, pid):
         logging.debug(
             "FileHashStore - retrieve_object: Request to retrieve object for pid: %s",
             pid,
         )
-        self._is_string_none_or_empty(pid, "pid", "retrieve_object")
+        self._validate_string(pid, "pid", "retrieve_object")
 
+        object_cid = self.find_object(pid)
         entity = "objects"
-        object_cid = self.get_sha256_hex_digest(pid)
-        object_exists = self.exists(entity, object_cid)
 
-        if object_exists:
+        if object_cid:
             logging.debug(
                 "FileHashStore - retrieve_object: Metadata exists for pid: %s, retrieving object.",
                 pid,
@@ -547,11 +703,11 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_metadata: Request to retrieve metadata for pid: %s",
             pid,
         )
-        self._is_string_none_or_empty(pid, "pid", "retrieve_metadata")
-        checked_format_id = self._validate_format_id(format_id, "retrieve_metadata")
+        self._validate_string(pid, "pid", "retrieve_metadata")
+        checked_format_id = self._validate_arg_format_id(format_id, "retrieve_metadata")
 
         entity = "metadata"
-        metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
+        metadata_cid = self.computehash(pid + checked_format_id)
         metadata_exists = self.exists(entity, metadata_cid)
         if metadata_exists:
             metadata_stream = self.open(entity, metadata_cid)
@@ -571,28 +727,62 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - delete_object: Request to delete object for pid: %s", pid
         )
-        self._is_string_none_or_empty(pid, "pid", "delete_object")
+        self._validate_string(pid, "pid", "delete_object")
+        cid = self.find_object(pid)
 
-        entity = "objects"
-        object_cid = self.get_sha256_hex_digest(pid)
-        self.delete(entity, object_cid)
+        while cid in self.reference_locked_cids:
+            logging.debug(
+                "FileHashStore - delete_object: (cid) %s is currently locked. Waiting",
+                cid,
+            )
+            time.sleep(self.time_out_sec)
+        # Modify reference_locked_cids consecutively
+        with self.reference_lock:
+            logging.debug(
+                "FileHashStore - delete_object: Adding cid: %s to reference_locked_cids.",
+                cid,
+            )
+            self.reference_locked_cids.append(cid)
+        try:
+            # Remove pid from cid reference file
+            cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+            self._delete_cid_refs_pid(cid_ref_abs_path, pid)
+            # Delete cid reference file
+            # If the file is not empty, it will not be deleted.
+            cid_refs_deleted = self._delete_cid_refs_file(cid_ref_abs_path)
+            # Delete pid reference file
+            pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+            self._delete_pid_refs_file(pid_ref_abs_path)
+            # Finally, delete the object
+            if cid_refs_deleted:
+                entity = "objects"
+                self.delete(entity, cid)
 
-        logging.info(
-            "FileHashStore - delete_object: Successfully deleted object for pid: %s",
-            pid,
-        )
-        return True
+            info_string = (
+                "FileHashStore - delete_object: Successfully deleted references and/or"
+                + f" objects associated with pid: {pid}"
+            )
+            logging.info(info_string)
+            return True
+        finally:
+            # Release cid
+            with self.reference_lock:
+                logging.debug(
+                    "FileHashStore - delete_object: Removing cid: %s from reference_locked_cids.",
+                    cid,
+                )
+                self.reference_locked_cids.remove(cid)
 
     def delete_metadata(self, pid, format_id=None):
         logging.debug(
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
         )
-        self._is_string_none_or_empty(pid, "pid", "delete_metadata")
-        checked_format_id = self._validate_format_id(format_id, "delete_metadata")
+        self._validate_string(pid, "pid", "delete_metadata")
+        checked_format_id = self._validate_arg_format_id(format_id, "delete_metadata")
 
         entity = "metadata"
-        metadata_cid = self.get_sha256_hex_digest(pid + checked_format_id)
+        metadata_cid = self.computehash(pid + checked_format_id)
         self.delete(entity, metadata_cid)
 
         logging.info(
@@ -606,12 +796,12 @@ class FileHashStore(HashStore):
             "FileHashStore - get_hex_digest: Request to get hex digest for object with pid: %s",
             pid,
         )
-        self._is_string_none_or_empty(pid, "pid", "get_hex_digest")
-        self._is_string_none_or_empty(algorithm, "algorithm", "get_hex_digest")
+        self._validate_string(pid, "pid", "get_hex_digest")
+        self._validate_string(algorithm, "algorithm", "get_hex_digest")
 
         entity = "objects"
         algorithm = self.clean_algorithm(algorithm)
-        object_cid = self.get_sha256_hex_digest(pid)
+        object_cid = self.find_object(pid)
         if not self.exists(entity, object_cid):
             exception_string = (
                 f"FileHashStore - get_hex_digest: No object found for pid: {pid}"
@@ -621,16 +811,16 @@ class FileHashStore(HashStore):
         cid_stream = self.open(entity, object_cid)
         hex_digest = self.computehash(cid_stream, algorithm=algorithm)
 
-        info_msg = (
+        info_string = (
             f"FileHashStore - get_hex_digest: Successfully calculated hex digest for pid: {pid}."
             + f" Hex Digest: {hex_digest}",
         )
-        logging.info(info_msg)
+        logging.info(info_string)
         return hex_digest
 
     # FileHashStore Core Methods
 
-    def put_object(
+    def store_and_validate_data(
         self,
         pid,
         file,
@@ -640,7 +830,8 @@ class FileHashStore(HashStore):
         checksum_algorithm=None,
         file_size_to_validate=None,
     ):
-        """Store contents of `file` on disk using the hash of the given pid
+        """Store contents of `file` on disk using, validate the object's parameters if
+        provided and tag/reference the object.
 
         Args:
             pid (string): Authority-based identifier. \n
@@ -656,7 +847,7 @@ class FileHashStore(HashStore):
 
         Returns:
             object_metadata (ObjectMetadata): object that contains the object id,
-            object file size, duplicate file boolean and hex digest dictionary.
+            object file size and hex digest dictionary.
         """
         stream = Stream(file)
 
@@ -684,6 +875,57 @@ class FileHashStore(HashStore):
             pid,
         )
         return object_metadata
+
+    def store_data_only(self, data):
+        """Store an object to HashStore and return the id and a hex digest
+        dictionary of the default algorithms. This method does not validate the
+        object and writes directly to /objects after the hex digests are calculated.
+
+        Args:
+            data (mixed): String or path to object.
+
+        Raises:
+            IOError: If object fails to store
+            FileExistsError: If file already exists
+
+        Returns:
+            object_metadata (ObjectMetadata): object that contains the object id,
+            object file size and hex digest dictionary.
+        """
+        logging.debug(
+            "FileHashStore - store_object: Request to store data object only."
+        )
+
+        try:
+            # Ensure the data is a stream
+            stream = Stream(data)
+
+            # Get the hex digest dictionary
+            with closing(stream):
+                (
+                    object_ref_pid_location,
+                    obj_file_size,
+                    hex_digest_dict,
+                ) = self._move_and_get_checksums(None, stream)
+
+            object_metadata = ObjectMetadata(
+                object_ref_pid_location, obj_file_size, hex_digest_dict
+            )
+            # The permanent address of the data stored is based on the data's checksum
+            cid = hex_digest_dict.get(self.algorithm)
+            logging.debug(
+                "FileHashStore - store_object: Successfully stored object with cid: %s",
+                cid,
+            )
+            return object_metadata
+        # pylint: disable=W0718
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - store_object: failed to store object."
+                + f" Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
 
     def _move_and_get_checksums(
         self,
@@ -716,29 +958,18 @@ class FileHashStore(HashStore):
             file_size_to_validate (bytes, optional): Expected size of object
 
         Returns:
-            object_metadata (tuple): object id, object file size, duplicate file
-            boolean and hex digest dictionary.
+            object_metadata (tuple): object id, object file size and hex digest dictionary.
         """
-        entity = "objects"
-        object_cid = self.get_sha256_hex_digest(pid)
-        abs_file_path = self.build_abs_path(entity, object_cid, extension)
-
-        # Only create tmp file to be moved if target destination doesn't exist
-        if os.path.isfile(abs_file_path):
-            exception_string = (
-                "FileHashStore - _move_and_get_checksums: File already exists"
-                + f" for pid: {pid} at {abs_file_path}"
-            )
-            logging.error(exception_string)
-            raise FileExistsError(exception_string)
-
-        # Create temporary file and calculate hex digests
         debug_msg = (
             "FileHashStore - _move_and_get_checksums: Creating temp"
             + f" file and calculating checksums for pid: {pid}"
         )
         logging.debug(debug_msg)
-        hex_digests, tmp_file_name, tmp_file_size = self._mktmpfile(
+        (
+            hex_digests,
+            tmp_file_name,
+            tmp_file_size,
+        ) = self._write_to_tmp_file_and_get_hex_digests(
             stream, additional_algorithm, checksum_algorithm
         )
         logging.debug(
@@ -746,10 +977,16 @@ class FileHashStore(HashStore):
             tmp_file_name,
         )
 
-        # Only move file if it doesn't exist.
-        # Files are stored once and only once
+        # Objects are stored with their content identifier based on the store algorithm
+        entity = "objects"
+        object_cid = hex_digests.get(self.algorithm)
+        abs_file_path = self.build_abs_path(entity, object_cid, extension)
+
+        # Only move file if it doesn't exist. We do not check before we create the tmp
+        # file and calculate the hex digests because the given checksum could be incorrect.
         if not os.path.isfile(abs_file_path):
-            self._validate_object(
+            # Files are stored once and only once
+            self._validate_arg_object(
                 pid,
                 checksum,
                 checksum_algorithm,
@@ -784,12 +1021,12 @@ class FileHashStore(HashStore):
                     pid_checksum = self.get_hex_digest(pid, self.algorithm)
                     if pid_checksum == hex_digests.get(self.algorithm):
                         # If the checksums match, return and log warning
-                        warning_msg = (
+                        exception_string = (
                             "FileHashStore - _move_and_get_checksums: File moved"
                             + f" successfully but unexpected issue encountered: {exception_string}",
                         )
-                        logging.warning(warning_msg)
-                        return
+                        logging.error(exception_string)
+                        raise err
                     else:
                         debug_msg = (
                             "FileHashStore - _move_and_get_checksums: Permanent file"
@@ -810,23 +1047,27 @@ class FileHashStore(HashStore):
                 raise
         else:
             # Else delete temporary file
-            warning_msg = (
-                f"FileHashStore - _move_and_get_checksums: Object exists at: {abs_file_path},"
-                + " deleting temporary file."
+            exception_string = (
+                "FileHashStore - _move_and_get_checksums: Object already exists at:"
+                + f" {abs_file_path}, deleting temporary file."
             )
-            logging.warning(warning_msg)
+            logging.error(exception_string)
             self.delete(entity, tmp_file_name)
+            raise FileExistsError(exception_string)
 
-        return (object_cid, tmp_file_size, hex_digests)
+        return object_cid, tmp_file_size, hex_digests
 
-    def _mktmpfile(self, stream, additional_algorithm=None, checksum_algorithm=None):
+    def _write_to_tmp_file_and_get_hex_digests(
+        self, stream, additional_algorithm=None, checksum_algorithm=None
+    ):
         """Create a named temporary file from a `Stream` object and return its filename
-        and a dictionary of its algorithms and hex digests. If an additionak and/or checksum
-        algorithm is provided, it will add the respective hex digest to the dictionary.
+        and a dictionary of its algorithms and hex digests. If an additional and/or checksum
+        algorithm is provided, it will add the respective hex digest to the dictionary if
+        it is supported.
 
         Args:
             stream (io.BufferedReader): Object stream.
-            algorithm (string): Algorithm of additional hex digest to generate
+            additional_algorithm (string): Algorithm of additional hex digest to generate
             checksum_algorithm (string): Algorithm of additional checksum algo to generate
 
         Returns:
@@ -843,26 +1084,11 @@ class FileHashStore(HashStore):
         # Physically create directory if it doesn't exist
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
-        tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
-
-        # Delete tmp file if python interpreter crashes or thread is interrupted
-        # when store_object is called
-        def delete_tmp_file():
-            if os.path.exists(tmp.name):
-                os.remove(tmp.name)
-
-        atexit.register(delete_tmp_file)
-
-        # Ensure tmp file is created with desired permissions
-        if self.fmode is not None:
-            oldmask = os.umask(0)
-            try:
-                os.chmod(tmp.name, self.fmode)
-            finally:
-                os.umask(oldmask)
+        tmp = self._mktmpfile(tmp_root_path)
 
         logging.debug(
-            "FileHashStore - _mktempfile: tmp file created: %s, calculating hex digests.",
+            "FileHashStore - _write_to_tmp_file_and_get_hex_digests: tmp file created:"
+            + " %s, calculating hex digests.",
             tmp.name,
         )
 
@@ -879,7 +1105,8 @@ class FileHashStore(HashStore):
                     for hash_algorithm in hash_algorithms:
                         hash_algorithm.update(self._to_bytes(data))
             logging.debug(
-                "FileHashStore - _mktempfile: Object stream successfully written to tmp file: %s",
+                "FileHashStore - _write_to_tmp_file_and_get_hex_digests: Object stream"
+                + " successfully written to tmp file: %s",
                 tmp.name,
             )
 
@@ -891,19 +1118,23 @@ class FileHashStore(HashStore):
             # Ready for validation and atomic move
             tmp_file_completion_flag = True
 
-            logging.debug("FileHashStore - _mktempfile: Hex digests calculated.")
+            logging.debug(
+                "FileHashStore - _write_to_tmp_file_and_get_hex_digests: Hex digests calculated."
+            )
             return hex_digest_dict, tmp.name, tmp_file_size
         # pylint: disable=W0718
         except Exception as err:
             exception_string = (
-                f"FileHashStore - _mktempfile: Unexpected {err=}, {type(err)=}"
+                "FileHashStore - _write_to_tmp_file_and_get_hex_digests:"
+                + f" Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             # pylint: disable=W0707,W0719
             raise Exception(exception_string)
         except KeyboardInterrupt:
             exception_string = (
-                "FileHashStore - _mktempfile: Keyboard interruption by user."
+                "FileHashStore - _write_to_tmp_file_and_get_hex_digests:"
+                + " Keyboard interruption by user."
             )
             logging.error(exception_string)
             if os.path.exists(tmp.name):
@@ -916,10 +1147,270 @@ class FileHashStore(HashStore):
                 # pylint: disable=W0718
                 except Exception as err:
                     exception_string = (
-                        f"FileHashStore - _mktempfile: Unexpected {err=} while attempting to"
+                        "FileHashStore - _write_to_tmp_file_and_get_hex_digests:"
+                        + f"Unexpected {err=} while attempting to"
                         + f" delete tmp file: {tmp.name}, {type(err)=}"
                     )
                     logging.error(exception_string)
+
+    def _mktmpfile(self, path):
+        """Create a temporary file at the given path ready to be written.
+
+        Args:
+            path (string): Path to the file location
+
+        Returns:
+            tmp (file object): object with file-like interface
+        """
+        tmp = NamedTemporaryFile(dir=path, delete=False)
+
+        # Delete tmp file if python interpreter crashes or thread is interrupted
+        def delete_tmp_file():
+            if os.path.exists(tmp.name):
+                os.remove(tmp.name)
+
+        atexit.register(delete_tmp_file)
+
+        # Ensure tmp file is created with desired permissions
+        if self.fmode is not None:
+            oldmask = os.umask(0)
+            try:
+                os.chmod(tmp.name, self.fmode)
+            finally:
+                os.umask(oldmask)
+        return tmp
+
+    def _write_cid_refs_file(self, path, pid):
+        """Write the cid reference file in the supplied path to a file. A reference file
+        contains every pid that references a cid each on its own line. This method will
+        only write into an empty file, and will not write over an existing one.
+
+        Args:
+            path (string): Path of file to be written into
+            pid (string): Authority-based or persistent identifier of object
+        """
+        logging.debug(
+            "FileHashStore - write_cid_refs_file: Writing pid (%s) into file: %s",
+            pid,
+            path,
+        )
+
+        if os.path.isfile(path):
+            if os.path.getsize(path) != 0:
+                err_msg = (
+                    "FileHashStore - _write_cid_refs_file: Failed to write cid reference file."
+                    + f" File is not empty: {path} "
+                )
+                logging.error(err_msg)
+                raise OSError(err_msg)
+
+        try:
+            with open(path, "w", encoding="utf8") as cid_ref_file:
+                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                cid_ref_file.write(pid + "\n")
+                # The context manager will take care of releasing the lock
+                # But the code to explicitly release the lock if desired is below
+                # fcntl.flock(f, fcntl.LOCK_UN)
+            return
+
+        except Exception as err:
+            exception_string = (
+                f"FileHashStore - write_cid_refs_file: failed to write pid ({pid})"
+                + f" into path: {path}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
+
+    def _update_cid_refs(self, cid_ref_abs_path, pid):
+        """Update an existing cid reference file with the given pid.
+
+        Args:
+            cid_ref_abs_path (string): Absolute path to the cid ref file
+            pid (string): Authority-based or persistent identifier of object
+        """
+        logging.debug(
+            "FileHashStore - update_cid_refs: Adding pid (%s) into cid reference file: %s",
+            pid,
+            cid_ref_abs_path,
+        )
+        if not os.path.exists(cid_ref_abs_path):
+            exception_string = (
+                f"FileHashStore - update_cid_refs: {cid_ref_abs_path} does not exist."
+                + f" Cannot write pid: {[pid]}"
+            )
+            logging.error(exception_string)
+            raise FileNotFoundError(exception_string)
+
+        try:
+            with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+                for _, line in enumerate(f, start=1):
+                    value = line.strip()
+                    if pid == value:
+                        err_msg = (
+                            f"FileHashStore - update_cid_refs: pid ({pid}) already reference in"
+                            + f" cid reference file: {cid_ref_abs_path} "
+                        )
+                        raise ValueError(err_msg)
+
+            with open(cid_ref_abs_path, "a+", encoding="utf8") as cid_ref_file:
+                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                cid_ref_file.write(pid + "\n")
+                # The context manager will take care of releasing the lock
+                # But the code to explicitly release the lock if desired is below
+                # fcntl.flock(f, fcntl.LOCK_UN)
+            return
+
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - update_cid_refs: failed to update reference for cid:"
+                + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
+
+    def _delete_cid_refs_pid(self, cid_ref_abs_path, pid):
+        """Delete a pid from a cid reference file.
+
+        Args:
+            cid_ref_abs_path (string): Absolute path to the cid ref file
+            pid (string): Authority-based or persistent identifier of object
+        """
+        logging.debug(
+            "FileHashStore - _delete_cid_refs_pid: Deleting pid (%s) from cid reference file: %s",
+            pid,
+            cid_ref_abs_path,
+        )
+
+        try:
+            with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
+                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                # Read the ref file to see if the pid is already referencing the cid
+                cid_ref_file_content = cid_ref_file.read()
+
+                if pid not in cid_ref_file_content:
+                    err_msg = (
+                        f"FileHashStore - _delete_cid_refs_pid: pid ({pid}) does not exist in"
+                        + f" cid reference file: {cid_ref_abs_path} "
+                    )
+                    raise ValueError(err_msg)
+
+            with open(cid_ref_abs_path, "w", encoding="utf8") as cid_ref_file:
+                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                cid_ref_file.write(cid_ref_file_content.replace(pid + "\n", ""))
+                # The context manager will take care of releasing the lock
+                # But the code to explicitly release the lock if desired is below
+                # fcntl.flock(f, fcntl.LOCK_UN)
+            return
+
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - _delete_cid_refs_pid: failed to update reference for cid:"
+                + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
+
+    def _delete_cid_refs_file(self, cid_ref_abs_path):
+        """Delete a cid reference file. There must be no references remaining.
+
+        Args:
+            cid_ref_abs_path (string): Absolute path to the cid ref file
+
+        Returns:
+            boolean: True if deleted, False if not
+        """
+        logging.debug(
+            "FileHashStore - _delete_cid_refs_file: Deleting reference file: %s",
+            cid_ref_abs_path,
+        )
+
+        try:
+            if not os.path.exists(cid_ref_abs_path):
+                err_msg = (
+                    "FileHashStore - _delete_cid_refs_file: Cid reference file not found: %s",
+                    cid_ref_abs_path,
+                )
+                logging.error(err_msg)
+                raise FileNotFoundError(err_msg)
+            if os.path.getsize(cid_ref_abs_path) != 0:
+                err_msg = (
+                    "FileHashStore - _delete_cid_refs_file: Failed to delete cid reference file."
+                    + f" File is not empty: {cid_ref_abs_path} "
+                )
+                logging.error(err_msg)
+                raise OSError(err_msg)
+            else:
+                os.remove(cid_ref_abs_path)
+                return True
+
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - _delete_cid_refs_file: failed to delete reference file:"
+                + f" {cid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
+
+    def _write_pid_refs_file(self, path, cid):
+        """Write the pid reference file in the supplied path for the given cid (content
+        identifier). A reference file for a pid contains the cid that it references.
+
+        Args:
+            path (string): Path of file to be written into
+            cid (string): Content identifier
+        """
+        logging.debug(
+            "FileHashStore - _write_pid_refs_file: Writing cid (%s) into file: %s",
+            cid,
+            path,
+        )
+
+        try:
+            with open(path, "w", encoding="utf8") as pid_ref_file:
+                fcntl.flock(pid_ref_file, fcntl.LOCK_EX)
+                pid_ref_file.write(cid)
+                # The context manager will take care of releasing the lock
+                # But the code to explicitly release the lock if desired is below
+                # fcntl.flock(f, fcntl.LOCK_UN)
+            return
+
+        except Exception as err:
+            exception_string = (
+                f"FileHashStore - _write_pid_refs_file: failed to write cid ({cid})"
+                + f" into path: {path}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
+
+    def _delete_pid_refs_file(self, pid_ref_abs_path):
+        """Delete a pid reference file.
+
+        Args:
+            pid_ref_abs_path (string): Absolute path to the pid ref file
+        """
+        logging.debug(
+            "FileHashStore - _delete_pid_refs_file: Deleting reference file: %s",
+            pid_ref_abs_path,
+        )
+
+        try:
+            if not os.path.exists(pid_ref_abs_path):
+                err_msg = (
+                    "FileHashStore - _delete_pid_refs_file: pid reference file not found: %s",
+                    pid_ref_abs_path,
+                )
+                raise FileNotFoundError(err_msg)
+            else:
+                os.remove(pid_ref_abs_path)
+                return
+
+        except Exception as err:
+            exception_string = (
+                "FileHashStore - _delete_pid_refs_file: failed to delete reference file:"
+                + f" {pid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
 
     def put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the
@@ -942,7 +1433,7 @@ class FileHashStore(HashStore):
             metadata_tmp = self._mktmpmetadata(metadata_stream)
 
         # Get target and related paths (permanent location)
-        metadata_cid = self.get_sha256_hex_digest(pid + format_id)
+        metadata_cid = self.computehash(pid + format_id)
         rel_path = "/".join(self.shard(metadata_cid))
         full_path = self.get_store_path("metadata") / rel_path
 
@@ -980,11 +1471,10 @@ class FileHashStore(HashStore):
             raise FileNotFoundError(exception_string)
 
     def _mktmpmetadata(self, stream):
-        """Create a named temporary file with `stream` (metadata) and `format_id`.
+        """Create a named temporary file with `stream` (metadata).
 
         Args:
             stream (io.BufferedReader): Metadata stream.
-            format_id (string): Format of metadata.
 
         Returns:
             tmp.name (string): Path/name of temporary file created and written into.
@@ -995,14 +1485,7 @@ class FileHashStore(HashStore):
         if os.path.exists(tmp_root_path) is False:
             self.create_path(tmp_root_path)
 
-        tmp = NamedTemporaryFile(dir=tmp_root_path, delete=False)
-        # Ensure tmp file is created with desired permissions
-        if self.fmode is not None:
-            oldmask = os.umask(0)
-            try:
-                os.chmod(tmp.name, self.fmode)
-            finally:
-                os.umask(oldmask)
+        tmp = self._mktmpfile(tmp_root_path)
 
         # tmp is a file-like object that is already opened for writing by default
         logging.debug(
@@ -1021,12 +1504,15 @@ class FileHashStore(HashStore):
 
     # FileHashStore Utility & Supporting Methods
 
-    def _validate_data_to_store(self, data):
-        """Evaluates a data argument to ensure that it is either a string, path or
-        stream object before attempting to store it.
+    def _validate_arg_data(self, data):
+        """Checks a data argument to ensure that it is either a string, path or stream
+        object.
 
         Args:
             data (string, path, stream): object to validate
+
+        Returns:
+            boolean: True if valid.
         """
         if (
             not isinstance(data, str)
@@ -1034,7 +1520,7 @@ class FileHashStore(HashStore):
             and not isinstance(data, io.BufferedIOBase)
         ):
             exception_string = (
-                "FileHashStore - store_object: Data must be a path, string or buffered"
+                "FileHashStore - _validate_arg_data: Data must be a path, string or buffered"
                 + f" stream type. Data type supplied: {type(data)}"
             )
             logging.error(exception_string)
@@ -1042,21 +1528,26 @@ class FileHashStore(HashStore):
         if isinstance(data, str):
             if data.replace(" ", "") == "":
                 exception_string = (
-                    "FileHashStore - store_object: Data string cannot be empty."
+                    "FileHashStore - _validate_arg_data: Data string cannot be empty."
                 )
                 logging.error(exception_string)
                 raise TypeError(exception_string)
+        return True
 
-    def _validate_algorithms_and_checksum(
+    def _validate_arg_algorithms_and_checksum(
         self, additional_algorithm, checksum, checksum_algorithm
     ):
-        """Determines whether calling app has supplied the necessary arguments to validate
-        an object with a checksum value
+        """Determines whether caller has supplied the necessary arguments to validate
+        an object with a checksum value.
 
         Args:
             additional_algorithm: value of additional algorithm to calculate
             checksum (string): value of checksum
             checksum_algorithm (string): algorithm of checksum
+
+        Returns:
+            additional_algorithm_checked (string): hashlib compatible string or 'None'
+            checksum_algorithm_checked (string): hashlib compatible string or 'None'
         """
         additional_algorithm_checked = None
         if additional_algorithm != self.algorithm and additional_algorithm is not None:
@@ -1064,56 +1555,22 @@ class FileHashStore(HashStore):
             additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
         checksum_algorithm_checked = None
         if checksum is not None:
-            self._is_string_none_or_empty(
+            self._validate_string(
                 checksum_algorithm,
                 "checksum_algorithm",
-                "validate_checksum_args (store_object)",
+                "_validate_arg_algorithms_and_checksum (store_object)",
             )
         if checksum_algorithm is not None:
-            self._is_string_none_or_empty(
+            self._validate_string(
                 checksum,
                 "checksum",
-                "validate_checksum_args (store_object)",
+                "_validate_arg_algorithms_and_checksum (store_object)",
             )
             # Set checksum_algorithm
             checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
         return additional_algorithm_checked, checksum_algorithm_checked
 
-    def _refine_algorithm_list(self, additional_algorithm, checksum_algorithm):
-        """Create the final list of hash algorithms to calculate
-
-        Args:
-            additional_algorithm (string)
-            checksum_algorithm (string)
-
-        Return:
-            algorithm_list_to_calculate (set): De-duplicated list of hash algorithms
-        """
-        algorithm_list_to_calculate = self.default_algo_list
-        if checksum_algorithm is not None:
-            self.clean_algorithm(checksum_algorithm)
-            if checksum_algorithm in self.other_algo_list:
-                debug_additional_other_algo_str = (
-                    f"FileHashStore - _mktempfile: checksum algorithm: {checksum_algorithm}"
-                    + " found in other_algo_lists, adding to list of algorithms to calculate."
-                )
-                logging.debug(debug_additional_other_algo_str)
-                algorithm_list_to_calculate.append(checksum_algorithm)
-        if additional_algorithm is not None:
-            self.clean_algorithm(additional_algorithm)
-            if additional_algorithm in self.other_algo_list:
-                debug_additional_other_algo_str = (
-                    f"FileHashStore - _mktempfile: additional algorithm: {additional_algorithm}"
-                    + " found in other_algo_lists, adding to list of algorithms to calculate."
-                )
-                logging.debug(debug_additional_other_algo_str)
-                algorithm_list_to_calculate.append(additional_algorithm)
-
-        # Remove duplicates
-        algorithm_list_to_calculate = set(algorithm_list_to_calculate)
-        return algorithm_list_to_calculate
-
-    def _validate_object(
+    def _validate_arg_object(
         self,
         pid,
         checksum,
@@ -1124,70 +1581,65 @@ class FileHashStore(HashStore):
         tmp_file_size,
         file_size_to_validate,
     ):
-        """Evaluates an object's integrity
+        """Evaluates an object's integrity and throws exception if there is a mismatch.
 
         Args:
-            pid: For logging purposes
-            checksum: Value of checksum
-            checksum_algorithm: Algorithm of checksum
-            entity: Type of object
-            hex_digests: Dictionary of hex digests to select from
-            tmp_file_name: Name of tmp file
-            tmp_file_size: Size of the tmp file
-            file_size_to_validate: Expected size of the object
+            pid (string): For logging purposes
+            checksum (string): Value of checksum to check
+            checksum_algorithm (string): Algorithm of checksum
+            entity (string): Type of object ('objects' or 'metadata')
+            hex_digests (dictionary): Dictionary of hex digests to parse
+            tmp_file_name (string): Name of tmp file
+            tmp_file_size (int): Size of the tmp file
+            file_size_to_validate (int): Expected size of the object
         """
         if file_size_to_validate is not None and file_size_to_validate > 0:
             if file_size_to_validate != tmp_file_size:
-                self.delete(entity, tmp_file_name)
                 exception_string = (
-                    "FileHashStore - _move_and_get_checksums: Object file size calculated: "
+                    "FileHashStore - _validate_arg_object: Object file size calculated: "
                     + f" {tmp_file_size} does not match with expected size:"
-                    + f"{file_size_to_validate}. Tmp file deleted and file not stored for"
-                    + f" pid: {pid}"
+                    + f"{file_size_to_validate}."
                 )
-                logging.error(exception_string)
-                raise ValueError(exception_string)
+                if pid is not None:
+                    self.delete(entity, tmp_file_name)
+                    exception_string_for_pid = (
+                        exception_string
+                        + f" Tmp file deleted and file not stored for pid: {pid}"
+                    )
+                    logging.error(exception_string_for_pid)
+                    raise ValueError(exception_string_for_pid)
+                else:
+                    logging.error(exception_string)
+                    raise ValueError(exception_string)
         if checksum_algorithm is not None and checksum is not None:
-            hex_digest_stored = hex_digests[checksum_algorithm]
-            if hex_digest_stored != checksum:
-                self.delete(entity, tmp_file_name)
+            if checksum_algorithm not in hex_digests:
                 exception_string = (
-                    "FileHashStore - _move_and_get_checksums: Hex digest and checksum"
-                    + f" do not match - file not stored for pid: {pid}. Algorithm:"
-                    + f" {checksum_algorithm}. Checksum provided: {checksum} !="
-                    + f" HexDigest: {hex_digest_stored}. Tmp file deleted."
+                    "FileHashStore - _validate_arg_object: checksum_algorithm"
+                    + f" ({checksum_algorithm}) cannot be found in the hex digests dictionary."
                 )
                 logging.error(exception_string)
-                raise ValueError(exception_string)
+                raise KeyError(exception_string)
+            else:
+                hex_digest_stored = hex_digests[checksum_algorithm]
+                if hex_digest_stored != checksum:
+                    exception_string = (
+                        "FileHashStore - _validate_arg_object: Hex digest and checksum"
+                        + f" do not match - file not stored for pid: {pid}. Algorithm:"
+                        + f" {checksum_algorithm}. Checksum provided: {checksum} !="
+                        + f" HexDigest: {hex_digest_stored}."
+                    )
+                    if pid is not None:
+                        self.delete(entity, tmp_file_name)
+                        exception_string_for_pid = (
+                            exception_string + f"Tmp file ({tmp_file_name}) deleted."
+                        )
+                        logging.error(exception_string_for_pid)
+                        raise ValueError(exception_string_for_pid)
+                    else:
+                        logging.error(exception_string)
+                        raise ValueError(exception_string)
 
-    def _validate_metadata_to_store(self, metadata):
-        """Evaluates a metadata argument to ensure that it is either a string, path or
-        stream object before attempting to store it.
-
-        Args:
-            metadata (string, path, stream): metadata to validate
-        """
-        if isinstance(metadata, str):
-            if metadata.replace(" ", "") == "":
-                exception_string = (
-                    "FileHashStore - store_metadata: Given string path to"
-                    + " metadata cannot be empty."
-                )
-                logging.error(exception_string)
-                raise TypeError(exception_string)
-        if (
-            not isinstance(metadata, str)
-            and not isinstance(metadata, Path)
-            and not isinstance(metadata, io.BufferedIOBase)
-        ):
-            exception_string = (
-                "FileHashStore - store_metadata: Metadata must be a path or string"
-                + f" type, data type supplied: {type(metadata)}"
-            )
-            logging.error(exception_string)
-            raise TypeError(exception_string)
-
-    def _validate_format_id(self, format_id, method):
+    def _validate_arg_format_id(self, format_id, method):
         """Determines the metadata namespace (format_id) to use for storing,
         retrieving and deleting metadata.
 
@@ -1209,6 +1661,90 @@ class FileHashStore(HashStore):
         else:
             checked_format_id = format_id
         return checked_format_id
+
+    def _verify_hashstore_references(self, pid, cid):
+        """Verifies that the supplied pid and pid reference file and content have been
+        written successfully.
+
+        Args:
+            pid (string): Authority-based or persistent identifier
+            cid (string): Content identifier
+        """
+        # Check that reference files were created
+        pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+        cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+        if not os.path.exists(pid_ref_abs_path):
+            exception_string = (
+                "FileHashStore - _verify_hashstore_references: Pid refs file missing: %s",
+                pid_ref_abs_path,
+            )
+            logging.error(exception_string)
+            raise FileNotFoundError(exception_string)
+        if not os.path.exists(cid_ref_abs_path):
+            exception_string = (
+                "FileHashStore - _verify_hashstore_references: Cid refs file missing: %s",
+                cid_ref_abs_path,
+            )
+            logging.error(exception_string)
+            raise FileNotFoundError(exception_string)
+        # Check the content of the reference files
+        # Start with the cid
+        retrieved_cid = self.find_object(pid)
+        if retrieved_cid != cid:
+            exception_string = (
+                "FileHashStore - _verify_hashstore_references: Pid refs file exists"
+                + f" ({pid_ref_abs_path}) but cid ({cid}) does not match."
+            )
+            logging.error(exception_string)
+            raise ValueError(exception_string)
+        # Then the pid
+        pid_found = False
+        with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+            for _, line in enumerate(f, start=1):
+                value = line.strip()
+                if value == pid:
+                    pid_found = True
+        if not pid_found:
+            exception_string = (
+                "FileHashStore - _verify_hashstore_references: Cid refs file exists"
+                + f" ({cid_ref_abs_path}) but pid ({pid}) not found."
+            )
+            logging.error(exception_string)
+            raise ValueError(exception_string)
+
+    def _refine_algorithm_list(self, additional_algorithm, checksum_algorithm):
+        """Create the final list of hash algorithms to calculate.
+
+        Args:
+            additional_algorithm (string)
+            checksum_algorithm (string)
+
+        Return:
+            algorithm_list_to_calculate (set): De-duplicated list of hash algorithms
+        """
+        algorithm_list_to_calculate = self.default_algo_list
+        if checksum_algorithm is not None:
+            self.clean_algorithm(checksum_algorithm)
+            if checksum_algorithm in self.other_algo_list:
+                debug_additional_other_algo_str = (
+                    f"FileHashStore - _refine_algorithm_list: checksum algo: {checksum_algorithm}"
+                    + " found in other_algo_lists, adding to list of algorithms to calculate."
+                )
+                logging.debug(debug_additional_other_algo_str)
+                algorithm_list_to_calculate.append(checksum_algorithm)
+        if additional_algorithm is not None:
+            self.clean_algorithm(additional_algorithm)
+            if additional_algorithm in self.other_algo_list:
+                debug_additional_other_algo_str = (
+                    f"FileHashStore - _refine_algorithm_list: addit algo: {additional_algorithm}"
+                    + " found in other_algo_lists, adding to list of algorithms to calculate."
+                )
+                logging.debug(debug_additional_other_algo_str)
+                algorithm_list_to_calculate.append(additional_algorithm)
+
+        # Remove duplicates
+        algorithm_list_to_calculate = set(algorithm_list_to_calculate)
+        return algorithm_list_to_calculate
 
     def clean_algorithm(self, algorithm_string):
         """Format a string and ensure that it is supported and compatible with
@@ -1242,11 +1778,12 @@ class FileHashStore(HashStore):
         return cleaned_string
 
     def computehash(self, stream, algorithm=None):
-        """Compute hash of a file-like object using :attr:`algorithm` by default
-        or with optional algorithm supported.
+        """Compute the hash of a file-like object (or string) using the store algorthm by
+        default or with optional algorithm supported.
 
         Args:
-            stream (io.BufferedReader): A buffered stream of an object_cid object. \n
+            stream (mixed): A buffered stream (io.BufferedReader) of an object. A string is
+                also acceptable as they are a sequence of characters (Python only).\n
             algorithm (string): Algorithm of hex digest to generate.
 
         Returns:
@@ -1272,9 +1809,11 @@ class FileHashStore(HashStore):
             return Path(self.objects)
         elif entity == "metadata":
             return Path(self.metadata)
+        elif entity == "refs":
+            return Path(self.refs)
         else:
             raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
+                f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
             )
 
     def exists(self, entity, file):
@@ -1312,8 +1851,8 @@ class FileHashStore(HashStore):
         # This creates a list of `depth` number of tokens with width
         # `width` from the first part of the id plus the remainder.
         hierarchical_list = compact(
-            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
-            + [digest[self.depth * self.width :]]
+            [digest[i * self.width: self.width * (i + 1)] for i in range(self.depth)]
+            + [digest[self.depth * self.width:]]
         )
 
         return hierarchical_list
@@ -1356,9 +1895,9 @@ class FileHashStore(HashStore):
         except OSError:
             pass
         else:
-            self.remove_empty(os.path.dirname(realpath))
+            self._remove_empty(os.path.dirname(realpath))
 
-    def remove_empty(self, subpath):
+    def _remove_empty(self, subpath):
         """Successively remove all empty folders starting with `subpath` and
         proceeding "up" through directory tree until reaching the `root`
         folder.
@@ -1445,18 +1984,18 @@ class FileHashStore(HashStore):
         # Could not determine a match.
         return None
 
-    def build_abs_path(self, entity, cid, extension=""):
+    def build_abs_path(self, entity, hash_id, extension=""):
         """Build the absolute file path for a given hash id with an optional file extension.
 
         Args:
             entity (str): Desired entity type (ex. "objects", "metadata"). \n
-            cid (str): A hash id to build a file path for. \n
+            hash_id (str): A hash id to build a file path for. \n
             extension (str): An optional file extension to append to the file path.
 
         Returns:
             absolute_path (str): An absolute file path for the specified hash id.
         """
-        paths = self.shard(cid)
+        paths = self.shard(hash_id)
         root_dir = self.get_store_path(entity)
 
         if extension and not extension.startswith(os.extsep):
@@ -1466,6 +2005,28 @@ class FileHashStore(HashStore):
 
         absolute_path = os.path.join(root_dir, *paths) + extension
         return absolute_path
+
+    def get_refs_abs_path(self, ref_type, hash_id):
+        """Get the absolute path to the reference file for the given ref_type. If a
+        'pid' is provided, this method will calculate the pid's hash based on the store
+        algorithm, and return the expected address of the pid reference file. If a
+        'cid' is provided, this method will return the expected address by sharding the
+        cid based on HashStore's configuration.
+
+        Args:
+            ref_type (string): 'pid' or 'cid'
+            hash_id (string): Authority-based, persistent or hash identifier
+
+        Returns:
+            ref_file_abs_path (string): Path to the ref file for the given type and pid
+        """
+        entity = "refs"
+        if ref_type == "pid":
+            hash_id = self.computehash(hash_id, self.algorithm)
+        ref_file_abs_path = self.build_abs_path(entity, hash_id).replace(
+            "/refs/", f"/refs/{ref_type}/"
+        )
+        return ref_file_abs_path
 
     def count(self, entity):
         """Return count of the number of files in the `root` directory.
@@ -1495,8 +2056,8 @@ class FileHashStore(HashStore):
     # Other Static Methods
 
     @staticmethod
-    def _validate_file_size(file_size):
-        """Checks whether a file size is > 0 and an int and throws exception if not.
+    def _is_int_and_non_negative(file_size):
+        """Checks whether a given argument is an integer and > 0 and throws exception if not.
 
         Args:
             file_size (int): file size to check
@@ -1504,28 +2065,28 @@ class FileHashStore(HashStore):
         if file_size is not None:
             if not isinstance(file_size, int):
                 exception_string = (
-                    "FileHashStore - _is_file_size_valid: size given must be an integer."
+                    "FileHashStore - _is_int_and_non_negative: size given must be an integer."
                     + f" File size: {file_size}. Arg Type: {type(file_size)}."
                 )
                 logging.error(exception_string)
                 raise TypeError(exception_string)
-            if file_size < 1 or not isinstance(file_size, int):
+            if file_size < 1:
                 exception_string = (
-                    "FileHashStore - _is_file_size_valid: size given must be > 0"
+                    "FileHashStore - _is_int_and_non_negative: size given must be > 0"
                 )
                 logging.error(exception_string)
                 raise ValueError(exception_string)
 
     @staticmethod
-    def _is_string_none_or_empty(string, arg, method):
+    def _validate_string(string, arg, method):
         """Checks whether a string is None or empty and throws an exception if so.
 
         Args:
             string (string): Value to check
-            arg (): Name of argument to check
+            arg (string): Name of argument to check
             method (string): Calling method for logging purposes
         """
-        if string is None or string.replace(" ", "") == "":
+        if string is None or string.strip() == "":
             exception_string = (
                 f"FileHashStore - {method}: {arg} cannot be None"
                 + f" or empty, {arg}: {string}."
@@ -1546,19 +2107,6 @@ class FileHashStore(HashStore):
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")
         return text
-
-    @staticmethod
-    def get_sha256_hex_digest(string):
-        """Calculate the SHA-256 digest of a UTF-8 encoded string.
-
-        Args:
-            string (string): String to convert.
-
-        Returns:
-            hex (string): Hexadecimal string.
-        """
-        hex_digest = hashlib.sha256(string.encode("utf-8")).hexdigest()
-        return hex_digest
 
 
 class Stream(object):

@@ -641,7 +641,7 @@ class FileHashStore(HashStore):
         # Validate input parameters
         self._is_string_none_or_empty(pid, "pid", "store_metadata")
         checked_format_id = self._validate_arg_format_id(format_id, "store_metadata")
-        self._validate_arg_metadata(metadata)
+        self._validate_arg_data(metadata)
 
         # Wait for the pid to release if it's in use
         while pid in self.metadata_locked_pids:
@@ -1649,33 +1649,6 @@ class FileHashStore(HashStore):
                         logging.error(exception_string)
                         raise ValueError(exception_string)
 
-    def _validate_arg_metadata(self, metadata):
-        """Evaluates a metadata argument to ensure that it is either a string, path or
-        stream object before attempting to store it.
-
-        Args:
-            metadata (string, path, stream): metadata to validate
-        """
-        if isinstance(metadata, str):
-            if metadata.replace(" ", "") == "":
-                exception_string = (
-                    "FileHashStore - store_metadata: Given string path to"
-                    + " metadata cannot be empty."
-                )
-                logging.error(exception_string)
-                raise TypeError(exception_string)
-        if (
-            not isinstance(metadata, str)
-            and not isinstance(metadata, Path)
-            and not isinstance(metadata, io.BufferedIOBase)
-        ):
-            exception_string = (
-                "FileHashStore - store_metadata: Metadata must be a path or string"
-                + f" type, data type supplied: {type(metadata)}"
-            )
-            logging.error(exception_string)
-            raise TypeError(exception_string)
-
     def _validate_arg_format_id(self, format_id, method):
         """Determines the metadata namespace (format_id) to use for storing,
         retrieving and deleting metadata.
@@ -1888,8 +1861,8 @@ class FileHashStore(HashStore):
         # This creates a list of `depth` number of tokens with width
         # `width` from the first part of the id plus the remainder.
         hierarchical_list = compact(
-            [digest[i * self.width: self.width * (i + 1)] for i in range(self.depth)]
-            + [digest[self.depth * self.width:]]
+            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
+            + [digest[self.depth * self.width :]]
         )
 
         return hierarchical_list

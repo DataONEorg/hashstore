@@ -201,9 +201,8 @@ class FileHashStore(HashStore):
         else:
             exception_string = (
                 f"FileHashStore - write_properties: algorithm supplied ({store_algorithm})"
-                + " cannot be used as default for HashStore. Must be one of:"
-                + " MD5, SHA-1, SHA-256, SHA-384, SHA-512 which are DataONE"
-                + " controlled algorithm values"
+                f" cannot be used as default for HashStore. Must be one of: {', '.join(accepted_store_algorithms)}"
+                f" which are DataONE controlled algorithm values"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
@@ -238,7 +237,6 @@ class FileHashStore(HashStore):
         """Build a YAML string representing the configuration for a HashStore.
 
         Args:
-            store_path (str): Path to the HashStore directory.
             store_depth (int): Depth when sharding an object's hex digest.
             store_width (int): Width of directories when sharding an object's hex digest.
             store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
@@ -374,7 +372,7 @@ class FileHashStore(HashStore):
     def _set_default_algorithms(self):
         """Set the default algorithms to calculate when storing objects."""
 
-        def lookup_algo(algo):
+        def lookup_algo(algo_to_translate):
             """Translate DataONE controlled algorithms to python hashlib values:
             https://dataoneorg.github.io/api-documentation/apis/Types.html#Types.ChecksumAlgorithm
             """
@@ -385,7 +383,7 @@ class FileHashStore(HashStore):
                 "SHA-384": "sha384",
                 "SHA-512": "sha512",
             }
-            return dataone_algo_translation[algo]
+            return dataone_algo_translation[algo_to_translate]
 
         if not os.path.exists(self.hashstore_configuration_yaml):
             exception_string = (
@@ -490,7 +488,7 @@ class FileHashStore(HashStore):
     def verify_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
-        """Confirms that a object_metadata's content is equal to the given values.
+        """Confirms that an object_metadata's content is equal to the given values.
 
         Args:
             object_metadata (ObjectMetadata): object_metadata object
@@ -1067,7 +1065,7 @@ class FileHashStore(HashStore):
             self.delete(entity, tmp_file_name)
             raise FileExistsError(exception_string)
 
-        return (object_cid, tmp_file_size, hex_digests)
+        return object_cid, tmp_file_size, hex_digests
 
     def _write_to_tmp_file_and_get_hex_digests(
         self, stream, additional_algorithm=None, checksum_algorithm=None
@@ -1079,7 +1077,7 @@ class FileHashStore(HashStore):
 
         Args:
             stream (io.BufferedReader): Object stream.
-            algorithm (string): Algorithm of additional hex digest to generate
+            additional_algorithm (string): Algorithm of additional hex digest to generate
             checksum_algorithm (string): Algorithm of additional checksum algo to generate
 
         Returns:
@@ -1195,7 +1193,7 @@ class FileHashStore(HashStore):
     def _write_cid_refs_file(self, path, pid):
         """Write the cid reference file in the supplied path to a file. A reference file
         contains every pid that references a cid each on its own line. This method will
-        only write into an empty file, and will not write over an an existing one.
+        only write into an empty file, and will not write over an existing one.
 
         Args:
             path (string): Path of file to be written into
@@ -1483,11 +1481,10 @@ class FileHashStore(HashStore):
             raise FileNotFoundError(exception_string)
 
     def _mktmpmetadata(self, stream):
-        """Create a named temporary file with `stream` (metadata) and `format_id`.
+        """Create a named temporary file with `stream` (metadata).
 
         Args:
             stream (io.BufferedReader): Metadata stream.
-            format_id (string): Format of metadata.
 
         Returns:
             tmp.name (string): Path/name of temporary file created and written into.
@@ -1891,8 +1888,8 @@ class FileHashStore(HashStore):
         # This creates a list of `depth` number of tokens with width
         # `width` from the first part of the id plus the remainder.
         hierarchical_list = compact(
-            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
-            + [digest[self.depth * self.width :]]
+            [digest[i * self.width: self.width * (i + 1)] for i in range(self.depth)]
+            + [digest[self.depth * self.width:]]
         )
 
         return hierarchical_list

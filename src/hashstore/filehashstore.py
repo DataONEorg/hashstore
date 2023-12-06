@@ -1566,13 +1566,13 @@ class FileHashStore(HashStore):
             self._validate_string(
                 checksum_algorithm,
                 "checksum_algorithm",
-                "validate_checksum_args (store_object)",
+                "_validate_arg_algorithms_and_checksum (store_object)",
             )
         if checksum_algorithm is not None:
             self._validate_string(
                 checksum,
                 "checksum",
-                "validate_checksum_args (store_object)",
+                "_validate_arg_algorithms_and_checksum (store_object)",
             )
             # Set checksum_algorithm
             checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)

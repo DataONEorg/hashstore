@@ -432,7 +432,7 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_object: Request to store object for pid: %s", pid
             )
             # Validate input parameters
-            self._is_string_none_or_empty(pid, "pid", "store_object")
+            self._validate_string(pid, "pid", "store_object")
             self._validate_arg_data(data)
             self._is_int_and_non_negative(expected_object_size)
             (
@@ -496,10 +496,8 @@ class FileHashStore(HashStore):
             checksum_algorithm (string): Algorithm of checksum
             expected_file_size (int): Size of the tmp file
         """
-        self._is_string_none_or_empty(checksum, "checksum", "verify_object")
-        self._is_string_none_or_empty(
-            checksum_algorithm, "checksum_algorithm", "verify_object"
-        )
+        self._validate_string(checksum, "checksum", "verify_object")
+        self._validate_string(checksum_algorithm, "checksum_algorithm", "verify_object")
         self._is_int_and_non_negative(expected_file_size)
         if object_metadata is None or not isinstance(object_metadata, ObjectMetadata):
             exception_string = (
@@ -537,8 +535,8 @@ class FileHashStore(HashStore):
             cid,
             pid,
         )
-        self._is_string_none_or_empty(pid, "pid", "tag_object")
-        self._is_string_none_or_empty(cid, "cid", "tag_object")
+        self._validate_string(pid, "pid", "tag_object")
+        self._validate_string(cid, "cid", "tag_object")
         # Wait for the cid to release if it's being tagged
         while cid in self.reference_locked_cids:
             logging.debug(
@@ -618,7 +616,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - find_object: Request to find object for for pid: %s", pid
         )
-        self._is_string_none_or_empty(pid, "pid", "find_object")
+        self._validate_string(pid, "pid", "find_object")
 
         pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
         if not os.path.exists(pid_ref_abs_path):
@@ -639,7 +637,7 @@ class FileHashStore(HashStore):
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
         )
         # Validate input parameters
-        self._is_string_none_or_empty(pid, "pid", "store_metadata")
+        self._validate_string(pid, "pid", "store_metadata")
         checked_format_id = self._validate_arg_format_id(format_id, "store_metadata")
         self._validate_arg_data(metadata)
 
@@ -685,7 +683,7 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_object: Request to retrieve object for pid: %s",
             pid,
         )
-        self._is_string_none_or_empty(pid, "pid", "retrieve_object")
+        self._validate_string(pid, "pid", "retrieve_object")
 
         object_cid = self.find_object(pid)
         entity = "objects"
@@ -713,7 +711,7 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_metadata: Request to retrieve metadata for pid: %s",
             pid,
         )
-        self._is_string_none_or_empty(pid, "pid", "retrieve_metadata")
+        self._validate_string(pid, "pid", "retrieve_metadata")
         checked_format_id = self._validate_arg_format_id(format_id, "retrieve_metadata")
 
         entity = "metadata"
@@ -737,7 +735,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - delete_object: Request to delete object for pid: %s", pid
         )
-        self._is_string_none_or_empty(pid, "pid", "delete_object")
+        self._validate_string(pid, "pid", "delete_object")
         cid = self.find_object(pid)
 
         while cid in self.reference_locked_cids:
@@ -788,7 +786,7 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
         )
-        self._is_string_none_or_empty(pid, "pid", "delete_metadata")
+        self._validate_string(pid, "pid", "delete_metadata")
         checked_format_id = self._validate_arg_format_id(format_id, "delete_metadata")
 
         entity = "metadata"
@@ -806,8 +804,8 @@ class FileHashStore(HashStore):
             "FileHashStore - get_hex_digest: Request to get hex digest for object with pid: %s",
             pid,
         )
-        self._is_string_none_or_empty(pid, "pid", "get_hex_digest")
-        self._is_string_none_or_empty(algorithm, "algorithm", "get_hex_digest")
+        self._validate_string(pid, "pid", "get_hex_digest")
+        self._validate_string(algorithm, "algorithm", "get_hex_digest")
 
         entity = "objects"
         algorithm = self.clean_algorithm(algorithm)
@@ -1565,13 +1563,13 @@ class FileHashStore(HashStore):
             additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
         checksum_algorithm_checked = None
         if checksum is not None:
-            self._is_string_none_or_empty(
+            self._validate_string(
                 checksum_algorithm,
                 "checksum_algorithm",
                 "validate_checksum_args (store_object)",
             )
         if checksum_algorithm is not None:
-            self._is_string_none_or_empty(
+            self._validate_string(
                 checksum,
                 "checksum",
                 "validate_checksum_args (store_object)",
@@ -2088,7 +2086,7 @@ class FileHashStore(HashStore):
                 raise ValueError(exception_string)
 
     @staticmethod
-    def _is_string_none_or_empty(string, arg, method):
+    def _validate_string(string, arg, method):
         """Checks whether a string is None or empty and throws an exception if so.
 
         Args:

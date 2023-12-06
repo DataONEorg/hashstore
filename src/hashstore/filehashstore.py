@@ -2078,7 +2078,7 @@ class FileHashStore(HashStore):
                 )
                 logging.error(exception_string)
                 raise TypeError(exception_string)
-            if file_size < 1 or not isinstance(file_size, int):
+            if file_size < 1:
                 exception_string = (
                     "FileHashStore - _is_int_and_non_negative: size given must be > 0"
                 )

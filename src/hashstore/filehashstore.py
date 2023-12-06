@@ -2096,7 +2096,7 @@ class FileHashStore(HashStore):
             arg (string): Name of argument to check
             method (string): Calling method for logging purposes
         """
-        if string is None or string.replace(" ", "") == "":
+        if string is None or string.strip() == "":
             exception_string = (
                 f"FileHashStore - {method}: {arg} cannot be None"
                 + f" or empty, {arg}: {string}."

@@ -488,14 +488,6 @@ class FileHashStore(HashStore):
     def verify_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
-        """Confirms that an object_metadata's content is equal to the given values.
-
-        Args:
-            object_metadata (ObjectMetadata): object_metadata object
-            checksum (string): Value of checksum
-            checksum_algorithm (string): Algorithm of checksum
-            expected_file_size (int): Size of the tmp file
-        """
         self._validate_string(checksum, "checksum", "verify_object")
         self._validate_string(checksum_algorithm, "checksum_algorithm", "verify_object")
         self._is_int_and_non_negative(expected_file_size)
@@ -1859,8 +1851,8 @@ class FileHashStore(HashStore):
         # This creates a list of `depth` number of tokens with width
         # `width` from the first part of the id plus the remainder.
         hierarchical_list = compact(
-            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
-            + [digest[self.depth * self.width :]]
+            [digest[i * self.width: self.width * (i + 1)] for i in range(self.depth)]
+            + [digest[self.depth * self.width:]]
         )
 
         return hierarchical_list

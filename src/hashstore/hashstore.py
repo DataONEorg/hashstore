@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
 import importlib.metadata
+import importlib.util
 
 
 class HashStore(ABC):
@@ -256,12 +257,12 @@ class HashStoreFactory:
 
 
 class ObjectMetadata(namedtuple("ObjectMetadata", ["id", "obj_size", "hex_digests"])):
-    """File address containing file's path on disk and its content hash ID.
+    """Represents metadata associated with an object.
 
-    Args:
-        ab_id (str): Hash ID (hexdigest) of file contents.
-        obj_size (bytes): Size of the object
-        hex_digests (dict, optional): A list of hex digests to validate objects
+    Attributes:
+        id (str): A unique identifier for the object (Hash ID, hex digest).
+        obj_size (bytes): The size of the object in bytes.
+        hex_digests (list, optional): A list of hex digests to validate objects
             (md5, sha1, sha256, sha384, sha512)
     """
 

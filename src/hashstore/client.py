@@ -392,7 +392,7 @@ class HashStoreClient:
         obj_db_checksum = obj_tuple[2]
 
         with self.hashstore.retrieve_object(pid_guid) as obj_stream:
-            computed_digest = self.hashstore.computehash(obj_stream, algo)
+            computed_digest = self.hashstore.get_hex_digest(obj_stream, algo)
             obj_stream.close()
 
         if computed_digest != obj_db_checksum:

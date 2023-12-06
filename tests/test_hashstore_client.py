@@ -82,7 +82,6 @@ def test_store_object(store, pids):
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         client_module_path = f"{client_directory}/client.py"
         test_store = store.root
         store_object_opt = "-storeobject"
@@ -111,7 +110,6 @@ def test_store_metadata(store, pids):
     test_dir = "tests/testdata/"
     namespace = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         client_module_path = f"{client_directory}/client.py"

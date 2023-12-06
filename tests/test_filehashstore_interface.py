@@ -398,10 +398,10 @@ def test_store_object_duplicates_threads(pids, store):
 
     file_exists_error_flag = False
 
-    def store_object_wrapper(pid, path):
+    def store_object_wrapper(obj_pid, obj_path):
         nonlocal file_exists_error_flag
         try:
-            store.store_object(pid, path)  # Call store_object inside the thread
+            store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
         except FileExistsError:
             file_exists_error_flag = True
 
@@ -444,10 +444,10 @@ def test_store_object_interrupt_process(store):
 
     interrupt_flag = False
 
-    def store_object_wrapper(pid, path):
+    def store_object_wrapper(obj_pid, path):
         print(store.root)
         while not interrupt_flag:
-            store.store_object(pid, path)  # Call store_object inside the thread
+            store.store_object(obj_pid, path)  # Call store_object inside the thread
 
     # Create/start the thread
     thread = threading.Thread(target=store_object_wrapper, args=(pid, file_path))

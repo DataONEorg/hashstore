@@ -2,7 +2,7 @@
 import sys
 import os
 from pathlib import Path
-from hashstore import client
+from hashstore import hashstoreclient
 
 
 def test_create_hashstore(tmp_path):
@@ -29,7 +29,7 @@ def test_create_hashstore(tmp_path):
     sys.path.append(client_directory)
     # Manually change sys args to simulate command line arguments
     sys.argv = chs_args
-    client.main()
+    hashstoreclient.main()
 
     hashstore_yaml = Path(client_test_store + "/hashstore.yaml")
     hashstore_object_path = Path(client_test_store + "/objects")
@@ -66,7 +66,7 @@ def test_get_checksum(capsys, store, pids):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
         capsystext = capsys.readouterr().out
         expected_output = (
@@ -99,7 +99,7 @@ def test_store_object(store, pids):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
         assert store.exists("objects", pids[pid][store.algorithm])
 
@@ -131,7 +131,7 @@ def test_store_metadata(store, pids):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
         assert store.exists("metadata", pids[pid]["metadata_cid"])
 
@@ -159,7 +159,7 @@ def test_retrieve_objects(capsys, pids, store):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
         object_stream = store.retrieve_object(pid)
         object_content = (
@@ -201,7 +201,7 @@ def test_retrieve_metadata(capsys, pids, store):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
         metadata_stream = store.retrieve_metadata(pid, namespace)
         metadata_content = (
@@ -239,7 +239,7 @@ def test_delete_objects(pids, store):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
         assert not store.exists("objects", pids[pid][store.algorithm])
 
@@ -271,6 +271,6 @@ def test_delete_metadata(pids, store):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
         assert not store.exists("metadata", pids[pid]["metadata_cid"])

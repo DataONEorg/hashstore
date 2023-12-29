@@ -1857,10 +1857,12 @@ class FileHashStore(HashStore):
 
         try:
             os.remove(realpath)
-        except OSError:
-            pass
-        else:
-            self._remove_empty(os.path.dirname(realpath))
+        except OSError as err:
+            exception_string = (
+                f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
 
     def _remove_empty(self, subpath):
         """Successively remove all empty folders starting with `subpath` and

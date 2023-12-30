@@ -96,20 +96,70 @@ def test_tag_object_cid_refs_file_exists(pids, store):
         assert not os.path.exists(second_cid_hash)
 
 
-def test_tag_object_cid_refs_update(pids, store):
+def test_tag_object_cid_refs_update_cid_refs_updated(store):
     """Test tag object updates a cid reference file that already exists."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(None, path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
-        store.tag_object("dou.test.1", cid)
-        cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
-        with open(cid_ref_abs_path, "r", encoding="utf8") as f:
-            cid_ref_file_pid = f.read()
+    pid = "jtao.1700.1"
+    path = test_dir + pid.replace("/", "_")
+    # Store data only
+    object_metadata = store.store_object(None, path)
+    cid = object_metadata.id
+    # Tag object
+    store.tag_object(pid, cid)
+    # Tag the cid with another pid
+    additional_pid = "dou.test.1"
+    store.tag_object(additional_pid, cid)
 
-        assert "dou.test.1" in cid_ref_file_pid
+    # Read cid file to confirm cid refs file contains the additional pid
+    cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
+    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+        for _, line in enumerate(f, start=1):
+            value = line.strip()
+            assert value == pid or value == additional_pid
+
+
+def test_tag_object_cid_refs_update_pid_refs_created(store):
+    """Test tag object creates a pid reference file when called to tag an object
+    that already exists."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid.replace("/", "_")
+    # Store data only
+    object_metadata = store.store_object(None, path)
+    cid = object_metadata.id
+    # Tag object
+    store.tag_object(pid, cid)
+    # Tag the cid with another pid
+    additional_pid = "dou.test.1"
+    store.tag_object(additional_pid, cid)
+
+    pid_refs_file_path = store.get_refs_abs_path("pid", additional_pid)
+    assert os.path.exists(pid_refs_file_path)
+
+
+def test_tag_object_cid_refs_update_pid_found_but_file_missing(store):
+    """Test that tag_object creates a missing pid refs file that somehow disappeared
+    when called to tag a cid that already contains the pid."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid.replace("/", "_")
+    object_metadata = store.store_object(None, path)
+    store.tag_object(pid, object_metadata.id)
+    cid = object_metadata.id
+    # Manually update the cid refs, pid refs file missing at this point
+    additional_pid = "dou.test.1"
+    cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
+    store._update_cid_refs(cid_ref_abs_path, additional_pid)
+
+    # Confirm the pid refs file is missing
+    pid_refs_file_path = store.get_refs_abs_path("pid", additional_pid)
+    assert not os.path.exists(pid_refs_file_path)
+
+    # Call tag_object, this should create the missing pid refs file
+    store.tag_object(additional_pid, cid)
+
+    # Confirm it has been created
+    assert os.path.exists(pid_refs_file_path)
 
 
 def test_verify_object(pids, store):
@@ -278,14 +328,15 @@ def test_update_cid_refs_content_multiple(pids, store):
 
 
 def test_update_cid_refs_content_pid_exists(pids, store):
-    """Test that update_cid_ref throws exception if pid already exists."""
+    """Test that update_cid_ref does not throw exception if pid already exists
+    and proceeds to complete the tagging process (verify_object)"""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
         store._write_cid_refs_file(cid_ref_abs_path, pid)
-        with pytest.raises(ValueError):
-            store._update_cid_refs(cid_ref_abs_path, pid)
+        # Exception should not be thrown
+        store._update_cid_refs(cid_ref_abs_path, pid)
 
 
 def test_update_cid_refs_content_cid_refs_does_not_exist(pids, store):

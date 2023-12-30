@@ -1240,11 +1240,12 @@ class FileHashStore(HashStore):
                 for _, line in enumerate(f, start=1):
                     value = line.strip()
                     if pid == value:
-                        err_msg = (
+                        warning_msg = (
                             f"FileHashStore - update_cid_refs: pid ({pid}) already reference in"
                             + f" cid reference file: {cid_ref_abs_path} "
                         )
-                        raise ValueError(err_msg)
+                        logging.warning(warning_msg)
+                        return
 
             with open(cid_ref_abs_path, "a+", encoding="utf8") as cid_ref_file:
                 fcntl.flock(cid_ref_file, fcntl.LOCK_EX)

@@ -505,7 +505,7 @@ class FileHashStore(HashStore):
                 pid=None,
                 checksum=checksum,
                 checksum_algorithm=checksum_algorithm_checked,
-                entity=None,
+                entity="objects",
                 hex_digests=object_metadata_hex_digests,
                 tmp_file_name=None,
                 tmp_file_size=object_metadata_file_size,
@@ -1572,7 +1572,8 @@ class FileHashStore(HashStore):
         tmp_file_size,
         file_size_to_validate,
     ):
-        """Evaluates an object's integrity and raises an exception if there is a mismatch.
+        """Evaluates an object's integrity - if there is a mismatch, deletes the object
+        in question and raises an exception.
 
         :param str pid: For logging purposes.
         :param str checksum: Value of the checksum to check.
@@ -1619,6 +1620,7 @@ class FileHashStore(HashStore):
                         + f" HexDigest: {hex_digest_stored}."
                     )
                     if pid is not None:
+                        # Delete the tmp file
                         self.delete(entity, tmp_file_name)
                         exception_string_for_pid = (
                             exception_string + f"Tmp file ({tmp_file_name}) deleted."
@@ -1626,6 +1628,10 @@ class FileHashStore(HashStore):
                         logging.error(exception_string_for_pid)
                         raise ValueError(exception_string_for_pid)
                     else:
+                        # Delete the object
+                        cid = hex_digests[self.algorithm]
+                        cid_abs_path = self.get_refs_abs_path("cid", cid)
+                        self.delete(entity, cid_abs_path)
                         logging.error(exception_string)
                         raise ValueError(exception_string)
 

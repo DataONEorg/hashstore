@@ -168,8 +168,6 @@ def test_verify_object(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
@@ -185,8 +183,6 @@ def test_verify_object_exception_incorrect_object_metadata_type(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
@@ -202,12 +198,15 @@ def test_verify_object_exception_incorrect_size(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
         with pytest.raises(ValueError):
             store.verify_object(object_metadata, checksum, checksum_algorithm, 1000)
+
+        cid = object_metadata.id
+        cid = object_metadata.hex_digests[store.algorithm]
+        cid_abs_path = store.get_refs_abs_path("cid", cid)
+        assert not os.path.exists(cid_abs_path)
 
 
 def test_verify_object_exception_incorrect_checksum(pids, store):
@@ -225,6 +224,11 @@ def test_verify_object_exception_incorrect_checksum(pids, store):
                 object_metadata, "abc123", checksum_algorithm, expected_file_size
             )
 
+        cid = object_metadata.id
+        cid = object_metadata.hex_digests[store.algorithm]
+        cid_abs_path = store.get_refs_abs_path("cid", cid)
+        assert not os.path.exists(cid_abs_path)
+
 
 def test_verify_object_exception_incorrect_checksum_algo(pids, store):
     """Test verify object raises exception when incorrect algorithm is supplied."""
@@ -232,8 +236,6 @@ def test_verify_object_exception_incorrect_checksum_algo(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
-        cid = object_metadata.id
-        store.tag_object(pid, cid)
         checksum = object_metadata.hex_digests.get(store.algorithm)
         expected_file_size = object_metadata.obj_size
         with pytest.raises(ValueError):

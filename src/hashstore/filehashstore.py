@@ -541,29 +541,42 @@ class FileHashStore(HashStore):
         try:
             pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+            # Ensure refs tmp folder exists
+            tmp_root_path = self.get_store_path("refs") / "tmp"
+            if os.path.exists(tmp_root_path) is False:
+                self.create_path(tmp_root_path)
+
+            # Proceed to tagging process
             if os.path.exists(pid_ref_abs_path):
+                print("Path exists:\n")
+                print(pid_ref_abs_path)
                 # A pid reference file can only contain one cid
                 exception_string = (
-                    "FileHashStore - write_pid_refs_file: pid ref file already exists for %s",
-                    pid_ref_abs_path,
+                    "FileHashStore - write_pid_refs_file: pid ref file already exists for"
+                    + pid_ref_abs_path
                 )
                 logging.error(exception_string)
                 raise FileExistsError(exception_string)
             elif os.path.exists(cid_ref_abs_path):
+                # Create the pid refs file
+                pid_tmp_file = self._mktmpfile(tmp_root_path)
+                pid_tmp_file_path = pid_tmp_file.name
+                self._write_pid_refs_file(pid_tmp_file_path, cid)
+                # Create path for pid ref file in '.../refs/pid'
+                self.create_path(os.path.dirname(pid_ref_abs_path))
+                shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 # Update cid ref files if it already exists
                 self._update_cid_refs(cid_ref_abs_path, pid)
+                # Verify refs file content
+                self._verify_hashstore_references(pid, cid)
                 logging.info(
                     "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
                     cid,
                     pid,
                 )
+                return True
             else:
                 # All ref files begin as tmp files and get moved sequentially at once
-                # Ensure refs tmp folder exists
-                tmp_root_path = self.get_store_path("refs") / "tmp"
-                if os.path.exists(tmp_root_path) is False:
-                    self.create_path(tmp_root_path)
-
                 # Then write pid_refs_file content into tmp file
                 pid_tmp_file = self._mktmpfile(tmp_root_path)
                 pid_tmp_file_path = pid_tmp_file.name

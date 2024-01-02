@@ -1330,8 +1330,8 @@ class FileHashStore(HashStore):
                     "FileHashStore - _delete_cid_refs_file: Failed to delete cid reference file."
                     + f" File is not empty: {cid_ref_abs_path} "
                 )
-                logging.error(err_msg)
-                raise OSError(err_msg)
+                logging.warning(err_msg)
+                return False
             else:
                 os.remove(cid_ref_abs_path)
                 return True

@@ -404,8 +404,8 @@ def test_delete_cid_refs_file_file_not_empty(pids, store):
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
         store._write_cid_refs_file(cid_ref_abs_path, pid)
-        with pytest.raises(OSError):
-            store._delete_cid_refs_file(cid_ref_abs_path)
+        is_cid_refs_file_deleted = store._delete_cid_refs_file(cid_ref_abs_path)
+        assert not is_cid_refs_file_deleted
 
 
 def test_delete_cid_refs_file_file_not_found(pids, store):

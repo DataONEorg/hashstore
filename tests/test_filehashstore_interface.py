@@ -839,21 +839,16 @@ def test_delete_objects_cid_refs_file(pids, store):
 def test_delete_objects_cid_refs_file_with_pid_refs_remaining(pids, store):
     """Test delete_object does not delete the cid refs file that still contains ref."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.id
         cid_refs_abs_path = store.get_refs_abs_path("cid", cid)
         # pylint: disable=W0212
         store._update_cid_refs(cid_refs_abs_path, "dou.test.1")
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        with pytest.raises(OSError):
-            store.delete_object(pid)
-            cid_refs_file_path = store.get_refs_abs_path("cid", cid)
-            assert os.path.exists(cid_refs_file_path)
+        store.delete_object(pid)
+        cid_refs_file_path = store.get_refs_abs_path("cid", cid)
+        assert os.path.exists(cid_refs_file_path)
 
 
 def test_delete_object_pid_empty(store):

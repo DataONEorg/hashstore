@@ -264,10 +264,11 @@ class HashStoreClient:
         :param str obj_type: Type of objects ('object' or 'metadata').
         :param int num: Number of files to store.
         """
-        info_msg = f"HashStore Client - Begin storing {obj_type} objects."
+        info_msg = f"HashStoreClient - Begin storing {obj_type} objects."
         logging.info(info_msg)
         # Object and Metadata list
         metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
+        logging.info(info_msg)
 
         # Get list of objects to store from metacat db
         if obj_type == self.OBJ_TYPE:
@@ -619,35 +620,25 @@ class MetacatDB:
             item_checksum_algorithm = tuple_item[4]
             if os.path.exists(filepath_docid_rev):
                 if action == "store":
-                    # If the file has already been stored, skip it
-                    if not self.hashstore.exists(
-                        "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
-                    ):
-                        # This tuple is formed to match 'HashStore' store_object's signature
-                        # Which is '.starmap()'ed when called
-                        store_object_tuple_item = (
-                            pid_guid,
-                            filepath_docid_rev,
-                            None,
-                            item_checksum,
-                            item_checksum_algorithm,
-                        )
-                        refined_object_list.append(store_object_tuple_item)
+                    # This tuple is formed to match 'HashStore' store_object's signature
+                    # Which is '.starmap()'ed when called
+                    store_object_tuple_item = (
+                        pid_guid,
+                        filepath_docid_rev,
+                        None,
+                        item_checksum,
+                        item_checksum_algorithm,
+                    )
+                    refined_object_list.append(store_object_tuple_item)
                 if action == "retrieve":
-                    if self.hashstore.exists(
-                        "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
-                    ):
-                        retrieve_object_tuple_item = (
-                            pid_guid,
-                            item_checksum_algorithm,
-                            item_checksum,
-                        )
-                        refined_object_list.append(retrieve_object_tuple_item)
+                    retrieve_object_tuple_item = (
+                        pid_guid,
+                        item_checksum_algorithm,
+                        item_checksum,
+                    )
+                    refined_object_list.append(retrieve_object_tuple_item)
                 if action == "delete":
-                    if self.hashstore.exists(
-                        "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
-                    ):
-                        refined_object_list.append(pid_guid)
+                    refined_object_list.append(pid_guid)
 
         return refined_object_list
 
@@ -672,41 +663,22 @@ class MetacatDB:
             item_checksum_algorithm = tuple_item[4]
             if os.path.exists(filepath_docid_rev):
                 if action == "store":
-                    # If the file has already been stored, skip it
-                    if not self.hashstore.exists(
-                        "metadata",
-                        self.hashstore.get_sha256_hex_digest(
-                            pid_guid + metadata_namespace
-                        ),
-                    ):
-                        tuple_item = (pid_guid, filepath_docid_rev, metadata_namespace)
-                        refined_metadata_list.append(tuple_item)
+                    tuple_item = (pid_guid, filepath_docid_rev, metadata_namespace)
+                    refined_metadata_list.append(tuple_item)
                 if action == "retrieve":
-                    if self.hashstore.exists(
-                        "metadata",
-                        self.hashstore.get_sha256_hex_digest(
-                            pid_guid + metadata_namespace
-                        ),
-                    ):
-                        tuple_item = (
-                            pid_guid,
-                            metadata_namespace,
-                            item_checksum,
-                            item_checksum_algorithm,
-                        )
-                        refined_metadata_list.append(tuple_item)
+                    tuple_item = (
+                        pid_guid,
+                        metadata_namespace,
+                        item_checksum,
+                        item_checksum_algorithm,
+                    )
+                    refined_metadata_list.append(tuple_item)
                 if action == "delete":
-                    if self.hashstore.exists(
-                        "metadata",
-                        self.hashstore.get_sha256_hex_digest(
-                            pid_guid + metadata_namespace
-                        ),
-                    ):
-                        tuple_item = (
-                            pid_guid,
-                            metadata_namespace,
-                        )
-                        refined_metadata_list.append(tuple_item)
+                    tuple_item = (
+                        pid_guid,
+                        metadata_namespace,
+                    )
+                    refined_metadata_list.append(tuple_item)
         return refined_metadata_list
 
 

@@ -1160,30 +1160,53 @@ class FileHashStore(HashStore):
                     )
                     logging.error(exception_string)
 
-    def _mktmpfile(self, path):
+    def _mktmpfile(self, path, max_retry=10, wait_delay=60):
         """Create a temporary file at the given path ready to be written.
 
         :param str path: Path to the file location.
 
         :return: file object - object with a file-like interface.
         """
-        tmp = NamedTemporaryFile(dir=path, delete=False)
-
-        # Delete tmp file if python interpreter crashes or thread is interrupted
-        def delete_tmp_file():
-            if os.path.exists(tmp.name):
-                os.remove(tmp.name)
-
-        atexit.register(delete_tmp_file)
-
-        # Ensure tmp file is created with desired permissions
-        if self.fmode is not None:
-            oldmask = os.umask(0)
+        # HashStore's primary purpose of storing objects can require the usage of
+        # many file descriptors in concurrency/parallel settings, causing the limit
+        # allowed by an OS to be quickly reached (and preventing files from being stored)
+        # We will re-try generating the temp file to minimize non-critical errors.
+        #
+        # To see the limit on Linux, run the command `ulimit -n`
+        attempt = 1
+        while attempt <= max_retry:
             try:
-                os.chmod(tmp.name, self.fmode)
-            finally:
-                os.umask(oldmask)
-        return tmp
+                tmp = NamedTemporaryFile(dir=path, delete=False)
+
+                # Delete tmp file if python interpreter crashes or thread is interrupted
+                def delete_tmp_file():
+                    if os.path.exists(tmp.name):
+                        os.remove(tmp.name)
+
+                atexit.register(delete_tmp_file)
+
+                # Ensure tmp file is created with desired permissions
+                if self.fmode is not None:
+                    oldmask = os.umask(0)
+                    try:
+                        os.chmod(tmp.name, self.fmode)
+                    finally:
+                        os.umask(oldmask)
+                return tmp
+            except OSError as ose:
+                if "Too many open files" in str(ose):
+                    warn_string = (
+                        f"FileHashStore - mktmpfile: {ose}."
+                        + " Retrying after {wait_delay} seconds."
+                    )
+                    logging.warning(warn_string)
+                    attempt += 1
+                    time.sleep(wait_delay)
+                else:
+                    # If the error is not related to "Too many open files", raise it
+                    exception_string = f"FileHashStore - mktmpfile: {ose}"
+                    logging.error(exception_string)
+                    raise ose
 
     def _write_cid_refs_file(self, path, pid):
         """Write the CID reference file in the supplied path to a file. A reference file

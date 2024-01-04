@@ -430,7 +430,12 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
         input_stream = io.open(path, "rb")
         with pytest.raises(FileExistsError):
             # pylint: disable=W0212
-            store._move_and_get_checksums(pid, input_stream)
+            store._move_and_get_checksums(
+                pid,
+                input_stream,
+                checksum="nonmatchingchecksum",
+                checksum_algorithm="sha256",
+            )
             input_stream.close()
     assert store.count(entity) == 3
 

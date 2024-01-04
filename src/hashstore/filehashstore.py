@@ -1054,14 +1054,29 @@ class FileHashStore(HashStore):
                 logging.error("FileHashStore - _move_and_get_checksums: %s", err_msg)
                 raise
         else:
-            # Else delete temporary file
-            exception_string = (
-                "FileHashStore - _move_and_get_checksums: Object already exists at:"
-                + f" {abs_file_path}, deleting temporary file."
-            )
-            logging.error(exception_string)
-            self.delete(entity, tmp_file_name)
-            raise FileExistsError(exception_string)
+            # If the file exists, determine if the object is what the client states it to be
+            try:
+                self._validate_arg_object(
+                    pid,
+                    checksum,
+                    checksum_algorithm,
+                    entity,
+                    hex_digests,
+                    tmp_file_name,
+                    tmp_file_size,
+                    file_size_to_validate,
+                )
+            except Exception as ge:
+                # If any exception is thrown during validation, 
+                exception_string = (
+                    "FileHashStore - _move_and_get_checksums: Object exists but cannot be verified"
+                    + f" (validation error): {abs_file_path}, deleting temporary file. Error: {ge}"
+                )
+                logging.error(exception_string)
+                raise FileExistsError from ge
+            finally:
+                # Delete the temporary file, it already exists so it is redundant
+                self.delete(entity, tmp_file_name)
 
         return object_cid, tmp_file_size, hex_digests
 
@@ -2061,6 +2076,10 @@ class FileHashStore(HashStore):
             directory_to_count = self.objects
         elif entity == "metadata":
             directory_to_count = self.metadata
+        elif entity == "pid":
+            directory_to_count = self.refs + "/pid"
+        elif entity == "cid":
+            directory_to_count = self.refs + "/cid"
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"

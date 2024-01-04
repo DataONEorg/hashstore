@@ -331,8 +331,72 @@ def test_store_object_checksum_incorrect_checksum(store):
         )
 
 
-def test_store_object_duplicate_raises_error(pids, store):
-    """Test store duplicate object throws FileExistsError."""
+def test_store_object_duplicate_does_not_store_duplicate(store):
+    """Test that storing duplicate object does not store object twice."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    entity = "objects"
+    # Store first blob
+    _object_metadata_one = store.store_object(pid, path)
+    # Store second blob
+    pid_that_refs_existing_cid = "dou.test.1"
+    _object_metadata_two = store.store_object(pid_that_refs_existing_cid, path)
+    # Confirm only one object exists and the tmp file created is deleted
+    assert store.count(entity) == 1
+
+
+def test_store_object_duplicate_references_files(pids, store):
+    """Test that storing duplicate object but different pid creates the expected
+    amount of reference files."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    # Store with first pid
+    _object_metadata_one = store.store_object(pid, path)
+    # Store with second pid
+    pid_two = "dou.test.1"
+    _object_metadata_two = store.store_object(pid_two, path)
+    # Store with third pid
+    pid_three = "dou.test.2"
+    _object_metadata_three = store.store_object(pid_three, path)
+    # Confirm that there are 3 pid reference files
+    assert store.count("pid") == 3
+    # Confirm that there are 1 cid reference files
+    assert store.count("cid") == 1
+    # Confirm the content of the cid refence files
+    cid_ref_abs_path = store.get_refs_abs_path("cid", pids[pid][store.algorithm])
+    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+        for _, line in enumerate(f, start=1):
+            value = line.strip()
+            assert value == pid or value == pid_two or value == pid_three
+
+
+def test_store_object_duplicate_references_content(pids, store):
+    """Test that storing duplicate object but different pid creates the expected
+    amount of reference files."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    # Store with first pid
+    store.store_object(pid, path)
+    # Store with second pid
+    pid_two = "dou.test.1"
+    store.store_object(pid_two, path)
+    # Store with third pid
+    pid_three = "dou.test.2"
+    store.store_object(pid_three, path)
+    # Confirm the content of the cid refence files
+    cid_ref_abs_path = store.get_refs_abs_path("cid", pids[pid][store.algorithm])
+    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+        for _, line in enumerate(f, start=1):
+            value = line.strip()
+            assert value == pid or value == pid_two or value == pid_three
+
+
+def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, store):
+    """Test store duplicate object throws FileExistsError when object exists
+    but the data to validate against is incorrect."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -341,7 +405,9 @@ def test_store_object_duplicate_raises_error(pids, store):
     _object_metadata_one = store.store_object(pid, path)
     # Store second blob
     with pytest.raises(FileExistsError):
-        _object_metadata_two = store.store_object(pid, path)
+        _object_metadata_two = store.store_object(
+            pid, path, checksum="nonmatchingchecksum", checksum_algorithm="sha256"
+        )
     assert store.count(entity) == 1
     assert store.exists(entity, pids[pid][store.algorithm])
 

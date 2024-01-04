@@ -476,6 +476,13 @@ class FileHashStore(HashStore):
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,
                 )
+            except Exception as err:
+                exception_string = (
+                    "FileHashStore - store_object: failed to store object."
+                    + f" Unexpected {err=}, {type(err)=}"
+                )
+                logging.error(exception_string)
+                raise err
             finally:
                 # Release pid
                 with self.object_lock:
@@ -931,7 +938,7 @@ class FileHashStore(HashStore):
         # pylint: disable=W0718
         except Exception as err:
             exception_string = (
-                "FileHashStore - store_object: failed to store object."
+                "FileHashStore - store_object (store_data_only): failed to store object."
                 + f" Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
@@ -1067,7 +1074,7 @@ class FileHashStore(HashStore):
                     file_size_to_validate,
                 )
             except Exception as ge:
-                # If any exception is thrown during validation, 
+                # If any exception is thrown during validation,
                 exception_string = (
                     "FileHashStore - _move_and_get_checksums: Object exists but cannot be verified"
                     + f" (validation error): {abs_file_path}, deleting temporary file. Error: {ge}"

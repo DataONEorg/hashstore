@@ -571,7 +571,7 @@ class FileHashStore(HashStore):
                 )
                 logging.error(exception_string)
                 raise FileExistsError(exception_string)
-            
+
             elif os.path.exists(cid_ref_abs_path):
                 # Create the pid refs file
                 pid_tmp_file_path = self._write_pid_refs_file(tmp_root_path, cid)
@@ -586,7 +586,7 @@ class FileHashStore(HashStore):
                     pid,
                 )
                 return True
-            
+
             else:
                 # All ref files begin as tmp files and get moved sequentially at once
                 # Get tmp files with the expected cid and pid refs content
@@ -1206,6 +1206,7 @@ class FileHashStore(HashStore):
         :param str pid: Authority-based or persistent identifier of the object.
 
         :return: cid_tmp_file_path - Path to the cid tmp file
+        :rtype: string
         """
         logging.debug(
             "FileHashStore - write_cid_refs_file: Writing pid (%s) into file: %s",
@@ -1226,8 +1227,8 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                f"FileHashStore - write_cid_refs_file: failed to write pid ({pid})"
-                + f" into path: {path}. Unexpected {err=}, {type(err)=}"
+                "FileHashStore - write_cid_refs_file: failed to write cid refs file for pid:"
+                + f"  {pid} into path: {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
@@ -1319,7 +1320,7 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - _delete_cid_refs_pid: failed to update reference for cid:"
+                "FileHashStore - _delete_cid_refs_pid: failed to remove pid from cid refs file:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
@@ -1359,18 +1360,21 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - _delete_cid_refs_file: failed to delete reference file:"
+                "FileHashStore - _delete_cid_refs_file: failed to delete cid refs file:"
                 + f" {cid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
 
     def _write_pid_refs_file(self, path, cid):
-        """Write the PID reference file in the supplied path for the given CID (content
+        """Generate a tmp pid refs file into the given path for the given CID (content
         identifier). A reference file for a PID contains the CID that it references.
 
         :param str path: Path of the file to be written into.
         :param str cid: Content identifier.
+
+        :return: pid_tmp_file_path
+        :rtype: string
         """
         logging.debug(
             "FileHashStore - _write_pid_refs_file: Writing cid (%s) into file: %s",
@@ -1392,7 +1396,7 @@ class FileHashStore(HashStore):
         except Exception as err:
             exception_string = (
                 f"FileHashStore - _write_pid_refs_file: failed to write cid ({cid})"
-                + f" in : {path}. Unexpected {err=}, {type(err)=}"
+                + f" into pid refs file: {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
@@ -1420,7 +1424,7 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - _delete_pid_refs_file: failed to delete reference file:"
+                "FileHashStore - _delete_pid_refs_file: failed to delete pid refs file:"
                 + f" {pid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)

@@ -1217,7 +1217,7 @@ class FileHashStore(HashStore):
             cid_tmp_file = self._mktmpfile(path)
             cid_tmp_file_path = cid_tmp_file.name
             with open(cid_tmp_file_path, "w", encoding="utf8") as tmp_cid_ref_file:
-                fcntl.flock(tmp_cid_ref_file, fcntl.LOCK_EX)
+                # fcntl.flock(tmp_cid_ref_file, fcntl.LOCK_EX)
                 tmp_cid_ref_file.write(pid + "\n")
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
@@ -1254,7 +1254,7 @@ class FileHashStore(HashStore):
 
         try:
             with open(cid_ref_abs_path, "a+", encoding="utf8") as cid_ref_file:
-                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                # fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
                 for _, line in enumerate(cid_ref_file, start=1):
                     value = line.strip()
                     if pid == value:
@@ -1294,7 +1294,7 @@ class FileHashStore(HashStore):
         )
         try:
             with open(cid_ref_abs_path, "r+", encoding="utf8") as cid_ref_file:
-                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                # fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
                 # Read the ref file to see if the pid is already referencing the cid
                 cid_ref_file_content = cid_ref_file.read()
 
@@ -1384,7 +1384,7 @@ class FileHashStore(HashStore):
             pid_tmp_file = self._mktmpfile(path)
             pid_tmp_file_path = pid_tmp_file.name
             with open(pid_tmp_file_path, "w", encoding="utf8") as pid_ref_file:
-                fcntl.flock(pid_ref_file, fcntl.LOCK_EX)
+                # fcntl.flock(pid_ref_file, fcntl.LOCK_EX)
                 pid_ref_file.write(cid)
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below

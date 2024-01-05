@@ -243,7 +243,7 @@ def test_verify_object_exception_incorrect_checksum_algo(pids, store):
             store.verify_object(object_metadata, checksum, "md2", expected_file_size)
 
 
-def test_write_cid_refs_file(pids, store):
+def test_write_cid_refs_file(store):
     """Test that write_cid_reference writes a reference file."""
     tmp_root_path = store.get_store_path("refs") / "tmp"
     tmp_cid_refs_file = store._write_cid_refs_file(tmp_root_path, "test_pid")

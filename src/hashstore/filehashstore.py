@@ -144,13 +144,11 @@ class FileHashStore(HashStore):
             logging.critical(exception_string)
             raise FileNotFoundError(exception_string)
 
-        try:
-            # Open file
-            with open(
-                self.hashstore_configuration_yaml, "r", encoding="utf-8"
-            ) as hs_yaml_file:
-                yaml_data = yaml.safe_load(hs_yaml_file)
-        finally:
+        # Open file
+        with open(
+            self.hashstore_configuration_yaml, "r", encoding="utf-8"
+        ) as hs_yaml_file:
+            yaml_data = yaml.safe_load(hs_yaml_file)
             hs_yaml_file.close()
 
         # Get hashstore properties
@@ -225,18 +223,16 @@ class FileHashStore(HashStore):
             store_metadata_namespace,
         )
         # Write 'hashstore.yaml'
-        try:
-            with open(
-                self.hashstore_configuration_yaml, "w", encoding="utf-8"
-            ) as hs_yaml_file:
-                hs_yaml_file.write(hashstore_configuration_yaml)
-            logging.debug(
-                "FileHashStore - write_properties: Configuration file written to: %s",
-                self.hashstore_configuration_yaml,
-            )
-        finally:
+        with open(
+            self.hashstore_configuration_yaml, "w", encoding="utf-8"
+        ) as hs_yaml_file:
+            hs_yaml_file.write(hashstore_configuration_yaml)
             hs_yaml_file.close()
 
+        logging.debug(
+            "FileHashStore - write_properties: Configuration file written to: %s",
+            self.hashstore_configuration_yaml,
+        )
         return
 
     @staticmethod
@@ -397,12 +393,10 @@ class FileHashStore(HashStore):
             logging.critical(exception_string)
             raise FileNotFoundError(exception_string)
 
-        try:
-            with open(
-                self.hashstore_configuration_yaml, "r", encoding="utf-8"
-            ) as hs_yaml_file:
-                yaml_data = yaml.safe_load(hs_yaml_file)
-        finally:
+        with open(
+            self.hashstore_configuration_yaml, "r", encoding="utf-8"
+        ) as hs_yaml_file:
+            yaml_data = yaml.safe_load(hs_yaml_file)
             hs_yaml_file.close()
 
         # Set default store algorithm
@@ -570,8 +564,6 @@ class FileHashStore(HashStore):
 
             # Proceed to tagging process
             if os.path.exists(pid_ref_abs_path):
-                print("Path exists:\n")
-                print(pid_ref_abs_path)
                 # A pid reference file can only contain one cid
                 exception_string = (
                     "FileHashStore - write_pid_refs_file: pid ref file already exists for"
@@ -579,14 +571,14 @@ class FileHashStore(HashStore):
                 )
                 logging.error(exception_string)
                 raise FileExistsError(exception_string)
+            
             elif os.path.exists(cid_ref_abs_path):
                 # Create the pid refs file
                 pid_tmp_file_path = self._write_pid_refs_file(tmp_root_path, cid)
                 self.create_path(os.path.dirname(pid_ref_abs_path))
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
-                # Update cid ref files if it already exists
+                # Update cid ref files as it already exists
                 self._update_cid_refs(cid_ref_abs_path, pid)
-                # Verify refs file content
                 self._verify_hashstore_references(pid, cid)
                 logging.info(
                     "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
@@ -594,6 +586,7 @@ class FileHashStore(HashStore):
                     pid,
                 )
                 return True
+            
             else:
                 # All ref files begin as tmp files and get moved sequentially at once
                 # Get tmp files with the expected cid and pid refs content
@@ -639,10 +632,8 @@ class FileHashStore(HashStore):
             raise FileNotFoundError(err_msg)
         else:
             # Read the file to get the cid from the pid reference
-            try:
-                with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
-                    pid_refs_cid = pid_ref_file.read()
-            finally:
+            with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                pid_refs_cid = pid_ref_file.read()
                 pid_ref_file.close()
 
         return pid_refs_cid
@@ -770,8 +761,7 @@ class FileHashStore(HashStore):
             # Remove pid from cid reference file
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
             self._delete_cid_refs_pid(cid_ref_abs_path, pid)
-            # Delete cid reference file
-            # If the file is not empty, it will not be deleted.
+            # Delete cid reference file, if the file is not empty, it will not be deleted.
             cid_refs_deleted = self._delete_cid_refs_file(cid_ref_abs_path)
             # Delete pid reference file
             pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
@@ -1277,6 +1267,7 @@ class FileHashStore(HashStore):
 
                 fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
                 cid_ref_file.write(pid + "\n")
+                cid_ref_file.close()
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
@@ -1289,9 +1280,6 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise err
-
-        finally:
-            cid_ref_file.close()
 
     def _delete_cid_refs_pid(self, cid_ref_abs_path, pid):
         """Delete a PID from a CID reference file.
@@ -1311,6 +1299,7 @@ class FileHashStore(HashStore):
                 cid_ref_file_content = cid_ref_file.read()
 
                 if pid not in cid_ref_file_content:
+                    cid_ref_file.close()
                     err_msg = (
                         f"FileHashStore - _delete_cid_refs_pid: pid ({pid}) does not exist in"
                         + f" cid reference file: {cid_ref_abs_path} "
@@ -1325,6 +1314,7 @@ class FileHashStore(HashStore):
                     # The context manager will take care of releasing the lock
                     # But the code to explicitly release the lock if desired is below
                     # fcntl.flock(f, fcntl.LOCK_UN)
+                    cid_ref_file.close()
             return
 
         except Exception as err:
@@ -1334,9 +1324,6 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise err
-
-        finally:
-            cid_ref_file.close()
 
     def _delete_cid_refs_file(self, cid_ref_abs_path):
         """Delete a CID reference file. There must be no references remaining.
@@ -1729,14 +1716,11 @@ class FileHashStore(HashStore):
             raise ValueError(exception_string)
         # Then the pid
         pid_found = False
-        try:
-            with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
-                for _, line in enumerate(cid_ref_file, start=1):
-                    value = line.strip()
-                    if value == pid:
-                        pid_found = True
-                cid_ref_file.close()
-        finally:
+        with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
+            for _, line in enumerate(cid_ref_file, start=1):
+                value = line.strip()
+                if value == pid:
+                    pid_found = True
             cid_ref_file.close()
 
         if not pid_found:

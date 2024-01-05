@@ -577,7 +577,7 @@ class FileHashStore(HashStore):
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 # Update cid ref files as it already exists
                 self._update_cid_refs(cid_ref_abs_path, pid)
-                self._verify_hashstore_references(pid, cid)
+                self._verify_hashstore_references(pid, cid, "update")
                 logging.info(
                     "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
                     cid,
@@ -598,7 +598,7 @@ class FileHashStore(HashStore):
                 shutil.move(cid_tmp_file_path, cid_ref_abs_path)
                 # Ensure that the reference files have been written as expected
                 # If there is an issue, client or user will have to manually review
-                self._verify_hashstore_references(pid, cid)
+                self._verify_hashstore_references(pid, cid, "create")
 
                 logging.info(
                     "FileHashStore - tag_object: Successfully tagged cid: %s with pid %s",
@@ -1677,27 +1677,30 @@ class FileHashStore(HashStore):
             checked_format_id = format_id
         return checked_format_id
 
-    def _verify_hashstore_references(self, pid, cid):
+    def _verify_hashstore_references(self, pid, cid, verify_type):
         """Verifies that the supplied pid and pid reference file and content have been
         written successfully.
 
         :param str pid: Authority-based or persistent identifier.
         :param str cid: Content identifier.
+        :param str verify_type: "update" or "create"
         """
         # Check that reference files were created
         pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
         cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
         if not os.path.exists(pid_ref_abs_path):
             exception_string = (
-                "FileHashStore - _verify_hashstore_references: Pid refs file missing: %s",
-                pid_ref_abs_path,
+                "FileHashStore - _verify_hashstore_references: Pid refs file missing: "
+                + pid_ref_abs_path
+                + f" . Verify type {verify_type}"
             )
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
         if not os.path.exists(cid_ref_abs_path):
             exception_string = (
-                "FileHashStore - _verify_hashstore_references: Cid refs file missing: %s",
-                cid_ref_abs_path,
+                "FileHashStore - _verify_hashstore_references: Cid refs file missing: "
+                + cid_ref_abs_path
+                + f" . Verify type {verify_type}"
             )
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
@@ -1708,6 +1711,7 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file exists"
                 + f" ({pid_ref_abs_path}) but cid ({cid}) does not match."
+                + f"Verify type {verify_type}"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
@@ -1724,6 +1728,7 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file exists"
                 + f" ({cid_ref_abs_path}) but pid ({pid}) not found."
+                + f"Verify type {verify_type}"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)

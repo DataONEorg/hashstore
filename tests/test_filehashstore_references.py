@@ -337,7 +337,6 @@ def test_delete_cid_refs_pid_pid_not_found(pids, store):
     for pid in pids.keys():
         tmp_root_path = store.get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_cid_refs_file(tmp_root_path, pid)
-
         pid_other = "dou.test.1"
         store._update_cid_refs(tmp_cid_refs_file, pid_other)
         with pytest.raises(ValueError):
@@ -379,21 +378,18 @@ def test_write_pid_refs_file(pids, store):
     """Test that write_pid_refs_file writes a reference file."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
-        pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
-        store.create_path(os.path.dirname(pid_ref_abs_path))
-        store._write_pid_refs_file(pid_ref_abs_path, cid)
-        assert os.path.exists(pid_ref_abs_path)
+        tmp_root_path = store.get_store_path("refs") / "tmp"
+        tmp_pid_refs_file = store._write_pid_refs_file(tmp_root_path, cid)
+        assert os.path.exists(tmp_pid_refs_file)
 
 
 def test_write_pid_refs_file_content(pids, store):
     """Test that write_pid_refs_file writes the expected content."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
-        pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
-        store.create_path(os.path.dirname(pid_ref_abs_path))
-        store._write_pid_refs_file(pid_ref_abs_path, cid)
-
-        with open(pid_ref_abs_path, "r", encoding="utf8") as f:
+        tmp_root_path = store.get_store_path("refs") / "tmp"
+        tmp_pid_refs_file = store._write_pid_refs_file(tmp_root_path, cid)
+        with open(tmp_pid_refs_file, "r", encoding="utf8") as f:
             pid_refs_cid = f.read()
 
         assert cid == pid_refs_cid
@@ -403,12 +399,11 @@ def test_delete_pid_refs_file(pids, store):
     """Test that delete_pid_refs_file deletes a reference file."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
-        pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
-        store.create_path(os.path.dirname(pid_ref_abs_path))
-        store._write_pid_refs_file(pid_ref_abs_path, cid)
-        store._delete_pid_refs_file(pid_ref_abs_path)
+        tmp_root_path = store.get_store_path("refs") / "tmp"
+        tmp_pid_refs_file = store._write_pid_refs_file(tmp_root_path, cid)
+        store._delete_pid_refs_file(tmp_pid_refs_file)
 
-        assert not os.path.exists(pid_ref_abs_path)
+        assert not os.path.exists(tmp_pid_refs_file)
 
 
 def test_delete_pid_refs_file_file_not_found(pids, store):
@@ -431,10 +426,20 @@ def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
     """Test _verify_hashstore_references throws exception when pid refs file cid is incorrect."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
+        # Write the cid refs file and move it where it needs to be
+        tmp_root_path = store.get_store_path("refs") / "tmp"
+        tmp_cid_refs_file = store._write_cid_refs_file(tmp_root_path, pid)
+        cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
+        store.create_path(os.path.dirname(cid_ref_abs_path))
+        shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
+        # Write the pid refs file and move it where it needs to be with a bad cid
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
-        store._write_pid_refs_file(pid_ref_abs_path, "bad_cid")
-        with pytest.raises(FileNotFoundError):
+        tmp_root_path = store.get_store_path("refs") / "tmp"
+        tmp_pid_refs_file = store._write_pid_refs_file(tmp_root_path, "bad_cid")
+        shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
+
+        with pytest.raises(ValueError):
             store._verify_hashstore_references(pid, cid)
 
 
@@ -444,7 +449,10 @@ def test_verify_hashstore_references_cid_refs_file_missing(pids, store):
         cid = pids[pid]["sha256"]
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
-        store._write_pid_refs_file(pid_ref_abs_path, cid)
+        tmp_root_path = store.get_store_path("refs") / "tmp"
+        tmp_pid_refs_file = store._write_pid_refs_file(tmp_root_path, "bad_cid")
+        shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
+
         with pytest.raises(FileNotFoundError):
             store._verify_hashstore_references(pid, cid)
 
@@ -457,14 +465,16 @@ def test_verify_hashstore_references_cid_refs_file_missing_pid(pids, store):
         # Get a tmp cid refs file and write the wrong pid into it
         tmp_root_path = store.get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_cid_refs_file(tmp_root_path, "bad pid")
-        # Move it to its permanent address
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
         shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
-        # Now write the pid ref, both cid and pid refs must be present
+        # Now write the pid refs file, both cid and pid refs must be present
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
-        store._write_pid_refs_file(pid_ref_abs_path, cid)
+        tmp_root_path = store.get_store_path("refs") / "tmp"
+        tmp_pid_refs_file = store._write_pid_refs_file(tmp_root_path, cid)
+        shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
+
         with pytest.raises(ValueError):
             store._verify_hashstore_references(pid, cid)
 
@@ -476,17 +486,18 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
     references does not contain the expected pid."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
-        # Get a tmp cid refs file and write the wrong pid into it
+        # Write the wrong pid into a cid refs file and move it where it needs to be
         tmp_root_path = store.get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_cid_refs_file(tmp_root_path, "bad pid")
-        # Move it to its permanent address
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
         store.create_path(os.path.dirname(cid_ref_abs_path))
         shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
-        # Now write the pid ref
+        # Now write the pid refs with expected values
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         store.create_path(os.path.dirname(pid_ref_abs_path))
-        store._write_pid_refs_file(pid_ref_abs_path, cid)
+        tmp_root_path = store.get_store_path("refs") / "tmp"
+        tmp_pid_refs_file = store._write_pid_refs_file(tmp_root_path, cid)
+        shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
         cid_reference_list = [pid]
         for i in range(0, 5):

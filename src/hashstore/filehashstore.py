@@ -581,10 +581,7 @@ class FileHashStore(HashStore):
                 raise FileExistsError(exception_string)
             elif os.path.exists(cid_ref_abs_path):
                 # Create the pid refs file
-                pid_tmp_file = self._mktmpfile(tmp_root_path)
-                pid_tmp_file_path = pid_tmp_file.name
-                self._write_pid_refs_file(pid_tmp_file_path, cid)
-                # Create path for pid ref file in '.../refs/pid'
+                pid_tmp_file_path = self._write_pid_refs_file(tmp_root_path, cid)
                 self.create_path(os.path.dirname(pid_ref_abs_path))
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 # Update cid ref files if it already exists
@@ -599,16 +596,11 @@ class FileHashStore(HashStore):
                 return True
             else:
                 # All ref files begin as tmp files and get moved sequentially at once
-                # Then write pid_refs_file content into tmp file
-                pid_tmp_file = self._mktmpfile(tmp_root_path)
-                pid_tmp_file_path = pid_tmp_file.name
-                self._write_pid_refs_file(pid_tmp_file_path, cid)
-                # Then get a cid_refs_file
+                # Get tmp files with the expected cid and pid refs content
+                pid_tmp_file_path = self._write_pid_refs_file(tmp_root_path, cid)
                 cid_tmp_file_path = self._write_cid_refs_file(tmp_root_path, pid)
-
-                # Create path for pid ref file in '.../refs/pid'
+                # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
                 self.create_path(os.path.dirname(pid_ref_abs_path))
-                # Create path for cid ref file in '.../refs/cid'
                 self.create_path(os.path.dirname(cid_ref_abs_path))
                 # Move both files
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
@@ -1230,10 +1222,9 @@ class FileHashStore(HashStore):
             pid,
             path,
         )
-        cid_tmp_file = self._mktmpfile(path)
-        cid_tmp_file_path = cid_tmp_file.name
-
         try:
+            cid_tmp_file = self._mktmpfile(path)
+            cid_tmp_file_path = cid_tmp_file.name
             with open(cid_tmp_file_path, "w", encoding="utf8") as tmp_cid_ref_file:
                 fcntl.flock(tmp_cid_ref_file, fcntl.LOCK_EX)
                 tmp_cid_ref_file.write(pid + "\n")
@@ -1399,26 +1390,25 @@ class FileHashStore(HashStore):
             cid,
             path,
         )
-
         try:
-            with open(path, "w", encoding="utf8") as pid_ref_file:
+            pid_tmp_file = self._mktmpfile(path)
+            pid_tmp_file_path = pid_tmp_file.name
+            with open(pid_tmp_file_path, "w", encoding="utf8") as pid_ref_file:
                 fcntl.flock(pid_ref_file, fcntl.LOCK_EX)
                 pid_ref_file.write(cid)
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
-            return
+                pid_ref_file.close()
+            return pid_tmp_file_path
 
         except Exception as err:
             exception_string = (
                 f"FileHashStore - _write_pid_refs_file: failed to write cid ({cid})"
-                + f" into path: {path}. Unexpected {err=}, {type(err)=}"
+                + f" in : {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
-
-        finally:
-            pid_ref_file.close()
 
     def _delete_pid_refs_file(self, pid_ref_abs_path):
         """Delete a PID reference file.
@@ -1745,6 +1735,7 @@ class FileHashStore(HashStore):
                     value = line.strip()
                     if value == pid:
                         pid_found = True
+                cid_ref_file.close()
         finally:
             cid_ref_file.close()
 

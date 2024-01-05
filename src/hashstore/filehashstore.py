@@ -559,8 +559,6 @@ class FileHashStore(HashStore):
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
             # Ensure refs tmp folder exists
             tmp_root_path = self.get_store_path("refs") / "tmp"
-            if os.path.exists(tmp_root_path) is False:
-                self.create_path(tmp_root_path)
 
             # Proceed to tagging process
             if os.path.exists(pid_ref_abs_path):
@@ -1097,11 +1095,7 @@ class FileHashStore(HashStore):
         algorithm_list_to_calculate = self._refine_algorithm_list(
             additional_algorithm, checksum_algorithm
         )
-
-        tmp_root_path = self.get_store_path("objects") / "tmp"
-        # Physically create directory if it doesn't exist
-        if os.path.exists(tmp_root_path) is False:
-            self.create_path(tmp_root_path)
+        tmp_root_path = self.get_store_path("metadata") / "tmp"
         tmp = self._mktmpfile(tmp_root_path)
 
         logging.debug(
@@ -1179,6 +1173,10 @@ class FileHashStore(HashStore):
 
         :return: file object - object with a file-like interface.
         """
+        # Physically create directory if it doesn't exist
+        if os.path.exists(path) is False:
+            self.create_path(path)
+
         tmp = NamedTemporaryFile(dir=path, delete=False)
 
         # Delete tmp file if python interpreter crashes or thread is interrupted
@@ -1496,10 +1494,6 @@ class FileHashStore(HashStore):
         """
         # Create temporary file in .../{store_path}/tmp
         tmp_root_path = self.get_store_path("metadata") / "tmp"
-        # Physically create directory if it doesn't exist
-        if os.path.exists(tmp_root_path) is False:
-            self.create_path(tmp_root_path)
-
         tmp = self._mktmpfile(tmp_root_path)
 
         # tmp is a file-like object that is already opened for writing by default

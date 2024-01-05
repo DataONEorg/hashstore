@@ -603,10 +603,8 @@ class FileHashStore(HashStore):
                 pid_tmp_file = self._mktmpfile(tmp_root_path)
                 pid_tmp_file_path = pid_tmp_file.name
                 self._write_pid_refs_file(pid_tmp_file_path, cid)
-                # Then write cid_refs_file content into another tmp file
-                cid_tmp_file = self._mktmpfile(tmp_root_path)
-                cid_tmp_file_path = cid_tmp_file.name
-                self._write_cid_refs_file(cid_tmp_file_path, pid)
+                # Then get a cid_refs_file
+                cid_tmp_file_path = self._write_cid_refs_file(tmp_root_path, pid)
 
                 # Create path for pid ref file in '.../refs/pid'
                 self.create_path(os.path.dirname(pid_ref_abs_path))
@@ -1224,30 +1222,26 @@ class FileHashStore(HashStore):
 
         :param str path: Path of the file to be written into.
         :param str pid: Authority-based or persistent identifier of the object.
+
+        :return: cid_tmp_file_path - Path to the cid tmp file
         """
         logging.debug(
             "FileHashStore - write_cid_refs_file: Writing pid (%s) into file: %s",
             pid,
             path,
         )
-
-        if os.path.isfile(path):
-            if os.path.getsize(path) != 0:
-                err_msg = (
-                    "FileHashStore - _write_cid_refs_file: Failed to write cid reference file."
-                    + f" File is not empty: {path} "
-                )
-                logging.error(err_msg)
-                raise OSError(err_msg)
+        cid_tmp_file = self._mktmpfile(path)
+        cid_tmp_file_path = cid_tmp_file.name
 
         try:
-            with open(path, "w", encoding="utf8") as cid_ref_file:
-                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
-                cid_ref_file.write(pid + "\n")
+            with open(cid_tmp_file_path, "w", encoding="utf8") as tmp_cid_ref_file:
+                fcntl.flock(tmp_cid_ref_file, fcntl.LOCK_EX)
+                tmp_cid_ref_file.write(pid + "\n")
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
-            return
+                tmp_cid_ref_file.close()
+            return cid_tmp_file_path
 
         except Exception as err:
             exception_string = (
@@ -1256,9 +1250,6 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise err
-
-        finally:
-            cid_ref_file.close()
 
     def _update_cid_refs(self, cid_ref_abs_path, pid):
         """Update an existing CID reference file with the given PID.

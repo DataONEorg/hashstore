@@ -1266,7 +1266,6 @@ class FileHashStore(HashStore):
                         cid_ref_file.close()
                         return
 
-                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
                 cid_ref_file.write(pid + "\n")
                 cid_ref_file.close()
                 # The context manager will take care of releasing the lock

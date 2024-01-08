@@ -1217,11 +1217,11 @@ class FileHashStore(HashStore):
                 cid_tmp_file_path = cid_tmp_file.name
                 with open(cid_tmp_file_path, "w", encoding="utf8") as tmp_cid_ref_file:
                     tmp_cid_ref_file.write(pid + "\n")
-                # The context manager will take care of releasing the lock
-                # But the code to explicitly release the lock if desired is below
-                # fcntl.flock(f, fcntl.LOCK_UN)
-                # Ensure that file is immediately written to and not held in memory
-                tmp_cid_ref_file.flush()
+                    # The context manager will take care of releasing the lock
+                    # But the code to explicitly release the lock if desired is below
+                    # fcntl.flock(f, fcntl.LOCK_UN)
+                    # Ensure that file is immediately written to and not held in memory
+                    tmp_cid_ref_file.flush()
                 return cid_tmp_file_path
 
         except Exception as err:

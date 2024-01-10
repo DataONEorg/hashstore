@@ -1095,7 +1095,7 @@ class FileHashStore(HashStore):
         algorithm_list_to_calculate = self._refine_algorithm_list(
             additional_algorithm, checksum_algorithm
         )
-        tmp_root_path = self.get_store_path("metadata") / "tmp"
+        tmp_root_path = self.get_store_path("objects") / "tmp"
         tmp = self._mktmpfile(tmp_root_path)
 
         logging.debug(

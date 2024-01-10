@@ -1213,16 +1213,12 @@ class FileHashStore(HashStore):
         )
         try:
             with self._mktmpfile(path) as cid_tmp_file:
-                # fcntl.flock(tmp_cid_ref_file, fcntl.LOCK_EX)
                 cid_tmp_file_path = cid_tmp_file.name
                 with open(cid_tmp_file_path, "w", encoding="utf8") as tmp_cid_ref_file:
                     tmp_cid_ref_file.write(pid + "\n")
-                    # The context manager will take care of releasing the lock
-                    # But the code to explicitly release the lock if desired is below
-                    # fcntl.flock(f, fcntl.LOCK_UN)
                     # Ensure that file is immediately written to and not held in memory
-                    tmp_cid_ref_file.flush()
-                return cid_tmp_file_path
+                    # tmp_cid_ref_file.flush()
+                    return cid_tmp_file_path
 
         except Exception as err:
             exception_string = (
@@ -1253,7 +1249,7 @@ class FileHashStore(HashStore):
 
         try:
             with open(cid_ref_abs_path, "a+", encoding="utf8") as cid_ref_file:
-                # fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                # Confirm that pid is not currently already tagged
                 for line in cid_ref_file:
                     value = line.strip()
                     if pid == value:
@@ -1262,16 +1258,15 @@ class FileHashStore(HashStore):
                             + f" cid reference file: {cid_ref_abs_path} "
                         )
                         logging.warning(warning_msg)
-                        cid_ref_file.close()
                         return
-
+                # Lock file for the shortest amount of time possible
+                file_descriptor = cid_ref_file.fileno()
+                fcntl.flock(file_descriptor, fcntl.LOCK_EX)
                 cid_ref_file.write(pid + "\n")
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
-                # Ensure that file is immediately written to and not held in memory
-                cid_ref_file.flush()
-            return
+                return
 
         except Exception as err:
             exception_string = (
@@ -1305,6 +1300,9 @@ class FileHashStore(HashStore):
                     )
                     raise ValueError(err_msg)
                 else:
+                    # Lock file for the shortest amount of time possible
+                    file_descriptor = cid_ref_file.fileno()
+                    fcntl.flock(file_descriptor, fcntl.LOCK_EX)
                     # Move the file pointer to the beginning for writing
                     cid_ref_file.seek(0)
                     cid_ref_file.write(cid_ref_file_content.replace(pid + "\n", ""))
@@ -1313,10 +1311,7 @@ class FileHashStore(HashStore):
                     # The context manager will take care of releasing the lock
                     # But the code to explicitly release the lock if desired is below
                     # fcntl.flock(f, fcntl.LOCK_UN)
-                    # Ensure that file is immediately written to and not held in memory
-                    cid_ref_file.flush()
-            return
-
+                return
         except Exception as err:
             exception_string = (
                 "FileHashStore - _delete_cid_refs_pid: failed to remove pid from cid refs file:"
@@ -1384,14 +1379,8 @@ class FileHashStore(HashStore):
             with self._mktmpfile(path) as pid_tmp_file:
                 pid_tmp_file_path = pid_tmp_file.name
                 with open(pid_tmp_file_path, "w", encoding="utf8") as pid_ref_file:
-                    # fcntl.flock(pid_ref_file, fcntl.LOCK_EX)
                     pid_ref_file.write(cid)
-                    # The context manager will take care of releasing the lock
-                    # But the code to explicitly release the lock if desired is below
-                    # fcntl.flock(f, fcntl.LOCK_UN)
-                    # Ensure that file is immediately written to and not held in memory
-                    pid_ref_file.flush()
-                return pid_tmp_file_path
+                    return pid_tmp_file_path
 
         except Exception as err:
             exception_string = (

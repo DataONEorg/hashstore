@@ -1258,6 +1258,7 @@ class FileHashStore(HashStore):
                             + f" cid reference file: {cid_ref_abs_path} "
                         )
                         logging.warning(warning_msg)
+                        # Exit try statement, we do not want to write the pid
                         return
                 # Lock file for the shortest amount of time possible
                 file_descriptor = cid_ref_file.fileno()
@@ -1266,8 +1267,6 @@ class FileHashStore(HashStore):
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
-                return
-
         except Exception as err:
             exception_string = (
                 "FileHashStore - update_cid_refs: failed to update reference for cid:"
@@ -1311,7 +1310,6 @@ class FileHashStore(HashStore):
                     # The context manager will take care of releasing the lock
                     # But the code to explicitly release the lock if desired is below
                     # fcntl.flock(f, fcntl.LOCK_UN)
-                return
         except Exception as err:
             exception_string = (
                 "FileHashStore - _delete_cid_refs_pid: failed to remove pid from cid refs file:"
@@ -1409,7 +1407,6 @@ class FileHashStore(HashStore):
                 raise FileNotFoundError(err_msg)
             else:
                 os.remove(pid_ref_abs_path)
-                return
 
         except Exception as err:
             exception_string = (

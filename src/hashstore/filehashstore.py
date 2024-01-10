@@ -1624,7 +1624,7 @@ class FileHashStore(HashStore):
                 raise KeyError(exception_string)
             else:
                 hex_digest_stored = hex_digests[checksum_algorithm]
-                if hex_digest_stored != checksum:
+                if hex_digest_stored != checksum.lower():
                     exception_string = (
                         "FileHashStore - _validate_arg_object: Hex digest and checksum"
                         + f" do not match - file not stored for pid: {pid}. Algorithm:"

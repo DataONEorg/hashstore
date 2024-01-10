@@ -1711,13 +1711,12 @@ class FileHashStore(HashStore):
                 value = line.strip()
                 if value == pid:
                     pid_found = True
-            cid_ref_file.close()
-
+                    break
         if not pid_found:
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file exists"
                 + f" ({cid_ref_abs_path}) but pid ({pid}) not found."
-                + f"Verify type {verify_type}"
+                + f" Verify type {verify_type}"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)

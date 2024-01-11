@@ -625,7 +625,7 @@ class FileHashStore(HashStore):
         if not os.path.exists(pid_ref_abs_path):
             err_msg = (
                 f"FileHashStore - find_object: pid ({pid}) reference file not found: "
-                + pid_ref_abs_path,
+                + pid_ref_abs_path
             )
             raise FileNotFoundError(err_msg)
         else:
@@ -756,25 +756,30 @@ class FileHashStore(HashStore):
             )
             self.reference_locked_cids.append(cid)
         try:
-            # Remove pid from cid reference file
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+            pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+            # Remove pid from cid reference file
             self._delete_cid_refs_pid(cid_ref_abs_path, pid)
+            self._delete_pid_refs_file(pid_ref_abs_path)
             # Delete cid reference file, if the file is not empty, it will not be deleted.
             cid_refs_deleted = self._delete_cid_refs_file(cid_ref_abs_path)
-            # Delete pid reference file
-            pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
-            self._delete_pid_refs_file(pid_ref_abs_path)
-            # Finally, delete the object
             if cid_refs_deleted:
+                # If the cid reference file has been deleted, delete the actual object
                 entity = "objects"
                 self.delete(entity, cid)
-
-            info_string = (
-                "FileHashStore - delete_object: Successfully deleted references and/or"
-                + f" objects associated with pid: {pid}"
-            )
-            logging.info(info_string)
+                info_string = (
+                    "FileHashStore - delete_object: Successfully deleted references and"
+                    + f" object associated with pid: {pid}"
+                )
+                logging.info(info_string)
+            else:
+                info_string = (
+                    "FileHashStore - delete_object: Successfully deleted pid refs file but"
+                    + f" not object with cid ({cid}), cid refs file still has references."
+                )
+                logging.info(info_string)
             return True
+
         finally:
             # Release cid
             with self.reference_lock:
@@ -1287,26 +1292,22 @@ class FileHashStore(HashStore):
             cid_ref_abs_path,
         )
         try:
-            with open(cid_ref_abs_path, "r+", encoding="utf8") as cid_ref_file:
-                # fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
-                # Read the ref file to see if the pid is already referencing the cid
+            with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
                 cid_ref_file_content = cid_ref_file.read()
 
-                if pid not in cid_ref_file_content:
-                    err_msg = (
-                        f"FileHashStore - _delete_cid_refs_pid: pid ({pid}) does not exist in"
-                        + f" cid reference file: {cid_ref_abs_path} "
-                    )
-                    raise ValueError(err_msg)
-                else:
-                    # Lock file for the shortest amount of time possible
+            if pid not in cid_ref_file_content:
+                err_msg = (
+                    f"FileHashStore - _delete_cid_refs_pid: pid ({pid}) does not exist in"
+                    + f" cid reference file: {cid_ref_abs_path} "
+                )
+                raise ValueError(err_msg)
+            else:
+                updated_content = cid_ref_file_content.replace(pid + "\n", "")
+                with open(cid_ref_abs_path, "w", encoding="utf8")as cid_ref_file:
                     file_descriptor = cid_ref_file.fileno()
+                    # Lock file for the shortest amount of time possible
                     fcntl.flock(file_descriptor, fcntl.LOCK_EX)
-                    # Move the file pointer to the beginning for writing
-                    cid_ref_file.seek(0)
-                    cid_ref_file.write(cid_ref_file_content.replace(pid + "\n", ""))
-                    # Ensure file ends where the new content ends
-                    cid_ref_file.truncate()
+                    cid_ref_file.write(updated_content)
                     # The context manager will take care of releasing the lock
                     # But the code to explicitly release the lock if desired is below
                     # fcntl.flock(f, fcntl.LOCK_UN)
@@ -1341,7 +1342,7 @@ class FileHashStore(HashStore):
                 raise FileNotFoundError(err_msg)
             if os.path.getsize(cid_ref_abs_path) != 0:
                 err_msg = (
-                    "FileHashStore - _delete_cid_refs_file: Failed to delete cid reference file."
+                    "FileHashStore - _delete_cid_refs_file: Did not delete cid reference file."
                     + f" File is not empty: {cid_ref_abs_path} "
                 )
                 logging.warning(err_msg)

@@ -1346,6 +1346,11 @@ class FileHashStore(HashStore):
                 return False
             else:
                 os.remove(cid_ref_abs_path)
+                debug_msg = (
+                    "FileHashStore - _delete_cid_refs_file: Deleted cid reference file."
+                    + cid_ref_abs_path
+                )
+                logging.debug(debug_msg)
                 return True
 
         except Exception as err:

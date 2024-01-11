@@ -332,17 +332,6 @@ def test_delete_cid_refs_pid(pids, store):
                 assert value == pid_other
 
 
-def test_delete_cid_refs_pid_pid_not_found(pids, store):
-    """Test that delete_cid_refs_pid raises exception when pid not found."""
-    for pid in pids.keys():
-        tmp_root_path = store.get_store_path("refs") / "tmp"
-        tmp_cid_refs_file = store._write_cid_refs_file(tmp_root_path, pid)
-        pid_other = "dou.test.1"
-        store._update_cid_refs(tmp_cid_refs_file, pid_other)
-        with pytest.raises(ValueError):
-            store._delete_cid_refs_pid(tmp_cid_refs_file, "dou.not.found.1")
-
-
 def test_delete_cid_refs_pid_file(pids, store):
     """Test that delete_cid_refs_file deletes a reference file."""
     for pid in pids.keys():

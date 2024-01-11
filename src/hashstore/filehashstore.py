@@ -1292,25 +1292,22 @@ class FileHashStore(HashStore):
             cid_ref_abs_path,
         )
         try:
-            with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
-                cid_ref_file_content = cid_ref_file.read()
-
-            if pid not in cid_ref_file_content:
-                err_msg = (
-                    f"FileHashStore - _delete_cid_refs_pid: pid ({pid}) does not exist in"
-                    + f" cid reference file: {cid_ref_abs_path} "
-                )
-                raise ValueError(err_msg)
-            else:
-                updated_content = cid_ref_file_content.replace(pid + "\n", "")
-                with open(cid_ref_abs_path, "w", encoding="utf8")as cid_ref_file:
-                    file_descriptor = cid_ref_file.fileno()
-                    # Lock file for the shortest amount of time possible
-                    fcntl.flock(file_descriptor, fcntl.LOCK_EX)
-                    cid_ref_file.write(updated_content)
-                    # The context manager will take care of releasing the lock
-                    # But the code to explicitly release the lock if desired is below
-                    # fcntl.flock(f, fcntl.LOCK_UN)
+            with open(cid_ref_abs_path, "r+", encoding="utf8") as cid_ref_file:
+                # Lock file immediately, this process needs to complete
+                # before any others read/modify the content of cid_ref_file
+                file_descriptor = cid_ref_file.fileno()
+                fcntl.flock(file_descriptor, fcntl.LOCK_EX)
+                new_pid_lines = [
+                    cid_pid_line
+                    for cid_pid_line in cid_ref_file.readlines()
+                    if cid_pid_line.strip() != pid
+                ]
+                cid_ref_file.seek(0)
+                cid_ref_file.truncate()
+                cid_ref_file.writelines(new_pid_lines)
+                # The context manager will take care of releasing the lock
+                # But the code to explicitly release the lock if desired is below
+                # fcntl.flock(f, fcntl.LOCK_UN)
         except Exception as err:
             exception_string = (
                 "FileHashStore - _delete_cid_refs_pid: failed to remove pid from cid refs file:"

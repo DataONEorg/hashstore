@@ -557,7 +557,6 @@ class FileHashStore(HashStore):
         try:
             pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
-            # Ensure refs tmp folder exists
             tmp_root_path = self.get_store_path("refs") / "tmp"
 
             # Proceed to tagging process
@@ -569,7 +568,6 @@ class FileHashStore(HashStore):
                 )
                 logging.error(exception_string)
                 raise FileExistsError(exception_string)
-
             elif os.path.exists(cid_ref_abs_path):
                 # Create the pid refs file
                 pid_tmp_file_path = self._write_pid_refs_file(tmp_root_path, cid)
@@ -584,7 +582,6 @@ class FileHashStore(HashStore):
                     pid,
                 )
                 return True
-
             else:
                 # All ref files begin as tmp files and get moved sequentially at once
                 # Get tmp files with the expected cid and pid refs content
@@ -1332,12 +1329,12 @@ class FileHashStore(HashStore):
         try:
             if not os.path.exists(cid_ref_abs_path):
                 err_msg = (
-                    "FileHashStore - _delete_cid_refs_file: Cid reference file not found: %s",
-                    cid_ref_abs_path,
+                    "FileHashStore - _delete_cid_refs_file: Cid reference file not found: "
+                    + cid_ref_abs_path
                 )
                 logging.error(err_msg)
                 raise FileNotFoundError(err_msg)
-            if os.path.getsize(cid_ref_abs_path) != 0:
+            elif os.path.getsize(cid_ref_abs_path) != 0:
                 err_msg = (
                     "FileHashStore - _delete_cid_refs_file: Did not delete cid reference file."
                     + f" File is not empty: {cid_ref_abs_path} "

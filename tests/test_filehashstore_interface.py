@@ -392,6 +392,8 @@ def test_store_object_duplicate_references_content(pids, store):
         for _, line in enumerate(f, start=1):
             value = line.strip()
             assert value == pid or value == pid_two or value == pid_three
+    assert len(os.listdir(store.root + "/refs/pid")) == 3
+    assert len(os.listdir(store.root + "/refs/cid")) == 1
 
 
 def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, store):
@@ -1054,3 +1056,77 @@ def test_get_hex_digest_algorithm_none(store):
     algorithm = None
     with pytest.raises(ValueError):
         store.get_hex_digest(pid, algorithm)
+
+
+def test_store_and_delete_objects_100_pids_1_cid(store):
+    """Test that deleting an object that is tagged with 100 pids successfully
+    deletes all related files"""
+    test_dir = "tests/testdata/"
+    path = test_dir + "jtao.1700.1"
+    # Store
+    upper_limit = 101
+    for i in range(1, upper_limit):
+        pid_modified = f"dou.test.{str(i)}"
+        store.store_object(pid_modified, path)
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 100
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 1
+    assert store.count("objects") == 1
+    # Delete
+    for i in range(1, upper_limit):
+        pid_modified = f"dou.test.{str(i)}"
+        store.delete_object(pid_modified)
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 0
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 0
+    assert store.count("objects") == 0
+
+
+def test_store_and_delete_object_300_pids_1_cid_threads(store):
+    """Test store object thread lock."""
+
+    def store_object_wrapper(pid_var):
+        try:
+            test_dir = "tests/testdata/"
+            path = test_dir + "jtao.1700.1"
+            upper_limit = 101
+            for i in range(1, upper_limit):
+                pid_modified = f"dou.test.{pid_var}.{str(i)}"
+                store.store_object(pid_modified, path)
+        # pylint: disable=W0718
+        except Exception as e:
+            print(e)
+
+    # Store
+    thread1 = Thread(target=store_object_wrapper, args=("matt",))
+    thread2 = Thread(target=store_object_wrapper, args=("matthew",))
+    thread3 = Thread(target=store_object_wrapper, args=("matthias",))
+    thread1.start()
+    thread2.start()
+    thread3.start()
+    thread1.join()
+    thread2.join()
+    thread3.join()
+
+    def delete_object_wrapper(pid_var):
+        try:
+            upper_limit = 101
+            for i in range(1, upper_limit):
+                pid_modified = f"dou.test.{pid_var}.{str(i)}"
+                store.delete_object(pid_modified)
+        # pylint: disable=W0718
+        except Exception as e:
+            print(e)
+
+    # Delete
+    thread4 = Thread(target=delete_object_wrapper, args=("matt",))
+    thread5 = Thread(target=delete_object_wrapper, args=("matthew",))
+    thread6 = Thread(target=delete_object_wrapper, args=("matthias",))
+    thread4.start()
+    thread5.start()
+    thread6.start()
+    thread4.join()
+    thread5.join()
+    thread6.join()
+
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 0
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 0
+    assert store.count("objects") == 0

@@ -595,7 +595,10 @@ class MetacatDB:
         # Create full object list to store into HashStore
         print("Creating list of objects and metadata from metacat db")
         object_metadata_list = []
-        gb_files_to_skip = skip_obj_size * (1024**3)
+        gb_files_to_skip = None
+        if skip_obj_size is not None:
+            gb_files_to_skip = skip_obj_size * (1024**3)
+
         for row in rows:
             size = row[6]
             if gb_files_to_skip is not None and size > gb_files_to_skip:

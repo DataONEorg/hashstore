@@ -1300,8 +1300,8 @@ class FileHashStore(HashStore):
                     if cid_pid_line.strip() != pid
                 ]
                 cid_ref_file.seek(0)
-                cid_ref_file.truncate()
                 cid_ref_file.writelines(new_pid_lines)
+                cid_ref_file.truncate()
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)

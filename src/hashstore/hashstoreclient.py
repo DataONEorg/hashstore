@@ -599,7 +599,7 @@ class MetacatDB:
         for row in rows:
             size = row[6]
             if gb_files_to_skip is not None and size > gb_files_to_skip:
-                pass
+                continue
             else:
                 # Get pid, filepath and formatId
                 pid_guid = row[0]

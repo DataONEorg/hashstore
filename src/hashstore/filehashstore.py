@@ -1328,18 +1328,18 @@ class FileHashStore(HashStore):
 
         try:
             if not os.path.exists(cid_ref_abs_path):
-                err_msg = (
-                    "FileHashStore - _delete_cid_refs_file: Cid reference file not found: "
-                    + cid_ref_abs_path
+                warn_msg = (
+                    "FileHashStore - _delete_cid_refs_file: Did not delete cid refs file: "
+                    + f" File not found: {cid_ref_abs_path}"
                 )
-                logging.error(err_msg)
-                raise FileNotFoundError(err_msg)
+                logging.warning(warn_msg)
+                return False
             elif os.path.getsize(cid_ref_abs_path) != 0:
-                err_msg = (
+                warn_msg = (
                     "FileHashStore - _delete_cid_refs_file: Did not delete cid reference file."
-                    + f" File is not empty: {cid_ref_abs_path} "
+                    + f" File is not empty: {cid_ref_abs_path}"
                 )
-                logging.warning(err_msg)
+                logging.warning(warn_msg)
                 return False
             else:
                 os.remove(cid_ref_abs_path)

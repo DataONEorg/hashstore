@@ -359,8 +359,8 @@ def test_delete_cid_refs_file_file_not_found(pids, store):
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
-        with pytest.raises(FileNotFoundError):
-            store._delete_cid_refs_file(cid_ref_abs_path)
+        is_cid_refs_file_deleted = store._delete_cid_refs_file(cid_ref_abs_path)
+        assert not is_cid_refs_file_deleted
 
 
 def test_write_pid_refs_file(pids, store):
@@ -400,7 +400,7 @@ def test_delete_pid_refs_file_file_not_found(pids, store):
     for pid in pids.keys():
         pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
         with pytest.raises(FileNotFoundError):
-            store._delete_cid_refs_file(pid_ref_abs_path)
+            store._delete_pid_refs_file(pid_ref_abs_path)
 
 
 def test_verify_hashstore_references_pid_refs_file_missing(pids, store):

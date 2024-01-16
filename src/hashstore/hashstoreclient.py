@@ -104,6 +104,11 @@ class HashStoreParser:
             action="store_true",
             help="Delete objects in a HashStore",
         )
+        self.parser.add_argument(
+            "-gbskip",
+            dest="gb_file_size_to_skip",
+            help="Number of objects to convert",
+        )
 
         # Individual API call related optional arguments
         self.parser.add_argument(
@@ -257,17 +262,20 @@ class HashStoreClient:
 
     # Methods relating to testing HashStore with knbvm (test.arcticdata.io)
 
-    def store_to_hashstore_from_list(self, origin_dir, obj_type, num):
+    def store_to_hashstore_from_list(self, origin_dir, obj_type, num, skip_obj_size):
         """Store objects in a given directory into HashStore.
 
         :param str origin_dir: Directory to convert.
         :param str obj_type: Type of objects ('object' or 'metadata').
         :param int num: Number of files to store.
+        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB)
         """
         info_msg = f"HashStoreClient - Begin storing {obj_type} objects."
         logging.info(info_msg)
         # Object and Metadata list
-        metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(
+            origin_dir, num, skip_obj_size
+        )
         logging.info(info_msg)
 
         # Get list of objects to store from metacat db
@@ -332,19 +340,24 @@ class HashStoreClient:
         except Exception as so_exception:
             print(so_exception)
 
-    def retrieve_and_validate_from_hashstore(self, origin_dir, obj_type, num):
+    def retrieve_and_validate_from_hashstore(
+        self, origin_dir, obj_type, num, skip_obj_size
+    ):
         """Retrieve objects or metadata from a Hashstore and validate the content.
 
         :param str origin_dir: Directory to convert.
         :param str obj_type: Type of objects ('object' or 'metadata').
         :param int num: Number of files to store.
+        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB)
         """
         info_msg = (
             f"HashStore Client - Begin retrieving and validating {obj_type} objects."
         )
         logging.info(info_msg)
         # Object and Metadata list
-        metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(
+            origin_dir, num, skip_obj_size
+        )
 
         # Get list of objects to store from metacat db
         logging.info("HashStore Client - Refining object list for %s", obj_type)
@@ -428,17 +441,20 @@ class HashStoreClient:
 
         return
 
-    def delete_objects_from_list(self, origin_dir, obj_type, num):
+    def delete_objects_from_list(self, origin_dir, obj_type, num, skip_obj_size):
         """Deletes objects in a given directory into HashStore.
 
         :param str origin_dir: Directory to convert.
         :param str obj_type: Type of objects ('object' or 'metadata').
         :param int num: Number of files to store.
+        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB)
         """
         info_msg = f"HashStore Client - Begin deleting {obj_type} objects."
         logging.info(info_msg)
         # Object and Metadata list
-        metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(
+            origin_dir, num, skip_obj_size
+        )
 
         # Get list of objects to store from metacat db
         if obj_type == self.OBJ_TYPE:
@@ -537,11 +553,12 @@ class MetacatDB:
             checked_property = yaml_data[key]
             self.db_yaml_dict[key] = checked_property
 
-    def get_object_metadata_list(self, origin_directory, num):
+    def get_object_metadata_list(self, origin_directory, num, skip_obj_size=None):
         """Query the Metacat database for the full object and metadata list, ordered by GUID.
 
         :param str origin_directory: 'var/metacat/data' or 'var/metacat/documents'.
         :param int num: Number of rows to retrieve from the Metacat database.
+        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB), defaults to 'None'
         """
         # Create a connection to the database
         db_user = self.db_yaml_dict["db_user"]
@@ -568,7 +585,7 @@ class MetacatDB:
             limit_query = f" LIMIT {num}"
         query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
                 systemmetadata.object_format, systemmetadata.checksum,
-                systemmetadata.checksum_algorithm FROM identifier INNER JOIN systemmetadata
+                systemmetadata.checksum_algorithm, systemmetadata.size FROM identifier INNER JOIN systemmetadata
                 ON identifier.guid = systemmetadata.guid ORDER BY identifier.guid{limit_query};"""
         cursor.execute(query)
 
@@ -578,21 +595,28 @@ class MetacatDB:
         # Create full object list to store into HashStore
         print("Creating list of objects and metadata from metacat db")
         object_metadata_list = []
+        gb_files_to_skip = skip_obj_size * (1024**3)
         for row in rows:
-            # Get pid, filepath and formatId
-            pid_guid = row[0]
-            metadatapath_docid_rev = origin_directory + "/" + row[1] + "." + str(row[2])
-            metadata_namespace = row[3]
-            row_checksum = row[4]
-            row_checksum_algorithm = row[5]
-            tuple_item = (
-                pid_guid,
-                metadatapath_docid_rev,
-                metadata_namespace,
-                row_checksum,
-                row_checksum_algorithm,
-            )
-            object_metadata_list.append(tuple_item)
+            size = row[6]
+            if gb_files_to_skip is not None and size > gb_files_to_skip:
+                pass
+            else:
+                # Get pid, filepath and formatId
+                pid_guid = row[0]
+                metadatapath_docid_rev = (
+                    origin_directory + "/" + row[1] + "." + str(row[2])
+                )
+                metadata_namespace = row[3]
+                row_checksum = row[4]
+                row_checksum_algorithm = row[5]
+                tuple_item = (
+                    pid_guid,
+                    metadatapath_docid_rev,
+                    metadata_namespace,
+                    row_checksum,
+                    row_checksum_algorithm,
+                )
+                object_metadata_list.append(tuple_item)
 
         # Close the cursor and connection when done
         cursor.close()
@@ -749,6 +773,7 @@ def main():
             number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
             # Determine if we are working with objects or metadata
             directory_type = getattr(args, "source_directory_type")
+            size_of_obj_to_skip = getattr(args, "gb_file_size_to_skip")
             accepted_directory_types = ["object", "metadata"]
             if directory_type not in accepted_directory_types:
                 raise ValueError(
@@ -760,18 +785,21 @@ def main():
                     directory_to_convert,
                     directory_type,
                     number_of_objects_to_convert,
+                    size_of_obj_to_skip,
                 )
             if getattr(args, "retrieve_and_validate"):
                 hashstore_c.retrieve_and_validate_from_hashstore(
                     directory_to_convert,
                     directory_type,
                     number_of_objects_to_convert,
+                    size_of_obj_to_skip,
                 )
             if getattr(args, "delete_from_hashstore"):
                 hashstore_c.delete_objects_from_list(
                     directory_to_convert,
                     directory_type,
                     number_of_objects_to_convert,
+                    size_of_obj_to_skip,
                 )
         else:
             raise FileNotFoundError(

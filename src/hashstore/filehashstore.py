@@ -1632,7 +1632,7 @@ class FileHashStore(HashStore):
                         # Delete the tmp file
                         self.delete(entity, tmp_file_name)
                         exception_string_for_pid = (
-                            exception_string + f"Tmp file ({tmp_file_name}) deleted."
+                            exception_string + f". Tmp file ({tmp_file_name}) deleted."
                         )
                         logging.error(exception_string_for_pid)
                         raise ValueError(exception_string_for_pid)

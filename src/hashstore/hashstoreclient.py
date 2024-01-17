@@ -155,6 +155,12 @@ class HashStoreParser:
             help="Flag to get the hex digest of a data object in HashStore",
         )
         self.parser.add_argument(
+            "-findobject",
+            dest="client_findobject",
+            action="store_true",
+            help="Flag to determine if an object is stored in HashStore",
+        )
+        self.parser.add_argument(
             "-storeobject",
             dest="client_storeobject",
             action="store_true",
@@ -818,6 +824,13 @@ def main():
         print(f"guid/pid: {pid}")
         print(f"algorithm: {algorithm}")
         print(f"Checksum/Hex Digest: {digest}")
+
+    elif getattr(args, "client_findobject"):
+        if pid is None:
+            raise ValueError("'-pid' option is required")
+        # Find the content identifier of the object
+        cid = hashstore_c.hashstore.find_object(pid)
+        print(f"Content identifier: {cid}")
 
     elif getattr(args, "client_storeobject"):
         if pid is None:

@@ -77,6 +77,37 @@ def test_get_checksum(capsys, store, pids):
         assert capsystext == expected_output
 
 
+def test_find_object(capsys, store, pids):
+    """Test find_object returns a content identifier if it exists."""
+    client_directory = os.getcwd() + "/src/hashstore"
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.id
+
+        client_module_path = f"{client_directory}/client.py"
+        test_store = store.root
+        find_object_opt = "-findobject"
+        client_pid_arg = f"-pid={pid}"
+        chs_args = [
+            client_module_path,
+            test_store,
+            find_object_opt,
+            client_pid_arg,
+        ]
+
+        # Add file path of HashStore to sys so modules can be discovered
+        sys.path.append(client_directory)
+        # Manually change sys args to simulate command line arguments
+        sys.argv = chs_args
+        hashstoreclient.main()
+
+        capsystext = capsys.readouterr().out
+        expected_output = f"Content identifier: {cid}\n"
+        assert capsystext == expected_output
+
+
 def test_store_object(store, pids):
     """Test storing objects to HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"

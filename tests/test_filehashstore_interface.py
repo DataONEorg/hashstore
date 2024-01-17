@@ -331,8 +331,74 @@ def test_store_object_checksum_incorrect_checksum(store):
         )
 
 
-def test_store_object_duplicate_raises_error(pids, store):
-    """Test store duplicate object throws FileExistsError."""
+def test_store_object_duplicate_does_not_store_duplicate(store):
+    """Test that storing duplicate object does not store object twice."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    entity = "objects"
+    # Store first blob
+    _object_metadata_one = store.store_object(pid, path)
+    # Store second blob
+    pid_that_refs_existing_cid = "dou.test.1"
+    _object_metadata_two = store.store_object(pid_that_refs_existing_cid, path)
+    # Confirm only one object exists and the tmp file created is deleted
+    assert store.count(entity) == 1
+
+
+def test_store_object_duplicate_references_files(pids, store):
+    """Test that storing duplicate object but different pid creates the expected
+    amount of reference files."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    # Store with first pid
+    _object_metadata_one = store.store_object(pid, path)
+    # Store with second pid
+    pid_two = "dou.test.1"
+    _object_metadata_two = store.store_object(pid_two, path)
+    # Store with third pid
+    pid_three = "dou.test.2"
+    _object_metadata_three = store.store_object(pid_three, path)
+    # Confirm that there are 3 pid reference files
+    assert store.count("pid") == 3
+    # Confirm that there are 1 cid reference files
+    assert store.count("cid") == 1
+    # Confirm the content of the cid refence files
+    cid_ref_abs_path = store.get_refs_abs_path("cid", pids[pid][store.algorithm])
+    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+        for _, line in enumerate(f, start=1):
+            value = line.strip()
+            assert value == pid or value == pid_two or value == pid_three
+
+
+def test_store_object_duplicate_references_content(pids, store):
+    """Test that storing duplicate object but different pid creates the expected
+    amount of reference files."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    # Store with first pid
+    store.store_object(pid, path)
+    # Store with second pid
+    pid_two = "dou.test.1"
+    store.store_object(pid_two, path)
+    # Store with third pid
+    pid_three = "dou.test.2"
+    store.store_object(pid_three, path)
+    # Confirm the content of the cid refence files
+    cid_ref_abs_path = store.get_refs_abs_path("cid", pids[pid][store.algorithm])
+    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+        for _, line in enumerate(f, start=1):
+            value = line.strip()
+            assert value == pid or value == pid_two or value == pid_three
+    assert len(os.listdir(store.root + "/refs/pid")) == 3
+    assert len(os.listdir(store.root + "/refs/cid")) == 1
+
+
+def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, store):
+    """Test store duplicate object throws FileExistsError when object exists
+    but the data to validate against is incorrect."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -341,7 +407,9 @@ def test_store_object_duplicate_raises_error(pids, store):
     _object_metadata_one = store.store_object(pid, path)
     # Store second blob
     with pytest.raises(FileExistsError):
-        _object_metadata_two = store.store_object(pid, path)
+        _object_metadata_two = store.store_object(
+            pid, path, checksum="nonmatchingchecksum", checksum_algorithm="sha256"
+        )
     assert store.count(entity) == 1
     assert store.exists(entity, pids[pid][store.algorithm])
 
@@ -839,21 +907,16 @@ def test_delete_objects_cid_refs_file(pids, store):
 def test_delete_objects_cid_refs_file_with_pid_refs_remaining(pids, store):
     """Test delete_object does not delete the cid refs file that still contains ref."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.id
         cid_refs_abs_path = store.get_refs_abs_path("cid", cid)
         # pylint: disable=W0212
         store._update_cid_refs(cid_refs_abs_path, "dou.test.1")
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        with pytest.raises(OSError):
-            store.delete_object(pid)
-            cid_refs_file_path = store.get_refs_abs_path("cid", cid)
-            assert os.path.exists(cid_refs_file_path)
+        store.delete_object(pid)
+        cid_refs_file_path = store.get_refs_abs_path("cid", cid)
+        assert os.path.exists(cid_refs_file_path)
 
 
 def test_delete_object_pid_empty(store):
@@ -993,3 +1056,77 @@ def test_get_hex_digest_algorithm_none(store):
     algorithm = None
     with pytest.raises(ValueError):
         store.get_hex_digest(pid, algorithm)
+
+
+def test_store_and_delete_objects_100_pids_1_cid(store):
+    """Test that deleting an object that is tagged with 100 pids successfully
+    deletes all related files"""
+    test_dir = "tests/testdata/"
+    path = test_dir + "jtao.1700.1"
+    # Store
+    upper_limit = 101
+    for i in range(1, upper_limit):
+        pid_modified = f"dou.test.{str(i)}"
+        store.store_object(pid_modified, path)
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 100
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 1
+    assert store.count("objects") == 1
+    # Delete
+    for i in range(1, upper_limit):
+        pid_modified = f"dou.test.{str(i)}"
+        store.delete_object(pid_modified)
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 0
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 0
+    assert store.count("objects") == 0
+
+
+def test_store_and_delete_object_300_pids_1_cid_threads(store):
+    """Test store object thread lock."""
+
+    def store_object_wrapper(pid_var):
+        try:
+            test_dir = "tests/testdata/"
+            path = test_dir + "jtao.1700.1"
+            upper_limit = 101
+            for i in range(1, upper_limit):
+                pid_modified = f"dou.test.{pid_var}.{str(i)}"
+                store.store_object(pid_modified, path)
+        # pylint: disable=W0718
+        except Exception as e:
+            print(e)
+
+    # Store
+    thread1 = Thread(target=store_object_wrapper, args=("matt",))
+    thread2 = Thread(target=store_object_wrapper, args=("matthew",))
+    thread3 = Thread(target=store_object_wrapper, args=("matthias",))
+    thread1.start()
+    thread2.start()
+    thread3.start()
+    thread1.join()
+    thread2.join()
+    thread3.join()
+
+    def delete_object_wrapper(pid_var):
+        try:
+            upper_limit = 101
+            for i in range(1, upper_limit):
+                pid_modified = f"dou.test.{pid_var}.{str(i)}"
+                store.delete_object(pid_modified)
+        # pylint: disable=W0718
+        except Exception as e:
+            print(e)
+
+    # Delete
+    thread4 = Thread(target=delete_object_wrapper, args=("matt",))
+    thread5 = Thread(target=delete_object_wrapper, args=("matthew",))
+    thread6 = Thread(target=delete_object_wrapper, args=("matthias",))
+    thread4.start()
+    thread5.start()
+    thread6.start()
+    thread4.join()
+    thread5.join()
+    thread6.join()
+
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 0
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 0
+    assert store.count("objects") == 0

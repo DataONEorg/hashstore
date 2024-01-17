@@ -143,9 +143,13 @@ class FileHashStore(HashStore):
             )
             logging.critical(exception_string)
             raise FileNotFoundError(exception_string)
+
         # Open file
-        with open(self.hashstore_configuration_yaml, "r", encoding="utf-8") as file:
-            yaml_data = yaml.safe_load(file)
+        with open(
+            self.hashstore_configuration_yaml, "r", encoding="utf-8"
+        ) as hs_yaml_file:
+            yaml_data = yaml.safe_load(hs_yaml_file)
+            hs_yaml_file.close()
 
         # Get hashstore properties
         hashstore_yaml_dict = {}
@@ -221,8 +225,9 @@ class FileHashStore(HashStore):
         # Write 'hashstore.yaml'
         with open(
             self.hashstore_configuration_yaml, "w", encoding="utf-8"
-        ) as hashstore_yaml:
-            hashstore_yaml.write(hashstore_configuration_yaml)
+        ) as hs_yaml_file:
+            hs_yaml_file.write(hashstore_configuration_yaml)
+            hs_yaml_file.close()
 
         logging.debug(
             "FileHashStore - write_properties: Configuration file written to: %s",
@@ -387,8 +392,12 @@ class FileHashStore(HashStore):
             )
             logging.critical(exception_string)
             raise FileNotFoundError(exception_string)
-        with open(self.hashstore_configuration_yaml, "r", encoding="utf-8") as file:
-            yaml_data = yaml.safe_load(file)
+
+        with open(
+            self.hashstore_configuration_yaml, "r", encoding="utf-8"
+        ) as hs_yaml_file:
+            yaml_data = yaml.safe_load(hs_yaml_file)
+            hs_yaml_file.close()
 
         # Set default store algorithm
         self.algorithm = lookup_algo(yaml_data["store_algorithm"])
@@ -469,6 +478,13 @@ class FileHashStore(HashStore):
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,
                 )
+            except Exception as err:
+                exception_string = (
+                    f"FileHashStore - store_object: failed to store object for pid: {pid}."
+                    + f" Unexpected {err=}, {type(err)=}"
+                )
+                logging.error(exception_string)
+                raise err
             finally:
                 # Release pid
                 with self.object_lock:
@@ -541,15 +557,10 @@ class FileHashStore(HashStore):
         try:
             pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
-            # Ensure refs tmp folder exists
             tmp_root_path = self.get_store_path("refs") / "tmp"
-            if os.path.exists(tmp_root_path) is False:
-                self.create_path(tmp_root_path)
 
             # Proceed to tagging process
             if os.path.exists(pid_ref_abs_path):
-                print("Path exists:\n")
-                print(pid_ref_abs_path)
                 # A pid reference file can only contain one cid
                 exception_string = (
                     "FileHashStore - write_pid_refs_file: pid ref file already exists for"
@@ -559,16 +570,12 @@ class FileHashStore(HashStore):
                 raise FileExistsError(exception_string)
             elif os.path.exists(cid_ref_abs_path):
                 # Create the pid refs file
-                pid_tmp_file = self._mktmpfile(tmp_root_path)
-                pid_tmp_file_path = pid_tmp_file.name
-                self._write_pid_refs_file(pid_tmp_file_path, cid)
-                # Create path for pid ref file in '.../refs/pid'
+                pid_tmp_file_path = self._write_pid_refs_file(tmp_root_path, cid)
                 self.create_path(os.path.dirname(pid_ref_abs_path))
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
-                # Update cid ref files if it already exists
+                # Update cid ref files as it already exists
                 self._update_cid_refs(cid_ref_abs_path, pid)
-                # Verify refs file content
-                self._verify_hashstore_references(pid, cid)
+                self._verify_hashstore_references(pid, cid, "update")
                 logging.info(
                     "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
                     cid,
@@ -577,25 +584,18 @@ class FileHashStore(HashStore):
                 return True
             else:
                 # All ref files begin as tmp files and get moved sequentially at once
-                # Then write pid_refs_file content into tmp file
-                pid_tmp_file = self._mktmpfile(tmp_root_path)
-                pid_tmp_file_path = pid_tmp_file.name
-                self._write_pid_refs_file(pid_tmp_file_path, cid)
-                # Then write cid_refs_file content into another tmp file
-                cid_tmp_file = self._mktmpfile(tmp_root_path)
-                cid_tmp_file_path = cid_tmp_file.name
-                self._write_cid_refs_file(cid_tmp_file_path, pid)
-
-                # Create path for pid ref file in '.../refs/pid'
+                # Get tmp files with the expected cid and pid refs content
+                pid_tmp_file_path = self._write_pid_refs_file(tmp_root_path, cid)
+                cid_tmp_file_path = self._write_cid_refs_file(tmp_root_path, pid)
+                # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
                 self.create_path(os.path.dirname(pid_ref_abs_path))
-                # Create path for cid ref file in '.../refs/cid'
                 self.create_path(os.path.dirname(cid_ref_abs_path))
                 # Move both files
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 shutil.move(cid_tmp_file_path, cid_ref_abs_path)
                 # Ensure that the reference files have been written as expected
                 # If there is an issue, client or user will have to manually review
-                self._verify_hashstore_references(pid, cid)
+                self._verify_hashstore_references(pid, cid, "create")
 
                 logging.info(
                     "FileHashStore - tag_object: Successfully tagged cid: %s with pid %s",
@@ -622,13 +622,14 @@ class FileHashStore(HashStore):
         if not os.path.exists(pid_ref_abs_path):
             err_msg = (
                 f"FileHashStore - find_object: pid ({pid}) reference file not found: "
-                + pid_ref_abs_path,
+                + pid_ref_abs_path
             )
             raise FileNotFoundError(err_msg)
         else:
             # Read the file to get the cid from the pid reference
-            with open(pid_ref_abs_path, "r", encoding="utf8") as f:
-                pid_refs_cid = f.read()
+            with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                pid_refs_cid = pid_ref_file.read()
+                pid_ref_file.close()
 
         return pid_refs_cid
 
@@ -752,26 +753,30 @@ class FileHashStore(HashStore):
             )
             self.reference_locked_cids.append(cid)
         try:
-            # Remove pid from cid reference file
             cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
-            self._delete_cid_refs_pid(cid_ref_abs_path, pid)
-            # Delete cid reference file
-            # If the file is not empty, it will not be deleted.
-            cid_refs_deleted = self._delete_cid_refs_file(cid_ref_abs_path)
-            # Delete pid reference file
             pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+            # Remove pid from cid reference file
+            self._delete_cid_refs_pid(cid_ref_abs_path, pid)
             self._delete_pid_refs_file(pid_ref_abs_path)
-            # Finally, delete the object
+            # Delete cid reference file, if the file is not empty, it will not be deleted.
+            cid_refs_deleted = self._delete_cid_refs_file(cid_ref_abs_path)
             if cid_refs_deleted:
+                # If the cid reference file has been deleted, delete the actual object
                 entity = "objects"
                 self.delete(entity, cid)
-
-            info_string = (
-                "FileHashStore - delete_object: Successfully deleted references and/or"
-                + f" objects associated with pid: {pid}"
-            )
-            logging.info(info_string)
+                info_string = (
+                    "FileHashStore - delete_object: Successfully deleted references and"
+                    + f" object associated with pid: {pid}"
+                )
+                logging.info(info_string)
+            else:
+                info_string = (
+                    "FileHashStore - delete_object: Successfully deleted pid refs file but"
+                    + f" not object with cid ({cid}), cid refs file still has references."
+                )
+                logging.info(info_string)
             return True
+
         finally:
             # Release cid
             with self.reference_lock:
@@ -923,7 +928,7 @@ class FileHashStore(HashStore):
         # pylint: disable=W0718
         except Exception as err:
             exception_string = (
-                "FileHashStore - store_object: failed to store object."
+                "FileHashStore - store_object (store_data_only): failed to store object."
                 + f" Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
@@ -1046,14 +1051,29 @@ class FileHashStore(HashStore):
                 logging.error("FileHashStore - _move_and_get_checksums: %s", err_msg)
                 raise
         else:
-            # Else delete temporary file
-            exception_string = (
-                "FileHashStore - _move_and_get_checksums: Object already exists at:"
-                + f" {abs_file_path}, deleting temporary file."
-            )
-            logging.error(exception_string)
-            self.delete(entity, tmp_file_name)
-            raise FileExistsError(exception_string)
+            # If the file exists, determine if the object is what the client states it to be
+            try:
+                self._validate_arg_object(
+                    pid,
+                    checksum,
+                    checksum_algorithm,
+                    entity,
+                    hex_digests,
+                    tmp_file_name,
+                    tmp_file_size,
+                    file_size_to_validate,
+                )
+            except Exception as ge:
+                # If any exception is thrown during validation,
+                exception_string = (
+                    "FileHashStore - _move_and_get_checksums: Object exists but cannot be verified"
+                    + f" (validation error): {abs_file_path}, deleting temporary file. Error: {ge}"
+                )
+                logging.error(exception_string)
+                raise FileExistsError from ge
+            finally:
+                # Delete the temporary file, it already exists so it is redundant
+                self.delete(entity, tmp_file_name)
 
         return object_cid, tmp_file_size, hex_digests
 
@@ -1077,11 +1097,7 @@ class FileHashStore(HashStore):
         algorithm_list_to_calculate = self._refine_algorithm_list(
             additional_algorithm, checksum_algorithm
         )
-
         tmp_root_path = self.get_store_path("objects") / "tmp"
-        # Physically create directory if it doesn't exist
-        if os.path.exists(tmp_root_path) is False:
-            self.create_path(tmp_root_path)
         tmp = self._mktmpfile(tmp_root_path)
 
         logging.debug(
@@ -1102,6 +1118,7 @@ class FileHashStore(HashStore):
                     tmp_file.write(self._to_bytes(data))
                     for hash_algorithm in hash_algorithms:
                         hash_algorithm.update(self._to_bytes(data))
+                tmp_file.close()
             logging.debug(
                 "FileHashStore - _write_to_tmp_file_and_get_hex_digests: Object stream"
                 + " successfully written to tmp file: %s",
@@ -1158,6 +1175,10 @@ class FileHashStore(HashStore):
 
         :return: file object - object with a file-like interface.
         """
+        # Physically create directory if it doesn't exist
+        if os.path.exists(path) is False:
+            self.create_path(path)
+
         tmp = NamedTemporaryFile(dir=path, delete=False)
 
         # Delete tmp file if python interpreter crashes or thread is interrupted
@@ -1183,35 +1204,28 @@ class FileHashStore(HashStore):
 
         :param str path: Path of the file to be written into.
         :param str pid: Authority-based or persistent identifier of the object.
+
+        :return: cid_tmp_file_path - Path to the cid tmp file
+        :rtype: string
         """
         logging.debug(
             "FileHashStore - write_cid_refs_file: Writing pid (%s) into file: %s",
             pid,
             path,
         )
-
-        if os.path.isfile(path):
-            if os.path.getsize(path) != 0:
-                err_msg = (
-                    "FileHashStore - _write_cid_refs_file: Failed to write cid reference file."
-                    + f" File is not empty: {path} "
-                )
-                logging.error(err_msg)
-                raise OSError(err_msg)
-
         try:
-            with open(path, "w", encoding="utf8") as cid_ref_file:
-                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
-                cid_ref_file.write(pid + "\n")
-                # The context manager will take care of releasing the lock
-                # But the code to explicitly release the lock if desired is below
-                # fcntl.flock(f, fcntl.LOCK_UN)
-            return
+            with self._mktmpfile(path) as cid_tmp_file:
+                cid_tmp_file_path = cid_tmp_file.name
+                with open(cid_tmp_file_path, "w", encoding="utf8") as tmp_cid_ref_file:
+                    tmp_cid_ref_file.write(pid + "\n")
+                    # Ensure that file is immediately written to and not held in memory
+                    # tmp_cid_ref_file.flush()
+                    return cid_tmp_file_path
 
         except Exception as err:
             exception_string = (
-                f"FileHashStore - write_cid_refs_file: failed to write pid ({pid})"
-                + f" into path: {path}. Unexpected {err=}, {type(err)=}"
+                "FileHashStore - write_cid_refs_file: failed to write cid refs file for pid:"
+                + f"  {pid} into path: {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
@@ -1236,8 +1250,9 @@ class FileHashStore(HashStore):
             raise FileNotFoundError(exception_string)
 
         try:
-            with open(cid_ref_abs_path, "r", encoding="utf8") as f:
-                for _, line in enumerate(f, start=1):
+            with open(cid_ref_abs_path, "a+", encoding="utf8") as cid_ref_file:
+                # Confirm that pid is not currently already tagged
+                for line in cid_ref_file:
                     value = line.strip()
                     if pid == value:
                         warning_msg = (
@@ -1245,16 +1260,15 @@ class FileHashStore(HashStore):
                             + f" cid reference file: {cid_ref_abs_path} "
                         )
                         logging.warning(warning_msg)
+                        # Exit try statement, we do not want to write the pid
                         return
-
-            with open(cid_ref_abs_path, "a+", encoding="utf8") as cid_ref_file:
-                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
+                # Lock file for the shortest amount of time possible
+                file_descriptor = cid_ref_file.fileno()
+                fcntl.flock(file_descriptor, fcntl.LOCK_EX)
                 cid_ref_file.write(pid + "\n")
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
-            return
-
         except Exception as err:
             exception_string = (
                 "FileHashStore - update_cid_refs: failed to update reference for cid:"
@@ -1274,31 +1288,26 @@ class FileHashStore(HashStore):
             pid,
             cid_ref_abs_path,
         )
-
         try:
-            with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
-                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
-                # Read the ref file to see if the pid is already referencing the cid
-                cid_ref_file_content = cid_ref_file.read()
-
-                if pid not in cid_ref_file_content:
-                    err_msg = (
-                        f"FileHashStore - _delete_cid_refs_pid: pid ({pid}) does not exist in"
-                        + f" cid reference file: {cid_ref_abs_path} "
-                    )
-                    raise ValueError(err_msg)
-
-            with open(cid_ref_abs_path, "w", encoding="utf8") as cid_ref_file:
-                fcntl.flock(cid_ref_file, fcntl.LOCK_EX)
-                cid_ref_file.write(cid_ref_file_content.replace(pid + "\n", ""))
+            with open(cid_ref_abs_path, "r+", encoding="utf8") as cid_ref_file:
+                # Lock file immediately, this process needs to complete
+                # before any others read/modify the content of cid_ref_file
+                file_descriptor = cid_ref_file.fileno()
+                fcntl.flock(file_descriptor, fcntl.LOCK_EX)
+                new_pid_lines = [
+                    cid_pid_line
+                    for cid_pid_line in cid_ref_file.readlines()
+                    if cid_pid_line.strip() != pid
+                ]
+                cid_ref_file.seek(0)
+                cid_ref_file.writelines(new_pid_lines)
+                cid_ref_file.truncate()
                 # The context manager will take care of releasing the lock
                 # But the code to explicitly release the lock if desired is below
                 # fcntl.flock(f, fcntl.LOCK_UN)
-            return
-
         except Exception as err:
             exception_string = (
-                "FileHashStore - _delete_cid_refs_pid: failed to update reference for cid:"
+                "FileHashStore - _delete_cid_refs_pid: failed to remove pid from cid refs file:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
@@ -1319,57 +1328,62 @@ class FileHashStore(HashStore):
 
         try:
             if not os.path.exists(cid_ref_abs_path):
-                err_msg = (
-                    "FileHashStore - _delete_cid_refs_file: Cid reference file not found: %s",
-                    cid_ref_abs_path,
+                warn_msg = (
+                    "FileHashStore - _delete_cid_refs_file: Did not delete cid refs file: "
+                    + f" File not found: {cid_ref_abs_path}"
                 )
-                logging.error(err_msg)
-                raise FileNotFoundError(err_msg)
-            if os.path.getsize(cid_ref_abs_path) != 0:
-                err_msg = (
-                    "FileHashStore - _delete_cid_refs_file: Failed to delete cid reference file."
-                    + f" File is not empty: {cid_ref_abs_path} "
+                logging.warning(warn_msg)
+                return False
+            elif os.path.getsize(cid_ref_abs_path) != 0:
+                warn_msg = (
+                    "FileHashStore - _delete_cid_refs_file: Did not delete cid reference file."
+                    + f" File is not empty: {cid_ref_abs_path}"
                 )
-                logging.error(err_msg)
-                raise OSError(err_msg)
+                logging.warning(warn_msg)
+                return False
             else:
                 os.remove(cid_ref_abs_path)
+                debug_msg = (
+                    "FileHashStore - _delete_cid_refs_file: Deleted cid reference file."
+                    + cid_ref_abs_path
+                )
+                logging.debug(debug_msg)
                 return True
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - _delete_cid_refs_file: failed to delete reference file:"
+                "FileHashStore - _delete_cid_refs_file: failed to delete cid refs file:"
                 + f" {cid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
 
     def _write_pid_refs_file(self, path, cid):
-        """Write the PID reference file in the supplied path for the given CID (content
+        """Generate a tmp pid refs file into the given path for the given CID (content
         identifier). A reference file for a PID contains the CID that it references.
 
         :param str path: Path of the file to be written into.
         :param str cid: Content identifier.
+
+        :return: pid_tmp_file_path
+        :rtype: string
         """
         logging.debug(
             "FileHashStore - _write_pid_refs_file: Writing cid (%s) into file: %s",
             cid,
             path,
         )
-
         try:
-            with open(path, "w", encoding="utf8") as pid_ref_file:
-                fcntl.flock(pid_ref_file, fcntl.LOCK_EX)
-                pid_ref_file.write(cid)
-                # The context manager will take care of releasing the lock
-                # But the code to explicitly release the lock if desired is below
-                # fcntl.flock(f, fcntl.LOCK_UN)
-            return
+            with self._mktmpfile(path) as pid_tmp_file:
+                pid_tmp_file_path = pid_tmp_file.name
+                with open(pid_tmp_file_path, "w", encoding="utf8") as pid_ref_file:
+                    pid_ref_file.write(cid)
+                    return pid_tmp_file_path
 
         except Exception as err:
             exception_string = (
                 f"FileHashStore - _write_pid_refs_file: failed to write cid ({cid})"
-                + f" into path: {path}. Unexpected {err=}, {type(err)=}"
+                + f" into pid refs file: {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
@@ -1393,11 +1407,10 @@ class FileHashStore(HashStore):
                 raise FileNotFoundError(err_msg)
             else:
                 os.remove(pid_ref_abs_path)
-                return
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - _delete_pid_refs_file: failed to delete reference file:"
+                "FileHashStore - _delete_pid_refs_file: failed to delete pid refs file:"
                 + f" {pid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
@@ -1470,10 +1483,6 @@ class FileHashStore(HashStore):
         """
         # Create temporary file in .../{store_path}/tmp
         tmp_root_path = self.get_store_path("metadata") / "tmp"
-        # Physically create directory if it doesn't exist
-        if os.path.exists(tmp_root_path) is False:
-            self.create_path(tmp_root_path)
-
         tmp = self._mktmpfile(tmp_root_path)
 
         # tmp is a file-like object that is already opened for writing by default
@@ -1612,7 +1621,7 @@ class FileHashStore(HashStore):
                 raise KeyError(exception_string)
             else:
                 hex_digest_stored = hex_digests[checksum_algorithm]
-                if hex_digest_stored != checksum:
+                if hex_digest_stored != checksum.lower():
                     exception_string = (
                         "FileHashStore - _validate_arg_object: Hex digest and checksum"
                         + f" do not match - file not stored for pid: {pid}. Algorithm:"
@@ -1623,7 +1632,7 @@ class FileHashStore(HashStore):
                         # Delete the tmp file
                         self.delete(entity, tmp_file_name)
                         exception_string_for_pid = (
-                            exception_string + f"Tmp file ({tmp_file_name}) deleted."
+                            exception_string + f". Tmp file ({tmp_file_name}) deleted."
                         )
                         logging.error(exception_string_for_pid)
                         raise ValueError(exception_string_for_pid)
@@ -1657,27 +1666,30 @@ class FileHashStore(HashStore):
             checked_format_id = format_id
         return checked_format_id
 
-    def _verify_hashstore_references(self, pid, cid):
+    def _verify_hashstore_references(self, pid, cid, verify_type):
         """Verifies that the supplied pid and pid reference file and content have been
         written successfully.
 
         :param str pid: Authority-based or persistent identifier.
         :param str cid: Content identifier.
+        :param str verify_type: "update" or "create"
         """
         # Check that reference files were created
         pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
         cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
         if not os.path.exists(pid_ref_abs_path):
             exception_string = (
-                "FileHashStore - _verify_hashstore_references: Pid refs file missing: %s",
-                pid_ref_abs_path,
+                "FileHashStore - _verify_hashstore_references: Pid refs file missing: "
+                + pid_ref_abs_path
+                + f" . Verify type {verify_type}"
             )
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
         if not os.path.exists(cid_ref_abs_path):
             exception_string = (
-                "FileHashStore - _verify_hashstore_references: Cid refs file missing: %s",
-                cid_ref_abs_path,
+                "FileHashStore - _verify_hashstore_references: Cid refs file missing: "
+                + cid_ref_abs_path
+                + f" . Verify type {verify_type}"
             )
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
@@ -1688,20 +1700,23 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file exists"
                 + f" ({pid_ref_abs_path}) but cid ({cid}) does not match."
+                + f"Verify type {verify_type}"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
         # Then the pid
         pid_found = False
-        with open(cid_ref_abs_path, "r", encoding="utf8") as f:
-            for _, line in enumerate(f, start=1):
+        with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
+            for _, line in enumerate(cid_ref_file, start=1):
                 value = line.strip()
                 if value == pid:
                     pid_found = True
+                    break
         if not pid_found:
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file exists"
                 + f" ({cid_ref_abs_path}) but pid ({pid}) not found."
+                + f" Verify type {verify_type}"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
@@ -2022,6 +2037,10 @@ class FileHashStore(HashStore):
             directory_to_count = self.objects
         elif entity == "metadata":
             directory_to_count = self.metadata
+        elif entity == "pid":
+            directory_to_count = self.refs + "/pid"
+        elif entity == "cid":
+            directory_to_count = self.refs + "/cid"
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"

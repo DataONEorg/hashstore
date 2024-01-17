@@ -184,6 +184,16 @@ take a longer time to run (relating to the storage of large files) - to execute 
 
 ## HashStore Client
 
+Client API Options:
+- `-getchecksum` (get_hex_digest)
+- `-findobject`
+- `-storeobject`
+- `-storemetadata`
+- `-retrieveobject`
+- `-retrievemetadata`
+- `-deleteobject`
+- `-deletemetadata`
+
 How to use HashStore client (command line app)
 ```sh
 # Step 1: Create a HashStore
@@ -191,6 +201,9 @@ $ python './src/hashstore/hashstoreclient.py' /path/to/store/ -chs -dp=3 -wp=2 -
 
 # Get the checksum of a data object
 $ python './src/hashstore/hashstoreclient.py' /path/to/store/ -getchecksum -pid=content_identifier -algo=SHA-256
+
+# Find an object (returns the content identifier)
+$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -findobject -pid=content_identifier
 
 # Store a data object
 $ python './src/hashstore/hashstoreclient.py' /path/to/store/ -storeobject -pid=content_identifier -path=/path/to/object

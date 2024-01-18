@@ -631,7 +631,16 @@ class FileHashStore(HashStore):
                 pid_refs_cid = pid_ref_file.read()
                 pid_ref_file.close()
 
-        return pid_refs_cid
+            cid_ref_abs_path = self.get_refs_abs_path("cid", pid_refs_cid)
+            if not os.path.exists(cid_ref_abs_path):
+                err_msg = (
+                    f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
+                    + f", but cid refs file not found: {cid_ref_abs_path}"
+                )
+                logging.error(err_msg)
+                raise FileNotFoundError(err_msg)
+            else:
+                return pid_refs_cid
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(

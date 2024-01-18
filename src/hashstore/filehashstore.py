@@ -149,7 +149,6 @@ class FileHashStore(HashStore):
             self.hashstore_configuration_yaml, "r", encoding="utf-8"
         ) as hs_yaml_file:
             yaml_data = yaml.safe_load(hs_yaml_file)
-            hs_yaml_file.close()
 
         # Get hashstore properties
         hashstore_yaml_dict = {}
@@ -227,7 +226,6 @@ class FileHashStore(HashStore):
             self.hashstore_configuration_yaml, "w", encoding="utf-8"
         ) as hs_yaml_file:
             hs_yaml_file.write(hashstore_configuration_yaml)
-            hs_yaml_file.close()
 
         logging.debug(
             "FileHashStore - write_properties: Configuration file written to: %s",
@@ -397,7 +395,6 @@ class FileHashStore(HashStore):
             self.hashstore_configuration_yaml, "r", encoding="utf-8"
         ) as hs_yaml_file:
             yaml_data = yaml.safe_load(hs_yaml_file)
-            hs_yaml_file.close()
 
         # Set default store algorithm
         self.algorithm = lookup_algo(yaml_data["store_algorithm"])
@@ -629,7 +626,6 @@ class FileHashStore(HashStore):
             # Read the file to get the cid from the pid reference
             with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
                 pid_refs_cid = pid_ref_file.read()
-                pid_ref_file.close()
 
             cid_ref_abs_path = self.get_refs_abs_path("cid", pid_refs_cid)
             if not os.path.exists(cid_ref_abs_path):
@@ -1125,7 +1121,7 @@ class FileHashStore(HashStore):
                     tmp_file.write(self._to_bytes(data))
                     for hash_algorithm in hash_algorithms:
                         hash_algorithm.update(self._to_bytes(data))
-                tmp_file.close()
+
             logging.debug(
                 "FileHashStore - _write_to_tmp_file_and_get_hex_digests: Object stream"
                 + " successfully written to tmp file: %s",
@@ -1657,7 +1653,8 @@ class FileHashStore(HashStore):
             raise FileNotFoundError(exception_string)
         # Check the content of the reference files
         # Start with the cid
-        retrieved_cid = self.find_object(pid)
+        with open(pid_ref_abs_path, "r", encoding="utf8") as f:
+            retrieved_cid = f.read()
         if retrieved_cid != cid:
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file exists"

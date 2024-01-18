@@ -1789,7 +1789,7 @@ class FileHashStore(HashStore):
         :return: True if the file exists.
         :rtype: bool
         """
-        file_exists = bool(self.get_real_path(entity, file))
+        file_exists = bool(self.get_abs_path(entity, file))
         return file_exists
 
     def shard(self, digest):
@@ -1829,7 +1829,7 @@ class FileHashStore(HashStore):
         :return: An `io` stream dependent on the `mode`.
         :rtype: io.BufferedReader
         """
-        realpath = self.get_real_path(entity, file)
+        realpath = self.get_abs_path(entity, file)
         if realpath is None:
             raise IOError(f"Could not locate file: {file}")
 
@@ -1845,7 +1845,7 @@ class FileHashStore(HashStore):
         :param str entity: Desired entity type (ex. "objects", "metadata").
         :param str file: Address ID or path of file.
         """
-        realpath = self.get_real_path(entity, file)
+        realpath = self.get_abs_path(entity, file)
         if realpath is None:
             return None
 
@@ -1922,8 +1922,8 @@ class FileHashStore(HashStore):
         absolute_path = os.path.join(root_dir, *paths) + extension
         return absolute_path
 
-    def get_real_path(self, entity, file):
-        """Attempt to determine the real path of a file ID or path through
+    def get_abs_path(self, entity, file):
+        """Attempt to determine the absolute path of a file ID or path through
         successive checking of candidate paths. If the real path is stored with
         an extension, the path is considered a match if the basename matches
         the expected file path of the ID.

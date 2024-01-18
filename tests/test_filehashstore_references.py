@@ -333,34 +333,32 @@ def test_delete_cid_refs_pid(pids, store):
 
 
 def test_delete_cid_refs_pid_file(pids, store):
-    """Test that delete_cid_refs_file deletes a reference file."""
+    """Test that delete_cid_refs_pid leaves a file empty when removing the last pid."""
     for pid in pids.keys():
         tmp_root_path = store.get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_cid_refs_file(tmp_root_path, pid)
         # First remove the pid
         store._delete_cid_refs_pid(tmp_cid_refs_file, pid)
-        cid_refs_deleted = store._delete_cid_refs_file(tmp_cid_refs_file)
 
-        assert cid_refs_deleted
-        assert not os.path.exists(tmp_cid_refs_file)
+        assert os.path.getsize(tmp_cid_refs_file) == 0
 
 
-def test_delete_cid_refs_file_file_not_empty(pids, store):
-    """Test that delete_cid_refs_file raises an exception when refs file is not empty."""
-    for pid in pids.keys():
-        tmp_root_path = store.get_store_path("refs") / "tmp"
-        tmp_cid_refs_file = store._write_cid_refs_file(tmp_root_path, pid)
-        is_cid_refs_file_deleted = store._delete_cid_refs_file(tmp_cid_refs_file)
-        assert not is_cid_refs_file_deleted
+# def test_delete_cid_refs_file_file_not_empty(pids, store):
+#     """Test that delete_cid_refs_file raises an exception when refs file is not empty."""
+#     for pid in pids.keys():
+#         tmp_root_path = store.get_store_path("refs") / "tmp"
+#         tmp_cid_refs_file = store._write_cid_refs_file(tmp_root_path, pid)
+#         is_cid_refs_file_deleted = store._delete_cid_refs_file(tmp_cid_refs_file)
+#         assert not is_cid_refs_file_deleted
 
 
-def test_delete_cid_refs_file_file_not_found(pids, store):
-    """Test that delete_cid_refs_file raises an exception when refs file not found."""
-    for pid in pids.keys():
-        cid = pids[pid]["sha256"]
-        cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
-        is_cid_refs_file_deleted = store._delete_cid_refs_file(cid_ref_abs_path)
-        assert not is_cid_refs_file_deleted
+# def test_delete_cid_refs_file_file_not_found(pids, store):
+#     """Test that delete_cid_refs_file raises an exception when refs file not found."""
+#     for pid in pids.keys():
+#         cid = pids[pid]["sha256"]
+#         cid_ref_abs_path = store.get_refs_abs_path("cid", cid)
+#         is_cid_refs_file_deleted = store._delete_cid_refs_file(cid_ref_abs_path)
+#         assert not is_cid_refs_file_deleted
 
 
 def test_write_pid_refs_file(pids, store):

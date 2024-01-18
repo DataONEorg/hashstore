@@ -758,9 +758,9 @@ class FileHashStore(HashStore):
             # Remove pid from cid reference file
             self._delete_cid_refs_pid(cid_ref_abs_path, pid)
             self._delete_pid_refs_file(pid_ref_abs_path)
-            # Delete cid reference file, if the file is not empty, it will not be deleted.
-            cid_refs_deleted = self._delete_cid_refs_file(cid_ref_abs_path)
-            if cid_refs_deleted:
+            # Delete cid reference file and object
+            if os.path.getsize(cid_ref_abs_path) == 0:
+                os.remove(cid_ref_abs_path)
                 # If the cid reference file has been deleted, delete the actual object
                 entity = "objects"
                 self.delete(entity, cid)
@@ -772,7 +772,7 @@ class FileHashStore(HashStore):
             else:
                 info_string = (
                     "FileHashStore - delete_object: Successfully deleted pid refs file but"
-                    + f" not object with cid ({cid}), cid refs file still has references."
+                    + f" not object with cid ({cid}), cid refs file not empty."
                 )
                 logging.info(info_string)
             return True
@@ -1309,51 +1309,6 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore - _delete_cid_refs_pid: failed to remove pid from cid refs file:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
-            )
-            logging.error(exception_string)
-            raise err
-
-    def _delete_cid_refs_file(self, cid_ref_abs_path):
-        """Delete a CID reference file. There must be no references remaining.
-
-        :param str cid_ref_abs_path: Absolute path to the CID reference file.
-
-        :return: True if deleted, False if not.
-        :rtype: bool
-        """
-        logging.debug(
-            "FileHashStore - _delete_cid_refs_file: Deleting reference file: %s",
-            cid_ref_abs_path,
-        )
-
-        try:
-            if not os.path.exists(cid_ref_abs_path):
-                warn_msg = (
-                    "FileHashStore - _delete_cid_refs_file: Did not delete cid refs file: "
-                    + f" File not found: {cid_ref_abs_path}"
-                )
-                logging.warning(warn_msg)
-                return False
-            elif os.path.getsize(cid_ref_abs_path) != 0:
-                warn_msg = (
-                    "FileHashStore - _delete_cid_refs_file: Did not delete cid reference file."
-                    + f" File is not empty: {cid_ref_abs_path}"
-                )
-                logging.warning(warn_msg)
-                return False
-            else:
-                os.remove(cid_ref_abs_path)
-                debug_msg = (
-                    "FileHashStore - _delete_cid_refs_file: Deleted cid reference file."
-                    + cid_ref_abs_path
-                )
-                logging.debug(debug_msg)
-                return True
-
-        except Exception as err:
-            exception_string = (
-                "FileHashStore - _delete_cid_refs_file: failed to delete cid refs file:"
-                + f" {cid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err

@@ -666,8 +666,8 @@ def test_mktmpmetadata(pids, store):
 # Tests for FileHashStore Utility & Supporting Methods
 
 
-def test_validate_arg_object(pids, store):
-    """Test _validate_arg_object succeeds given good arguments."""
+def test_verify_object_information(pids, store):
+    """Test _verify_object_information succeeds given good arguments."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -677,7 +677,7 @@ def test_validate_arg_object(pids, store):
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
         # pylint: disable=W0212
-        store._validate_arg_object(
+        store._verify_object_information(
             None,
             checksum,
             checksum_algorithm,
@@ -689,8 +689,8 @@ def test_validate_arg_object(pids, store):
         )
 
 
-def test_validate_arg_object_incorrect_size(pids, store):
-    """Test _validate_arg_object throws exception when size is incorrect."""
+def test_verify_object_information_incorrect_size(pids, store):
+    """Test _verify_object_information throws exception when size is incorrect."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -700,7 +700,7 @@ def test_validate_arg_object_incorrect_size(pids, store):
         checksum_algorithm = store.algorithm
         with pytest.raises(ValueError):
             # pylint: disable=W0212
-            store._validate_arg_object(
+            store._verify_object_information(
                 None,
                 checksum,
                 checksum_algorithm,
@@ -712,8 +712,8 @@ def test_validate_arg_object_incorrect_size(pids, store):
             )
 
 
-def test_validate_arg_object_incorrect_size_with_pid(pids, store):
-    """Test _validate_arg_object deletes the expected tmp file if obj size does
+def test_verify_object_information_incorrect_size_with_pid(pids, store):
+    """Test _verify_object_information deletes the expected tmp file if obj size does
     not match and raises an exception."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -729,7 +729,7 @@ def test_validate_arg_object_incorrect_size_with_pid(pids, store):
         tmp_file = store._mktmpfile(objects_tmp_folder)
         assert os.path.isfile(tmp_file.name)
         with pytest.raises(ValueError):
-            store._validate_arg_object(
+            store._verify_object_information(
                 "Test_Pid",
                 checksum,
                 checksum_algorithm,
@@ -742,8 +742,9 @@ def test_validate_arg_object_incorrect_size_with_pid(pids, store):
             assert not os.path.isfile(tmp_file.name)
 
 
-def test_validate_arg_object_missing_key_in_hex_digests(pids, store):
-    """Test _validate_arg_object throws exception when algorithm is not found in hex digests."""
+def test_verify_object_information_missing_key_in_hex_digests(pids, store):
+    """Test _verify_object_information throws exception when algorithm is not found
+    in hex digests."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -753,7 +754,7 @@ def test_validate_arg_object_missing_key_in_hex_digests(pids, store):
         expected_file_size = object_metadata.obj_size
         with pytest.raises(KeyError):
             # pylint: disable=W0212
-            store._validate_arg_object(
+            store._verify_object_information(
                 None,
                 checksum,
                 checksum_algorithm,
@@ -1054,9 +1055,9 @@ def test_count(pids, store):
     assert store.count(entity) == 3
 
 
-def test_to_bytes(store):
+def test_cast_to_bytes(store):
     """Test _to_bytes returns bytes."""
     string = "teststring"
     # pylint: disable=W0212
-    string_bytes = store._to_bytes(string)
+    string_bytes = store._cast_to_bytes(string)
     assert isinstance(string_bytes, bytes)

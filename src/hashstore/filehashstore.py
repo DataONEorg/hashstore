@@ -419,7 +419,7 @@ class FileHashStore(HashStore):
         checksum_algorithm=None,
         expected_object_size=None,
     ):
-        if pid is None and self._validate_arg_data(data):
+        if pid is None and self._check_arg_data(data):
             # If no pid is supplied, store the object only without tagging
             logging.debug("FileHashStore - store_object: Request to store data only.")
             object_metadata = self.store_data_only(data)
@@ -433,13 +433,13 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_object: Request to store object for pid: %s", pid
             )
             # Validate input parameters
-            self._validate_string(pid, "pid", "store_object")
-            self._validate_arg_data(data)
-            self._is_int_and_non_negative(expected_object_size)
+            self._check_string(pid, "pid", "store_object")
+            self._check_arg_data(data)
+            self._check_integer(expected_object_size)
             (
                 additional_algorithm_checked,
                 checksum_algorithm_checked,
-            ) = self._validate_arg_algorithms_and_checksum(
+            ) = self._check_arg_algorithms_and_checksum(
                 additional_algorithm, checksum, checksum_algorithm
             )
 
@@ -496,9 +496,9 @@ class FileHashStore(HashStore):
     def verify_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
-        self._validate_string(checksum, "checksum", "verify_object")
-        self._validate_string(checksum_algorithm, "checksum_algorithm", "verify_object")
-        self._is_int_and_non_negative(expected_file_size)
+        self._check_string(checksum, "checksum", "verify_object")
+        self._check_string(checksum_algorithm, "checksum_algorithm", "verify_object")
+        self._check_integer(expected_file_size)
         if object_metadata is None or not isinstance(object_metadata, ObjectMetadata):
             exception_string = (
                 "FileHashStore - verify_object: 'object_metadata' cannot be None."
@@ -514,7 +514,7 @@ class FileHashStore(HashStore):
             object_metadata_hex_digests = object_metadata.hex_digests
             object_metadata_file_size = object_metadata.obj_size
             checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
-            self._validate_arg_object(
+            self._verify_object_information(
                 pid=None,
                 checksum=checksum,
                 checksum_algorithm=checksum_algorithm_checked,
@@ -535,8 +535,8 @@ class FileHashStore(HashStore):
             cid,
             pid,
         )
-        self._validate_string(pid, "pid", "tag_object")
-        self._validate_string(cid, "cid", "tag_object")
+        self._check_string(pid, "pid", "tag_object")
+        self._check_string(cid, "cid", "tag_object")
         # Wait for the cid to release if it's being tagged
         while cid in self.reference_locked_cids:
             logging.debug(
@@ -613,7 +613,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - find_object: Request to find object for for pid: %s", pid
         )
-        self._validate_string(pid, "pid", "find_object")
+        self._check_string(pid, "pid", "find_object")
 
         pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
         if not os.path.exists(pid_ref_abs_path):
@@ -643,9 +643,9 @@ class FileHashStore(HashStore):
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
         )
         # Validate input parameters
-        self._validate_string(pid, "pid", "store_metadata")
-        checked_format_id = self._validate_arg_format_id(format_id, "store_metadata")
-        self._validate_arg_data(metadata)
+        self._check_string(pid, "pid", "store_metadata")
+        checked_format_id = self._check_arg_format_id(format_id, "store_metadata")
+        self._check_arg_data(metadata)
 
         # Wait for the pid to release if it's in use
         while pid in self.metadata_locked_pids:
@@ -689,7 +689,7 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_object: Request to retrieve object for pid: %s",
             pid,
         )
-        self._validate_string(pid, "pid", "retrieve_object")
+        self._check_string(pid, "pid", "retrieve_object")
 
         object_cid = self.find_object(pid)
         entity = "objects"
@@ -717,8 +717,8 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_metadata: Request to retrieve metadata for pid: %s",
             pid,
         )
-        self._validate_string(pid, "pid", "retrieve_metadata")
-        checked_format_id = self._validate_arg_format_id(format_id, "retrieve_metadata")
+        self._check_string(pid, "pid", "retrieve_metadata")
+        checked_format_id = self._check_arg_format_id(format_id, "retrieve_metadata")
 
         entity = "metadata"
         metadata_cid = self.computehash(pid + checked_format_id)
@@ -741,7 +741,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - delete_object: Request to delete object for pid: %s", pid
         )
-        self._validate_string(pid, "pid", "delete_object")
+        self._check_string(pid, "pid", "delete_object")
         cid = self.find_object(pid)
 
         while cid in self.reference_locked_cids:
@@ -794,8 +794,8 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
         )
-        self._validate_string(pid, "pid", "delete_metadata")
-        checked_format_id = self._validate_arg_format_id(format_id, "delete_metadata")
+        self._check_string(pid, "pid", "delete_metadata")
+        checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
 
         entity = "metadata"
         metadata_cid = self.computehash(pid + checked_format_id)
@@ -812,8 +812,8 @@ class FileHashStore(HashStore):
             "FileHashStore - get_hex_digest: Request to get hex digest for object with pid: %s",
             pid,
         )
-        self._validate_string(pid, "pid", "get_hex_digest")
-        self._validate_string(algorithm, "algorithm", "get_hex_digest")
+        self._check_string(pid, "pid", "get_hex_digest")
+        self._check_string(algorithm, "algorithm", "get_hex_digest")
 
         entity = "objects"
         algorithm = self.clean_algorithm(algorithm)
@@ -994,7 +994,7 @@ class FileHashStore(HashStore):
         # file and calculate the hex digests because the given checksum could be incorrect.
         if not os.path.isfile(abs_file_path):
             # Files are stored once and only once
-            self._validate_arg_object(
+            self._verify_object_information(
                 pid,
                 checksum,
                 checksum_algorithm,
@@ -1056,7 +1056,7 @@ class FileHashStore(HashStore):
         else:
             # If the file exists, determine if the object is what the client states it to be
             try:
-                self._validate_arg_object(
+                self._verify_object_information(
                     pid,
                     checksum,
                     checksum_algorithm,
@@ -1118,9 +1118,9 @@ class FileHashStore(HashStore):
             # tmp is a file-like object that is already opened for writing by default
             with tmp as tmp_file:
                 for data in stream:
-                    tmp_file.write(self._to_bytes(data))
+                    tmp_file.write(self._cast_to_bytes(data))
                     for hash_algorithm in hash_algorithms:
-                        hash_algorithm.update(self._to_bytes(data))
+                        hash_algorithm.update(self._cast_to_bytes(data))
 
             logging.debug(
                 "FileHashStore - _write_to_tmp_file_and_get_hex_digests: Object stream"
@@ -1450,7 +1450,7 @@ class FileHashStore(HashStore):
         )
         with tmp as tmp_file:
             for data in stream:
-                tmp_file.write(self._to_bytes(data))
+                tmp_file.write(self._cast_to_bytes(data))
 
         logging.debug(
             "FileHashStore - _mktmpmetadata: Successfully written to tmp metadata file: %s",
@@ -1460,75 +1460,7 @@ class FileHashStore(HashStore):
 
     # FileHashStore Utility & Supporting Methods
 
-    def _validate_arg_data(self, data):
-        """Checks a data argument to ensure that it is either a string, path, or stream
-        object.
-
-        :param data: Object to validate (string, path, or stream).
-        :type data: str, os.PathLike, io.BufferedReader
-
-        :return: True if valid.
-        :rtype: bool
-        """
-        if (
-            not isinstance(data, str)
-            and not isinstance(data, Path)
-            and not isinstance(data, io.BufferedIOBase)
-        ):
-            exception_string = (
-                "FileHashStore - _validate_arg_data: Data must be a path, string or buffered"
-                + f" stream type. Data type supplied: {type(data)}"
-            )
-            logging.error(exception_string)
-            raise TypeError(exception_string)
-        if isinstance(data, str):
-            if data.replace(" ", "") == "":
-                exception_string = (
-                    "FileHashStore - _validate_arg_data: Data string cannot be empty."
-                )
-                logging.error(exception_string)
-                raise TypeError(exception_string)
-        return True
-
-    def _validate_arg_algorithms_and_checksum(
-        self, additional_algorithm, checksum, checksum_algorithm
-    ):
-        """Determines whether the caller has supplied the necessary arguments to validate
-        an object with a checksum value.
-
-        :param additional_algorithm: Value of the additional algorithm to calculate.
-        :type additional_algorithm: str or None
-        :param checksum: Value of the checksum.
-        :type checksum: str or None
-        :param checksum_algorithm: Algorithm of the checksum.
-        :type checksum_algorithm: str or None
-
-        :return: Hashlib-compatible string or 'None' for additional_algorithm and
-            checksum_algorithm.
-        :rtype: str
-        """
-        additional_algorithm_checked = None
-        if additional_algorithm != self.algorithm and additional_algorithm is not None:
-            # Set additional_algorithm
-            additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
-        checksum_algorithm_checked = None
-        if checksum is not None:
-            self._validate_string(
-                checksum_algorithm,
-                "checksum_algorithm",
-                "_validate_arg_algorithms_and_checksum (store_object)",
-            )
-        if checksum_algorithm is not None:
-            self._validate_string(
-                checksum,
-                "checksum",
-                "_validate_arg_algorithms_and_checksum (store_object)",
-            )
-            # Set checksum_algorithm
-            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
-        return additional_algorithm_checked, checksum_algorithm_checked
-
-    def _validate_arg_object(
+    def _verify_object_information(
         self,
         pid,
         checksum,
@@ -1602,28 +1534,6 @@ class FileHashStore(HashStore):
                         logging.error(exception_string)
                         raise ValueError(exception_string)
 
-    def _validate_arg_format_id(self, format_id, method):
-        """Determines the metadata namespace (format_id) to use for storing,
-        retrieving, and deleting metadata.
-
-        :param str format_id: Metadata namespace to review.
-        :param str method: Calling method for logging purposes.
-
-        :return: Valid metadata namespace.
-        :rtype: str
-        """
-        checked_format_id = None
-        if format_id is not None and format_id.replace(" ", "") == "":
-            exception_string = f"FileHashStore - {method}: Format_id cannot be empty."
-            logging.error(exception_string)
-            raise ValueError(exception_string)
-        elif format_id is None:
-            # Use default value set by hashstore config
-            checked_format_id = self.sysmeta_ns
-        else:
-            checked_format_id = format_id
-        return checked_format_id
-
     def _verify_hashstore_references(self, pid, cid, verify_type):
         """Verifies that the supplied pid and pid reference file and content have been
         written successfully.
@@ -1679,6 +1589,96 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
+
+    def _check_arg_data(self, data):
+        """Checks a data argument to ensure that it is either a string, path, or stream
+        object.
+
+        :param data: Object to validate (string, path, or stream).
+        :type data: str, os.PathLike, io.BufferedReader
+
+        :return: True if valid.
+        :rtype: bool
+        """
+        if (
+            not isinstance(data, str)
+            and not isinstance(data, Path)
+            and not isinstance(data, io.BufferedIOBase)
+        ):
+            exception_string = (
+                "FileHashStore - _validate_arg_data: Data must be a path, string or buffered"
+                + f" stream type. Data type supplied: {type(data)}"
+            )
+            logging.error(exception_string)
+            raise TypeError(exception_string)
+        if isinstance(data, str):
+            if data.replace(" ", "") == "":
+                exception_string = (
+                    "FileHashStore - _validate_arg_data: Data string cannot be empty."
+                )
+                logging.error(exception_string)
+                raise TypeError(exception_string)
+        return True
+
+    def _check_arg_algorithms_and_checksum(
+        self, additional_algorithm, checksum, checksum_algorithm
+    ):
+        """Determines whether the caller has supplied the necessary arguments to validate
+        an object with a checksum value.
+
+        :param additional_algorithm: Value of the additional algorithm to calculate.
+        :type additional_algorithm: str or None
+        :param checksum: Value of the checksum.
+        :type checksum: str or None
+        :param checksum_algorithm: Algorithm of the checksum.
+        :type checksum_algorithm: str or None
+
+        :return: Hashlib-compatible string or 'None' for additional_algorithm and
+            checksum_algorithm.
+        :rtype: str
+        """
+        additional_algorithm_checked = None
+        if additional_algorithm != self.algorithm and additional_algorithm is not None:
+            # Set additional_algorithm
+            additional_algorithm_checked = self.clean_algorithm(additional_algorithm)
+        checksum_algorithm_checked = None
+        if checksum is not None:
+            self._check_string(
+                checksum_algorithm,
+                "checksum_algorithm",
+                "_check_arg_algorithms_and_checksum (store_object)",
+            )
+        if checksum_algorithm is not None:
+            self._check_string(
+                checksum,
+                "checksum",
+                "_check_arg_algorithms_and_checksum (store_object)",
+            )
+            # Set checksum_algorithm
+            checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
+        return additional_algorithm_checked, checksum_algorithm_checked
+
+    def _check_arg_format_id(self, format_id, method):
+        """Determines the metadata namespace (format_id) to use for storing,
+        retrieving, and deleting metadata.
+
+        :param str format_id: Metadata namespace to review.
+        :param str method: Calling method for logging purposes.
+
+        :return: Valid metadata namespace.
+        :rtype: str
+        """
+        checked_format_id = None
+        if format_id is not None and format_id.replace(" ", "") == "":
+            exception_string = f"FileHashStore - {method}: Format_id cannot be empty."
+            logging.error(exception_string)
+            raise ValueError(exception_string)
+        elif format_id is None:
+            # Use default value set by hashstore config
+            checked_format_id = self.sysmeta_ns
+        else:
+            checked_format_id = format_id
+        return checked_format_id
 
     def _refine_algorithm_list(self, additional_algorithm, checksum_algorithm):
         """Create the final list of hash algorithms to calculate.
@@ -1760,25 +1760,9 @@ class FileHashStore(HashStore):
             check_algorithm = self.clean_algorithm(algorithm)
             hashobj = hashlib.new(check_algorithm)
         for data in stream:
-            hashobj.update(self._to_bytes(data))
+            hashobj.update(self._cast_to_bytes(data))
         hex_digest = hashobj.hexdigest()
         return hex_digest
-
-    def get_store_path(self, entity):
-        """Return a path object of the root directory of the store.
-
-        :param str entity: Desired entity type: "objects" or "metadata"
-        """
-        if entity == "objects":
-            return Path(self.objects)
-        elif entity == "metadata":
-            return Path(self.metadata)
-        elif entity == "refs":
-            return Path(self.refs)
-        else:
-            raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
-            )
 
     def exists(self, entity, file):
         """Check whether a given file id or path exists on disk.
@@ -1986,6 +1970,22 @@ class FileHashStore(HashStore):
         )
         return ref_file_abs_path
 
+    def get_store_path(self, entity):
+        """Return a path object of the root directory of the store.
+
+        :param str entity: Desired entity type: "objects" or "metadata"
+        """
+        if entity == "objects":
+            return Path(self.objects)
+        elif entity == "metadata":
+            return Path(self.metadata)
+        elif entity == "refs":
+            return Path(self.refs)
+        else:
+            raise ValueError(
+                f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
+            )
+
     def count(self, entity):
         """Return the count of the number of files in the `root` directory.
 
@@ -2017,7 +2017,7 @@ class FileHashStore(HashStore):
     # Other Static Methods
 
     @staticmethod
-    def _is_int_and_non_negative(file_size):
+    def _check_integer(file_size):
         """Check whether a given argument is an integer and greater than 0;
         throw an exception if not.
 
@@ -2026,20 +2026,20 @@ class FileHashStore(HashStore):
         if file_size is not None:
             if not isinstance(file_size, int):
                 exception_string = (
-                    "FileHashStore - _is_int_and_non_negative: size given must be an integer."
+                    "FileHashStore - _check_integer: size given must be an integer."
                     + f" File size: {file_size}. Arg Type: {type(file_size)}."
                 )
                 logging.error(exception_string)
                 raise TypeError(exception_string)
             if file_size < 1:
                 exception_string = (
-                    "FileHashStore - _is_int_and_non_negative: size given must be > 0"
+                    "FileHashStore - _check_integer: size given must be > 0"
                 )
                 logging.error(exception_string)
                 raise ValueError(exception_string)
 
     @staticmethod
-    def _validate_string(string, arg, method):
+    def _check_string(string, arg, method):
         """Check whether a string is None or empty; throw an exception if so.
 
         :param str string: Value to check.
@@ -2055,7 +2055,7 @@ class FileHashStore(HashStore):
             raise ValueError(exception_string)
 
     @staticmethod
-    def _to_bytes(text):
+    def _cast_to_bytes(text):
         """Convert text to a sequence of bytes using utf-8 encoding.
 
         :param str text: String to convert.

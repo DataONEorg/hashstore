@@ -988,7 +988,7 @@ class FileHashStore(HashStore):
         # Objects are stored with their content identifier based on the store algorithm
         entity = "objects"
         object_cid = hex_digests.get(self.algorithm)
-        abs_file_path = self.build_abs_path(entity, object_cid, extension)
+        abs_file_path = self.build_path(entity, object_cid, extension)
 
         # Only move file if it doesn't exist. We do not check before we create the tmp
         # file and calculate the hex digests because the given checksum could be incorrect.
@@ -1901,6 +1901,27 @@ class FileHashStore(HashStore):
         except FileExistsError:
             assert os.path.isdir(path), f"expected {path} to be a directory"
 
+    def build_path(self, entity, hash_id, extension=""):
+        """Build the absolute file path for a given hash ID with an optional file extension.
+
+        :param str entity: Desired entity type (ex. "objects", "metadata").
+        :param str hash_id: A hash ID to build a file path for.
+        :param str extension: An optional file extension to append to the file path.
+
+        :return: An absolute file path for the specified hash ID.
+        :rtype: str
+        """
+        paths = self.shard(hash_id)
+        root_dir = self.get_store_path(entity)
+
+        if extension and not extension.startswith(os.extsep):
+            extension = os.extsep + extension
+        elif not extension:
+            extension = ""
+
+        absolute_path = os.path.join(root_dir, *paths) + extension
+        return absolute_path
+
     def get_real_path(self, entity, file):
         """Attempt to determine the real path of a file ID or path through
         successive checking of candidate paths. If the real path is stored with
@@ -1936,33 +1957,12 @@ class FileHashStore(HashStore):
             return relpath
 
         # Check for sharded path.
-        abspath = self.build_abs_path(entity, file)
+        abspath = self.build_path(entity, file)
         if os.path.isfile(abspath):
             return abspath
 
         # Could not determine a match.
         return None
-
-    def build_abs_path(self, entity, hash_id, extension=""):
-        """Build the absolute file path for a given hash ID with an optional file extension.
-
-        :param str entity: Desired entity type (ex. "objects", "metadata").
-        :param str hash_id: A hash ID to build a file path for.
-        :param str extension: An optional file extension to append to the file path.
-
-        :return: An absolute file path for the specified hash ID.
-        :rtype: str
-        """
-        paths = self.shard(hash_id)
-        root_dir = self.get_store_path(entity)
-
-        if extension and not extension.startswith(os.extsep):
-            extension = os.extsep + extension
-        elif not extension:
-            extension = ""
-
-        absolute_path = os.path.join(root_dir, *paths) + extension
-        return absolute_path
 
     def get_refs_abs_path(self, ref_type, hash_id):
         """Get the absolute path to the reference file for the given ref_type.
@@ -1981,7 +1981,7 @@ class FileHashStore(HashStore):
         entity = "refs"
         if ref_type == "pid":
             hash_id = self.computehash(hash_id, self.algorithm)
-        ref_file_abs_path = self.build_abs_path(entity, hash_id).replace(
+        ref_file_abs_path = self.build_path(entity, hash_id).replace(
             "/refs/", f"/refs/{ref_type}/"
         )
         return ref_file_abs_path

@@ -1032,7 +1032,7 @@ def test_get_real_path_with_bad_entity(store, pids):
             store.get_real_path(entity, object_metadata.id)
 
 
-def test_build_abs_path(store, pids):
+def test_build_path(store, pids):
     """Test build_abs_path builds the absolute file path."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -1040,7 +1040,7 @@ def test_build_abs_path(store, pids):
         path = test_dir + pid.replace("/", "_")
         _ = store.store_and_validate_data(pid, path)
         # pylint: disable=W0212
-        abs_path = store.build_abs_path(entity, pids[pid][store.algorithm])
+        abs_path = store.build_path(entity, pids[pid][store.algorithm])
         assert os.path.exists(abs_path)
 
 

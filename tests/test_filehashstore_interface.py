@@ -161,7 +161,7 @@ def test_store_object_additional_algorithm_invalid(store):
 
 
 def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
-    """Test store object formats algorithm in uppercase."""
+    """Test store object formats a given algorithm that's in uppercase."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -581,13 +581,32 @@ def test_store_object_sparse_large_file(store):
 
 
 def test_find_object(pids, store):
-    """Test find object returns the correct content identifier (cid)."""
+    """Test find_object returns the correct content identifier (cid)."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
         cid = store.find_object(pid)
         assert cid == object_metadata.hex_digests.get("sha256")
+
+
+def test_find_object_pid_refs_cid_not_found(pids, store):
+    """Test find_object throws exception when pid refs file is found with a cid
+    but the cid does not exist."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        _object_metadata = store.store_object(pid, path)
+
+        # Place the wrong cid into the pid refs file that has already been created
+        pid_ref_abs_path = store.get_refs_abs_path("pid", pid)
+        with open(pid_ref_abs_path, "w", encoding="utf8") as pid_ref_file:
+            pid_ref_file.seek(0)
+            pid_ref_file.write("intentionally.wrong.pid")
+            pid_ref_file.truncate()
+
+        with pytest.raises(FileNotFoundError):
+            store.find_object(pid)
 
 
 def test_find_object_pid_object_does_not_exist(store):
@@ -858,7 +877,7 @@ def test_retrieve_metadata_format_id_empty_spaces(store):
         store.retrieve_metadata(pid, format_id)
 
 
-def test_delete_objects(pids, store):
+def test_delete_object(pids, store):
     """Test delete_object successfully deletes objects from /objects."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -873,8 +892,8 @@ def test_delete_objects(pids, store):
     assert store.count(entity) == 0
 
 
-def test_delete_objects_pid_refs_file(pids, store):
-    """Test delete_object deletes the pid refs file containing the cid."""
+def test_delete_object_pid_refs_file(pids, store):
+    """Test delete_object deletes the associated pid refs file for the object."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
@@ -888,8 +907,8 @@ def test_delete_objects_pid_refs_file(pids, store):
         assert not os.path.exists(pid_refs_file_path)
 
 
-def test_delete_objects_cid_refs_file(pids, store):
-    """Test delete_object deletes the cid refs file containing the cid."""
+def test_delete_object_cid_refs_file(pids, store):
+    """Test delete_object deletes the associated cid refs file for the object."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
@@ -904,7 +923,7 @@ def test_delete_objects_cid_refs_file(pids, store):
         assert not os.path.exists(cid_refs_file_path)
 
 
-def test_delete_objects_cid_refs_file_with_pid_refs_remaining(pids, store):
+def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
     """Test delete_object does not delete the cid refs file that still contains ref."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():

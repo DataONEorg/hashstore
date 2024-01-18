@@ -767,12 +767,10 @@ class FileHashStore(HashStore):
             # Remove pid from cid reference file
             self._delete_cid_refs_pid(cid_ref_abs_path, pid)
             self._delete_pid_refs_file(pid_ref_abs_path)
-            # Delete cid reference file and object
+            # Delete cid reference file and object only if the cid refs file is empty
             if os.path.getsize(cid_ref_abs_path) == 0:
-                os.remove(cid_ref_abs_path)
-                # If the cid reference file has been deleted, delete the actual object
-                entity = "objects"
-                self.delete(entity, cid)
+                self.delete("cid", cid_ref_abs_path)
+                self.delete("objects", cid)
                 info_string = (
                     "FileHashStore - delete_object: Successfully deleted references and"
                     + f" object associated with pid: {pid}"
@@ -1370,7 +1368,7 @@ class FileHashStore(HashStore):
                 )
                 raise FileNotFoundError(err_msg)
             else:
-                os.remove(pid_ref_abs_path)
+                self.delete("pid", pid_ref_abs_path)
 
         except Exception as err:
             exception_string = (
@@ -1928,6 +1926,10 @@ class FileHashStore(HashStore):
             rel_root = self.objects
         elif entity == "metadata":
             rel_root = self.metadata
+        elif entity == "cid":
+            rel_root = self.refs + "/cid"
+        elif entity == "pid":
+            rel_root = self.refs + "/pid"
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"

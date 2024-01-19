@@ -981,7 +981,7 @@ def test_get_real_path_file_does_not_exist(store):
     """Test get_real_path returns None when object does not exist."""
     entity = "objects"
     test_path = "tests/testdata/helloworld.txt"
-    real_path_exists = store.get_abs_path(entity, test_path)
+    real_path_exists = store.resolve_path(entity, test_path)
     assert real_path_exists is None
 
 
@@ -992,7 +992,7 @@ def test_get_real_path_with_object_id(store, pids):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        obj_abs_path = store.get_abs_path(entity, object_metadata.id)
+        obj_abs_path = store.resolve_path(entity, object_metadata.id)
         assert os.path.exists(obj_abs_path)
 
 
@@ -1005,7 +1005,7 @@ def test_get_real_path_with_object_id_sharded(pids, store):
         object_metadata = store.store_and_validate_data(pid, path)
         object_metadata_shard = store.shard(object_metadata.id)
         object_metadata_shard_path = "/".join(object_metadata_shard)
-        obj_abs_path = store.get_abs_path(entity, object_metadata_shard_path)
+        obj_abs_path = store.resolve_path(entity, object_metadata_shard_path)
         assert os.path.exists(obj_abs_path)
 
 
@@ -1018,7 +1018,7 @@ def test_get_real_path_with_metadata_id(store, pids):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         metadata_cid = store.store_metadata(pid, syspath, format_id)
-        metadata_abs_path = store.get_abs_path(entity, metadata_cid)
+        metadata_abs_path = store.resolve_path(entity, metadata_cid)
         assert os.path.exists(metadata_abs_path)
 
 
@@ -1030,7 +1030,7 @@ def test_get_real_path_with_bad_entity(store, pids):
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
         with pytest.raises(ValueError):
-            store.get_abs_path(entity, object_metadata.id)
+            store.resolve_path(entity, object_metadata.id)
 
 
 def test_build_path(store, pids):

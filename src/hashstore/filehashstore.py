@@ -552,8 +552,8 @@ class FileHashStore(HashStore):
             )
             self.reference_locked_cids.append(cid)
         try:
-            pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
-            cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+            pid_ref_abs_path = self.get_refs_path("pid", pid)
+            cid_ref_abs_path = self.get_refs_path("cid", cid)
             tmp_root_path = self.get_store_path("refs") / "tmp"
 
             # Proceed to tagging process
@@ -615,7 +615,7 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid", "find_object")
 
-        pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+        pid_ref_abs_path = self.get_refs_path("pid", pid)
         if not os.path.exists(pid_ref_abs_path):
             err_msg = (
                 f"FileHashStore - find_object: pid ({pid}) reference file not found: "
@@ -627,7 +627,7 @@ class FileHashStore(HashStore):
             with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
                 pid_refs_cid = pid_ref_file.read()
 
-            cid_ref_abs_path = self.get_refs_abs_path("cid", pid_refs_cid)
+            cid_ref_abs_path = self.get_refs_path("cid", pid_refs_cid)
             if not os.path.exists(cid_ref_abs_path):
                 err_msg = (
                     f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
@@ -758,8 +758,8 @@ class FileHashStore(HashStore):
             )
             self.reference_locked_cids.append(cid)
         try:
-            cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
-            pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
+            cid_ref_abs_path = self.get_refs_path("cid", cid)
+            pid_ref_abs_path = self.get_refs_path("pid", pid)
             # Remove pid from cid reference file
             self._delete_cid_refs_pid(cid_ref_abs_path, pid)
             self._delete_pid_refs_file(pid_ref_abs_path)
@@ -1529,7 +1529,7 @@ class FileHashStore(HashStore):
                     else:
                         # Delete the object
                         cid = hex_digests[self.algorithm]
-                        cid_abs_path = self.get_refs_abs_path("cid", cid)
+                        cid_abs_path = self.get_refs_path("cid", cid)
                         self.delete(entity, cid_abs_path)
                         logging.error(exception_string)
                         raise ValueError(exception_string)
@@ -1543,8 +1543,8 @@ class FileHashStore(HashStore):
         :param str verify_type: "update" or "create"
         """
         # Check that reference files were created
-        pid_ref_abs_path = self.get_refs_abs_path("pid", pid)
-        cid_ref_abs_path = self.get_refs_abs_path("cid", cid)
+        pid_ref_abs_path = self.get_refs_path("pid", pid)
+        cid_ref_abs_path = self.get_refs_path("cid", cid)
         if not os.path.exists(pid_ref_abs_path):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file missing: "
@@ -1912,7 +1912,7 @@ class FileHashStore(HashStore):
         an extension, the path is considered a match if the basename matches
         the expected file path of the ID.
 
-        :param str entity: Desired entity type (ex. "objects", "metadata").
+        :param str entity: Desired entity type ("objects" or "metadata").
         :param str file: Name of the file.
 
         :return: Whether the file is found or not.
@@ -1928,10 +1928,6 @@ class FileHashStore(HashStore):
             rel_root = self.objects
         elif entity == "metadata":
             rel_root = self.metadata
-        elif entity == "cid":
-            rel_root = self.refs + "/cid"
-        elif entity == "pid":
-            rel_root = self.refs + "/pid"
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
@@ -1948,8 +1944,8 @@ class FileHashStore(HashStore):
         # Could not determine a match.
         return None
 
-    def get_refs_abs_path(self, ref_type, hash_id):
-        """Get the absolute path to the reference file for the given ref_type.
+    def get_refs_path(self, ref_type, hash_id):
+        """Compute the absolute path to the reference file for the given ref_type.
 
         If a 'pid' is provided, this method will calculate the pid's hash based on the store
         algorithm and return the expected address of the pid reference file. If a 'cid' is

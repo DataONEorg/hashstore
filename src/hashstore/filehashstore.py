@@ -552,8 +552,8 @@ class FileHashStore(HashStore):
             )
             self.reference_locked_cids.append(cid)
         try:
-            pid_ref_abs_path = self.get_refs_path("pid", pid)
-            cid_ref_abs_path = self.get_refs_path("cid", cid)
+            pid_ref_abs_path = self.resolve_path("pid", pid)
+            cid_ref_abs_path = self.resolve_path("cid", cid)
             tmp_root_path = self.get_store_path("refs") / "tmp"
 
             # Proceed to tagging process
@@ -615,7 +615,7 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid", "find_object")
 
-        pid_ref_abs_path = self.get_refs_path("pid", pid)
+        pid_ref_abs_path = self.resolve_path("pid", pid)
         if not os.path.exists(pid_ref_abs_path):
             err_msg = (
                 f"FileHashStore - find_object: pid ({pid}) reference file not found: "
@@ -627,7 +627,7 @@ class FileHashStore(HashStore):
             with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
                 pid_refs_cid = pid_ref_file.read()
 
-            cid_ref_abs_path = self.get_refs_path("cid", pid_refs_cid)
+            cid_ref_abs_path = self.resolve_path("cid", pid_refs_cid)
             if not os.path.exists(cid_ref_abs_path):
                 err_msg = (
                     f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
@@ -758,8 +758,8 @@ class FileHashStore(HashStore):
             )
             self.reference_locked_cids.append(cid)
         try:
-            cid_ref_abs_path = self.get_refs_path("cid", cid)
-            pid_ref_abs_path = self.get_refs_path("pid", pid)
+            cid_ref_abs_path = self.resolve_path("cid", cid)
+            pid_ref_abs_path = self.resolve_path("pid", pid)
             # Remove pid from cid reference file
             self._delete_cid_refs_pid(cid_ref_abs_path, pid)
             self._delete_pid_refs_file(pid_ref_abs_path)
@@ -1529,7 +1529,7 @@ class FileHashStore(HashStore):
                     else:
                         # Delete the object
                         cid = hex_digests[self.algorithm]
-                        cid_abs_path = self.get_refs_path("cid", cid)
+                        cid_abs_path = self.resolve_path("cid", cid)
                         self.delete(entity, cid_abs_path)
                         logging.error(exception_string)
                         raise ValueError(exception_string)
@@ -1543,8 +1543,8 @@ class FileHashStore(HashStore):
         :param str verify_type: "update" or "create"
         """
         # Check that reference files were created
-        pid_ref_abs_path = self.get_refs_path("pid", pid)
-        cid_ref_abs_path = self.get_refs_path("cid", cid)
+        pid_ref_abs_path = self.resolve_path("pid", pid)
+        cid_ref_abs_path = self.resolve_path("cid", cid)
         if not os.path.exists(pid_ref_abs_path):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file missing: "
@@ -1908,15 +1908,14 @@ class FileHashStore(HashStore):
 
     def resolve_path(self, entity, file):
         """Attempt to determine the absolute path of a file ID or path through
-        successive checking of candidate paths. If the real path is stored with
-        an extension, the path is considered a match if the basename matches
-        the expected file path of the ID.
+        successive checking of candidate paths.
 
-        :param str entity: Desired entity type ("objects" or "metadata").
+        :param str entity: Desired entity type ("objects", "metadata", "cid", "pid"),
+            where "cid" & "pid" represents resolving the path to the refs files.
         :param str file: Name of the file.
 
-        :return: Whether the file is found or not.
-        :rtype: bool
+        :return: Path to file
+        :rtype: str
         """
         # Check for absolute path.
         if os.path.isfile(file):
@@ -1926,50 +1925,32 @@ class FileHashStore(HashStore):
         rel_root = ""
         if entity == "objects":
             rel_root = self.objects
-        elif entity == "metadata":
+        if entity == "metadata":
             rel_root = self.metadata
-        else:
-            raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
-            )
         relpath = os.path.join(rel_root, file)
         if os.path.isfile(relpath):
             return relpath
 
         # Check for sharded path.
-        abspath = self.build_path(entity, file)
-        if os.path.isfile(abspath):
-            return abspath
-
-        # Could not determine a match.
-        return None
-
-    def get_refs_path(self, ref_type, hash_id):
-        """Compute the absolute path to the reference file for the given ref_type.
-
-        If a 'pid' is provided, this method will calculate the pid's hash based on the store
-        algorithm and return the expected address of the pid reference file. If a 'cid' is
-        provided, this method will return the expected address by sharding the cid based on
-        HashStore's configuration.
-
-        :param str ref_type: 'pid' or 'cid'
-        :param str hash_id: Authority-based, persistent, or hash identifier
-
-        :return: Path to the reference file for the given type and ID.
-        :rtype: str
-        """
-        entity = "refs"
-        if ref_type == "pid":
-            hash_id = self.computehash(hash_id, self.algorithm)
-        ref_file_abs_path = self.build_path(entity, hash_id).replace(
-            "/refs/", f"/refs/{ref_type}/"
-        )
-        return ref_file_abs_path
+        if entity == "cid":
+            ref_file_abs_path = self.build_path(entity, file)
+            return ref_file_abs_path
+        elif entity == "pid":
+            hash_id = self.computehash(file, self.algorithm)
+            ref_file_abs_path = self.build_path(entity, hash_id)
+            return ref_file_abs_path
+        else:
+            abspath = self.build_path(entity, file)
+            if os.path.isfile(abspath):
+                return abspath
 
     def get_store_path(self, entity):
         """Return a path object of the root directory of the store.
 
         :param str entity: Desired entity type: "objects" or "metadata"
+
+        :return: Path to requested store entity type
+        :rtype: Path
         """
         if entity == "objects":
             return Path(self.objects)
@@ -1977,6 +1958,10 @@ class FileHashStore(HashStore):
             return Path(self.metadata)
         elif entity == "refs":
             return Path(self.refs)
+        elif entity == "cid":
+            return Path(self.refs) / "cid"
+        elif entity == "pid":
+            return Path(self.refs) / "pid"
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"

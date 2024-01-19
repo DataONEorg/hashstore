@@ -365,7 +365,7 @@ def test_store_object_duplicate_references_files(pids, store):
     # Confirm that there are 1 cid reference files
     assert store.count("cid") == 1
     # Confirm the content of the cid refence files
-    cid_ref_abs_path = store.get_refs_path("cid", pids[pid][store.algorithm])
+    cid_ref_abs_path = store.resolve_path("cid", pids[pid][store.algorithm])
     with open(cid_ref_abs_path, "r", encoding="utf8") as f:
         for _, line in enumerate(f, start=1):
             value = line.strip()
@@ -387,11 +387,12 @@ def test_store_object_duplicate_references_content(pids, store):
     pid_three = "dou.test.2"
     store.store_object(pid_three, path)
     # Confirm the content of the cid refence files
-    cid_ref_abs_path = store.get_refs_path("cid", pids[pid][store.algorithm])
+    cid_ref_abs_path = store.resolve_path("cid", pids[pid][store.algorithm])
     with open(cid_ref_abs_path, "r", encoding="utf8") as f:
         for _, line in enumerate(f, start=1):
             value = line.strip()
             assert value == pid or value == pid_two or value == pid_three
+    print(os.listdir(store.root + "/refs/pid/"))
     assert len(os.listdir(store.root + "/refs/pid")) == 3
     assert len(os.listdir(store.root + "/refs/cid")) == 1
 
@@ -599,7 +600,7 @@ def test_find_object_pid_refs_cid_not_found(pids, store):
         _object_metadata = store.store_object(pid, path)
 
         # Place the wrong cid into the pid refs file that has already been created
-        pid_ref_abs_path = store.get_refs_path("pid", pid)
+        pid_ref_abs_path = store.resolve_path("pid", pid)
         with open(pid_ref_abs_path, "w", encoding="utf8") as pid_ref_file:
             pid_ref_file.seek(0)
             pid_ref_file.write("intentionally.wrong.pid")
@@ -903,7 +904,7 @@ def test_delete_object_pid_refs_file(pids, store):
         _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
-        pid_refs_file_path = store.get_refs_path("pid", pid)
+        pid_refs_file_path = store.resolve_path("pid", pid)
         assert not os.path.exists(pid_refs_file_path)
 
 
@@ -919,7 +920,7 @@ def test_delete_object_cid_refs_file(pids, store):
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         cid = object_metadata.id
         store.delete_object(pid)
-        cid_refs_file_path = store.get_refs_path("cid", cid)
+        cid_refs_file_path = store.resolve_path("cid", cid)
         assert not os.path.exists(cid_refs_file_path)
 
 
@@ -930,11 +931,11 @@ def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.id
-        cid_refs_abs_path = store.get_refs_path("cid", cid)
+        cid_refs_abs_path = store.resolve_path("cid", cid)
         # pylint: disable=W0212
         store._update_cid_refs(cid_refs_abs_path, "dou.test.1")
         store.delete_object(pid)
-        cid_refs_file_path = store.get_refs_path("cid", cid)
+        cid_refs_file_path = store.resolve_path("cid", cid)
         assert os.path.exists(cid_refs_file_path)
 
 

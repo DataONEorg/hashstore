@@ -87,7 +87,7 @@ def test_objectmetadata():
         "sha512": "sha512value",
     }
     object_metadata = ObjectMetadata(ab_id, obj_size, hex_digest_dict)
-    assert object_metadata.id == ab_id
+    assert object_metadata.cid == ab_id
     assert object_metadata.obj_size == obj_size
     assert object_metadata.hex_digests.get("md5") == hex_digest_dict["md5"]
     assert object_metadata.hex_digests.get("sha1") == hex_digest_dict["sha1"]

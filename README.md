@@ -68,7 +68,7 @@ my_store = factory.get_hashstore(module_name, class_name, properties)
 pid = "j.tao.1700.1"
 object = "/path/to/your/object.data"
 object_metadata = my_store.store_object(pid, object)
-object_cid = object_metadata.id
+object_cid = object_metadata.cid
 
 # Store metadata (.../[hashstore_path]/metadata/)
 # By default, storing metadata will use the given properties namespace `format_id`
@@ -200,28 +200,28 @@ How to use HashStore client (command line app)
 $ python './src/hashstore/hashstoreclient.py' /path/to/store/ -chs -dp=3 -wp=2 -ap=SHA-256 -nsp="http://www.ns.test/v1"
 
 # Get the checksum of a data object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -getchecksum -pid=content_identifier -algo=SHA-256
+$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -getchecksum -pid=persistent_identifier -algo=SHA-256
 
 # Find an object (returns the content identifier)
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -findobject -pid=content_identifier
+$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -findobject -pid=persistent_identifier
 
 # Store a data object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -storeobject -pid=content_identifier -path=/path/to/object
+$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -storeobject -pid=persistent_identifier -path=/path/to/object
 
 # Store a metadata object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -storemetadata -pid=content_identifier  -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
+$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -storemetadata -pid=persistent_identifier  -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
 
 # Retrieve a data object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -retrieveobject -pid=content_identifier
+$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -retrieveobject -pid=persistent_identifier
 
 # Retrieve a metadata object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -retrievemetadata -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -retrievemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
 
 # Delete a data object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -deleteobject -pid=content_identifier
+$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -deleteobject -pid=persistent_identifier
 
 # Delete a metadata file
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -deletemetadata -pid=content_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -deletemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
 ```
 
 ## License

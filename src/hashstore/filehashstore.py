@@ -425,7 +425,7 @@ class FileHashStore(HashStore):
             object_metadata = self.store_data_only(data)
             logging.info(
                 "FileHashStore - store_object: Successfully stored object for cid: %s",
-                object_metadata.id,
+                object_metadata.cid,
             )
         else:
             # Else the object will be stored and tagged
@@ -470,7 +470,7 @@ class FileHashStore(HashStore):
                     checksum_algorithm=checksum_algorithm_checked,
                     file_size_to_validate=expected_object_size,
                 )
-                self.tag_object(pid, object_metadata.id)
+                self.tag_object(pid, object_metadata.cid)
                 logging.info(
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,
@@ -509,7 +509,7 @@ class FileHashStore(HashStore):
         else:
             logging.info(
                 "FileHashStore - verify_object: Called to verify object with id: %s",
-                object_metadata.id,
+                object_metadata.cid,
             )
             object_metadata_hex_digests = object_metadata.hex_digests
             object_metadata_file_size = object_metadata.obj_size
@@ -526,7 +526,7 @@ class FileHashStore(HashStore):
             )
             logging.info(
                 "FileHashStore - verify_object: object has been validated for cid: %s",
-                object_metadata.id,
+                object_metadata.cid,
             )
 
     def tag_object(self, pid, cid):

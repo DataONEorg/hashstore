@@ -26,7 +26,7 @@ def test_store_address_length(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        object_cid = object_metadata.id
+        object_cid = object_metadata.cid
         assert len(object_cid) == 64
 
 
@@ -37,7 +37,7 @@ def test_store_object(pids, store):
     for pid in pids.keys():
         path = Path(test_dir + pid.replace("/", "_"))
         object_metadata = store.store_object(pid, path)
-        assert object_metadata.id == pids[pid][store.algorithm]
+        assert object_metadata.cid == pids[pid][store.algorithm]
     assert store.count(entity) == 3
 
 
@@ -82,7 +82,7 @@ def test_store_object_id(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        assert object_metadata.id == pids[pid][store.algorithm]
+        assert object_metadata.cid == pids[pid][store.algorithm]
 
 
 def test_store_object_obj_size(pids, store):
@@ -558,7 +558,7 @@ def test_store_object_large_file(store):
     # Store object
     pid = "testfile_filehashstore"
     object_metadata = store.store_object(pid, file_path)
-    object_metadata_id = object_metadata.id
+    object_metadata_id = object_metadata.cid
     assert object_metadata_id == object_metadata.hex_digests.get("sha256")
 
 
@@ -577,7 +577,7 @@ def test_store_object_sparse_large_file(store):
     # Store object
     pid = "testfile_filehashstore"
     object_metadata = store.store_object(pid, file_path)
-    object_metadata_id = object_metadata.id
+    object_metadata_id = object_metadata.cid
     assert object_metadata_id == object_metadata.hex_digests.get("sha256")
 
 
@@ -918,7 +918,7 @@ def test_delete_object_cid_refs_file(pids, store):
         syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        cid = object_metadata.id
+        cid = object_metadata.cid
         store.delete_object(pid)
         cid_refs_file_path = store.resolve_path("cid", cid)
         assert not os.path.exists(cid_refs_file_path)
@@ -930,7 +930,7 @@ def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        cid = object_metadata.id
+        cid = object_metadata.cid
         cid_refs_abs_path = store.resolve_path("cid", cid)
         # pylint: disable=W0212
         store._update_cid_refs(cid_refs_abs_path, "dou.test.1")

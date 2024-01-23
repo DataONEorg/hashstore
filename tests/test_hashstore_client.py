@@ -84,7 +84,7 @@ def test_find_object(capsys, store, pids):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        cid = object_metadata.id
+        cid = object_metadata.cid
 
         client_module_path = f"{client_directory}/client.py"
         test_store = store.root

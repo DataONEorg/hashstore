@@ -254,7 +254,7 @@ class HashStoreFactory:
         )
 
 
-class ObjectMetadata(namedtuple("ObjectMetadata", ["id", "obj_size", "hex_digests"])):
+class ObjectMetadata(namedtuple("ObjectMetadata", ["cid", "obj_size", "hex_digests"])):
     """Represents metadata associated with an object.
 
     The `ObjectMetadata` class represents metadata associated with an object,
@@ -268,5 +268,5 @@ class ObjectMetadata(namedtuple("ObjectMetadata", ["id", "obj_size", "hex_digest
     """
 
     # Default value to prevent dangerous default value
-    def __new__(cls, ab_id, obj_size, hex_digests=None):
-        return super(ObjectMetadata, cls).__new__(cls, ab_id, obj_size, hex_digests)
+    def __new__(cls, cid, obj_size, hex_digests=None):
+        return super(ObjectMetadata, cls).__new__(cls, cid, obj_size, hex_digests)

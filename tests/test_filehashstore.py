@@ -224,7 +224,7 @@ def test_store_and_validate_data_files_path(pids, store):
     for pid in pids.keys():
         path = Path(test_dir) / pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        object_metadata_id = object_metadata.id
+        object_metadata_id = object_metadata.cid
         assert store.exists(entity, object_metadata_id)
 
 
@@ -235,7 +235,7 @@ def test_store_and_validate_data_files_string(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        object_metadata_id = object_metadata.id
+        object_metadata_id = object_metadata.cid
         assert store.exists(entity, object_metadata_id)
 
 
@@ -248,7 +248,7 @@ def test_store_and_validate_data_files_stream(pids, store):
         input_stream = io.open(path, "rb")
         object_metadata = store.store_and_validate_data(pid, input_stream)
         input_stream.close()
-        object_metadata_id = object_metadata.id
+        object_metadata_id = object_metadata.cid
         assert store.exists(entity, object_metadata_id)
     assert store.count(entity) == 3
 
@@ -259,7 +259,7 @@ def test_store_and_validate_data_cid(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        object_metadata_id = object_metadata.id
+        object_metadata_id = object_metadata.cid
         assert object_metadata_id == pids[pid][store.algorithm]
 
 
@@ -335,7 +335,7 @@ def test_store_data_only_cid(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_data_only(path)
-        object_metadata_id = object_metadata.id
+        object_metadata_id = object_metadata.cid
         assert object_metadata_id == pids[pid][store.algorithm]
 
 
@@ -821,7 +821,7 @@ def test_exists_with_object_metadata_id(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        assert store.exists(entity, object_metadata.id)
+        assert store.exists(entity, object_metadata.cid)
 
 
 def test_exists_with_sharded_path(pids, store):
@@ -831,7 +831,7 @@ def test_exists_with_sharded_path(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        object_metadata_shard = store.shard(object_metadata.id)
+        object_metadata_shard = store.shard(object_metadata.cid)
         object_metadata_shard_path = "/".join(object_metadata_shard)
         assert store.exists(entity, object_metadata_shard_path)
 
@@ -864,7 +864,7 @@ def test_open_objects(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        object_metadata_id = object_metadata.id
+        object_metadata_id = object_metadata.cid
         io_buffer = store.open(entity, object_metadata_id)
         assert isinstance(io_buffer, io.BufferedReader)
         io_buffer.close()
@@ -877,7 +877,7 @@ def test_delete_by_object_metadata_id(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        object_metadata_id = object_metadata.id
+        object_metadata_id = object_metadata.cid
         store.delete(entity, object_metadata_id)
     assert store.count(entity) == 0
 
@@ -928,7 +928,7 @@ def test_remove_empty_does_not_remove_nonempty_folders(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        object_metadata_shard = store.shard(object_metadata.id)
+        object_metadata_shard = store.shard(object_metadata.cid)
         object_metadata_shard_path = "/".join(object_metadata_shard)
         # Get parent directory of the relative path
         parent_dir = os.path.dirname(object_metadata_shard_path)
@@ -992,7 +992,7 @@ def test_get_real_path_with_object_id(store, pids):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        obj_abs_path = store.resolve_path(entity, object_metadata.id)
+        obj_abs_path = store.resolve_path(entity, object_metadata.cid)
         assert os.path.exists(obj_abs_path)
 
 
@@ -1003,7 +1003,7 @@ def test_get_real_path_with_object_id_sharded(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
-        object_metadata_shard = store.shard(object_metadata.id)
+        object_metadata_shard = store.shard(object_metadata.cid)
         object_metadata_shard_path = "/".join(object_metadata_shard)
         obj_abs_path = store.resolve_path(entity, object_metadata_shard_path)
         assert os.path.exists(obj_abs_path)
@@ -1030,7 +1030,7 @@ def test_get_real_path_with_bad_entity(store, pids):
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_and_validate_data(pid, path)
         with pytest.raises(ValueError):
-            store.resolve_path(entity, object_metadata.id)
+            store.resolve_path(entity, object_metadata.cid)
 
 
 def test_build_path(store, pids):

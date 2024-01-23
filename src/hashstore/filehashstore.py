@@ -903,7 +903,7 @@ class FileHashStore(HashStore):
             size, and hex digest dictionary.
         """
         logging.debug(
-            "FileHashStore - store_object: Request to store data object only."
+            "FileHashStore - store_data_only: Request to store data object only."
         )
 
         try:
@@ -924,14 +924,14 @@ class FileHashStore(HashStore):
             # The permanent address of the data stored is based on the data's checksum
             cid = hex_digest_dict.get(self.algorithm)
             logging.debug(
-                "FileHashStore - store_object: Successfully stored object with cid: %s",
+                "FileHashStore - store_data_only: Successfully stored object with cid: %s",
                 cid,
             )
             return object_metadata
         # pylint: disable=W0718
         except Exception as err:
             exception_string = (
-                "FileHashStore - store_object (store_data_only): failed to store object."
+                "FileHashStore - store_data_only: failed to store object."
                 + f" Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)

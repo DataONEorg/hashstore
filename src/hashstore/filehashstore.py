@@ -1488,7 +1488,7 @@ class FileHashStore(HashStore):
                 exception_string = (
                     "FileHashStore - _validate_arg_object: Object file size calculated: "
                     + f" {tmp_file_size} does not match with expected size:"
-                    + f"{file_size_to_validate}."
+                    + f" {file_size_to_validate}."
                 )
                 if pid is not None:
                     self.delete(entity, tmp_file_name)
@@ -1522,7 +1522,7 @@ class FileHashStore(HashStore):
                         # Delete the tmp file
                         self.delete(entity, tmp_file_name)
                         exception_string_for_pid = (
-                            exception_string + f". Tmp file ({tmp_file_name}) deleted."
+                            exception_string + f" Tmp file ({tmp_file_name}) deleted."
                         )
                         logging.error(exception_string_for_pid)
                         raise ValueError(exception_string_for_pid)

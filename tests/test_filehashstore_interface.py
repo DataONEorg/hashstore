@@ -964,8 +964,18 @@ def test_delete_metadata(pids, store):
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        store.delete_metadata(pid, format_id)
+        is_deleted = store.delete_metadata(pid, format_id)
+        assert is_deleted
     assert store.count(entity) == 0
+
+
+def test_delete_metadata_does_not_exist(pids, store):
+    """Test delete_metadata does not throw exception when called to delete
+    metadata that does not exist."""
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        is_deleted = store.delete_metadata(pid, format_id)
+        assert is_deleted
 
 
 def test_delete_metadata_default_format_id(store, pids):

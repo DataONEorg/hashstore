@@ -571,7 +571,8 @@ class FileHashStore(HashStore):
                 self.create_path(os.path.dirname(pid_ref_abs_path))
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 # Update cid ref files as it already exists
-                self._update_cid_refs(cid_ref_abs_path, pid)
+                if not self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path):
+                    self._update_cid_refs(cid_ref_abs_path, pid)
                 self._verify_hashstore_references(pid, cid, "update")
                 logging.info(
                     "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
@@ -616,27 +617,39 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid", "find_object")
 
         pid_ref_abs_path = self.resolve_path("pid", pid)
-        if not os.path.exists(pid_ref_abs_path):
-            err_msg = (
-                f"FileHashStore - find_object: pid ({pid}) reference file not found: "
-                + pid_ref_abs_path
-            )
-            raise FileNotFoundError(err_msg)
-        else:
+        if os.path.exists(pid_ref_abs_path):
             # Read the file to get the cid from the pid reference
             with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
                 pid_refs_cid = pid_ref_file.read()
 
+            # Confirm that the cid reference file exists
             cid_ref_abs_path = self.resolve_path("cid", pid_refs_cid)
-            if not os.path.exists(cid_ref_abs_path):
+            if os.path.exists(cid_ref_abs_path):
+                # Check that the pid is actually found in the cid reference file
+                if self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path):
+                    return pid_refs_cid
+                else:
+                    # If not, it is an orphan pid refs file
+                    err_msg = (
+                        "FileHashStore - find_object: pid refs file exists with cid: "
+                        + pid_refs_cid
+                        + f", but is missing from cid refs file: {cid_ref_abs_path}"
+                    )
+                    logging.error(err_msg)
+                    raise ValueError(err_msg)
+            else:
                 err_msg = (
                     f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
                     + f", but cid refs file not found: {cid_ref_abs_path}"
                 )
                 logging.error(err_msg)
                 raise FileNotFoundError(err_msg)
-            else:
-                return pid_refs_cid
+        else:
+            err_msg = (
+                f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
+                + pid_ref_abs_path
+            )
+            raise FileNotFoundError(err_msg)
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
@@ -1233,6 +1246,23 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
+    def _is_pid_in_cid_refs_file(self, pid, cid_ref_abs_path):
+        """Check a cid reference file for a pid.
+
+        :param str pid: Authority-based or persistent identifier of the object.
+        :param str cid_ref_abs_path: Path to the cid refs file
+
+        :return: pid_found
+        :rtype: boolean
+        """
+        with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
+            # Confirm that pid is not currently already tagged
+            for line in cid_ref_file:
+                value = line.strip()
+                if pid == value:
+                    return True
+        return False
+
     def _update_cid_refs(self, cid_ref_abs_path, pid):
         """Update an existing CID reference file with the given PID.
 
@@ -1253,18 +1283,7 @@ class FileHashStore(HashStore):
             raise FileNotFoundError(exception_string)
 
         try:
-            with open(cid_ref_abs_path, "a+", encoding="utf8") as cid_ref_file:
-                # Confirm that pid is not currently already tagged
-                for line in cid_ref_file:
-                    value = line.strip()
-                    if pid == value:
-                        warning_msg = (
-                            f"FileHashStore - update_cid_refs: pid ({pid}) already reference in"
-                            + f" cid reference file: {cid_ref_abs_path} "
-                        )
-                        logging.warning(warning_msg)
-                        # Exit try statement, we do not want to write the pid
-                        return
+            with open(cid_ref_abs_path, "a", encoding="utf8") as cid_ref_file:
                 # Lock file for the shortest amount of time possible
                 file_descriptor = cid_ref_file.fileno()
                 fcntl.flock(file_descriptor, fcntl.LOCK_EX)
@@ -1574,13 +1593,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise ValueError(exception_string)
         # Then the pid
-        pid_found = False
-        with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
-            for _, line in enumerate(cid_ref_file, start=1):
-                value = line.strip()
-                if value == pid:
-                    pid_found = True
-                    break
+        pid_found = self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path)
         if not pid_found:
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file exists"

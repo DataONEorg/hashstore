@@ -765,8 +765,25 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_object: Request to delete object for pid: %s", pid
         )
         self._check_string(pid, "pid", "delete_object")
-        cid = self.find_object(pid)
+        try:
+            cid = self.find_object(pid)
+        except FileNotFoundError as fnfe:
+            if "pid refs file not found" in fnfe:
+                # Nothing to delete
+                return
+            if "cid refs file not found" in fnfe:
+                # Delete pid refs file
+                pid_ref_abs_path = self.resolve_path("pid", pid)
+                self.delete("pid", pid_ref_abs_path)
+                return
+        except ValueError as ve:
+            if "is missing from cid refs file" in ve:
+                # Delete pid refs file
+                pid_ref_abs_path = self.resolve_path("pid", pid)
+                self.delete("pid", pid_ref_abs_path)
+                return
 
+        # Proceed with next steps - cid has been retrieved without any errors
         while cid in self.reference_locked_cids:
             logging.debug(
                 "FileHashStore - delete_object: (cid) %s is currently locked. Waiting",
@@ -783,9 +800,10 @@ class FileHashStore(HashStore):
         try:
             cid_ref_abs_path = self.resolve_path("cid", cid)
             pid_ref_abs_path = self.resolve_path("pid", pid)
+            # First delete the pid refs file immediately
+            self._delete_pid_refs_file(pid_ref_abs_path)
             # Remove pid from cid reference file
             self._delete_cid_refs_pid(cid_ref_abs_path, pid)
-            self._delete_pid_refs_file(pid_ref_abs_path)
             # Delete cid reference file and object only if the cid refs file is empty
             if os.path.getsize(cid_ref_abs_path) == 0:
                 self.delete("cid", cid_ref_abs_path)

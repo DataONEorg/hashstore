@@ -32,7 +32,7 @@ HashStore is a content-addressable file management system that utilizes the cont
 - delete_metadata
 - get_hex_digest
 
-For details, please see the HashStore interface (HashStore.java)
+For details, please see the HashStore interface (hashstore.py)
 
 
 ###### How do I create a HashStore?
@@ -89,17 +89,17 @@ metadata_cid = my_store.store_metadata(pid, metadata, format_id)
 
 In HashStore, objects are first saved as temporary files while their content identifiers are calculated. Once the default hash algorithm list and their hashes are generated, objects are stored in their permanent location using the store's algorithm's corresponding hash value, the store depth and the store width. Lastly, reference files are created for the object so that they can be found and retrieved given an identifier (ex. persistent identifier (pid)). Note: Objects are also stored once and only once.
 
-By calling the various interface methods for  `store_object`, the calling app/client can validate, store and tag an object simultaneously if the relevant data is available. In the absence of an identifier (ex. persistent identifier (pid)), `store_object` can be called to solely store an object. The client is then expected to call `verify_object` when the relevant metadata is available to confirm that the object has been stored as expected. If the object is determined to be invalid (via `verify_object`), it will be deleted. Lastly, to finalize this process of storing an object (to make the object discoverable), the client calls `tag_object`. In summary, there are two expected paths to store an object:
+By calling the various interface methods for  `store_object`, the calling app/client can validate, store and tag an object simultaneously if the relevant data is available. In the absence of an identifier (ex. persistent identifier (pid)), `store_object` can be called to solely store an object. The client is then expected to call `verify_object` when the relevant metadata is available to confirm that the object has been stored as expected. If the object is determined to be invalid (via `verify_object`), the client is expected to delete the object directly. Lastly, to finalize this process of storing an object (to make the object discoverable), the client calls `tag_object`. In summary, there are two expected paths to store an object:
 
 ```py
 # All-in-one process which stores, validates and tags an object
-objectMetadata objInfo = store_object(InputStream, pid, additionalAlgorithm, checksum, checksumAlgorithm, objSize)
+objectMetadata objInfo = store_object(stream, pid, additional_algo, checksum, checksum_algo, objSize)
 
 # Manual Process
 # Store object
-obj_metadata = store_object(InputStream)
+obj_metadata = store_object(stream)
 # Validate object, throws exceptions if there is a mismatch and deletes the associated file
-verify_object(objInfo, checksum, checksumAlgorithn, objSize)
+verify_object(obj_metadata, checksum, checksumAlgorithn, objSize)
 # Tag object, makes the object discoverable (find, retrieve, delete)
 tag_object(pid, cid)
 ```
@@ -152,7 +152,7 @@ These reference files are implemented in HashStore underneath the hood with no e
 
 ###### What does HashStore look like?
 
-```
+```shell
 # Example layout in HashStore with a single file stored along with its metadata and reference files.
 # This uses a store depth of 3, with a width of 2 and "SHA-256" as its default store algorithm
 ## Notes:

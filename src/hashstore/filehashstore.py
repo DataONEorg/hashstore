@@ -126,7 +126,8 @@ class FileHashStore(HashStore):
 
     # Configuration and Related Methods
 
-    def _load_properties(self):
+    @staticmethod
+    def _load_properties(hahstore_yaml_path, hashstore_required_prop_keys):
         """Get and return the contents of the current HashStore configuration.
 
         :return: HashStore properties with the following keys (and values):
@@ -136,7 +137,7 @@ class FileHashStore(HashStore):
             - ``store_metadata_namespace`` (str): Namespace for the HashStore's system metadata.
         :rtype: dict
         """
-        if not os.path.exists(self.hashstore_configuration_yaml):
+        if not os.path.exists(hahstore_yaml_path):
             exception_string = (
                 "FileHashStore - load_properties: hashstore.yaml not found"
                 + " in store root path."
@@ -145,14 +146,12 @@ class FileHashStore(HashStore):
             raise FileNotFoundError(exception_string)
 
         # Open file
-        with open(
-            self.hashstore_configuration_yaml, "r", encoding="utf-8"
-        ) as hs_yaml_file:
+        with open(hahstore_yaml_path, "r", encoding="utf-8") as hs_yaml_file:
             yaml_data = yaml.safe_load(hs_yaml_file)
 
         # Get hashstore properties
         hashstore_yaml_dict = {}
-        for key in self.property_required_keys:
+        for key in hashstore_required_prop_keys:
             if key != "store_path":
                 hashstore_yaml_dict[key] = yaml_data[key]
         logging.debug(
@@ -303,7 +302,9 @@ class FileHashStore(HashStore):
                 self.hashstore_configuration_yaml,
             )
             # If 'hashstore.yaml' is found, verify given properties before init
-            hashstore_yaml_dict = self._load_properties()
+            hashstore_yaml_dict = self._load_properties(
+                self.hashstore_configuration_yaml, self.property_required_keys
+            )
             for key in self.property_required_keys:
                 # 'store_path' is required to init HashStore but not saved in `hashstore.yaml`
                 if key != "store_path":
@@ -1305,7 +1306,8 @@ class FileHashStore(HashStore):
                     return True
         return False
 
-    def _update_cid_refs(self, cid_ref_abs_path, pid):
+    @staticmethod
+    def _update_cid_refs(cid_ref_abs_path, pid):
         """Update an existing CID reference file with the given PID.
 
         :param str cid_ref_abs_path: Absolute path to the CID reference file.
@@ -1341,7 +1343,8 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
-    def _delete_cid_refs_pid(self, cid_ref_abs_path, pid):
+    @staticmethod
+    def _delete_cid_refs_pid(cid_ref_abs_path, pid):
         """Delete a PID from a CID reference file.
 
         :param str cid_ref_abs_path: Absolute path to the CID reference file.
@@ -1645,7 +1648,8 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise ValueError(exception_string)
 
-    def _check_arg_data(self, data):
+    @staticmethod
+    def _check_arg_data(data):
         """Checks a data argument to ensure that it is either a string, path, or stream
         object.
 

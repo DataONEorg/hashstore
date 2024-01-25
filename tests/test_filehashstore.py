@@ -135,7 +135,9 @@ def test_init_with_existing_hashstore_missing_yaml(store, pids):
 
 def test_load_properties(store):
     """Verify dictionary returned from _load_properties matches initialization."""
-    hashstore_yaml_dict = store._load_properties()
+    hashstore_yaml_dict = store._load_properties(
+        store.hashstore_configuration_yaml, store.property_required_keys
+    )
     assert hashstore_yaml_dict.get("store_depth") == 3
     assert hashstore_yaml_dict.get("store_width") == 2
     assert hashstore_yaml_dict.get("store_algorithm") == "SHA-256"
@@ -149,7 +151,9 @@ def test_load_properties_hashstore_yaml_missing(store):
     """Confirm FileNotFoundError is raised when hashstore.yaml does not exist."""
     os.remove(store.hashstore_configuration_yaml)
     with pytest.raises(FileNotFoundError):
-        store._load_properties()
+        store._load_properties(
+            store.hashstore_configuration_yaml, store.property_required_keys
+        )
 
 
 def test_validate_properties(store):

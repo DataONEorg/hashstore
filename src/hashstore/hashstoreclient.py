@@ -245,11 +245,11 @@ class HashStoreClient:
     MET_TYPE = "metadata"
 
     def __init__(self, properties, testflag=None):
-        """Store objects in a given directory into HashStore.
+        """Initialize the HashStoreClient with optional flag to test with the
+        test server at 'test.arcticdata.io'
 
-        :param str origin_dir: Directory to convert.
-        :param str obj_type: Type of objects ('object' or 'metadata').
-        :param int num: Number of files to store.
+        :param dict properties: HashStore properties to initialize with
+        :param str testflag: 'knbvm' to denote testing on 'test.arcticdata.io'
         """
         factory = HashStoreFactory()
 

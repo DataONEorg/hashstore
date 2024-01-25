@@ -514,20 +514,30 @@ class FileHashStore(HashStore):
             object_metadata_hex_digests = object_metadata.hex_digests
             object_metadata_file_size = object_metadata.obj_size
             checksum_algorithm_checked = self.clean_algorithm(checksum_algorithm)
-            self._verify_object_information(
-                pid=None,
-                checksum=checksum,
-                checksum_algorithm=checksum_algorithm_checked,
-                entity="objects",
-                hex_digests=object_metadata_hex_digests,
-                tmp_file_name=None,
-                tmp_file_size=object_metadata_file_size,
-                file_size_to_validate=expected_file_size,
-            )
-            logging.info(
-                "FileHashStore - verify_object: object has been validated for cid: %s",
-                object_metadata.cid,
-            )
+
+            try:
+                self._verify_object_information(
+                    pid=None,
+                    checksum=checksum,
+                    checksum_algorithm=checksum_algorithm_checked,
+                    entity="objects",
+                    hex_digests=object_metadata_hex_digests,
+                    tmp_file_name=None,
+                    tmp_file_size=object_metadata_file_size,
+                    file_size_to_validate=expected_file_size,
+                )
+                logging.info(
+                    "FileHashStore - verify_object: object has been validated for cid: %s",
+                    object_metadata.cid,
+                )
+                return True
+            # pylint: disable=W0718
+            except Exception as err:
+                exception_string = (
+                    f"FileHashStore - verify_object: object not valid: {err}."
+                )
+                logging.info(exception_string)
+                return False
 
     def tag_object(self, pid, cid):
         logging.debug(

@@ -201,8 +201,11 @@ def test_verify_object_exception_incorrect_size(pids, store):
         object_metadata = store.store_object(data=path)
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
-        with pytest.raises(ValueError):
-            store.verify_object(object_metadata, checksum, checksum_algorithm, 1000)
+
+        is_valid = store.verify_object(
+            object_metadata, checksum, checksum_algorithm, 1000
+        )
+        assert not is_valid
 
         cid = object_metadata.cid
         cid = object_metadata.hex_digests[store.algorithm]
@@ -220,10 +223,11 @@ def test_verify_object_exception_incorrect_checksum(pids, store):
         store.tag_object(pid, cid)
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
-        with pytest.raises(ValueError):
-            store.verify_object(
-                object_metadata, "abc123", checksum_algorithm, expected_file_size
-            )
+
+        is_valid = store.verify_object(
+            object_metadata, "abc123", checksum_algorithm, expected_file_size
+        )
+        assert not is_valid
 
         cid = object_metadata.cid
         cid = object_metadata.hex_digests[store.algorithm]

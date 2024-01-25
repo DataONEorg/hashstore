@@ -132,7 +132,7 @@ def test_store_object(store, pids):
         sys.argv = chs_args
         hashstoreclient.main()
 
-        assert store.exists("objects", pids[pid][store.algorithm])
+        assert store._exists("objects", pids[pid][store.algorithm])
 
 
 def test_store_metadata(store, pids):
@@ -164,7 +164,7 @@ def test_store_metadata(store, pids):
         sys.argv = chs_args
         hashstoreclient.main()
 
-        assert store.exists("metadata", pids[pid]["metadata_cid"])
+        assert store._exists("metadata", pids[pid]["metadata_cid"])
 
 
 def test_retrieve_objects(capsys, pids, store):
@@ -272,7 +272,7 @@ def test_delete_objects(pids, store):
         sys.argv = chs_args
         hashstoreclient.main()
 
-        assert not store.exists("objects", pids[pid][store.algorithm])
+        assert not store._exists("objects", pids[pid][store.algorithm])
 
 
 def test_delete_metadata(pids, store):
@@ -304,4 +304,4 @@ def test_delete_metadata(pids, store):
         sys.argv = chs_args
         hashstoreclient.main()
 
-        assert not store.exists("metadata", pids[pid]["metadata_cid"])
+        assert not store._exists("metadata", pids[pid]["metadata_cid"])

@@ -1,4 +1,4 @@
-"""Test module for HashStore Module"""
+"""Test module for HashStore's HashStoreFactory and ObjectMetadata class."""
 import os
 import pytest
 from hashstore.hashstore import ObjectMetadata, HashStoreFactory
@@ -43,7 +43,8 @@ def test_factory_get_hashstore_unsupported_module(factory):
 
 
 def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
-    """Check factory raises exception with store algorithm value that part of the default list"""
+    """Check factory raises exception with store algorithm value that is not part of
+    the default list."""
     module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
 
@@ -59,7 +60,7 @@ def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
 
 
 def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory):
-    """Check factory raises exception with incorrectly formatted algorithm value"""
+    """Check factory raises exception with incorrectly formatted algorithm value."""
     module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
 
@@ -67,7 +68,7 @@ def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory)
         "store_path": os.getcwd() + "/metacat/test",
         "store_depth": 3,
         "store_width": 2,
-        "store_algorithm": "sha256",
+        "store_algorithm": "dou_algo",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
     with pytest.raises(ValueError):
@@ -75,7 +76,7 @@ def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory)
 
 
 def test_objectmetadata():
-    """Test class returns correct values via dot notation."""
+    """Test ObjectMetadata class returns correct values via dot notation."""
     ab_id = "hashstoretest"
     obj_size = 1234
     hex_digest_dict = {
@@ -86,7 +87,7 @@ def test_objectmetadata():
         "sha512": "sha512value",
     }
     object_metadata = ObjectMetadata(ab_id, obj_size, hex_digest_dict)
-    assert object_metadata.id == ab_id
+    assert object_metadata.cid == ab_id
     assert object_metadata.obj_size == obj_size
     assert object_metadata.hex_digests.get("md5") == hex_digest_dict["md5"]
     assert object_metadata.hex_digests.get("sha1") == hex_digest_dict["sha1"]

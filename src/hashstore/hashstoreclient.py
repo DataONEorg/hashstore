@@ -104,6 +104,11 @@ class HashStoreParser:
             action="store_true",
             help="Delete objects in a HashStore",
         )
+        self.parser.add_argument(
+            "-gbskip",
+            dest="gb_file_size_to_skip",
+            help="Number of objects to convert",
+        )
 
         # Individual API call related optional arguments
         self.parser.add_argument(
@@ -150,6 +155,12 @@ class HashStoreParser:
             help="Flag to get the hex digest of a data object in HashStore",
         )
         self.parser.add_argument(
+            "-findobject",
+            dest="client_findobject",
+            action="store_true",
+            help="Flag to determine if an object is stored in HashStore",
+        )
+        self.parser.add_argument(
             "-storeobject",
             dest="client_storeobject",
             action="store_true",
@@ -189,12 +200,12 @@ class HashStoreParser:
     def load_store_properties(self, hashstore_yaml):
         """Get and return the contents of the current HashStore config file.
 
-        Returns:
-            hashstore_yaml_dict (dict): HashStore properties with the following keys (and values):
-                store_depth (int): Depth when sharding an object's hex digest.
-                store_width (int): Width of directories when sharding an object's hex digest.
-                store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
-                store_metadata_namespace (str): Namespace for the HashStore's system metadata.
+        :return: HashStore properties with the following keys (and values):
+            - store_depth (int): Depth when sharding an object's hex digest.
+            - store_width (int): Width of directories when sharding an object's hex digest.
+            - store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
+            - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
+        :rtype: dict
         """
         property_required_keys = [
             "store_depth",
@@ -234,11 +245,11 @@ class HashStoreClient:
     MET_TYPE = "metadata"
 
     def __init__(self, properties, testflag=None):
-        """Initialize HashStore and MetacatDB
+        """Initialize the HashStoreClient with optional flag to test with the
+        test server at 'test.arcticdata.io'
 
-        Args:
-            properties: See FileHashStore for dictionary example
-            testflag (str): "knbvm" to initialize MetacatDB
+        :param dict properties: HashStore properties to initialize with
+        :param str testflag: 'knbvm' to denote testing on 'test.arcticdata.io'
         """
         factory = HashStoreFactory()
 
@@ -257,18 +268,21 @@ class HashStoreClient:
 
     # Methods relating to testing HashStore with knbvm (test.arcticdata.io)
 
-    def store_to_hashstore_from_list(self, origin_dir, obj_type, num):
-        """Store objects in a given directory into HashStore
+    def store_to_hashstore_from_list(self, origin_dir, obj_type, num, skip_obj_size):
+        """Store objects in a given directory into HashStore.
 
-        Args:
-            origin_dir (str): Directory to convert
-            obj_type (str): 'object' or 'metadata'
-            num (int): Number of files to store
+        :param str origin_dir: Directory to convert.
+        :param str obj_type: Type of objects ('object' or 'metadata').
+        :param int num: Number of files to store.
+        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB)
         """
-        info_msg = f"HashStore Client - Begin storing {obj_type} objects."
+        info_msg = f"HashStoreClient - Begin storing {obj_type} objects."
         logging.info(info_msg)
         # Object and Metadata list
-        metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(
+            origin_dir, num, skip_obj_size
+        )
+        logging.info(info_msg)
 
         # Get list of objects to store from metacat db
         if obj_type == self.OBJ_TYPE:
@@ -310,8 +324,7 @@ class HashStoreClient:
     def try_store_object(self, obj_tuple):
         """Store an object to HashStore and log exceptions as warning.
 
-        Args:
-            obj_tuple: See HashStore store_object signature for details.
+        :param obj_tuple: See HashStore store_object signature for details.
         """
         try:
             self.hashstore.store_object(*obj_tuple)
@@ -321,10 +334,10 @@ class HashStoreClient:
             print(so_exception)
 
     def try_store_metadata(self, obj_tuple):
-        """Store an object to HashStore and log exceptions as warning.
+        """Store a metadata document to HashStore and log exceptions as warning.
 
         Args:
-            obj_tuple: See HashStore store_object signature for details.
+            obj_tuple: See HashStore store_metadata signature for details.
         """
         try:
             self.hashstore.store_metadata(*obj_tuple)
@@ -333,20 +346,24 @@ class HashStoreClient:
         except Exception as so_exception:
             print(so_exception)
 
-    def retrieve_and_validate_from_hashstore(self, origin_dir, obj_type, num):
+    def retrieve_and_validate_from_hashstore(
+        self, origin_dir, obj_type, num, skip_obj_size
+    ):
         """Retrieve objects or metadata from a Hashstore and validate the content.
 
-        Args:
-            origin_dir (str): Directory to convert
-            obj_type (str): 'object' or 'metadata'
-            num (int): Number of files to store
+        :param str origin_dir: Directory to convert.
+        :param str obj_type: Type of objects ('object' or 'metadata').
+        :param int num: Number of files to store.
+        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB)
         """
         info_msg = (
             f"HashStore Client - Begin retrieving and validating {obj_type} objects."
         )
         logging.info(info_msg)
         # Object and Metadata list
-        metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(
+            origin_dir, num, skip_obj_size
+        )
 
         # Get list of objects to store from metacat db
         logging.info("HashStore Client - Refining object list for %s", obj_type)
@@ -384,15 +401,14 @@ class HashStoreClient:
     def validate_object(self, obj_tuple):
         """Retrieves an object from HashStore and validates its checksum.
 
-        Args:
-            obj_tuple: pid_guid, obj_checksum_algo, obj_checksum
+        :param obj_tuple: Tuple containing pid_guid, obj_checksum_algo, obj_checksum.
         """
         pid_guid = obj_tuple[0]
         algo = obj_tuple[1]
         obj_db_checksum = obj_tuple[2]
 
         with self.hashstore.retrieve_object(pid_guid) as obj_stream:
-            computed_digest = self.hashstore.computehash(obj_stream, algo)
+            computed_digest = self.hashstore.get_hex_digest(obj_stream, algo)
             obj_stream.close()
 
         if computed_digest != obj_db_checksum:
@@ -407,10 +423,9 @@ class HashStoreClient:
         return
 
     def validate_metadata(self, obj_tuple):
-        """Retrieves a metadata from HashStore and validates its checksum
+        """Retrieves a metadata from HashStore and validates its checksum.
 
-        Args:
-            obj_tuple: pid_guid, format_id, obj_checksum, obj_algorithm
+        :param obj_tuple: Tuple containing pid_guid, format_id, obj_checksum, obj_algorithm.
         """
         pid_guid = obj_tuple[0]
         namespace = obj_tuple[1]
@@ -432,17 +447,20 @@ class HashStoreClient:
 
         return
 
-    def delete_objects_from_list(self, origin_dir, obj_type, num):
-        """Store objects in a given directory into HashStore
-        Args:
-            origin_dir (str): Directory to convert
-            obj_type (str): 'object' or 'metadata'
-            num (int): Number of files to store
+    def delete_objects_from_list(self, origin_dir, obj_type, num, skip_obj_size):
+        """Deletes objects in a given directory into HashStore.
+
+        :param str origin_dir: Directory to convert.
+        :param str obj_type: Type of objects ('object' or 'metadata').
+        :param int num: Number of files to store.
+        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB)
         """
         info_msg = f"HashStore Client - Begin deleting {obj_type} objects."
         logging.info(info_msg)
         # Object and Metadata list
-        metacat_obj_list = self.metacatdb.get_object_metadata_list(origin_dir, num)
+        metacat_obj_list = self.metacatdb.get_object_metadata_list(
+            origin_dir, num, skip_obj_size
+        )
 
         # Get list of objects to store from metacat db
         if obj_type == self.OBJ_TYPE:
@@ -482,10 +500,9 @@ class HashStoreClient:
         logging.info(content)
 
     def try_delete_object(self, obj_pid):
-        """Delete an object to HashStore and log exceptions as warning.
+        """Delete an object from HashStore and log exceptions as a warning.
 
-        Args:
-            obj_pid (str): Pid of object to delete
+        :param str obj_pid: PID of the object to delete.
         """
         try:
             self.hashstore.delete_object(obj_pid)
@@ -495,10 +512,9 @@ class HashStoreClient:
             print(do_exception)
 
     def try_delete_metadata(self, obj_tuple):
-        """Delete an object to HashStore and log exceptions as warning.
+        """Delete an object from HashStore and log exceptions as a warning.
 
-        Args:
-            obj_tuple: pid_guid, format_id (namespace)
+        :param obj_tuple: Tuple containing the PID and format ID (namespace).
         """
         pid_guid = obj_tuple[0]
         namespace = obj_tuple[1]
@@ -543,12 +559,12 @@ class MetacatDB:
             checked_property = yaml_data[key]
             self.db_yaml_dict[key] = checked_property
 
-    def get_object_metadata_list(self, origin_directory, num):
-        """Query the metacat db for the full obj and metadata list and order by guid.
+    def get_object_metadata_list(self, origin_directory, num, skip_obj_size=None):
+        """Query the Metacat database for the full object and metadata list, ordered by GUID.
 
-        Args:
-            origin_directory (string): 'var/metacat/data' or 'var/metacat/documents'
-            num (int): Number of rows to retrieve from metacat db
+        :param str origin_directory: 'var/metacat/data' or 'var/metacat/documents'.
+        :param int num: Number of rows to retrieve from the Metacat database.
+        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB), defaults to 'None'
         """
         # Create a connection to the database
         db_user = self.db_yaml_dict["db_user"]
@@ -575,7 +591,7 @@ class MetacatDB:
             limit_query = f" LIMIT {num}"
         query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
                 systemmetadata.object_format, systemmetadata.checksum,
-                systemmetadata.checksum_algorithm FROM identifier INNER JOIN systemmetadata
+                systemmetadata.checksum_algorithm, systemmetadata.size FROM identifier INNER JOIN systemmetadata
                 ON identifier.guid = systemmetadata.guid ORDER BY identifier.guid{limit_query};"""
         cursor.execute(query)
 
@@ -585,21 +601,31 @@ class MetacatDB:
         # Create full object list to store into HashStore
         print("Creating list of objects and metadata from metacat db")
         object_metadata_list = []
+        gb_files_to_skip = None
+        if skip_obj_size is not None:
+            gb_files_to_skip = int(skip_obj_size) * (1024**3)
+
         for row in rows:
-            # Get pid, filepath and formatId
-            pid_guid = row[0]
-            metadatapath_docid_rev = origin_directory + "/" + row[1] + "." + str(row[2])
-            metadata_namespace = row[3]
-            row_checksum = row[4]
-            row_checksum_algorithm = row[5]
-            tuple_item = (
-                pid_guid,
-                metadatapath_docid_rev,
-                metadata_namespace,
-                row_checksum,
-                row_checksum_algorithm,
-            )
-            object_metadata_list.append(tuple_item)
+            size = int(row[6])
+            if gb_files_to_skip is not None and size > gb_files_to_skip:
+                continue
+            else:
+                # Get pid, filepath and formatId
+                pid_guid = row[0]
+                metadatapath_docid_rev = (
+                    origin_directory + "/" + row[1] + "." + str(row[2])
+                )
+                metadata_namespace = row[3]
+                row_checksum = row[4]
+                row_checksum_algorithm = row[5]
+                tuple_item = (
+                    pid_guid,
+                    metadatapath_docid_rev,
+                    metadata_namespace,
+                    row_checksum,
+                    row_checksum_algorithm,
+                )
+                object_metadata_list.append(tuple_item)
 
         # Close the cursor and connection when done
         cursor.close()
@@ -610,15 +636,14 @@ class MetacatDB:
     def refine_list_for_objects(self, metacat_obj_list, action):
         """Refine a list of objects by checking for file existence and removing duplicates.
 
-        Args:
-            metacat_obj_list (List): List of tuple objects representing rows from metacat db
-            action (string): "store", "retrieve" or "delete".
-                "store" will create a list of objects to store that do not exist in HashStore.
-                "retrieve" will create a list of objects that exist in HashStore.
-                "delete" will create a list of object pids
+        :param List metacat_obj_list: List of tuple objects representing rows from Metacat database.
+        :param str action: Action to perform. Options: "store", "retrieve", or "delete".
+            - "store": Create a list of objects to store that do not exist in HashStore.
+            - "retrieve": Create a list of objects that exist in HashStore.
+            - "delete": Create a list of object PIDs to delete.
 
-        Returns:
-            refined_object_list (List): List of tuple objects based on "action"
+        :return: Refined list of tuple objects based on the specified action.
+        :rtype: List
         """
         refined_object_list = []
         for tuple_item in metacat_obj_list:
@@ -628,50 +653,39 @@ class MetacatDB:
             item_checksum_algorithm = tuple_item[4]
             if os.path.exists(filepath_docid_rev):
                 if action == "store":
-                    # If the file has already been stored, skip it
-                    if not self.hashstore.exists(
-                        "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
-                    ):
-                        # This tuple is formed to match 'HashStore' store_object's signature
-                        # Which is '.starmap()'ed when called
-                        store_object_tuple_item = (
-                            pid_guid,
-                            filepath_docid_rev,
-                            None,
-                            item_checksum,
-                            item_checksum_algorithm,
-                        )
-                        refined_object_list.append(store_object_tuple_item)
+                    # This tuple is formed to match 'HashStore' store_object's signature
+                    # Which is '.starmap()'ed when called
+                    store_object_tuple_item = (
+                        pid_guid,
+                        filepath_docid_rev,
+                        None,
+                        item_checksum,
+                        item_checksum_algorithm,
+                    )
+                    refined_object_list.append(store_object_tuple_item)
                 if action == "retrieve":
-                    if self.hashstore.exists(
-                        "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
-                    ):
-                        retrieve_object_tuple_item = (
-                            pid_guid,
-                            item_checksum_algorithm,
-                            item_checksum,
-                        )
-                        refined_object_list.append(retrieve_object_tuple_item)
+                    retrieve_object_tuple_item = (
+                        pid_guid,
+                        item_checksum_algorithm,
+                        item_checksum,
+                    )
+                    refined_object_list.append(retrieve_object_tuple_item)
                 if action == "delete":
-                    if self.hashstore.exists(
-                        "objects", self.hashstore.get_sha256_hex_digest(pid_guid)
-                    ):
-                        refined_object_list.append(pid_guid)
+                    refined_object_list.append(pid_guid)
 
         return refined_object_list
 
     def refine_list_for_metadata(self, metacat_obj_list, action):
         """Refine a list of metadata by checking for file existence and removing duplicates.
 
-        Args:
-            metacat_obj_list (List): List of tuple objects representing rows from metacat db
-            action (string): "store", "retrieve" or "delete".
-                "store" will create a list of metadata to store that do not exist in HashStore.
-                "retrieve" will create a list of metadata that exist in HashStore.
-                "delete" will create a list of metadata pids with their format_ids
+        :param List metacat_obj_list: List of tuple objects representing rows from metacat db.
+        :param str action: Action to perform - "store", "retrieve", or "delete".
+            - "store": Create a list of metadata to store that do not exist in HashStore.
+            - "retrieve": Create a list of metadata that exist in HashStore.
+            - "delete": Create a list of metadata pids with their format_ids.
 
-        Returns:
-            refined_object_list (List): List of tuple metadata based on "action"
+        :return: List of tuple metadata based on the specified action.
+        :rtype: List
         """
         refined_metadata_list = []
         for tuple_item in metacat_obj_list:
@@ -682,41 +696,22 @@ class MetacatDB:
             item_checksum_algorithm = tuple_item[4]
             if os.path.exists(filepath_docid_rev):
                 if action == "store":
-                    # If the file has already been stored, skip it
-                    if not self.hashstore.exists(
-                        "metadata",
-                        self.hashstore.get_sha256_hex_digest(
-                            pid_guid + metadata_namespace
-                        ),
-                    ):
-                        tuple_item = (pid_guid, filepath_docid_rev, metadata_namespace)
-                        refined_metadata_list.append(tuple_item)
+                    tuple_item = (pid_guid, filepath_docid_rev, metadata_namespace)
+                    refined_metadata_list.append(tuple_item)
                 if action == "retrieve":
-                    if self.hashstore.exists(
-                        "metadata",
-                        self.hashstore.get_sha256_hex_digest(
-                            pid_guid + metadata_namespace
-                        ),
-                    ):
-                        tuple_item = (
-                            pid_guid,
-                            metadata_namespace,
-                            item_checksum,
-                            item_checksum_algorithm,
-                        )
-                        refined_metadata_list.append(tuple_item)
+                    tuple_item = (
+                        pid_guid,
+                        metadata_namespace,
+                        item_checksum,
+                        item_checksum_algorithm,
+                    )
+                    refined_metadata_list.append(tuple_item)
                 if action == "delete":
-                    if self.hashstore.exists(
-                        "metadata",
-                        self.hashstore.get_sha256_hex_digest(
-                            pid_guid + metadata_namespace
-                        ),
-                    ):
-                        tuple_item = (
-                            pid_guid,
-                            metadata_namespace,
-                        )
-                        refined_metadata_list.append(tuple_item)
+                    tuple_item = (
+                        pid_guid,
+                        metadata_namespace,
+                    )
+                    refined_metadata_list.append(tuple_item)
         return refined_metadata_list
 
 
@@ -787,6 +782,7 @@ def main():
             number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
             # Determine if we are working with objects or metadata
             directory_type = getattr(args, "source_directory_type")
+            size_of_obj_to_skip = getattr(args, "gb_file_size_to_skip")
             accepted_directory_types = ["object", "metadata"]
             if directory_type not in accepted_directory_types:
                 raise ValueError(
@@ -798,18 +794,21 @@ def main():
                     directory_to_convert,
                     directory_type,
                     number_of_objects_to_convert,
+                    size_of_obj_to_skip,
                 )
             if getattr(args, "retrieve_and_validate"):
                 hashstore_c.retrieve_and_validate_from_hashstore(
                     directory_to_convert,
                     directory_type,
                     number_of_objects_to_convert,
+                    size_of_obj_to_skip,
                 )
             if getattr(args, "delete_from_hashstore"):
                 hashstore_c.delete_objects_from_list(
                     directory_to_convert,
                     directory_type,
                     number_of_objects_to_convert,
+                    size_of_obj_to_skip,
                 )
         else:
             raise FileNotFoundError(
@@ -825,6 +824,13 @@ def main():
         print(f"guid/pid: {pid}")
         print(f"algorithm: {algorithm}")
         print(f"Checksum/Hex Digest: {digest}")
+
+    elif getattr(args, "client_findobject"):
+        if pid is None:
+            raise ValueError("'-pid' option is required")
+        # Find the content identifier of the object
+        cid = hashstore_c.hashstore.find_object(pid)
+        print(f"Content identifier: {cid}")
 
     elif getattr(args, "client_storeobject"):
         if pid is None:

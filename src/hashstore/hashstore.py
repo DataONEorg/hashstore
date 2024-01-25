@@ -95,7 +95,7 @@ class HashStore(ABC):
         :param str checksum_algorithm: Algorithm of the checksum.
         :param int expected_file_size: Size of the temporary file.
 
-        :return: None
+        :return: bool - `True` if valid
         """
         raise NotImplementedError()
 
@@ -254,19 +254,19 @@ class HashStoreFactory:
         )
 
 
-class ObjectMetadata(namedtuple("ObjectMetadata", ["id", "obj_size", "hex_digests"])):
+class ObjectMetadata(namedtuple("ObjectMetadata", ["cid", "obj_size", "hex_digests"])):
     """Represents metadata associated with an object.
 
     The `ObjectMetadata` class represents metadata associated with an object,
-    including a unique identifier (`id`), the size of the object in bytes (`obj_size`),
-    and an optional list of hex digests (`hex_digests`) to validate objects.
+    including a content identifier (`cid`), the size of the object in bytes (`obj_size`),
+    and an optional list of hex digests (`hex_digests`) to assist with validating objects.
 
-    :param str id: A unique identifier for the object (Hash ID, hex digest).
+    :param str cid: A unique identifier for the object (Hash ID, hex digest).
     :param bytes obj_size: The size of the object in bytes.
     :param list hex_digests: A list of hex digests to validate objects
         (md5, sha1, sha256, sha384, sha512) (optional).
     """
 
     # Default value to prevent dangerous default value
-    def __new__(cls, ab_id, obj_size, hex_digests=None):
-        return super(ObjectMetadata, cls).__new__(cls, ab_id, obj_size, hex_digests)
+    def __new__(cls, cid, obj_size, hex_digests=None):
+        return super(ObjectMetadata, cls).__new__(cls, cid, obj_size, hex_digests)

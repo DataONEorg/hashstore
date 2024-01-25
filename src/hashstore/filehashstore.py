@@ -1667,7 +1667,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise TypeError(exception_string)
         if isinstance(data, str):
-            if data.replace(" ", "") == "":
+            if data.strip() == "":
                 exception_string = (
                     "FileHashStore - _validate_arg_data: Data string cannot be empty."
                 )
@@ -1724,7 +1724,7 @@ class FileHashStore(HashStore):
         :rtype: str
         """
         checked_format_id = None
-        if format_id is not None and format_id.replace(" ", "") == "":
+        if format_id and not format_id.strip():
             exception_string = f"FileHashStore - {method}: Format_id cannot be empty."
             logging.error(exception_string)
             raise ValueError(exception_string)

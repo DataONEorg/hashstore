@@ -18,7 +18,7 @@ Documentation is a work in progress, and can be found on the [Metacat repository
 
 ## HashStore Overview
 
-HashStore is a content-addressable file management system that utilizes the content identifier of an object to address files. The system stores both objects, references (refs) and metadata in its respective directories and provides an API for interacting with the store. HashStore storage classes (like `FileHashStore`) must implement the HashStore interface to ensure the expected usage of HashStore.
+HashStore is a content-addressable file management system that utilizes the content identifier of an object to address files. The system stores objects, references (refs) and metadata in its respective directories and provides an API for interacting with the store. HashStore storage classes (like `FileHashStore`) must implement the HashStore interface to ensure the expected usage of HashStore.
 
 ###### Public API Methods
 - store_object
@@ -89,7 +89,7 @@ metadata_cid = my_store.store_metadata(pid, metadata, format_id)
 
 In HashStore, objects are first saved as temporary files while their content identifiers are calculated. Once the default hash algorithm list and their hashes are generated, objects are stored in their permanent location using the store's algorithm's corresponding hash value, the store depth and the store width. Lastly, reference files are created for the object so that they can be found and retrieved given an identifier (ex. persistent identifier (pid)). Note: Objects are also stored once and only once.
 
-By calling the various interface methods for  `store_object`, the calling app/client can validate, store and tag an object simultaneously if the relevant data is available. In the absence of an identfiier (ex. persistent identifier (pid)), `store_object` can be called to solely store an object. The client is then expected to call `verify_object` when the relevant metadata is available to confirm that the object has been stored as expected. If the object is determined to be invalid (via `verify_object`), it will be deleted. Lastly, to finalize this process of storing an object (to make the object discoverable), the client calls `tag_object`. In summary, there are two expected paths to store an object:
+By calling the various interface methods for  `store_object`, the calling app/client can validate, store and tag an object simultaneously if the relevant data is available. In the absence of an identifier (ex. persistent identifier (pid)), `store_object` can be called to solely store an object. The client is then expected to call `verify_object` when the relevant metadata is available to confirm that the object has been stored as expected. If the object is determined to be invalid (via `verify_object`), it will be deleted. Lastly, to finalize this process of storing an object (to make the object discoverable), the client calls `tag_object`. In summary, there are two expected paths to store an object:
 
 ```py
 # All-in-one process which stores, validates and tags an object
@@ -108,8 +108,8 @@ tag_object(pid, cid)
 - To retrieve an object, call the Public API method `retrieve_object` which opens a stream to the object if it exists.
 
 **How do I find an object or check that it exists if I have the pid?**
-- To find the location of the object, call the Public API method `find_object` which will return the content identifier (cid) of the object.
-- This cid can then be used to locate the object on disk by following HashStore's store configuration.
+- To check if an object exists, call the Public API method `find_object` which will return the content identifier (cid) of the object if it exists.
+- If desired, this cid can then be used to locate the object on disk by following HashStore's store configuration.
 
 **How do I delete an object if I have the pid?**
 - To delete an object, call the Public API method `delete_object` which will delete the object and its associated references and reference files where relevant.

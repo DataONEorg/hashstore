@@ -637,7 +637,16 @@ class FileHashStore(HashStore):
             if os.path.exists(cid_ref_abs_path):
                 # Check that the pid is actually found in the cid reference file
                 if self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path):
-                    return pid_refs_cid
+                    # Object must also exist in order to return the cid retrieved
+                    if not self.exists("objects", pid_refs_cid):
+                        err_msg = (
+                            f"FileHashStore - find_object: Refs file found for pid ({pid}) at"
+                            + pid_ref_abs_path
+                            + f", but object referenced does not exist, cid: {pid_refs_cid}"
+                        )
+                        raise FileNotFoundError(err_msg)
+                    else:
+                        return pid_refs_cid
                 else:
                     # If not, it is an orphan pid refs file
                     err_msg = (
@@ -772,6 +781,11 @@ class FileHashStore(HashStore):
                 # Nothing to delete
                 return
             if "cid refs file not found" in fnfe:
+                # Delete pid refs file
+                pid_ref_abs_path = self.resolve_path("pid", pid)
+                self.delete("pid", pid_ref_abs_path)
+                return
+            if "object referenced does not exist" in fnfe:
                 # Delete pid refs file
                 pid_ref_abs_path = self.resolve_path("pid", pid)
                 self.delete("pid", pid_ref_abs_path)
@@ -1974,9 +1988,11 @@ class FileHashStore(HashStore):
 
         # Check for sharded path.
         if entity == "cid":
+            # Note, we skip checking whether the file exists for refs
             ref_file_abs_path = self.build_path(entity, file)
             return ref_file_abs_path
         elif entity == "pid":
+            # Note, we skip checking whether the file exists for refs
             hash_id = self.computehash(file, self.algorithm)
             ref_file_abs_path = self.build_path(entity, hash_id)
             return ref_file_abs_path

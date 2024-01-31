@@ -162,13 +162,14 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_object(self, pid):
-        """Delete an object permanently from disk using a persistent identifier (pid).
+    def delete_object(self, ab_id, id_type):
+        """Delete an object and its related data permanently from disk using a given identifier
+        and 'id_type'. When 'id_type' is 'pid', HashStore will attempt to delete the object and
+        its associated references files. When 'id_type' is 'cid', HashStore will only attempt to
+        delete the object. If 'id_type' is not supplied, `delete_object` will assume it is 'pid'.
 
-        The `delete_object` method removes the object associated with the provided `pid` from
-        disk, resulting in the permanent deletion of the object.
-
-        :param str pid: Authority-based identifier.
+        :param str ab_id: Authority-based identifier.
+        :param str id_type: "pid" or "Cid
 
         :return: bool - `True` upon successful deletion.
         """

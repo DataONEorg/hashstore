@@ -42,6 +42,21 @@ def test_store_object(pids, store):
         object_metadata = store.store_object(pid, path)
         assert object_metadata.cid == pids[pid][store.algorithm]
     assert store._count(entity) == 3
+    assert store._count("pid") == 3
+    assert store._count("cid") == 3
+
+
+def test_store_object_only_object(pids, store):
+    """Test store object stores an object only (no reference files will be created)"""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(data=path)
+        assert object_metadata.cid == pids[pid][store.algorithm]
+    assert store._count(entity) == 3
+    assert store._count("pid") == 0
+    assert store._count("cid") == 0
 
 
 def test_store_object_files_path(pids, store):
@@ -882,7 +897,7 @@ def test_retrieve_metadata_format_id_empty_spaces(store):
 
 
 def test_delete_object(pids, store):
-    """Test delete_object successfully deletes objects from /objects."""
+    """Test delete_object successfully deletes objects from /objects and all refs files."""
     test_dir = "tests/testdata/"
     entity = "objects"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -894,6 +909,8 @@ def test_delete_object(pids, store):
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
     assert store._count(entity) == 0
+    assert store._count("pid") == 0
+    assert store._count("cid") == 0
 
 
 def test_delete_object_pid_refs_file(pids, store):
@@ -940,6 +957,17 @@ def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
         store.delete_object(pid)
         cid_refs_file_path = store._resolve_path("cid", cid)
         assert os.path.exists(cid_refs_file_path)
+
+
+def test_delete_object_id_type_cid(pids, store):
+    """Test delete_object successfully deletes only object."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid=None, data=path)
+        store.delete_object(object_metadata.cid, "cid")
+    assert store._count(entity) == 0
 
 
 def test_delete_object_pid_empty(store):

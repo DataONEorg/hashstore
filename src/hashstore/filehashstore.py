@@ -770,16 +770,21 @@ class FileHashStore(HashStore):
         )
         return metadata_stream
 
-    def delete_object(self, pid, id_type=None):
+    def delete_object(self, ab_id, id_type=None):
         logging.debug(
-            "FileHashStore - delete_object: Request to delete object for pid: %s", pid
+            "FileHashStore - delete_object: Request to delete object for id: %s", ab_id
         )
-        self._check_string(pid, "pid", "delete_object")
+        self._check_string(ab_id, "ab_id", "delete_object")
         if id_type is "cid":
-            # TODO: Delete object only
-            return True
+            cid_refs_abs_path = self._resolve_path("objects", ab_id)
+            if os.path.exists(cid_refs_abs_path):
+                self._delete("objects", ab_id)
+                return True
+            else:
+                return False
         else:
             # id_type is "pid"
+            pid = ab_id
             try:
                 cid = self.find_object(pid)
             except FileNotFoundError as fnfe:

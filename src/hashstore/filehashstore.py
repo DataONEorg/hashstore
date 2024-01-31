@@ -701,6 +701,7 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_metadata: Attempting to store metadata for pid: %s",
                 pid,
             )
+            # TODO: Refactor the way we store metadata and add pytests to confirm
             metadata_cid = self._put_metadata(metadata, pid, checked_format_id)
 
             logging.info(
@@ -841,6 +842,7 @@ class FileHashStore(HashStore):
                         + f" not object with cid ({cid}), cid refs file not empty."
                     )
                     logging.info(info_string)
+                # TODO:: Check 'id_type' for 'clear' & attempt to remove all metadata docs if so
                 return True
 
             finally:
@@ -1263,6 +1265,8 @@ class FileHashStore(HashStore):
             finally:
                 os.umask(oldmask)
         return tmp
+
+    # TODO: Clean up refs file methods, a lot of redundant code
 
     def _write_cid_refs_file(self, path, pid):
         """Write the CID reference file in the supplied path to a file. A reference file

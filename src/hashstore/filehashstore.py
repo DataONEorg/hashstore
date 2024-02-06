@@ -842,7 +842,7 @@ class FileHashStore(HashStore):
                         + f" not object with cid ({cid}), cid refs file not empty."
                     )
                     logging.info(info_string)
-                # TODO:: Check 'id_type' for 'clear' & attempt to remove all metadata docs if so
+                # TODO: Check 'id_type' for 'clear' & attempt to remove all metadata docs if so
                 return True
 
             finally:

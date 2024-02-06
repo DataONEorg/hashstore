@@ -25,13 +25,12 @@ class HashStore(ABC):
         checksum_algorithm,
         expected_object_size,
     ):
-        """Atomic storage of objects to disk using a given stream.
-
-        The `store_object` method ensures atomic storage of objects to disk. Upon successful
-        storage, it returns an ObjectMetadata object containing relevant file information,
-        such as the file's id (used to locate the object on disk), the file's size, and a hex digest
-        dictionary of algorithms and checksums. The method also tags the object, creating references
-        for discoverability.
+        """Atomic storage of objects to disk using a given stream. The `store_object` method
+        ensures atomic storage of objects to disk. Upon successful storage, it returns an
+        `ObjectMetadata` object containing relevant file information, such as the file's id
+        (used to locate the object on disk), the file's size, and a hex digest dictionary of
+        algorithms and checksums. The method also tags the object, creating references for
+        discoverability.
 
         `store_object` ensures that an object is stored only once by synchronizing multiple calls
         and rejecting attempts to store duplicate objects. If called without a pid, it stores the
@@ -68,11 +67,9 @@ class HashStore(ABC):
 
     @abstractmethod
     def tag_object(self, pid, cid):
-        """Create references to make objects discoverable in HashStore.
-
-        The `tag_object` method enables operations such as retrieving, deleting, or calculating
-        a hex digest based on the provided pid argument. To perform these actions, it's crucial
-        to locate the object associated with the given pid.
+        """Creates references that allow objects stored in HashStore to be discoverable. Retrieving,
+        deleting or calculating a hex digest of an object is based on a pid argument; and to
+        proceed, we must be able to find the object associated with the pid.
 
         :param str pid: Authority-based or persistent identifier of the object.
         :param str cid: Content identifier of the object.
@@ -85,10 +82,8 @@ class HashStore(ABC):
     def verify_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
-        """Confirm equality of content in an ObjectMetadata.
-
-        The `verify_object` method verifies that the content in the provided `object_metadata`
-        matches the specified values.
+        """Confirm equality of content in an ObjectMetadata. The `verify_object` method verifies
+        that the content in the provided `object_metadata` matches the specified values.
 
         :param ObjectMetadata object_metadata: ObjectMetadata object.
         :param str checksum: Value of the checksum.
@@ -102,7 +97,6 @@ class HashStore(ABC):
     @abstractmethod
     def find_object(self, pid):
         """Check if an object referenced by a pid exists and retrieve its content identifier.
-
         The `find_object` method validates the existence of an object based on the provided
         pid and returns the associated content identifier.
 
@@ -114,11 +108,12 @@ class HashStore(ABC):
 
     @abstractmethod
     def store_metadata(self, pid, metadata, format_id):
-        """Add or update metadata, such as `sysmeta`, to disk using the given path/stream.
-
-        The `store_metadata` method uses a persistent identifier `pid` and a metadata `format_id`
-        to determine the permanent address of the metadata object. The permanent address is
-        calculated by obtaining the SHA-256 hex digest of the concatenation of `pid` & `format_id`.
+        """Add or update metadata, such as `sysmeta`, to disk using the given path/stream. The
+        `store_metadata` method uses a persistent identifier `pid` and a metadata `format_id`
+        to determine the permanent address of the metadata object. All metadata documents for a
+        given `pid` will be stored in a directory (under ../metadata) that is determined by
+        calculating the hash of the given pid, with the document name being the hash of the
+        metadata format (`format_id`).
 
         Upon successful storage of metadata, the method returns a string representing the file's
         permanent address. Metadata objects are stored in parallel to objects in the
@@ -134,10 +129,9 @@ class HashStore(ABC):
 
     @abstractmethod
     def retrieve_object(self, pid):
-        """Retrieve an object from disk using a persistent identifier (pid).
-
-        The `retrieve_object` method opens and returns a buffered object stream ready for reading
-        if the object associated with the provided `pid` exists on disk.
+        """Retrieve an object from disk using a persistent identifier (pid). The `retrieve_object`
+        method opens and returns a buffered object stream ready for reading if the object
+        associated with the provided `pid` exists on disk.
 
         :param str pid: Authority-based identifier.
 
@@ -148,11 +142,8 @@ class HashStore(ABC):
     @abstractmethod
     def retrieve_metadata(self, pid, format_id):
         """Retrieve the metadata object from disk using a persistent identifier (pid)
-        and metadata namespace (format_id).
-
-        The `retrieve_metadata` method calculates the metadata object's permanent address
-        by hashing the concatenation of the given `pid` and `format_id`. If the object
-        exists, the method opens and returns a buffered metadata stream ready for reading.
+        and metadata namespace (format_id). If the metadata document exists, the method opens
+        and returns a buffered metadata stream ready for reading.
 
         :param str pid: Authority-based identifier.
         :param str format_id: Metadata format.
@@ -163,10 +154,11 @@ class HashStore(ABC):
 
     @abstractmethod
     def delete_object(self, ab_id, id_type):
-        """Delete an object and its related data permanently from disk using a given identifier
-        and 'id_type'. When 'id_type' is 'pid', HashStore will attempt to delete the object and
-        its associated references files. When 'id_type' is 'cid', HashStore will only attempt to
-        delete the object. If 'id_type' is not supplied, `delete_object` will assume it is 'pid'.
+        """Deletes an object and its related data permanently from HashStore using a given
+        persistent identifier. If the `id_type` is 'pid', the object associated with the pid will
+        be deleted if it is not referenced by any other pids, along with its reference files and
+        all metadata documents found in its respective metadata directory. If the `id_type` is
+        'cid', only the object will be deleted if it is not referenced by other pids.
 
         :param str ab_id: Authority-based identifier.
         :param str id_type: "pid" or "Cid
@@ -177,11 +169,9 @@ class HashStore(ABC):
 
     @abstractmethod
     def delete_metadata(self, pid, format_id):
-        """Delete a metadata document permanently from disk using a persistent identifier (pid)
-        and metadata namespace (format_id).
-
-        The `delete_metadata` method removes the metadata document associated with the provided
-        `pid` and `format_id` from disk, resulting in its permanent deletion.
+        """Deletes a metadata document (ex. `sysmeta`) permanently from HashStore using a given
+        persistent identifier and its respective metadata namespace. If a `format_id` is supplied,
+        only the metadata document associated with the `format_id` will be deleted.
 
         :param str pid: Authority-based identifier.
         :param str format_id: Metadata format.
@@ -192,10 +182,8 @@ class HashStore(ABC):
 
     @abstractmethod
     def get_hex_digest(self, pid, algorithm):
-        """Calculate the hex digest of an object in HashStore.
-
-        The `get_hex_digest` method calculates the hex digest of an object that exists
-        in HashStore using a given persistent identifier and hash algorithm.
+        """Calculates the hex digest of an object that exists in HashStore using a given persistent
+        identifier and hash algorithm.
 
         :param str pid: Authority-based identifier.
         :param str algorithm: Algorithm of hex digest to generate.

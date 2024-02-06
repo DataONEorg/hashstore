@@ -990,7 +990,7 @@ def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
         assert os.path.exists(cid_refs_file_path)
 
 
-def test_delete_object_id_type_cid(pids, store):
+def test_delete_object_idtype_cid(pids, store):
     """Test delete_object successfully deletes only object."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -999,6 +999,23 @@ def test_delete_object_id_type_cid(pids, store):
         object_metadata = store.store_object(pid=None, data=path)
         store.delete_object(object_metadata.cid, "cid")
     assert store._count(entity) == 0
+
+
+def test_delete_object_idtype_cid_refs_file_exists(pids, store):
+    """Test delete_object does not delete object if a cid refs file still exists."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        object_metadata = store.store_object(pid, path)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        store.delete_object(object_metadata.cid, "cid")
+    assert store._count(entity) == 3
+    assert store._count("pid") == 3
+    assert store._count("cid") == 3
 
 
 def test_delete_object_pid_empty(store):
@@ -1026,8 +1043,7 @@ def test_delete_metadata(pids, store):
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        is_deleted = store.delete_metadata(pid, format_id)
-        assert is_deleted
+        store.delete_metadata(pid, format_id)
     assert store._count(entity) == 0
 
 
@@ -1054,8 +1070,7 @@ def test_delete_metadata_does_not_exist(pids, store):
     metadata that does not exist."""
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
-        is_deleted = store.delete_metadata(pid, format_id)
-        assert is_deleted
+        store.delete_metadata(pid, format_id)
 
 
 def test_delete_metadata_default_format_id(store, pids):

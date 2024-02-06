@@ -162,8 +162,6 @@ class HashStore(ABC):
 
         :param str ab_id: Authority-based identifier.
         :param str id_type: "pid" or "Cid
-
-        :return: bool - `True` upon successful deletion.
         """
         raise NotImplementedError()
 
@@ -175,8 +173,6 @@ class HashStore(ABC):
 
         :param str pid: Authority-based identifier.
         :param str format_id: Metadata format.
-
-        :return: bool - `True` upon successful deletion.
         """
         raise NotImplementedError()
 

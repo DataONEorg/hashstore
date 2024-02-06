@@ -784,12 +784,11 @@ class FileHashStore(HashStore):
         )
         self._check_string(ab_id, "ab_id", "delete_object")
         if id_type is "cid":
-            cid_refs_abs_path = self._resolve_path("objects", ab_id)
-            if os.path.exists(cid_refs_abs_path):
+            cid_refs_abs_path = self._resolve_path("cid", ab_id)
+            # If the refs file still exists, do not delete the object
+            if not os.path.exists(cid_refs_abs_path):
                 self._delete("objects", ab_id)
-                return True
-            else:
-                return False
+                return
         else:
             # id_type is "pid"
             pid = ab_id
@@ -849,8 +848,7 @@ class FileHashStore(HashStore):
                         + f" not object with cid ({cid}), cid refs file not empty."
                     )
                     logging.info(info_string)
-                # TODO: Check 'id_type' for 'clear' & attempt to remove all metadata docs if so
-                return True
+                return
 
             finally:
                 # Release cid
@@ -890,7 +888,7 @@ class FileHashStore(HashStore):
                 pid,
             )
             logging.info(info_string)
-            return True
+            return
         else:
             # Delete a specific metadata file
             metadata_document_name = self._computehash(checked_format_id)
@@ -904,7 +902,7 @@ class FileHashStore(HashStore):
                 + f" {pid} for format_id: {format_id}"
             )
             logging.info(info_string)
-            return True
+            return
 
     def get_hex_digest(self, pid, algorithm):
         logging.debug(

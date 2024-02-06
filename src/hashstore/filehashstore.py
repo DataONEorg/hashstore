@@ -701,7 +701,6 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_metadata: Attempting to store metadata for pid: %s",
                 pid,
             )
-            # TODO: Refactor the way we store metadata and add pytests to confirm
             metadata_cid = self._put_metadata(metadata, pid, checked_format_id)
 
             logging.info(
@@ -874,14 +873,9 @@ class FileHashStore(HashStore):
         metadata_rel_path = self._get_store_path("metadata") / rel_path
         if format_id is None:
             # Delete all metadata files
-            metadata_files = os.listdir(metadata_rel_path)
-            metadata_file_paths = [
-                metadata_rel_path / file
-                for file in metadata_files
-                if os.path.isfile(metadata_rel_path / file)
-            ]
+            metadata_file_paths = self._get_file_paths(metadata_rel_path)
             for file_path in metadata_file_paths:
-                os.remove(file_path)
+                self._delete(entity, file_path)
 
             info_string = (
                 "FileHashStore - delete_metadata: Successfully deleted all metadata for pid: %s",
@@ -2074,6 +2068,30 @@ class FileHashStore(HashStore):
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
             )
+
+    @staticmethod
+    def _get_file_paths(directory):
+        """Get the file paths of a given directory
+
+        :param mixed directory: String or path to directory.
+
+        :raises FileNotFoundError: If the directory doesn't exist
+
+        :return: file_paths - File paths of the given directory
+        :rtype: List
+        """
+        if os.path.exists(directory):
+            files = os.listdir(directory)
+            file_paths = [
+                directory / file for file in files if os.path.isfile(directory / file)
+            ]
+            return file_paths
+        else:
+            err_msg = (
+                "FileHashStore - _get_file_paths: Directory does not exist: %s",
+                directory,
+            )
+            raise FileNotFoundError(err_msg)
 
     def _count(self, entity):
         """Return the count of the number of files in the `root` directory.

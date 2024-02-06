@@ -666,6 +666,33 @@ def test_store_metadata(pids, store):
     assert store._count(entity) == 3
 
 
+def test_store_metadata_one_pid_multiple_metadata_documents(store):
+    """Test store metadata for a pid with multiple metadata documents."""
+    test_dir = "tests/testdata/"
+    entity = "metadata"
+    pid = "jtao.1700.1"
+    filename = pid.replace("/", "_") + ".xml"
+    syspath = Path(test_dir) / filename
+    metadata_directory = store._computehash(pid)
+    rel_path = "/".join(store._shard(metadata_directory))
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id3 = "http://ns.dataone.org/service/types/v3.0"
+    format_id4 = "http://ns.dataone.org/service/types/v4.0"
+    metadata_cid = store.store_metadata(pid, syspath, format_id)
+    metadata_cid3 = store.store_metadata(pid, syspath, format_id3)
+    metadata_cid4 = store.store_metadata(pid, syspath, format_id4)
+    metadata_document_name = store._computehash(format_id)
+    metadata_document_name3 = store._computehash(format_id3)
+    metadata_document_name4 = store._computehash(format_id4)
+    full_path = store._get_store_path("metadata") / rel_path / metadata_document_name
+    full_path3 = store._get_store_path("metadata") / rel_path / metadata_document_name3
+    full_path4 = store._get_store_path("metadata") / rel_path / metadata_document_name4
+    assert metadata_cid == full_path
+    assert metadata_cid3 == full_path3
+    assert metadata_cid4 == full_path4
+    assert store._count(entity) == 3
+
+
 def test_store_metadata_default_format_id(pids, store):
     """Test store metadata returns expected id when storing with default format_id."""
     test_dir = "tests/testdata/"
@@ -1001,6 +1028,24 @@ def test_delete_metadata(pids, store):
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         is_deleted = store.delete_metadata(pid, format_id)
         assert is_deleted
+    assert store._count(entity) == 0
+
+
+def test_delete_metadata_one_pid_multiple_metadata_documents(store):
+    """Test delete_metadata for a pid with multiple metadata documents deletes
+    all metadata files as expected."""
+    test_dir = "tests/testdata/"
+    entity = "metadata"
+    pid = "jtao.1700.1"
+    filename = pid.replace("/", "_") + ".xml"
+    syspath = Path(test_dir) / filename
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id3 = "http://ns.dataone.org/service/types/v3.0"
+    format_id4 = "http://ns.dataone.org/service/types/v4.0"
+    _metadata_cid = store.store_metadata(pid, syspath, format_id)
+    _metadata_cid3 = store.store_metadata(pid, syspath, format_id3)
+    _metadata_cid4 = store.store_metadata(pid, syspath, format_id4)
+    store.delete_metadata(pid)
     assert store._count(entity) == 0
 
 

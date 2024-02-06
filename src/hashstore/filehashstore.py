@@ -869,25 +869,42 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid", "delete_metadata")
         checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
-        # TODO: Delete all metadata related to the given pid when format_id is None
+        # Get the metadata directory path for the given pid
         entity = "metadata"
         metadata_directory = self._computehash(pid)
-        if format_id is None:
-            metadata_document_name = self._computehash(self.sysmeta_ns)
-        else:
-            metadata_document_name = self._computehash(checked_format_id)
         rel_path = "/".join(self._shard(metadata_directory))
-        full_path_without_directory = rel_path + "/" + metadata_document_name
-        metadata_exists = self._exists(entity, full_path_without_directory)
+        metadata_rel_path = self._get_store_path("metadata") / rel_path
+        if format_id is None:
+            # Delete all metadata files
+            metadata_files = os.listdir(metadata_rel_path)
+            metadata_file_paths = [
+                metadata_rel_path / file
+                for file in metadata_files
+                if os.path.isfile(metadata_rel_path / file)
+            ]
+            for file_path in metadata_file_paths:
+                os.remove(file_path)
 
-        if metadata_exists:
-            self._delete(entity, full_path_without_directory)
+            info_string = (
+                "FileHashStore - delete_metadata: Successfully deleted all metadata for pid: %s",
+                pid,
+            )
+            logging.info(info_string)
+            return True
+        else:
+            # Delete a specific metadata file
+            metadata_document_name = self._computehash(checked_format_id)
+            full_path_without_directory = rel_path + "/" + metadata_document_name
+            metadata_exists = self._exists(entity, full_path_without_directory)
+            if metadata_exists:
+                self._delete(entity, full_path_without_directory)
 
-        logging.info(
-            "FileHashStore - delete_metadata: Successfully deleted metadata for pid: %s",
-            pid,
-        )
-        return True
+            info_string = (
+                "FileHashStore - delete_metadata: Successfully deleted metadata for pid:"
+                + f" {pid} for format_id: {format_id}"
+            )
+            logging.info(info_string)
+            return True
 
     def get_hex_digest(self, pid, algorithm):
         logging.debug(

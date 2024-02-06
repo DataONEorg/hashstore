@@ -755,10 +755,17 @@ class FileHashStore(HashStore):
         checked_format_id = self._check_arg_format_id(format_id, "retrieve_metadata")
 
         entity = "metadata"
-        metadata_cid = self._computehash(pid + checked_format_id)
-        metadata_exists = self._exists(entity, metadata_cid)
+        metadata_directory = self._computehash(pid)
+        if format_id is None:
+            metadata_document_name = self._computehash(self.sysmeta_ns)
+        else:
+            metadata_document_name = self._computehash(checked_format_id)
+        rel_path = "/".join(self._shard(metadata_directory))
+        full_path_without_directory = rel_path + "/" + metadata_document_name
+        metadata_exists = self._exists(entity, full_path_without_directory)
+
         if metadata_exists:
-            metadata_stream = self._open(entity, metadata_cid)
+            metadata_stream = self._open(entity, full_path_without_directory)
         else:
             exception_string = (
                 f"FileHashStore - retrieve_metadata: No metadata found for pid: {pid}"
@@ -862,10 +869,19 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid", "delete_metadata")
         checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
-
+        # TODO: Delete all metadata related to the given pid when format_id is None
         entity = "metadata"
-        metadata_cid = self._computehash(pid + checked_format_id)
-        self._delete(entity, metadata_cid)
+        metadata_directory = self._computehash(pid)
+        if format_id is None:
+            metadata_document_name = self._computehash(self.sysmeta_ns)
+        else:
+            metadata_document_name = self._computehash(checked_format_id)
+        rel_path = "/".join(self._shard(metadata_directory))
+        full_path_without_directory = rel_path + "/" + metadata_document_name
+        metadata_exists = self._exists(entity, full_path_without_directory)
+
+        if metadata_exists:
+            self._delete(entity, full_path_without_directory)
 
         logging.info(
             "FileHashStore - delete_metadata: Successfully deleted metadata for pid: %s",
@@ -1982,7 +1998,8 @@ class FileHashStore(HashStore):
 
     def _resolve_path(self, entity, file):
         """Attempt to determine the absolute path of a file ID or path through
-        successive checking of candidate paths.
+        successive checking of candidate paths - first by checking whether the 'file'
+        exists, followed by checking the entity type with respect to the file.
 
         :param str entity: Desired entity type ("objects", "metadata", "cid", "pid"),
             where "cid" & "pid" represents resolving the path to the refs files.

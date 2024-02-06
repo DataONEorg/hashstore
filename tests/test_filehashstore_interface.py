@@ -649,6 +649,7 @@ def test_find_object_pid_empty(store):
 def test_store_metadata(pids, store):
     """Test store metadata."""
     test_dir = "tests/testdata/"
+    entity = "metadata"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
@@ -662,6 +663,7 @@ def test_store_metadata(pids, store):
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
         assert metadata_cid == full_path
+    assert store._count(entity) == 3
 
 
 def test_store_metadata_default_format_id(pids, store):
@@ -680,28 +682,6 @@ def test_store_metadata_default_format_id(pids, store):
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
         assert metadata_cid == full_path
-
-
-def test_store_metadata_files_path(pids, store):
-    """Test store metadata with path."""
-    test_dir = "tests/testdata/"
-    entity = "metadata"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
-    for pid in pids.keys():
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
-        # TODO: Ensure exists works as expected for metadata
-        assert store._exists(entity, metadata_cid)
-        # Manually calculate expected path
-        metadata_directory = store._computehash(pid)
-        metadata_document_name = store._computehash(format_id)
-        rel_path = "/".join(store._shard(metadata_directory))
-        full_path = (
-            store._get_store_path("metadata") / rel_path / metadata_document_name
-        )
-        assert metadata_cid == full_path
-    assert store._count(entity) == 3
 
 
 def test_store_metadata_files_string(pids, store):
@@ -782,7 +762,7 @@ def test_store_metadata_metadata_none(store):
         store.store_metadata(pid, syspath_string, format_id)
 
 
-def test_store_metadata_metadata_cid(pids, store):
+def test_store_metadata_metadata_path(pids, store):
     """Test store metadata returns expected metadata_cid."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -792,7 +772,8 @@ def test_store_metadata_metadata_cid(pids, store):
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath, format_id)
-        assert metadata_cid == pids[pid]["metadata_cid"]
+        metadata_path = store._resolve_path("metadata", metadata_cid)
+        assert metadata_cid == metadata_path
 
 
 def test_store_metadata_thread_lock(store):

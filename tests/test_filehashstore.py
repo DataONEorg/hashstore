@@ -847,7 +847,16 @@ def test_exists_object_with_sharded_path(pids, store):
         assert store._exists(entity, object_metadata_shard_path)
 
 
-# TODO: Test exists for metadata
+def test_exists_metadata_files_path(pids, store):
+    """Test exists works as expected for metadata."""
+    test_dir = "tests/testdata/"
+    entity = "metadata"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        assert store._exists(entity, metadata_cid)
 
 
 def test_exists_object_with_nonexistent_file(store):

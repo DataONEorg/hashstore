@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from hashstore import hashstoreclient
 
+# pylint: disable=W0212
+
 
 def test_create_hashstore(tmp_path):
     """Test creating a HashStore through the client."""
@@ -135,11 +137,12 @@ def test_store_object(store, pids):
         assert store._exists("objects", pids[pid][store.algorithm])
 
 
-def test_store_metadata(store, pids):
+def test_store_metadata(capsys, store, pids):
     """Test storing metadata to HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
     namespace = "http://ns.dataone.org/service/types/v2.0"
+    entity = "metadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -164,7 +167,17 @@ def test_store_metadata(store, pids):
         sys.argv = chs_args
         hashstoreclient.main()
 
-        assert store._exists("metadata", pids[pid]["metadata_cid"])
+        metadata_directory = store._computehash(pid)
+        metadata_document_name = store._computehash(namespace)
+        rel_path = "/".join(store._shard(metadata_directory))
+        full_path = (
+            store._get_store_path("metadata") / rel_path / metadata_document_name
+        )
+        capsystext = capsys.readouterr().out
+        expected_output = f"Metadata Path: {full_path}\n"
+        assert capsystext == expected_output
+
+    assert store._count(entity) == 3
 
 
 def test_retrieve_objects(capsys, pids, store):

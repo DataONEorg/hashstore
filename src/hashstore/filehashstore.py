@@ -1472,9 +1472,10 @@ class FileHashStore(HashStore):
             metadata_tmp = self._mktmpmetadata(metadata_stream)
 
         # Get target and related paths (permanent location)
-        metadata_cid = self._computehash(pid + format_id)
-        rel_path = "/".join(self._shard(metadata_cid))
-        full_path = self._get_store_path("metadata") / rel_path
+        metadata_directory = self._computehash(pid)
+        metadata_document_name = self._computehash(format_id)
+        rel_path = "/".join(self._shard(metadata_directory))
+        full_path = self._get_store_path("metadata") / rel_path / metadata_document_name
 
         # Move metadata to target path
         if os.path.exists(metadata_tmp):
@@ -1487,7 +1488,7 @@ class FileHashStore(HashStore):
                     "FileHashStore - _put_metadata: Successfully put metadata for pid: %s",
                     pid,
                 )
-                return metadata_cid
+                return full_path
             except Exception as err:
                 exception_string = (
                     f"FileHashStore - _put_metadata: Unexpected {err=}, {type(err)=}"

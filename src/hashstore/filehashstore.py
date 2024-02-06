@@ -914,10 +914,13 @@ class FileHashStore(HashStore):
         metadata_rel_path = self._get_store_path("metadata") / rel_path
         if format_id is None:
             # Delete all metadata files
+            objects_to_delete = []
             metadata_file_paths = self._get_file_paths(metadata_rel_path)
             if metadata_file_paths is not None:
-                for file_path in metadata_file_paths:
-                    self._delete(entity, file_path)
+                for path in metadata_file_paths:
+                    objects_to_delete.append(self._rename_path_for_deletion(path))
+            for obj in objects_to_delete:
+                os.remove(obj)
 
             info_string = (
                 "FileHashStore - delete_metadata: Successfully deleted all metadata for pid: %s",

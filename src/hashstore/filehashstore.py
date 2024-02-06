@@ -578,7 +578,7 @@ class FileHashStore(HashStore):
                 raise FileExistsError(exception_string)
             elif os.path.exists(cid_ref_abs_path):
                 # Create the pid refs file
-                pid_tmp_file_path = self._write_pid_refs_file(tmp_root_path, cid)
+                pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
                 self._create_path(os.path.dirname(pid_ref_abs_path))
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 # Update cid ref files as it already exists
@@ -594,8 +594,8 @@ class FileHashStore(HashStore):
             else:
                 # All ref files begin as tmp files and get moved sequentially at once
                 # Get tmp files with the expected cid and pid refs content
-                pid_tmp_file_path = self._write_pid_refs_file(tmp_root_path, cid)
-                cid_tmp_file_path = self._write_cid_refs_file(tmp_root_path, pid)
+                pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
+                cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
                 # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
                 self._create_path(os.path.dirname(pid_ref_abs_path))
                 self._create_path(os.path.dirname(cid_ref_abs_path))
@@ -1340,35 +1340,37 @@ class FileHashStore(HashStore):
 
     # TODO: Clean up refs file methods, a lot of redundant code
 
-    def _write_cid_refs_file(self, path, pid):
-        """Write the CID reference file in the supplied path to a file. A reference file
-        contains every PID that references a CID, each on its own line. This method will
-        only write into an empty file and will not overwrite an existing one.
+    def _write_refs_file(self, path, ref_id, ref_type):
+        """Write a reference file in the supplied path into a temporary file.
+        All `pid` or `cid` reference files begin with a single identifier, with the
+        primary difference being that a cid reference file can contain multiple lines
+        of `pid`s that reference the `cid`.
 
-        :param str path: Path of the file to be written into.
-        :param str pid: Authority-based or persistent identifier of the object.
+        :param str path: Directory to write the temporary file
+        :param str ref_id: Authority-based, persistent or content identifier
 
-        :return: cid_tmp_file_path - Path to the cid tmp file
+        :return: tmp_file_path - Path to the tmp refs file
         :rtype: string
         """
         logging.debug(
-            "FileHashStore - write_cid_refs_file: Writing pid (%s) into file: %s",
-            pid,
+            "FileHashStore - write_cid_refs_file: Writing id (%s) into file: %s",
+            ref_id,
             path,
         )
         try:
-            with self._mktmpfile(path) as cid_tmp_file:
-                cid_tmp_file_path = cid_tmp_file.name
-                with open(cid_tmp_file_path, "w", encoding="utf8") as tmp_cid_ref_file:
-                    tmp_cid_ref_file.write(pid + "\n")
-                    # Ensure that file is immediately written to and not held in memory
-                    # tmp_cid_ref_file.flush()
-                    return cid_tmp_file_path
+            with self._mktmpfile(path) as tmp_file:
+                tmp_file_path = tmp_file.name
+                with open(tmp_file_path, "w", encoding="utf8") as tmp_cid_ref_file:
+                    if ref_type is "cid":
+                        tmp_cid_ref_file.write(ref_id + "\n")
+                    if ref_type is "pid":
+                        tmp_cid_ref_file.write(ref_id)
+                    return tmp_file_path
 
         except Exception as err:
             exception_string = (
-                "FileHashStore - write_cid_refs_file: failed to write cid refs file for pid:"
-                + f"  {pid} into path: {path}. Unexpected {err=}, {type(err)=}"
+                "FileHashStore - _write_refs_file: failed to write cid refs file for pid:"
+                + f" {ref_id} into path: {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err
@@ -1460,36 +1462,6 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore - _delete_cid_refs_pid: failed to remove pid from cid refs file:"
                 + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
-            )
-            logging.error(exception_string)
-            raise err
-
-    def _write_pid_refs_file(self, path, cid):
-        """Generate a tmp pid refs file into the given path for the given CID (content
-        identifier). A reference file for a PID contains the CID that it references.
-
-        :param str path: Path of the file to be written into.
-        :param str cid: Content identifier.
-
-        :return: pid_tmp_file_path
-        :rtype: string
-        """
-        logging.debug(
-            "FileHashStore - _write_pid_refs_file: Writing cid (%s) into file: %s",
-            cid,
-            path,
-        )
-        try:
-            with self._mktmpfile(path) as pid_tmp_file:
-                pid_tmp_file_path = pid_tmp_file.name
-                with open(pid_tmp_file_path, "w", encoding="utf8") as pid_ref_file:
-                    pid_ref_file.write(cid)
-                    return pid_tmp_file_path
-
-        except Exception as err:
-            exception_string = (
-                f"FileHashStore - _write_pid_refs_file: failed to write cid ({cid})"
-                + f" into pid refs file: {path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err

@@ -948,7 +948,9 @@ class FileHashStore(HashStore):
                 file_size_to_validate,
             )
 
-        object_metadata = ObjectMetadata(object_cid, obj_file_size, hex_digest_dict)
+        object_metadata = ObjectMetadata(
+            pid, object_cid, obj_file_size, hex_digest_dict
+        )
         logging.debug(
             "FileHashStore - put_object: Successfully put object for pid: %s",
             pid,
@@ -985,7 +987,7 @@ class FileHashStore(HashStore):
                 ) = self._move_and_get_checksums(None, stream)
 
             object_metadata = ObjectMetadata(
-                object_ref_pid_location, obj_file_size, hex_digest_dict
+                None, object_ref_pid_location, obj_file_size, hex_digest_dict
             )
             # The permanent address of the data stored is based on the data's checksum
             cid = hex_digest_dict.get(self.algorithm)

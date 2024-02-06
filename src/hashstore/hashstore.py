@@ -255,12 +255,15 @@ class HashStoreFactory:
         )
 
 
-class ObjectMetadata(namedtuple("ObjectMetadata", ["cid", "obj_size", "hex_digests"])):
+class ObjectMetadata(
+    namedtuple("ObjectMetadata", ["pid", "cid", "obj_size", "hex_digests"])
+):
     """Represents metadata associated with an object.
 
-    The `ObjectMetadata` class represents metadata associated with an object,
-    including a content identifier (`cid`), the size of the object in bytes (`obj_size`),
-    and an optional list of hex digests (`hex_digests`) to assist with validating objects.
+    The `ObjectMetadata` class represents metadata associated with an object, including
+    a persistent or authority-based identifier (`pid`), a content identifier (`cid`),
+    the size of the object in bytes (`obj_size`), and an optional list of hex digests
+    (`hex_digests`) to assist with validating objects.
 
     :param str cid: A unique identifier for the object (Hash ID, hex digest).
     :param bytes obj_size: The size of the object in bytes.
@@ -269,5 +272,5 @@ class ObjectMetadata(namedtuple("ObjectMetadata", ["cid", "obj_size", "hex_diges
     """
 
     # Default value to prevent dangerous default value
-    def __new__(cls, cid, obj_size, hex_digests=None):
-        return super(ObjectMetadata, cls).__new__(cls, cid, obj_size, hex_digests)
+    def __new__(cls, pid, cid, obj_size, hex_digests=None):
+        return super(ObjectMetadata, cls).__new__(cls, pid, cid, obj_size, hex_digests)

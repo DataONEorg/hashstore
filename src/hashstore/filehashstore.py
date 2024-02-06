@@ -791,6 +791,15 @@ class FileHashStore(HashStore):
         else:
             # id_type is "pid"
             pid = ab_id
+            objects_to_delete = []
+            rel_path = "/".join(self._shard(self._computehash(pid)))
+            metadata_rel_path = self._get_store_path("metadata") / rel_path
+            metadata_file_paths = self._get_file_paths(metadata_rel_path)
+            # Rename paths by appending _delete to the file name
+            if metadata_file_paths is not None:
+                for path in metadata_file_paths:
+                    objects_to_delete.append(self._rename_path_for_deletion(path))
+
             try:
                 cid = self.find_object(pid)
             except FileNotFoundError as fnfe:
@@ -799,19 +808,46 @@ class FileHashStore(HashStore):
                     return
                 if "cid refs file not found" in fnfe:
                     # Delete pid refs file
-                    self._delete("pid", pid)
+                    objects_to_delete.append(
+                        self._rename_path_for_deletion(self._resolve_path("pid", pid))
+                    )
+                    # Remove all files confirmed for deletion
+                    for obj in objects_to_delete:
+                        os.remove(obj)
                     return
                 if "object referenced does not exist" in fnfe:
                     # Delete pid refs file
+                    pid_ref_abs_path = self._resolve_path("pid", pid)
+                    # Add pid refs file to delete
+                    objects_to_delete.append(
+                        self._rename_path_for_deletion(pid_ref_abs_path)
+                    )
+                    # Remove pid from cid refs file
+                    # Retrieve the cid from the pid refs file
+                    with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                        pid_refs_cid = pid_ref_file.read()
+                    cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
+                    # Remove if the pid refs is found
+                    if self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path):
+                        self._delete_cid_refs_pid(cid_ref_abs_path, pid)
+                    # Remove all files confirmed for deletion
+                    for obj in objects_to_delete:
+                        os.remove(obj)
                     self._delete("pid", pid)
                     return
             except ValueError as ve:
                 if "is missing from cid refs file" in ve:
                     # Delete pid refs file
-                    self._delete("pid", pid)
+                    pid_ref_abs_path = self._resolve_path("pid", pid)
+                    objects_to_delete.append(
+                        self._rename_path_for_deletion(pid_ref_abs_path)
+                    )
+                    # Remove all files confirmed for deletion
+                    for obj in objects_to_delete:
+                        os.remove(obj)
                     return
 
-            # Proceed with next steps - cid has been retrieved without any errors
+            # Proceed with next steps - cid has been retrieved without any issues
             while cid in self.reference_locked_cids:
                 logging.debug(
                     "FileHashStore - delete_object: (cid) %s is currently locked. Waiting",
@@ -829,24 +865,29 @@ class FileHashStore(HashStore):
                 cid_ref_abs_path = self._resolve_path("cid", cid)
                 pid_ref_abs_path = self._resolve_path("pid", pid)
                 # First delete the pid refs file immediately
-                self._delete_pid_refs_file(pid_ref_abs_path)
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(pid_ref_abs_path)
+                )
                 # Remove pid from cid reference file
                 self._delete_cid_refs_pid(cid_ref_abs_path, pid)
                 # Delete cid reference file and object only if the cid refs file is empty
                 if os.path.getsize(cid_ref_abs_path) == 0:
-                    self._delete("cid", cid_ref_abs_path)
-                    self._delete("objects", cid)
-                    info_string = (
-                        "FileHashStore - delete_object: Successfully deleted references and"
-                        + f" object associated with pid: {pid}"
+                    objects_to_delete.append(
+                        self._rename_path_for_deletion(cid_ref_abs_path)
                     )
-                    logging.info(info_string)
-                else:
-                    info_string = (
-                        "FileHashStore - delete_object: Successfully deleted pid refs file but"
-                        + f" not object with cid ({cid}), cid refs file not empty."
+                    obj_real_path = self._resolve_path("objects", cid)
+                    objects_to_delete.append(
+                        self._rename_path_for_deletion(obj_real_path)
                     )
-                    logging.info(info_string)
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+
+                info_string = (
+                    "FileHashStore - delete_object: Successfully deleted references, metadata and"
+                    + f" object associated with pid: {pid}"
+                )
+                logging.info(info_string)
                 return
 
             finally:
@@ -874,8 +915,9 @@ class FileHashStore(HashStore):
         if format_id is None:
             # Delete all metadata files
             metadata_file_paths = self._get_file_paths(metadata_rel_path)
-            for file_path in metadata_file_paths:
-                self._delete(entity, file_path)
+            if metadata_file_paths is not None:
+                for file_path in metadata_file_paths:
+                    self._delete(entity, file_path)
 
             info_string = (
                 "FileHashStore - delete_metadata: Successfully deleted all metadata for pid: %s",
@@ -1941,6 +1983,21 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
+    @staticmethod
+    def _rename_path_for_deletion(path):
+        """Move and rename a given path by appending '_delete' to the file name
+
+        :param Path path: Path to file to rename
+
+        :return: Path to the renamed file
+        :rtype: str
+        """
+        if isinstance(path, str):
+            path = Path(path)
+        delete_path = path.with_name(path.stem + "_delete" + path.suffix)
+        shutil.move(path, delete_path)
+        return delete_path
+
     def _remove_empty(self, subpath):
         """Successively remove all empty folders starting with `subpath` and
         proceeding "up" through directory tree until reaching the `root`
@@ -2071,13 +2128,13 @@ class FileHashStore(HashStore):
 
     @staticmethod
     def _get_file_paths(directory):
-        """Get the file paths of a given directory
+        """Get the file paths of a given directory if it exists
 
         :param mixed directory: String or path to directory.
 
         :raises FileNotFoundError: If the directory doesn't exist
 
-        :return: file_paths - File paths of the given directory
+        :return: file_paths - File paths of the given directory or None if directory doesn't exist
         :rtype: List
         """
         if os.path.exists(directory):
@@ -2087,11 +2144,7 @@ class FileHashStore(HashStore):
             ]
             return file_paths
         else:
-            err_msg = (
-                "FileHashStore - _get_file_paths: Directory does not exist: %s",
-                directory,
-            )
-            raise FileNotFoundError(err_msg)
+            return None
 
     def _count(self, entity):
         """Return the count of the number of files in the `root` directory.

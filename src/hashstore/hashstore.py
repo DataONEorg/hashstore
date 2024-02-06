@@ -168,8 +168,8 @@ class HashStore(ABC):
     @abstractmethod
     def delete_metadata(self, pid, format_id):
         """Deletes a metadata document (ex. `sysmeta`) permanently from HashStore using a given
-        persistent identifier and its respective metadata namespace. If a `format_id` is supplied,
-        only the metadata document associated with the `format_id` will be deleted.
+        persistent identifier (`pid`) and format_id (metadata namespace). If a `format_id` is
+        not supplied, all metadata documents associated with the given `pid` will be deleted.
 
         :param str pid: Authority-based identifier.
         :param str format_id: Metadata format.

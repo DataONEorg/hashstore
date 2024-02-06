@@ -787,17 +787,19 @@ class FileHashStore(HashStore):
             # If the refs file still exists, do not delete the object
             if not os.path.exists(cid_refs_abs_path):
                 self._delete("objects", ab_id)
-                return
         else:
             # id_type is "pid"
             pid = ab_id
+            # Create a list of objects to delete to minimize delay
             objects_to_delete = []
+            # Get the metadata documents to delete
             rel_path = "/".join(self._shard(self._computehash(pid)))
             metadata_rel_path = self._get_store_path("metadata") / rel_path
             metadata_file_paths = self._get_file_paths(metadata_rel_path)
-            # Rename paths by appending _delete to the file name
+            # Add these files to be permanently deleted
             if metadata_file_paths is not None:
                 for path in metadata_file_paths:
+                    # Rename files by appending _delete to the file name
                     objects_to_delete.append(self._rename_path_for_deletion(path))
 
             try:
@@ -816,15 +818,14 @@ class FileHashStore(HashStore):
                         os.remove(obj)
                     return
                 if "object referenced does not exist" in fnfe:
-                    # Delete pid refs file
+                    # Add pid refs file to be permanently deleted
                     pid_ref_abs_path = self._resolve_path("pid", pid)
-                    # Add pid refs file to delete
                     objects_to_delete.append(
                         self._rename_path_for_deletion(pid_ref_abs_path)
                     )
                     # Remove pid from cid refs file
-                    # Retrieve the cid from the pid refs file
                     with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                        # Retrieve the cid
                         pid_refs_cid = pid_ref_file.read()
                     cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
                     # Remove if the pid refs is found
@@ -833,11 +834,10 @@ class FileHashStore(HashStore):
                     # Remove all files confirmed for deletion
                     for obj in objects_to_delete:
                         os.remove(obj)
-                    self._delete("pid", pid)
                     return
             except ValueError as ve:
                 if "is missing from cid refs file" in ve:
-                    # Delete pid refs file
+                    # Add pid refs file to be permanently deleted
                     pid_ref_abs_path = self._resolve_path("pid", pid)
                     objects_to_delete.append(
                         self._rename_path_for_deletion(pid_ref_abs_path)
@@ -864,7 +864,7 @@ class FileHashStore(HashStore):
             try:
                 cid_ref_abs_path = self._resolve_path("cid", cid)
                 pid_ref_abs_path = self._resolve_path("pid", pid)
-                # First delete the pid refs file immediately
+                # Add pid refs file to be permanently deleted
                 objects_to_delete.append(
                     self._rename_path_for_deletion(pid_ref_abs_path)
                 )
@@ -1343,11 +1343,12 @@ class FileHashStore(HashStore):
     def _write_refs_file(self, path, ref_id, ref_type):
         """Write a reference file in the supplied path into a temporary file.
         All `pid` or `cid` reference files begin with a single identifier, with the
-        primary difference being that a cid reference file can contain multiple lines
-        of `pid`s that reference the `cid`.
+        difference being that a cid reference file can potentially contain multiple
+        lines of `pid`s that reference the `cid`.
 
         :param str path: Directory to write the temporary file
         :param str ref_id: Authority-based, persistent or content identifier
+        :param str ref_type: 'cid' or 'pid'
 
         :return: tmp_file_path - Path to the tmp refs file
         :rtype: string
@@ -1429,7 +1430,7 @@ class FileHashStore(HashStore):
     def _is_string_in_refs_file(ref_id, refs_file_path):
         """Check a reference file for a ref_id (`cid` or `pid`).
 
-        :param str pid: Authority-based, persistent identifier or content identifier
+        :param str ref_id: Authority-based, persistent identifier or content identifier
         :param str refs_file_path: Path to the refs file
 
         :return: pid_found
@@ -1909,7 +1910,7 @@ class FileHashStore(HashStore):
 
     @staticmethod
     def _rename_path_for_deletion(path):
-        """Move and rename a given path by appending '_delete' to the file name
+        """Rename a given path by appending '_delete' and move it to the renamed path.
 
         :param Path path: Path to file to rename
 

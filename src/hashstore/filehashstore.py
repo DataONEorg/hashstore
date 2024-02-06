@@ -582,7 +582,7 @@ class FileHashStore(HashStore):
                 self._create_path(os.path.dirname(pid_ref_abs_path))
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 # Update cid ref files as it already exists
-                if not self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path):
+                if not self._is_string_in_refs_file(pid, cid_ref_abs_path):
                     self._update_refs_file(cid_ref_abs_path, pid, "add")
                 self._verify_hashstore_references(pid, cid, "update")
                 logging.info(
@@ -637,7 +637,7 @@ class FileHashStore(HashStore):
             cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
             if os.path.exists(cid_ref_abs_path):
                 # Check that the pid is actually found in the cid reference file
-                if self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path):
+                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
                     # Object must also exist in order to return the cid retrieved
                     if not self._exists("objects", pid_refs_cid):
                         err_msg = (
@@ -828,7 +828,7 @@ class FileHashStore(HashStore):
                         pid_refs_cid = pid_ref_file.read()
                     cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
                     # Remove if the pid refs is found
-                    if self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path):
+                    if self._is_string_in_refs_file(pid, cid_ref_abs_path):
                         self._update_refs_file(cid_ref_abs_path, pid, "remove")
                     # Remove all files confirmed for deletion
                     for obj in objects_to_delete:
@@ -1375,23 +1375,6 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
-    def _is_pid_in_cid_refs_file(self, pid, cid_ref_abs_path):
-        """Check a cid reference file for a pid.
-
-        :param str pid: Authority-based or persistent identifier of the object.
-        :param str cid_ref_abs_path: Path to the cid refs file
-
-        :return: pid_found
-        :rtype: boolean
-        """
-        with open(cid_ref_abs_path, "r", encoding="utf8") as cid_ref_file:
-            # Confirm that pid is not currently already tagged
-            for line in cid_ref_file:
-                value = line.strip()
-                if pid == value:
-                    return True
-        return False
-
     @staticmethod
     def _update_refs_file(refs_file_path, ref_id, update_type):
         """Add or remove an existing ref from a refs file.
@@ -1441,6 +1424,24 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise err
+
+    @staticmethod
+    def _is_string_in_refs_file(ref_id, refs_file_path):
+        """Check a reference file for a ref_id (`cid` or `pid`).
+
+        :param str pid: Authority-based, persistent identifier or content identifier
+        :param str refs_file_path: Path to the refs file
+
+        :return: pid_found
+        :rtype: boolean
+        """
+        with open(refs_file_path, "r", encoding="utf8") as ref_file:
+            # Confirm that pid is not currently already tagged
+            for line in ref_file:
+                value = line.strip()
+                if ref_id == value:
+                    return True
+        return False
 
     def _put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the
@@ -1643,7 +1644,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise ValueError(exception_string)
         # Then the pid
-        pid_found = self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path)
+        pid_found = self._is_string_in_refs_file(pid, cid_ref_abs_path)
         if not pid_found:
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file exists"

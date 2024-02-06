@@ -1466,34 +1466,6 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
-    def _delete_pid_refs_file(self, pid_ref_abs_path):
-        """Delete a PID reference file.
-
-        :param str pid_ref_abs_path: Absolute path to the PID reference file.
-        """
-        logging.debug(
-            "FileHashStore - _delete_pid_refs_file: Deleting reference file: %s",
-            pid_ref_abs_path,
-        )
-
-        try:
-            if not os.path.exists(pid_ref_abs_path):
-                err_msg = (
-                    "FileHashStore - _delete_pid_refs_file: pid reference file not found: %s",
-                    pid_ref_abs_path,
-                )
-                raise FileNotFoundError(err_msg)
-            else:
-                self._delete("pid", pid_ref_abs_path)
-
-        except Exception as err:
-            exception_string = (
-                "FileHashStore - _delete_pid_refs_file: failed to delete pid refs file:"
-                + f" {pid_ref_abs_path}. Unexpected {err=}, {type(err)=}"
-            )
-            logging.error(exception_string)
-            raise err
-
     def _put_metadata(self, metadata, pid, format_id):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the
         given PID and format ID as the permanent address.

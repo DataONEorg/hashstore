@@ -369,25 +369,6 @@ def test_write_refs_file_content_pid(pids, store):
         assert cid == pid_refs_cid
 
 
-def test_delete_pid_refs_file(pids, store):
-    """Test that delete_pid_refs_file deletes a reference file."""
-    for pid in pids.keys():
-        cid = pids[pid]["sha256"]
-        tmp_root_path = store._get_store_path("refs") / "tmp"
-        tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")
-        store._delete_pid_refs_file(tmp_pid_refs_file)
-
-        assert not os.path.exists(tmp_pid_refs_file)
-
-
-def test_delete_pid_refs_file_file_not_found(pids, store):
-    """Test that delete_pid_refs_file raises an exception when refs file not found."""
-    for pid in pids.keys():
-        pid_ref_abs_path = store._resolve_path("pid", pid)
-        with pytest.raises(FileNotFoundError):
-            store._delete_pid_refs_file(pid_ref_abs_path)
-
-
 def test_verify_hashstore_references_pid_refs_file_missing(pids, store):
     """Test _verify_hashstore_references throws exception when pid refs file is missing."""
     for pid in pids.keys():

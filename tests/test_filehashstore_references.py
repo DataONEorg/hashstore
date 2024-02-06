@@ -97,7 +97,7 @@ def test_tag_object_cid_refs_file_exists(pids, store):
         assert not os.path.exists(second_cid_hash)
 
 
-def test_tag_object_cid_refs_update_cid_refs_updated(store):
+def test_tag_object_cid_refs_update_refs_file_updated(store):
     """Test tag object updates a cid reference file that already exists."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -150,7 +150,7 @@ def test_tag_object_cid_refs_update_pid_found_but_file_missing(store):
     # Manually update the cid refs, pid refs file missing at this point
     additional_pid = "dou.test.1"
     cid_ref_abs_path = store._resolve_path("cid", cid)
-    store._update_cid_refs(cid_ref_abs_path, additional_pid)
+    store._update_refs_file(cid_ref_abs_path, additional_pid, "add")
 
     # Confirm the pid refs file is missing
     pid_refs_file_path = store._resolve_path("pid", additional_pid)
@@ -265,13 +265,13 @@ def test_write_refs_file_cid_content(pids, store):
         assert pid == cid_ref_file_pid.strip()
 
 
-def test_update_cid_refs_content(pids, store):
+def test_update_refs_file_content(pids, store):
     """Test that update_cid_ref updates the ref file as expected."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
         pid_other = "dou.test.1"
-        store._update_cid_refs(tmp_cid_refs_file, pid_other)
+        store._update_refs_file(tmp_cid_refs_file, pid_other, "add")
 
         with open(tmp_cid_refs_file, "r", encoding="utf8") as f:
             for _, line in enumerate(f, start=1):
@@ -279,7 +279,7 @@ def test_update_cid_refs_content(pids, store):
                 assert value == pid or value == pid_other
 
 
-def test_update_cid_refs_content_multiple(pids, store):
+def test_update_refs_file_content_multiple(pids, store):
     """Test that update_cid_refs adds multiple references successfully."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
@@ -287,7 +287,7 @@ def test_update_cid_refs_content_multiple(pids, store):
 
         cid_reference_list = [pid]
         for i in range(0, 5):
-            store._update_cid_refs(tmp_cid_refs_file, f"dou.test.{i}")
+            store._update_refs_file(tmp_cid_refs_file, f"dou.test.{i}", "add")
             cid_reference_list.append(f"dou.test.{i}")
 
         line_count = 0
@@ -300,34 +300,34 @@ def test_update_cid_refs_content_multiple(pids, store):
         assert line_count == 6
 
 
-def test_update_cid_refs_content_pid_exists(pids, store):
+def test_update_refs_file_content_pid_exists(pids, store):
     """Test that update_cid_ref does not throw exception if pid already exists
     and proceeds to complete the tagging process (verify_object)"""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
         # Exception should not be thrown
-        store._update_cid_refs(tmp_cid_refs_file, pid)
+        store._update_refs_file(tmp_cid_refs_file, pid, "add")
 
 
-def test_update_cid_refs_content_cid_refs_does_not_exist(pids, store):
+def test_update_refs_file_content_cid_refs_does_not_exist(pids, store):
     """Test that update_cid_ref throws exception if cid refs file doesn't exist."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store._resolve_path("cid", cid)
         with pytest.raises(FileNotFoundError):
-            store._update_cid_refs(cid_ref_abs_path, pid)
+            store._update_refs_file(cid_ref_abs_path, pid, "add")
 
 
-def test_delete_cid_refs_pid(pids, store):
+def test_update_refs_file_remove(pids, store):
     """Test that delete_cid_refs_pid deletes the given pid from the ref file."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
 
         pid_other = "dou.test.1"
-        store._update_cid_refs(tmp_cid_refs_file, pid_other)
-        store._delete_cid_refs_pid(tmp_cid_refs_file, pid)
+        store._update_refs_file(tmp_cid_refs_file, pid_other, "add")
+        store._update_refs_file(tmp_cid_refs_file, pid, "remove")
 
         with open(tmp_cid_refs_file, "r", encoding="utf8") as f:
             for _, line in enumerate(f, start=1):
@@ -336,13 +336,13 @@ def test_delete_cid_refs_pid(pids, store):
                 assert value == pid_other
 
 
-def test_delete_cid_refs_pid_file(pids, store):
+def test_update_refs_file_remove_file(pids, store):
     """Test that delete_cid_refs_pid leaves a file empty when removing the last pid."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
         # First remove the pid
-        store._delete_cid_refs_pid(tmp_cid_refs_file, pid)
+        store._update_refs_file(tmp_cid_refs_file, pid, "remove")
 
         assert os.path.exists(tmp_cid_refs_file)
         assert os.path.getsize(tmp_cid_refs_file) == 0
@@ -456,7 +456,7 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
 
         cid_reference_list = [pid]
         for i in range(0, 5):
-            store._update_cid_refs(cid_ref_abs_path, f"dou.test.{i}")
+            store._update_refs_file(cid_ref_abs_path, f"dou.test.{i}", "add")
             cid_reference_list.append(f"dou.test.{i}")
 
         with pytest.raises(ValueError):

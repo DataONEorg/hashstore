@@ -583,7 +583,7 @@ class FileHashStore(HashStore):
                 shutil.move(pid_tmp_file_path, pid_ref_abs_path)
                 # Update cid ref files as it already exists
                 if not self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path):
-                    self._update_cid_refs(cid_ref_abs_path, pid)
+                    self._update_refs_file(cid_ref_abs_path, pid, "add")
                 self._verify_hashstore_references(pid, cid, "update")
                 logging.info(
                     "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
@@ -829,7 +829,7 @@ class FileHashStore(HashStore):
                     cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
                     # Remove if the pid refs is found
                     if self._is_pid_in_cid_refs_file(pid, cid_ref_abs_path):
-                        self._delete_cid_refs_pid(cid_ref_abs_path, pid)
+                        self._update_refs_file(cid_ref_abs_path, pid, "remove")
                     # Remove all files confirmed for deletion
                     for obj in objects_to_delete:
                         os.remove(obj)
@@ -869,7 +869,7 @@ class FileHashStore(HashStore):
                     self._rename_path_for_deletion(pid_ref_abs_path)
                 )
                 # Remove pid from cid reference file
-                self._delete_cid_refs_pid(cid_ref_abs_path, pid)
+                self._update_refs_file(cid_ref_abs_path, pid, "remove")
                 # Delete cid reference file and object only if the cid refs file is empty
                 if os.path.getsize(cid_ref_abs_path) == 0:
                     objects_to_delete.append(
@@ -1393,75 +1393,51 @@ class FileHashStore(HashStore):
         return False
 
     @staticmethod
-    def _update_cid_refs(cid_ref_abs_path, pid):
-        """Update an existing CID reference file with the given PID.
+    def _update_refs_file(refs_file_path, ref_id, update_type):
+        """Add or remove an existing ref from a refs file.
 
-        :param str cid_ref_abs_path: Absolute path to the CID reference file.
-        :param str pid: Authority-based or persistent identifier of the object.
+        :param str refs_file_path: Absolute path to the refs file.
+        :param str ref_id: Authority-based or persistent identifier of the object.
+        :param str update_type: 'add' or 'remove'
         """
-        logging.debug(
-            "FileHashStore - update_cid_refs: Adding pid (%s) into cid reference file: %s",
-            pid,
-            cid_ref_abs_path,
+        debug_msg = (
+            f"FileHashStore - _update_refs_file: Updating ({update_type}) for ref_id: {ref_id}"
+            + f" at refs file: {refs_file_path}."
         )
-        if not os.path.exists(cid_ref_abs_path):
+        logging.debug(debug_msg)
+        if not os.path.exists(refs_file_path):
             exception_string = (
-                f"FileHashStore - update_cid_refs: {cid_ref_abs_path} does not exist."
-                + f" Cannot write pid: {[pid]}"
+                f"FileHashStore - _update_refs_file: {refs_file_path} does not exist."
+                + f" Cannot {update_type} ref_id: {ref_id}"
             )
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
 
         try:
-            with open(cid_ref_abs_path, "a", encoding="utf8") as cid_ref_file:
-                # Lock file for the shortest amount of time possible
-                file_descriptor = cid_ref_file.fileno()
-                fcntl.flock(file_descriptor, fcntl.LOCK_EX)
-                cid_ref_file.write(pid + "\n")
-                # The context manager will take care of releasing the lock
-                # But the code to explicitly release the lock if desired is below
-                # fcntl.flock(f, fcntl.LOCK_UN)
+            if update_type is "add":
+                with open(refs_file_path, "a", encoding="utf8") as ref_file:
+                    # Lock file for the shortest amount of time possible
+                    file_descriptor = ref_file.fileno()
+                    fcntl.flock(file_descriptor, fcntl.LOCK_EX)
+                    ref_file.write(ref_id + "\n")
+            if update_type is "remove":
+                with open(refs_file_path, "r+", encoding="utf8") as ref_file:
+                    # Lock file immediately, this process needs to complete
+                    # before any others read/modify the content of resf file
+                    file_descriptor = ref_file.fileno()
+                    fcntl.flock(file_descriptor, fcntl.LOCK_EX)
+                    new_pid_lines = [
+                        cid_pid_line
+                        for cid_pid_line in ref_file.readlines()
+                        if cid_pid_line.strip() != ref_id
+                    ]
+                    ref_file.seek(0)
+                    ref_file.writelines(new_pid_lines)
+                    ref_file.truncate()
         except Exception as err:
             exception_string = (
-                "FileHashStore - update_cid_refs: failed to update reference for cid:"
-                + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
-            )
-            logging.error(exception_string)
-            raise err
-
-    @staticmethod
-    def _delete_cid_refs_pid(cid_ref_abs_path, pid):
-        """Delete a PID from a CID reference file.
-
-        :param str cid_ref_abs_path: Absolute path to the CID reference file.
-        :param str pid: Authority-based or persistent identifier of the object.
-        """
-        logging.debug(
-            "FileHashStore - _delete_cid_refs_pid: Deleting pid (%s) from cid reference file: %s",
-            pid,
-            cid_ref_abs_path,
-        )
-        try:
-            with open(cid_ref_abs_path, "r+", encoding="utf8") as cid_ref_file:
-                # Lock file immediately, this process needs to complete
-                # before any others read/modify the content of cid_ref_file
-                file_descriptor = cid_ref_file.fileno()
-                fcntl.flock(file_descriptor, fcntl.LOCK_EX)
-                new_pid_lines = [
-                    cid_pid_line
-                    for cid_pid_line in cid_ref_file.readlines()
-                    if cid_pid_line.strip() != pid
-                ]
-                cid_ref_file.seek(0)
-                cid_ref_file.writelines(new_pid_lines)
-                cid_ref_file.truncate()
-                # The context manager will take care of releasing the lock
-                # But the code to explicitly release the lock if desired is below
-                # fcntl.flock(f, fcntl.LOCK_UN)
-        except Exception as err:
-            exception_string = (
-                "FileHashStore - _delete_cid_refs_pid: failed to remove pid from cid refs file:"
-                + f" {cid_ref_abs_path} for pid: {pid}. Unexpected {err=}, {type(err)=}"
+                f"FileHashStore - _update_refs_file: failed to {update_type} for ref_id: {ref_id}"
+                + f" at refs file: {refs_file_path}. Unexpected {err=}, {type(err)=}"
             )
             logging.error(exception_string)
             raise err

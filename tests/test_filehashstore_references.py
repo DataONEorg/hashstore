@@ -1,4 +1,5 @@
 """Test module for FileHashStore's reference system to tag stored objects."""
+
 import os
 import shutil
 import pytest
@@ -7,7 +8,7 @@ import pytest
 
 
 def test_tag_object(pids, store):
-    """Test tag object returns boolean."""
+    """Test tag object returns true boolean when successful."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -17,7 +18,7 @@ def test_tag_object(pids, store):
 
 
 def test_tag_object_pid_refs_file(pids, store):
-    """Test tag object creates the pid reference file."""
+    """Test tag object creates the expected pid reference file."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -44,7 +45,7 @@ def test_tag_object_pid_refs_file_exists(pids, store):
 
 
 def test_tag_object_pid_refs_file_content(pids, store):
-    """Test tag object creates the pid reference file contains the correct cid."""
+    """Test tag object created the pid reference file with the expected cid."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -69,7 +70,7 @@ def test_tag_object_cid_refs_file(pids, store):
 
 
 def test_tag_object_cid_refs_file_content(pids, store):
-    """Test tag object tags cid reference file successfully with pid."""
+    """Test tag object creates the cid reference file successfully with pid."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -82,8 +83,8 @@ def test_tag_object_cid_refs_file_content(pids, store):
 
 
 def test_tag_object_cid_refs_file_exists(pids, store):
-    """Test tag object raises exception when trying to add another cid to an
-    existing pid reference file and that a cid reference file is not created."""
+    """Test tag object raises exception when trying to tag a pid that already
+    has a pid refs file, and that a cid reference file is not created."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -164,7 +165,7 @@ def test_tag_object_cid_refs_update_pid_found_but_file_missing(store):
 
 
 def test_verify_object(pids, store):
-    """Test verify object succeeds given good arguments."""
+    """Test verify_object succeeds given good arguments."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -178,7 +179,7 @@ def test_verify_object(pids, store):
 
 
 def test_verify_object_exception_incorrect_object_metadata_type(pids, store):
-    """Test verify object raises exception when incorrect object is given to
+    """Test verify_object returns false when incorrect object is given to
     object_metadata arg."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -194,7 +195,7 @@ def test_verify_object_exception_incorrect_object_metadata_type(pids, store):
 
 
 def test_verify_object_exception_incorrect_size(pids, store):
-    """Test verify object raises exception when incorrect size is supplied."""
+    """Test verify_object returns false when incorrect size is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -214,7 +215,7 @@ def test_verify_object_exception_incorrect_size(pids, store):
 
 
 def test_verify_object_exception_incorrect_checksum(pids, store):
-    """Test verify object raises exception when incorrect checksum is supplied."""
+    """Test verify_object returns false when incorrect checksum is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -236,7 +237,7 @@ def test_verify_object_exception_incorrect_checksum(pids, store):
 
 
 def test_verify_object_exception_incorrect_checksum_algo(pids, store):
-    """Test verify object raises exception when incorrect algorithm is supplied."""
+    """Test verify_object returns false when incorrect algorithm is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -247,15 +248,15 @@ def test_verify_object_exception_incorrect_checksum_algo(pids, store):
             store.verify_object(object_metadata, checksum, "md2", expected_file_size)
 
 
-def test_write_refs_file_cid(store):
-    """Test that write_cid_reference writes a reference file."""
+def test_write_refs_file_ref_type_cid(store):
+    """Test that write_refs_file writes a reference file."""
     tmp_root_path = store._get_store_path("refs") / "tmp"
     tmp_cid_refs_file = store._write_refs_file(tmp_root_path, "test_pid", "cid")
     assert os.path.exists(tmp_cid_refs_file)
 
 
-def test_write_refs_file_cid_content(pids, store):
-    """Test that write_cid_ref_file writes the expected content."""
+def test_write_refs_file_ref_type_cid_content(pids, store):
+    """Test that write_refs_file writes the expected content."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
@@ -266,7 +267,7 @@ def test_write_refs_file_cid_content(pids, store):
 
 
 def test_update_refs_file_content(pids, store):
-    """Test that update_cid_ref updates the ref file as expected."""
+    """Test that update_refs_file updates the ref file as expected."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
@@ -280,7 +281,7 @@ def test_update_refs_file_content(pids, store):
 
 
 def test_update_refs_file_content_multiple(pids, store):
-    """Test that update_cid_refs adds multiple references successfully."""
+    """Test that _update_refs_file adds multiple references successfully."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
@@ -301,17 +302,23 @@ def test_update_refs_file_content_multiple(pids, store):
 
 
 def test_update_refs_file_content_pid_exists(pids, store):
-    """Test that update_cid_ref does not throw exception if pid already exists
-    and proceeds to complete the tagging process (verify_object)"""
+    """Test that _update_refs_file does add a pid to a refs file that already
+    contains the pid."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
         # Exception should not be thrown
         store._update_refs_file(tmp_cid_refs_file, pid, "add")
 
+        line_count = 0
+        with open(tmp_cid_refs_file, "r", encoding="utf8") as ref_file:
+            for _line in ref_file:
+                line_count += 1
+        assert line_count == 1
+
 
 def test_update_refs_file_content_cid_refs_does_not_exist(pids, store):
-    """Test that update_cid_ref throws exception if cid refs file doesn't exist."""
+    """Test that _update_refs_file throws exception if refs file doesn't exist."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store._resolve_path("cid", cid)
@@ -320,7 +327,7 @@ def test_update_refs_file_content_cid_refs_does_not_exist(pids, store):
 
 
 def test_update_refs_file_remove(pids, store):
-    """Test that delete_cid_refs_pid deletes the given pid from the ref file."""
+    """Test that _update_refs_file deletes the given pid from the ref file."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
@@ -336,8 +343,8 @@ def test_update_refs_file_remove(pids, store):
                 assert value == pid_other
 
 
-def test_update_refs_file_remove_file(pids, store):
-    """Test that delete_cid_refs_pid leaves a file empty when removing the last pid."""
+def test_update_refs_file_empty_file(pids, store):
+    """Test that _update_refs_file leaves a file empty when removing the last pid."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
@@ -348,7 +355,7 @@ def test_update_refs_file_remove_file(pids, store):
         assert os.path.getsize(tmp_cid_refs_file) == 0
 
 
-def test_write_refs_file_pid(pids, store):
+def test_write_refs_file_ref_type_pid(pids, store):
     """Test that write_pid_refs_file writes a reference file."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
@@ -357,7 +364,7 @@ def test_write_refs_file_pid(pids, store):
         assert os.path.exists(tmp_pid_refs_file)
 
 
-def test_write_refs_file_content_pid(pids, store):
+def test_write_refs_file_ref_type_content_pid(pids, store):
     """Test that write_pid_refs_file writes the expected content."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]

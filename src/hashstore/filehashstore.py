@@ -1,4 +1,5 @@
 """Core module for FileHashStore"""
+
 import atexit
 import io
 import shutil
@@ -1374,8 +1375,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
-    @staticmethod
-    def _update_refs_file(refs_file_path, ref_id, update_type):
+    def _update_refs_file(self, refs_file_path, ref_id, update_type):
         """Add or remove an existing ref from a refs file.
 
         :param str refs_file_path: Absolute path to the refs file.
@@ -1394,14 +1394,15 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
-
         try:
             if update_type is "add":
-                with open(refs_file_path, "a", encoding="utf8") as ref_file:
-                    # Lock file for the shortest amount of time possible
-                    file_descriptor = ref_file.fileno()
-                    fcntl.flock(file_descriptor, fcntl.LOCK_EX)
-                    ref_file.write(ref_id + "\n")
+                pid_found = self._is_string_in_refs_file(ref_id, refs_file_path)
+                if not pid_found:
+                    with open(refs_file_path, "a", encoding="utf8") as ref_file:
+                        # Lock file for the shortest amount of time possible
+                        file_descriptor = ref_file.fileno()
+                        fcntl.flock(file_descriptor, fcntl.LOCK_EX)
+                        ref_file.write(ref_id + "\n")
             if update_type is "remove":
                 with open(refs_file_path, "r+", encoding="utf8") as ref_file:
                     # Lock file immediately, this process needs to complete

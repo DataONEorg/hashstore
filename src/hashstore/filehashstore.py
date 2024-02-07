@@ -783,7 +783,7 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_object: Request to delete object for id: %s", ab_id
         )
         self._check_string(ab_id, "ab_id", "delete_object")
-        if id_type is "cid":
+        if id_type == "cid":
             cid_refs_abs_path = self._resolve_path("cid", ab_id)
             # If the refs file still exists, do not delete the object
             if not os.path.exists(cid_refs_abs_path):
@@ -1361,9 +1361,9 @@ class FileHashStore(HashStore):
             with self._mktmpfile(path) as tmp_file:
                 tmp_file_path = tmp_file.name
                 with open(tmp_file_path, "w", encoding="utf8") as tmp_cid_ref_file:
-                    if ref_type is "cid":
+                    if ref_type == "cid":
                         tmp_cid_ref_file.write(ref_id + "\n")
-                    if ref_type is "pid":
+                    if ref_type == "pid":
                         tmp_cid_ref_file.write(ref_id)
                     return tmp_file_path
 
@@ -1395,7 +1395,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
         try:
-            if update_type is "add":
+            if update_type == "add":
                 pid_found = self._is_string_in_refs_file(ref_id, refs_file_path)
                 if not pid_found:
                     with open(refs_file_path, "a", encoding="utf8") as ref_file:
@@ -1403,7 +1403,7 @@ class FileHashStore(HashStore):
                         file_descriptor = ref_file.fileno()
                         fcntl.flock(file_descriptor, fcntl.LOCK_EX)
                         ref_file.write(ref_id + "\n")
-            if update_type is "remove":
+            if update_type == "remove":
                 with open(refs_file_path, "r+", encoding="utf8") as ref_file:
                     # Lock file immediately, this process needs to complete
                     # before any others read/modify the content of resf file

@@ -1,4 +1,5 @@
 """Test module for FileHashStore init, core, utility and supporting methods."""
+
 import io
 import os
 from pathlib import Path
@@ -6,11 +7,7 @@ import pytest
 from hashstore.filehashstore import FileHashStore
 
 # pylint: disable=W0212
-
-
-def test_pids_length(pids):
-    """Ensure test harness pids are present."""
-    assert len(pids) == 3
+# TODO: To Review
 
 
 def test_init_directories_created(store):

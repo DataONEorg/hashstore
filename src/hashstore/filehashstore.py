@@ -1204,14 +1204,14 @@ class FileHashStore(HashStore):
                     tmp_file_size,
                     file_size_to_validate,
                 )
-            except Exception as ge:
+            except ValueError as ve:
                 # If any exception is thrown during validation,
                 exception_string = (
                     "FileHashStore - _move_and_get_checksums: Object exists but cannot be verified"
-                    + f" (validation error): {abs_file_path}, deleting temporary file. Error: {ge}"
+                    + f" (validation error): {abs_file_path}, deleting temporary file. Error: {ve}"
                 )
                 logging.error(exception_string)
-                raise FileExistsError from ge
+                raise ValueError from ve
             finally:
                 # Delete the temporary file, it already exists so it is redundant
                 self._delete(entity, tmp_file_name)
@@ -1337,8 +1337,6 @@ class FileHashStore(HashStore):
             finally:
                 os.umask(oldmask)
         return tmp
-
-    # TODO: Clean up refs file methods, a lot of redundant code
 
     def _write_refs_file(self, path, ref_id, ref_type):
         """Write a reference file in the supplied path into a temporary file.

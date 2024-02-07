@@ -431,7 +431,7 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        with pytest.raises(FileExistsError):
+        with pytest.raises(ValueError):
             # pylint: disable=W0212
             store._move_and_get_checksums(
                 pid,

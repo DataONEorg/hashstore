@@ -570,13 +570,68 @@ class FileHashStore(HashStore):
 
             # Proceed to tagging process
             if os.path.exists(pid_ref_abs_path):
-                # A pid reference file can only contain one cid
-                exception_string = (
-                    "FileHashStore - write_pid_refs_file: pid ref file already exists for"
-                    + pid_ref_abs_path
+                # A pid reference file can only contain and reference one cid
+                # First, confirm that the expected cid refs file exists by getting the cid
+                with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                    pid_refs_cid = pid_ref_file.read()
+
+                if pid_refs_cid != cid:
+                    # If it's not equal to the given cid, determine if it's an orphan file
+                    expected_cid_refs_path = self._resolve_path("cid", pid_refs_cid)
+                    if os.path.exists(
+                        expected_cid_refs_path
+                    ) and self._is_string_in_refs_file(pid, expected_cid_refs_path):
+                        # Throw exception, this pid is accounted for
+                        exception_string = (
+                            "FileHashStore - tag_object: Pid refs file exists with valid pid"
+                            + f" and cid reference files for pid: {pid} with cid: {cid}."
+                        )
+                        logging.error(exception_string)
+                        raise FileExistsError(exception_string)
+                    # Now check the expected cid refs file
+                    cid_ref_exists = os.path.exists(cid_ref_abs_path)
+                    if cid_ref_exists and self._is_string_in_refs_file(
+                        pid, cid_ref_abs_path
+                    ):
+                        self._verify_hashstore_references(pid, cid, "update")
+                    else:
+                        # Pid is not found in the cid reference file
+                        if cid_ref_exists:
+                            self._update_refs_file(cid_ref_abs_path, pid, "add")
+                        else:
+                            # Overwrite existing pid refs file, it is an orphaned file
+                            print("****OVERWRITING EXISTING FILES****")
+                            self._tag_pid_cid_and_verify_refs_files(
+                                pid,
+                                cid,
+                                pid_ref_abs_path,
+                                cid_ref_abs_path,
+                                tmp_root_path,
+                            )
+                    logging.info(
+                        "FileHashStore - tag_object: Successfully tagged cid: %s with pid %s",
+                        cid,
+                        pid,
+                    )
+                    return True
+
+                # Check to see if the given cid's respective refs file exists
+                if os.path.exists(cid_ref_abs_path):
+                    if not self._is_string_in_refs_file(pid, cid_ref_abs_path):
+                        self._update_refs_file(cid_ref_abs_path, pid, "add")
+                else:
+                    # Create cid refs file
+                    cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
+                    self._create_path(os.path.dirname(cid_ref_abs_path))
+                    shutil.move(cid_tmp_file_path, cid_ref_abs_path)
+                # Ensure everything is where it needs to be
+                self._verify_hashstore_references(pid, cid, "update")
+                logging.info(
+                    "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
+                    cid,
+                    pid,
                 )
-                logging.error(exception_string)
-                raise FileExistsError(exception_string)
+                return True
             elif os.path.exists(cid_ref_abs_path):
                 # Create the pid refs file
                 pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
@@ -593,20 +648,9 @@ class FileHashStore(HashStore):
                 )
                 return True
             else:
-                # All ref files begin as tmp files and get moved sequentially at once
-                # Get tmp files with the expected cid and pid refs content
-                pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
-                cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
-                # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
-                self._create_path(os.path.dirname(pid_ref_abs_path))
-                self._create_path(os.path.dirname(cid_ref_abs_path))
-                # Move both files
-                shutil.move(pid_tmp_file_path, pid_ref_abs_path)
-                shutil.move(cid_tmp_file_path, cid_ref_abs_path)
-                # Ensure that the reference files have been written as expected
-                # If there is an issue, client or user will have to manually review
-                self._verify_hashstore_references(pid, cid, "create")
-
+                self._tag_pid_cid_and_verify_refs_files(
+                    pid, cid, pid_ref_abs_path, cid_ref_abs_path, tmp_root_path
+                )
                 logging.info(
                     "FileHashStore - tag_object: Successfully tagged cid: %s with pid %s",
                     cid,
@@ -1338,6 +1382,32 @@ class FileHashStore(HashStore):
             finally:
                 os.umask(oldmask)
         return tmp
+
+    def _tag_pid_cid_and_verify_refs_files(
+        self, pid, cid, pid_ref_abs_path, cid_ref_abs_path, tmp_root_path
+    ):
+        """Create temporary pid and cid reference files, move them into their expected
+        locations and verify the content.
+
+        :param str pid: Authority-based or persistent identifier
+        :param str cid: Content identifier
+        :param str pid_ref_abs_path: Permanent address to pid refs file
+        :param str pid_ref_abs_path: Permanent address to pid refs file
+        :param str tmp_root_path: Path to folder to create temporary ref files
+        """
+        # All ref files begin as tmp files and get moved sequentially at once
+        # Get tmp files with the expected cid and pid refs content
+        pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
+        cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
+        # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
+        self._create_path(os.path.dirname(pid_ref_abs_path))
+        self._create_path(os.path.dirname(cid_ref_abs_path))
+        # Move both files
+        shutil.move(pid_tmp_file_path, pid_ref_abs_path)
+        shutil.move(cid_tmp_file_path, cid_ref_abs_path)
+        # Ensure that the reference files have been written as expected
+        # If there is an issue, client or user will have to manually review
+        self._verify_hashstore_references(pid, cid, "create")
 
     def _write_refs_file(self, path, ref_id, ref_type):
         """Write a reference file in the supplied path into a temporary file.

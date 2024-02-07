@@ -7,8 +7,20 @@ import pytest
 # pylint: disable=W0212
 
 
+def test_tag_pid_cid_and_verify_refs_files(store):
+    """Check that refs files are moved to where they are expected to be."""
+    pid = "dou.test.pid"
+    cid = "dou.test.cid"
+    pid_refs_file_path = store._resolve_path("pid", pid)
+    cid_refs_file_path = store._resolve_path("cid", cid)
+    tmp_root_path = store._get_store_path("refs") / "tmp"
+    store._tag_pid_cid_and_verify_refs_files(
+        pid, cid, pid_refs_file_path, cid_refs_file_path, tmp_root_path
+    )
+
+
 def test_tag_object(pids, store):
-    """Test tag object returns true boolean when successful."""
+    """Test tag_object returns true boolean when successful."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -17,8 +29,8 @@ def test_tag_object(pids, store):
         assert object_tagged
 
 
-def test_tag_object_pid_refs_file(pids, store):
-    """Test tag object creates the expected pid reference file."""
+def test_tag_object_pid_refs_file_exists(pids, store):
+    """Test tag_object creates the expected pid reference file."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -28,8 +40,21 @@ def test_tag_object_pid_refs_file(pids, store):
         assert os.path.exists(pid_refs_file_path)
 
 
-def test_tag_object_pid_refs_file_exists(pids, store):
-    """Test tag object throws exception when pid refs file already exists."""
+def test_tag_object_cid_refs_file_exists(pids, store):
+    """Test tag_object creates the cid reference file."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(None, path)
+        cid = object_metadata.cid
+        store.tag_object(pid, object_metadata.cid)
+        cid_refs_file_path = store._resolve_path("cid", cid)
+        assert os.path.exists(cid_refs_file_path)
+
+
+def test_tag_object_refs_file_exists(pids, store):
+    """Test tag_object does not throws exception when pid refs file already exists
+    and verifies the content."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -40,12 +65,29 @@ def test_tag_object_pid_refs_file_exists(pids, store):
         assert os.path.exists(pid_refs_file_path)
         cid_refs_file_path = store._resolve_path("cid", cid)
         assert os.path.exists(cid_refs_file_path)
-        with pytest.raises(FileExistsError):
-            store.tag_object(pid, cid)
+        store.tag_object(pid, cid)
+
+
+def test_tag_object_refs_file_exists_cid_is_not_double_tagged(pids, store):
+    """Test tag_object succeeds when trying to tag a pid that already has a pid
+    refs file, and that a cid reference file that already contains cid."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(None, path)
+        store.tag_object(pid, object_metadata.cid)
+        store.tag_object(pid, object_metadata.cid)
+
+        cid_refs_file_path = store._resolve_path("cid", object_metadata.cid)
+        line_count = 0
+        with open(cid_refs_file_path, "r", encoding="utf8") as ref_file:
+            for _line in ref_file:
+                line_count += 1
+        assert line_count == 1
 
 
 def test_tag_object_pid_refs_file_content(pids, store):
-    """Test tag object created the pid reference file with the expected cid."""
+    """Test tag_object created the pid reference file with the expected cid."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -57,20 +99,8 @@ def test_tag_object_pid_refs_file_content(pids, store):
         assert pid_refs_cid == object_metadata.cid
 
 
-def test_tag_object_cid_refs_file(pids, store):
-    """Test tag object creates the cid reference file."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(None, path)
-        cid = object_metadata.cid
-        store.tag_object(pid, object_metadata.cid)
-        cid_refs_file_path = store._resolve_path("cid", cid)
-        assert os.path.exists(cid_refs_file_path)
-
-
 def test_tag_object_cid_refs_file_content(pids, store):
-    """Test tag object creates the cid reference file successfully with pid."""
+    """Test tag_object creates the cid reference file successfully with pid."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -82,24 +112,8 @@ def test_tag_object_cid_refs_file_content(pids, store):
         assert pid_refs_cid == pid
 
 
-def test_tag_object_cid_refs_file_exists(pids, store):
-    """Test tag object raises exception when trying to tag a pid that already
-    has a pid refs file, and that a cid reference file is not created."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(None, path)
-        store.tag_object(pid, object_metadata.cid)
-        another_cid = "dou.test.1"
-        with pytest.raises(FileExistsError):
-            store.tag_object(pid, another_cid)
-
-        second_cid_hash = store._resolve_path("cid", another_cid)
-        assert not os.path.exists(second_cid_hash)
-
-
 def test_tag_object_cid_refs_update_refs_file_updated(store):
-    """Test tag object updates a cid reference file that already exists."""
+    """Test tag_object updates a cid reference file that already exists."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid.replace("/", "_")
@@ -113,15 +127,18 @@ def test_tag_object_cid_refs_update_refs_file_updated(store):
     store.tag_object(additional_pid, cid)
 
     # Read cid file to confirm cid refs file contains the additional pid
+    line_count = 0
     cid_ref_abs_path = store._resolve_path("cid", cid)
     with open(cid_ref_abs_path, "r", encoding="utf8") as f:
         for _, line in enumerate(f, start=1):
             value = line.strip()
+            line_count += 1
             assert value == pid or value == additional_pid
+    assert line_count == 2
 
 
 def test_tag_object_cid_refs_update_pid_refs_created(store):
-    """Test tag object creates a pid reference file when called to tag an object
+    """Test tag_object creates a pid reference file when called to tag an object
     that already exists."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -140,15 +157,15 @@ def test_tag_object_cid_refs_update_pid_refs_created(store):
 
 
 def test_tag_object_cid_refs_update_pid_found_but_file_missing(store):
-    """Test that tag_object creates a missing pid refs file that somehow disappeared
+    """Test tag_object creates a missing pid refs file that somehow disappeared
     when called to tag a cid that already contains the pid."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid.replace("/", "_")
-    object_metadata = store.store_object(None, path)
-    store.tag_object(pid, object_metadata.cid)
+    object_metadata = store.store_object(pid, path)
     cid = object_metadata.cid
-    # Manually update the cid refs, pid refs file missing at this point
+    # Manually update the cid refs
+    # This means that the pid refs file missing at this point
     additional_pid = "dou.test.1"
     cid_ref_abs_path = store._resolve_path("cid", cid)
     store._update_refs_file(cid_ref_abs_path, additional_pid, "add")
@@ -162,6 +179,73 @@ def test_tag_object_cid_refs_update_pid_found_but_file_missing(store):
 
     # Confirm it has been created
     assert os.path.exists(pid_refs_file_path)
+
+
+def test_tag_object_pid_refs_found_but_cid_arg_is_different(store):
+    """Test that tag_object throws an exception when pid refs file exists, contains a
+    different cid, and is correctly referenced in the associated cid refs file"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid.replace("/", "_")
+    object_metadata = store.store_object(pid, path)
+    cid = object_metadata.cid
+
+    pid_ref_abs_path = store._resolve_path("pid", pid)
+    tmp_root_path = store._get_store_path("refs") / "tmp"
+    tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")
+    shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
+
+    # Attempt to tag the existing pid with valid refs file
+    with pytest.raises(FileExistsError):
+        store.tag_object(pid, "bad_cid_value")
+
+
+def test_tag_object_pid_refs_found_but_missing_pid_in_cid_refs_file(store):
+    """Test tag_object completes as expected when pid refs file exists but is missing
+    (not tagged) from expected cid refs file."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid.replace("/", "_")
+    object_metadata = store.store_object(pid, path)
+    cid = object_metadata.cid
+
+    # Remove the pid from the cid refs file
+    cid_ref_abs_path = store._resolve_path("cid", cid)
+    store._update_refs_file(cid_ref_abs_path, pid, "remove")
+    assert not store._is_string_in_refs_file(pid, cid_ref_abs_path)
+
+    # Tag object, this should add the missing pid to the cid refs file
+    store.tag_object(pid, cid)
+    assert store._is_string_in_refs_file(pid, cid_ref_abs_path)
+
+    # Confirm that there is only 1 of each expected file
+    assert store._count("objects") == 1
+    assert store._count("pid") == 1
+    assert store._count("cid") == 1
+
+
+def test_tag_object_pid_refs_found_but_cid_refs_file_not_found(store):
+    """Test tag_object completes when a pid refs file exists but the expected
+    cid refs file somehow disappeared."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid.replace("/", "_")
+    object_metadata = store.store_object(pid, path)
+    cid = object_metadata.cid
+
+    # Delete the cid refs file
+    cid_ref_abs_path = store._resolve_path("cid", cid)
+    os.remove(cid_ref_abs_path)
+    assert not os.path.exists(cid_ref_abs_path)
+
+    # Tag object, this should create the missing pid refs file
+    store.tag_object(pid, cid)
+    assert os.path.exists(cid_ref_abs_path)
+
+    # Confirm that there is only 1 of each expected file
+    assert store._count("objects") == 1
+    assert store._count("pid") == 1
+    assert store._count("cid") == 1
 
 
 def test_verify_object(pids, store):

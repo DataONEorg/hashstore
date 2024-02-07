@@ -890,7 +890,7 @@ def test_open_objects(pids, store):
         io_buffer.close()
 
 
-def test_delete_by_object_metadata_id(pids, store):
+def test_delete_with_object_metadata_id(pids, store):
     """Check objects are deleted after calling delete with object id."""
     test_dir = "tests/testdata/"
     entity = "objects"

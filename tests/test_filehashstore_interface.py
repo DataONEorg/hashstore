@@ -472,14 +472,8 @@ def test_store_object_duplicates_threads(pids, store):
     path = test_dir + pid
     entity = "objects"
 
-    file_exists_error_flag = False
-
     def store_object_wrapper(obj_pid, obj_path):
-        nonlocal file_exists_error_flag
-        try:
-            store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
-        except FileExistsError:
-            file_exists_error_flag = True
+        store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
 
     thread1 = Thread(target=store_object_wrapper, args=(pid, path))
     thread2 = Thread(target=store_object_wrapper, args=(pid, path))
@@ -493,7 +487,6 @@ def test_store_object_duplicates_threads(pids, store):
     # One thread will succeed, file count must still be 1
     assert store._count(entity) == 1
     assert store._exists(entity, pids[pid][store.algorithm])
-    assert file_exists_error_flag
 
 
 @slow_test

@@ -850,7 +850,7 @@ def main():
             raise ValueError("'-path' option is required")
         # Store metadata to HashStore
         metadata_cid = hashstore_c.hashstore.store_metadata(pid, path, formatid)
-        print(f"Metadata ID: {metadata_cid}")
+        print(f"Metadata Path: {metadata_cid}")
 
     elif getattr(args, "client_retrieveobject"):
         if pid is None:

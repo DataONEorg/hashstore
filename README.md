@@ -112,7 +112,9 @@ tag_object(pid, cid)
 - If desired, this cid can then be used to locate the object on disk by following HashStore's store configuration.
 
 **How do I delete an object if I have the pid?**
-- To delete an object, call the Public API method `delete_object` which will delete the object and its associated references and reference files where relevant.
+- To delete an object and all its associated reference files, call the Public API method `delete_object` with `id_type` 'pid'.
+- To delete only an object, call `delete_object` with `id_type` 'cid' which will remove the object if it it is not referenced by any pids.
+- To delete an object and all its related data (reference files and system metadata), call the Public API method `delete_object` with `id_type` 'clear'.
 - Note, `delete_object` and `tag_object` calls are synchronized on their content identifier values so that the shared reference files are not unintentionally modified concurrently. An object that is in the process of being deleted should not be tagged, and vice versa. These calls have been implemented to occur sequentially to improve clarity in the event of an unexpected conflict or issue.
 
 

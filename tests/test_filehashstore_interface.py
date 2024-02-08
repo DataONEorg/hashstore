@@ -1,4 +1,5 @@
 """Test module for FileHashStore HashStore interface methods."""
+
 import io
 import os
 from pathlib import Path
@@ -18,23 +19,8 @@ slow_test = pytest.mark.skipif(
 )
 
 
-def test_pids_length(pids):
-    """Ensure test harness pids are present."""
-    assert len(pids) == 3
-
-
-def test_store_address_length(pids, store):
-    """Test store object object_cid length is 64 characters."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        object_cid = object_metadata.cid
-        assert len(object_cid) == 64
-
-
-def test_store_object(pids, store):
-    """Test store object."""
+def test_store_object_refs_files_and_object(pids, store):
+    """Test store object stores objects and creates reference files."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -42,10 +28,25 @@ def test_store_object(pids, store):
         object_metadata = store.store_object(pid, path)
         assert object_metadata.cid == pids[pid][store.algorithm]
     assert store._count(entity) == 3
+    assert store._count("pid") == 3
+    assert store._count("cid") == 3
+
+
+def test_store_object_only_object(pids, store):
+    """Test store object stores an object only (no reference files will be created)"""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(data=path)
+        assert object_metadata.cid == pids[pid][store.algorithm]
+    assert store._count(entity) == 3
+    assert store._count("pid") == 0
+    assert store._count("cid") == 0
 
 
 def test_store_object_files_path(pids, store):
-    """Test store object when given a path."""
+    """Test store object when given a path object."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -56,7 +57,7 @@ def test_store_object_files_path(pids, store):
 
 
 def test_store_object_files_string(pids, store):
-    """Test store object when given a string."""
+    """Test store object when given a string object."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -67,7 +68,7 @@ def test_store_object_files_string(pids, store):
 
 
 def test_store_object_files_input_stream(pids, store):
-    """Test store object given an input stream."""
+    """Test store object when given a stream object."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -79,13 +80,22 @@ def test_store_object_files_input_stream(pids, store):
     assert store._count(entity) == 3
 
 
-def test_store_object_id(pids, store):
-    """Test store object returns expected id."""
+def test_store_object_cid(pids, store):
+    """Test store object returns expected content identifier."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
         assert object_metadata.cid == pids[pid][store.algorithm]
+
+
+def test_store_object_pid(pids, store):
+    """Test store object returns expected persistent identifier."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+        assert object_metadata.pid == pid
 
 
 def test_store_object_obj_size(pids, store):
@@ -134,7 +144,7 @@ def test_store_object_data_incorrect_type_none(store):
     pid = "jtao.1700.1"
     path = None
     with pytest.raises(TypeError):
-        store.store_object(pid, path)
+        store.store_object(pid, data=path)
 
 
 def test_store_object_data_incorrect_type_empty(store):
@@ -142,7 +152,7 @@ def test_store_object_data_incorrect_type_empty(store):
     pid = "jtao.1700.1"
     path = ""
     with pytest.raises(TypeError):
-        store.store_object(pid, path)
+        store.store_object(pid, data=path)
 
 
 def test_store_object_data_incorrect_type_empty_spaces(store):
@@ -150,7 +160,7 @@ def test_store_object_data_incorrect_type_empty_spaces(store):
     pid = "jtao.1700.1"
     path = "   "
     with pytest.raises(TypeError):
-        store.store_object(pid, path)
+        store.store_object(pid, data=path)
 
 
 def test_store_object_additional_algorithm_invalid(store):
@@ -164,7 +174,7 @@ def test_store_object_additional_algorithm_invalid(store):
 
 
 def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
-    """Test store object formats a given algorithm that's in uppercase."""
+    """Test store object formats an additional algorithm in uppercase."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -177,7 +187,7 @@ def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
 
 
 def test_store_object_additional_algorithm_hyphen_lowercase(pids, store):
-    """Test store object with additional algorithm in lowercase."""
+    """Test store object formats an with additional algorithm in lowercase."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -193,7 +203,7 @@ def test_store_object_additional_algorithm_hyphen_lowercase(pids, store):
 
 
 def test_store_object_additional_algorithm_underscore(pids, store):
-    """Test store object with additional algorithm with underscore."""
+    """Test store object with formats an additional algorithm with underscore."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -209,7 +219,7 @@ def test_store_object_additional_algorithm_underscore(pids, store):
 
 
 def test_store_object_checksum_correct(store):
-    """Test store object successfully stores with good checksum."""
+    """Test store object does not throw exception with good checksum."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -225,7 +235,7 @@ def test_store_object_checksum_correct(store):
 
 
 def test_store_object_checksum_correct_and_additional_algo(store):
-    """Test store object successfully stores with good checksum and same additional algorithm."""
+    """Test store object with good checksum and an additional algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -249,7 +259,7 @@ def test_store_object_checksum_correct_and_additional_algo(store):
 
 
 def test_store_object_checksum_correct_and_additional_algo_duplicate(store):
-    """Test store object successfully stores with good checksum and same additional algorithm."""
+    """Test store object does not throw exception with duplicate algorithms."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -281,7 +291,8 @@ def test_store_object_checksum_algorithm_empty(store):
 
 
 def test_store_object_checksum_empty(store):
-    """Test store object raises error when checksum_algorithm supplied with empty checksum."""
+    """Test store object raises error when checksum_algorithm supplied with
+    an empty checksum."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -293,8 +304,8 @@ def test_store_object_checksum_empty(store):
 
 
 def test_store_object_checksum_empty_spaces(store):
-    """Test store object raises error when checksum_algorithm supplied and checksum is empty
-    with spaces."""
+    """Test store object raises error when checksum_algorithm supplied and
+    checksum is empty with spaces."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -306,7 +317,8 @@ def test_store_object_checksum_empty_spaces(store):
 
 
 def test_store_object_checksum_algorithm_empty_spaces(store):
-    """Test store object raises error when checksum supplied with no checksum_algorithm."""
+    """Test store object raises error when checksum is supplied and with empty
+    spaces as the checksum_algorithm."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -320,7 +332,7 @@ def test_store_object_checksum_algorithm_empty_spaces(store):
 
 
 def test_store_object_checksum_incorrect_checksum(store):
-    """Test store object raises error when supplied with bad checksum."""
+    """Test store object raises error when supplied with incorrect checksum."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -349,8 +361,8 @@ def test_store_object_duplicate_does_not_store_duplicate(store):
     assert store._count(entity) == 1
 
 
-def test_store_object_duplicate_references_files(pids, store):
-    """Test that storing duplicate object but different pid creates the expected
+def test_store_object_duplicate_object_references_file_count(store):
+    """Test that storing a duplicate object but with different pids creates the expected
     amount of reference files."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -367,15 +379,9 @@ def test_store_object_duplicate_references_files(pids, store):
     assert store._count("pid") == 3
     # Confirm that there are 1 cid reference files
     assert store._count("cid") == 1
-    # Confirm the content of the cid refence files
-    cid_ref_abs_path = store._resolve_path("cid", pids[pid][store.algorithm])
-    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
-        for _, line in enumerate(f, start=1):
-            value = line.strip()
-            assert value == pid or value == pid_two or value == pid_three
 
 
-def test_store_object_duplicate_references_content(pids, store):
+def test_store_object_duplicate_object_references_file_content(pids, store):
     """Test that storing duplicate object but different pid creates the expected
     amount of reference files."""
     test_dir = "tests/testdata/"
@@ -395,13 +401,10 @@ def test_store_object_duplicate_references_content(pids, store):
         for _, line in enumerate(f, start=1):
             value = line.strip()
             assert value == pid or value == pid_two or value == pid_three
-    print(os.listdir(store.root + "/refs/pid/"))
-    assert len(os.listdir(store.root + "/refs/pid")) == 3
-    assert len(os.listdir(store.root + "/refs/cid")) == 1
 
 
 def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, store):
-    """Test store duplicate object throws FileExistsError when object exists
+    """Test store duplicate object throws ValueError when object exists
     but the data to validate against is incorrect."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
@@ -410,7 +413,7 @@ def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, stor
     # Store first blob
     _object_metadata_one = store.store_object(pid, path)
     # Store second blob
-    with pytest.raises(FileExistsError):
+    with pytest.raises(ValueError):
         _object_metadata_two = store.store_object(
             pid, path, checksum="nonmatchingchecksum", checksum_algorithm="sha256"
         )
@@ -419,7 +422,7 @@ def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, stor
 
 
 def test_store_object_with_obj_file_size(store, pids):
-    """Test store object with correct file sizes."""
+    """Test store object stores object with correct file sizes."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         obj_file_size = pids[pid]["file_size_bytes"]
@@ -432,7 +435,7 @@ def test_store_object_with_obj_file_size(store, pids):
 
 
 def test_store_object_with_obj_file_size_incorrect(store, pids):
-    """Test store object throws exception with incorrect file size."""
+    """Test store object throws exception with incorrect file sizes."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         obj_file_size = 1234
@@ -442,7 +445,8 @@ def test_store_object_with_obj_file_size_incorrect(store, pids):
 
 
 def test_store_object_with_obj_file_size_non_integer(store, pids):
-    """Test store object throws exception with a non integer value as the file size."""
+    """Test store object throws exception with a non integer value (ex. a stirng)
+    as the file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         obj_file_size = "Bob"
@@ -468,14 +472,8 @@ def test_store_object_duplicates_threads(pids, store):
     path = test_dir + pid
     entity = "objects"
 
-    file_exists_error_flag = False
-
     def store_object_wrapper(obj_pid, obj_path):
-        nonlocal file_exists_error_flag
-        try:
-            store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
-        except FileExistsError:
-            file_exists_error_flag = True
+        store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
 
     thread1 = Thread(target=store_object_wrapper, args=(pid, path))
     thread2 = Thread(target=store_object_wrapper, args=(pid, path))
@@ -489,7 +487,6 @@ def test_store_object_duplicates_threads(pids, store):
     # One thread will succeed, file count must still be 1
     assert store._count(entity) == 1
     assert store._exists(entity, pids[pid][store.algorithm])
-    assert file_exists_error_flag
 
 
 @slow_test
@@ -634,40 +631,70 @@ def test_find_object_pid_empty(store):
 def test_store_metadata(pids, store):
     """Test store metadata."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
-    for pid in pids.keys():
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
-        assert metadata_cid == pids[pid]["metadata_cid"]
-
-
-def test_store_metadata_default_format_id(pids, store):
-    """Test store metadata returns expected id when storing with default format_id."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, syspath)
-        assert metadata_cid == pids[pid]["metadata_cid"]
-
-
-def test_store_metadata_files_path(pids, store):
-    """Test store metadata with path."""
-    test_dir = "tests/testdata/"
     entity = "metadata"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         metadata_cid = store.store_metadata(pid, syspath, format_id)
-        assert store._exists(entity, metadata_cid)
-        assert metadata_cid == pids[pid]["metadata_cid"]
+        # Manually calculate expected path
+        metadata_directory = store._computehash(pid)
+        metadata_document_name = store._computehash(format_id)
+        rel_path = "/".join(store._shard(metadata_directory))
+        full_path = (
+            store._get_store_path("metadata") / rel_path / metadata_document_name
+        )
+        assert metadata_cid == full_path
     assert store._count(entity) == 3
 
 
+def test_store_metadata_one_pid_multiple_docs_correct_location(store):
+    """Test store metadata for a pid with multiple metadata documents."""
+    test_dir = "tests/testdata/"
+    entity = "metadata"
+    pid = "jtao.1700.1"
+    filename = pid.replace("/", "_") + ".xml"
+    syspath = Path(test_dir) / filename
+    metadata_directory = store._computehash(pid)
+    rel_path = "/".join(store._shard(metadata_directory))
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id3 = "http://ns.dataone.org/service/types/v3.0"
+    format_id4 = "http://ns.dataone.org/service/types/v4.0"
+    metadata_cid = store.store_metadata(pid, syspath, format_id)
+    metadata_cid3 = store.store_metadata(pid, syspath, format_id3)
+    metadata_cid4 = store.store_metadata(pid, syspath, format_id4)
+    metadata_document_name = store._computehash(format_id)
+    metadata_document_name3 = store._computehash(format_id3)
+    metadata_document_name4 = store._computehash(format_id4)
+    full_path = store._get_store_path("metadata") / rel_path / metadata_document_name
+    full_path3 = store._get_store_path("metadata") / rel_path / metadata_document_name3
+    full_path4 = store._get_store_path("metadata") / rel_path / metadata_document_name4
+    assert metadata_cid == full_path
+    assert metadata_cid3 == full_path3
+    assert metadata_cid4 == full_path4
+    assert store._count(entity) == 3
+
+
+def test_store_metadata_default_format_id(pids, store):
+    """Test store metadata returns expected id when storing with default format_id."""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        metadata_cid = store.store_metadata(pid, syspath)
+        # Manually calculate expected path
+        metadata_directory = store._computehash(pid)
+        metadata_document_name = store._computehash(format_id)
+        rel_path = "/".join(store._shard(metadata_directory))
+        full_path = (
+            store._get_store_path("metadata") / rel_path / metadata_document_name
+        )
+        assert metadata_cid == full_path
+
+
 def test_store_metadata_files_string(pids, store):
-    """Test store metadata with string."""
+    """Test store metadata with a string object to the metadata."""
     test_dir = "tests/testdata/"
     entity = "metadata"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -694,7 +721,7 @@ def test_store_metadata_files_input_stream(pids, store):
 
 
 def test_store_metadata_pid_empty(store):
-    """Test store metadata raises error with empty string."""
+    """Test store metadata raises error with an empty string as the pid."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = ""
@@ -705,7 +732,7 @@ def test_store_metadata_pid_empty(store):
 
 
 def test_store_metadata_pid_empty_spaces(store):
-    """Test store metadata raises error with empty spaces."""
+    """Test store metadata raises error with empty spaces as the pid."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "   "
@@ -716,7 +743,7 @@ def test_store_metadata_pid_empty_spaces(store):
 
 
 def test_store_metadata_pid_format_id_spaces(store):
-    """Test store metadata raises error with empty spaces."""
+    """Test store metadata raises error with empty spaces as the format_id."""
     test_dir = "tests/testdata/"
     format_id = "       "
     pid = "jtao.1700.1"
@@ -727,7 +754,7 @@ def test_store_metadata_pid_format_id_spaces(store):
 
 
 def test_store_metadata_metadata_empty(store):
-    """Test store metadata raises error with empty metadata string."""
+    """Test store metadata raises error with empty spaces as the metadata path."""
     pid = "jtao.1700.1"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     syspath_string = "   "
@@ -736,7 +763,7 @@ def test_store_metadata_metadata_empty(store):
 
 
 def test_store_metadata_metadata_none(store):
-    """Test store metadata raises error with empty None metadata."""
+    """Test store metadata raises error with empty None metadata path."""
     pid = "jtao.1700.1"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     syspath_string = None
@@ -744,8 +771,8 @@ def test_store_metadata_metadata_none(store):
         store.store_metadata(pid, syspath_string, format_id)
 
 
-def test_store_metadata_metadata_cid(pids, store):
-    """Test store metadata returns expected metadata_cid."""
+def test_store_metadata_metadata_path(pids, store):
+    """Test store metadata returns expected path to metadata document."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
@@ -754,7 +781,8 @@ def test_store_metadata_metadata_cid(pids, store):
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath, format_id)
-        assert metadata_cid == pids[pid]["metadata_cid"]
+        metadata_path = store._resolve_path("metadata", metadata_cid)
+        assert metadata_cid == metadata_path
 
 
 def test_store_metadata_thread_lock(store):
@@ -785,7 +813,7 @@ def test_store_metadata_thread_lock(store):
 
 
 def test_retrieve_object(pids, store):
-    """Test retrieve_object returns correct object data."""
+    """Test retrieve_object returns a stream to the correct object data."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
@@ -816,7 +844,7 @@ def test_retrieve_object_pid_invalid(store):
 
 
 def test_retrieve_metadata(store):
-    """Test retrieve_metadata returns correct metadata."""
+    """Test retrieve_metadata returns a stream to the correct metadata."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     pid = "jtao.1700.1"
@@ -833,7 +861,7 @@ def test_retrieve_metadata(store):
 
 
 def test_retrieve_metadata_default_format_id(store):
-    """Test retrieve_metadata retrieves expected metadata with default format_id."""
+    """Test retrieve_metadata retrieves expected metadata without a format_id."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -866,7 +894,7 @@ def test_retrieve_metadata_bytes_pid_empty(store):
 
 
 def test_retrieve_metadata_format_id_empty(store):
-    """Test retrieve_metadata raises error when supplied with empty format_id."""
+    """Test retrieve_metadata raises error when supplied with an empty format_id."""
     format_id = ""
     pid = "jtao.1700.1"
     with pytest.raises(ValueError):
@@ -874,17 +902,16 @@ def test_retrieve_metadata_format_id_empty(store):
 
 
 def test_retrieve_metadata_format_id_empty_spaces(store):
-    """Test retrieve_metadata raises error when supplied with empty spaces format_id."""
+    """Test retrieve_metadata raises error when supplied with empty spaces asthe format_id."""
     format_id = "    "
     pid = "jtao.1700.1"
     with pytest.raises(ValueError):
         store.retrieve_metadata(pid, format_id)
 
 
-def test_delete_object(pids, store):
-    """Test delete_object successfully deletes objects from /objects."""
+def test_delete_object_object_deleted(pids, store):
+    """Test delete_object successfully deletes object."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -893,10 +920,40 @@ def test_delete_object(pids, store):
         _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
-    assert store._count(entity) == 0
+    assert store._count("objects") == 0
 
 
-def test_delete_object_pid_refs_file(pids, store):
+def test_delete_object_metadata_deleted(pids, store):
+    """Test delete_object successfully deletes relevant metadata
+    files and refs files."""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _object_metadata = store.store_object(pid, path)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        store.delete_object(pid)
+    assert store._count("metadata") == 0
+
+
+def test_delete_object_refs_files_deleted(pids, store):
+    """Test delete_object successfully deletes refs files."""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _object_metadata = store.store_object(pid, path)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        store.delete_object(pid)
+    assert store._count("pid") == 0
+    assert store._count("cid") == 0
+
+
+def test_delete_object_pid_refs_file_deleted(pids, store):
     """Test delete_object deletes the associated pid refs file for the object."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -911,7 +968,7 @@ def test_delete_object_pid_refs_file(pids, store):
         assert not os.path.exists(pid_refs_file_path)
 
 
-def test_delete_object_cid_refs_file(pids, store):
+def test_delete_object_cid_refs_file_deleted(pids, store):
     """Test delete_object deletes the associated cid refs file for the object."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -928,7 +985,7 @@ def test_delete_object_cid_refs_file(pids, store):
 
 
 def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
-    """Test delete_object does not delete the cid refs file that still contains ref."""
+    """Test delete_object does not delete the cid refs file that still contains refs."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -936,10 +993,38 @@ def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
         cid = object_metadata.cid
         cid_refs_abs_path = store._resolve_path("cid", cid)
         # pylint: disable=W0212
-        store._update_cid_refs(cid_refs_abs_path, "dou.test.1")
+        store._update_refs_file(cid_refs_abs_path, "dou.test.1", "add")
         store.delete_object(pid)
         cid_refs_file_path = store._resolve_path("cid", cid)
         assert os.path.exists(cid_refs_file_path)
+
+
+def test_delete_object_idtype_cid(pids, store):
+    """Test delete_object successfully deletes only object."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid=None, data=path)
+        store.delete_object(object_metadata.cid, "cid")
+    assert store._count(entity) == 0
+
+
+def test_delete_object_idtype_cid_refs_file_exists(pids, store):
+    """Test delete_object does not delete object if a cid refs file still exists."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        object_metadata = store.store_object(pid, path)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        store.delete_object(object_metadata.cid, "cid")
+    assert store._count(entity) == 3
+    assert store._count("pid") == 3
+    assert store._count("cid") == 3
 
 
 def test_delete_object_pid_empty(store):
@@ -967,8 +1052,25 @@ def test_delete_metadata(pids, store):
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        is_deleted = store.delete_metadata(pid, format_id)
-        assert is_deleted
+        store.delete_metadata(pid, format_id)
+    assert store._count(entity) == 0
+
+
+def test_delete_metadata_one_pid_multiple_metadata_documents(store):
+    """Test delete_metadata for a pid with multiple metadata documents deletes
+    all metadata files as expected."""
+    test_dir = "tests/testdata/"
+    entity = "metadata"
+    pid = "jtao.1700.1"
+    filename = pid.replace("/", "_") + ".xml"
+    syspath = Path(test_dir) / filename
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id3 = "http://ns.dataone.org/service/types/v3.0"
+    format_id4 = "http://ns.dataone.org/service/types/v4.0"
+    _metadata_cid = store.store_metadata(pid, syspath, format_id)
+    _metadata_cid3 = store.store_metadata(pid, syspath, format_id3)
+    _metadata_cid4 = store.store_metadata(pid, syspath, format_id4)
+    store.delete_metadata(pid)
     assert store._count(entity) == 0
 
 
@@ -977,8 +1079,7 @@ def test_delete_metadata_does_not_exist(pids, store):
     metadata that does not exist."""
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
-        is_deleted = store.delete_metadata(pid, format_id)
-        assert is_deleted
+        store.delete_metadata(pid, format_id)
 
 
 def test_delete_metadata_default_format_id(store, pids):

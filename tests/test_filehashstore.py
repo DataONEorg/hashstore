@@ -1,4 +1,5 @@
 """Test module for FileHashStore init, core, utility and supporting methods."""
+
 import io
 import os
 from pathlib import Path
@@ -6,11 +7,7 @@ import pytest
 from hashstore.filehashstore import FileHashStore
 
 # pylint: disable=W0212
-
-
-def test_pids_length(pids):
-    """Ensure test harness pids are present."""
-    assert len(pids) == 3
+# TODO: To Review
 
 
 def test_init_directories_created(store):
@@ -431,7 +428,7 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        with pytest.raises(FileExistsError):
+        with pytest.raises(ValueError):
             # pylint: disable=W0212
             store._move_and_get_checksums(
                 pid,
@@ -650,7 +647,15 @@ def test_put_metadata_cid(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         metadata_cid = store._put_metadata(syspath, pid, format_id)
-        assert metadata_cid == pids[pid]["metadata_cid"]
+
+        # Manually calculate expected path
+        metadata_directory = store._computehash(pid)
+        metadata_document_name = store._computehash(format_id)
+        rel_path = "/".join(store._shard(metadata_directory))
+        full_path = (
+            store._get_store_path("metadata") / rel_path / metadata_document_name
+        )
+        assert metadata_cid == full_path
 
 
 def test_mktmpmetadata(pids, store):
@@ -817,7 +822,7 @@ def test_get_store_path_refs(store):
     assert path_metadata_string.endswith("/metacat/refs")
 
 
-def test_exists_with_object_metadata_id(pids, store):
+def test_exists_object_with_object_metadata_id(pids, store):
     """Test exists method with an absolute file path."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -827,7 +832,7 @@ def test_exists_with_object_metadata_id(pids, store):
         assert store._exists(entity, object_metadata.cid)
 
 
-def test_exists_with_sharded_path(pids, store):
+def test_exists_object_with_sharded_path(pids, store):
     """Test exists method with an absolute file path."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -839,7 +844,19 @@ def test_exists_with_sharded_path(pids, store):
         assert store._exists(entity, object_metadata_shard_path)
 
 
-def test_exists_with_nonexistent_file(store):
+def test_exists_metadata_files_path(pids, store):
+    """Test exists works as expected for metadata."""
+    test_dir = "tests/testdata/"
+    entity = "metadata"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        assert store._exists(entity, metadata_cid)
+
+
+def test_exists_object_with_nonexistent_file(store):
     """Test exists method with a nonexistent file."""
     entity = "objects"
     non_existent_file = "tests/testdata/filedoesnotexist"
@@ -873,7 +890,7 @@ def test_open_objects(pids, store):
         io_buffer.close()
 
 
-def test_delete_by_object_metadata_id(pids, store):
+def test_delete_with_object_metadata_id(pids, store):
     """Check objects are deleted after calling delete with object id."""
     test_dir = "tests/testdata/"
     entity = "objects"

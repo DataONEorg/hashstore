@@ -593,14 +593,20 @@ class FileHashStore(HashStore):
                     if cid_ref_exists and self._is_string_in_refs_file(
                         pid, cid_ref_abs_path
                     ):
-                        self._verify_hashstore_references(pid, cid, "update")
+                        self._verify_hashstore_references(
+                            pid, cid, "Pid and cid refs found, verify refs files."
+                        )
                     else:
                         # Pid is not found in the cid reference file
                         if cid_ref_exists:
                             self._update_refs_file(cid_ref_abs_path, pid, "add")
+                            self._verify_hashstore_references(
+                                pid,
+                                cid,
+                                "Orphan pid refs file found, updating cid refs file.",
+                            )
                         else:
                             # Overwrite existing pid refs file, it is an orphaned file
-                            print("****OVERWRITING EXISTING FILES****")
                             self._tag_pid_cid_and_verify_refs_files(
                                 pid,
                                 cid,
@@ -619,13 +625,20 @@ class FileHashStore(HashStore):
                 if os.path.exists(cid_ref_abs_path):
                     if not self._is_string_in_refs_file(pid, cid_ref_abs_path):
                         self._update_refs_file(cid_ref_abs_path, pid, "add")
+                        self._verify_hashstore_references(
+                            pid,
+                            cid,
+                            "Pid and cid refs file exists, update cid refs file.",
+                        )
                 else:
                     # Create cid refs file
                     cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
                     self._create_path(os.path.dirname(cid_ref_abs_path))
                     shutil.move(cid_tmp_file_path, cid_ref_abs_path)
-                # Ensure everything is where it needs to be
-                self._verify_hashstore_references(pid, cid, "update")
+                    # Ensure everything is where it needs to be
+                    self._verify_hashstore_references(
+                        pid, cid, "Pid refs file exists, create cid refs file."
+                    )
                 logging.info(
                     "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
                     cid,
@@ -640,7 +653,11 @@ class FileHashStore(HashStore):
                 # Update cid ref files as it already exists
                 if not self._is_string_in_refs_file(pid, cid_ref_abs_path):
                     self._update_refs_file(cid_ref_abs_path, pid, "add")
-                self._verify_hashstore_references(pid, cid, "update")
+                self._verify_hashstore_references(
+                    pid,
+                    cid,
+                    "Pid refs file doesn't exist, but cid refs exists.",
+                )
                 logging.info(
                     "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
                     cid,
@@ -850,10 +867,11 @@ class FileHashStore(HashStore):
             try:
                 cid = self.find_object(pid)
             except FileNotFoundError as fnfe:
-                if "pid refs file not found" in fnfe:
+                fnfe_string = str(fnfe)
+                if "pid refs file not found" in fnfe_string:
                     # Nothing to delete
                     return
-                if "cid refs file not found" in fnfe:
+                if "cid refs file not found" in fnfe_string:
                     # Delete pid refs file
                     objects_to_delete.append(
                         self._rename_path_for_deletion(self._resolve_path("pid", pid))
@@ -862,7 +880,7 @@ class FileHashStore(HashStore):
                     for obj in objects_to_delete:
                         os.remove(obj)
                     return
-                if "object referenced does not exist" in fnfe:
+                if "object referenced does not exist" in fnfe_string:
                     # Add pid refs file to be permanently deleted
                     pid_ref_abs_path = self._resolve_path("pid", pid)
                     objects_to_delete.append(
@@ -881,7 +899,8 @@ class FileHashStore(HashStore):
                         os.remove(obj)
                     return
             except ValueError as ve:
-                if "is missing from cid refs file" in ve:
+                ve_string = str(ve)
+                if "is missing from cid refs file" in ve_string:
                     # Add pid refs file to be permanently deleted
                     pid_ref_abs_path = self._resolve_path("pid", pid)
                     objects_to_delete.append(
@@ -1407,7 +1426,7 @@ class FileHashStore(HashStore):
         shutil.move(cid_tmp_file_path, cid_ref_abs_path)
         # Ensure that the reference files have been written as expected
         # If there is an issue, client or user will have to manually review
-        self._verify_hashstore_references(pid, cid, "create")
+        self._verify_hashstore_references(pid, cid, "Created all refs files")
 
     def _write_refs_file(self, path, ref_id, ref_type):
         """Write a reference file in the supplied path into a temporary file.
@@ -1674,13 +1693,13 @@ class FileHashStore(HashStore):
                         logging.error(exception_string)
                         raise ValueError(exception_string)
 
-    def _verify_hashstore_references(self, pid, cid, verify_type):
+    def _verify_hashstore_references(self, pid, cid, additional_log_string):
         """Verifies that the supplied pid and pid reference file and content have been
         written successfully.
 
         :param str pid: Authority-based or persistent identifier.
         :param str cid: Content identifier.
-        :param str verify_type: "update" or "create"
+        :param str additional_log_string: String to append to exception statement
         """
         # Check that reference files were created
         pid_ref_abs_path = self._resolve_path("pid", pid)
@@ -1689,7 +1708,7 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file missing: "
                 + pid_ref_abs_path
-                + f" . Verify type {verify_type}"
+                + f" . Additional Context: {additional_log_string}"
             )
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
@@ -1697,7 +1716,7 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file missing: "
                 + cid_ref_abs_path
-                + f" . Verify type {verify_type}"
+                + f" . Additional Context: {additional_log_string}"
             )
             logging.error(exception_string)
             raise FileNotFoundError(exception_string)
@@ -1709,7 +1728,7 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file exists"
                 + f" ({pid_ref_abs_path}) but cid ({cid}) does not match."
-                + f"Verify type {verify_type}"
+                + f" Additional Context: {additional_log_string}"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
@@ -1719,7 +1738,7 @@ class FileHashStore(HashStore):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file exists"
                 + f" ({cid_ref_abs_path}) but pid ({pid}) not found."
-                + f" Verify type {verify_type}"
+                + f" Additional Context:  {additional_log_string}"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)

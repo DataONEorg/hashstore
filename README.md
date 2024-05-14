@@ -1,6 +1,6 @@
 ## HashStore: hash-based object storage for DataONE data packages
 
-- **Author**: Matthew B. Jones, Dou Mok, Jing Tao, Matthew Brooke
+- **Author**: Dou Mok, Matthew Brooke, Jing Tao, Matthew B. Jones
 - **License**: [Apache 2](http://opensource.org/licenses/Apache-2.0)
 - [Package source code on GitHub](https://github.com/DataONEorg/hashstore)
 - [**Submit Bugs and feature requests**](https://github.com/DataONEorg/hashstore/issues)
@@ -113,8 +113,7 @@ tag_object(pid, cid)
 
 **How do I delete an object if I have the pid?**
 - To delete an object and all its associated reference files, call the Public API method `delete_object` with `id_type` 'pid'.
-- To delete only an object, call `delete_object` with `id_type` 'cid' which will remove the object if it it is not referenced by any pids.
-- To delete an object and all its related data (reference files and system metadata), call the Public API method `delete_object` with `id_type` 'clear'.
+- To delete only an object, call `delete_object` with `id_type` 'cid' which will remove the object if it is not referenced by any pids.
 - Note, `delete_object` and `tag_object` calls are synchronized on their content identifier values so that the shared reference files are not unintentionally modified concurrently. An object that is in the process of being deleted should not be tagged, and vice versa. These calls have been implemented to occur sequentially to improve clarity in the event of an unexpected conflict or issue.
 
 

@@ -7,7 +7,6 @@ import pytest
 from hashstore.filehashstore import FileHashStore
 
 # pylint: disable=W0212
-# TODO: To Review
 
 
 def test_init_directories_created(store):
@@ -154,7 +153,7 @@ def test_load_properties_hashstore_yaml_missing(store):
 
 
 def test_validate_properties(store):
-    """Confirm properties validated when all key/values are supplied."""
+    """Confirm no exceptions are thrown when all key/values are supplied."""
     properties = {
         "store_path": "/etc/test",
         "store_depth": 3,
@@ -180,7 +179,7 @@ def test_validate_properties_missing_key(store):
 
 
 def test_validate_properties_key_value_is_none(store):
-    """Confirm exception raised when value from key is 'None'."""
+    """Confirm exception raised when a value from a key is 'None'."""
     properties = {
         "store_path": "/etc/test",
         "store_depth": 3,
@@ -218,7 +217,7 @@ def test_set_default_algorithms_missing_yaml(store, pids):
 
 
 def test_store_and_validate_data_files_path(pids, store):
-    """Test _store_and_validate_data objects with path object for the path arg."""
+    """Test _store_and_validate_data with path object for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -229,7 +228,7 @@ def test_store_and_validate_data_files_path(pids, store):
 
 
 def test_store_and_validate_data_files_string(pids, store):
-    """Test _store_and_validate_data objects with string for the path arg."""
+    """Test _store_and_validate_data with string for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -240,7 +239,7 @@ def test_store_and_validate_data_files_string(pids, store):
 
 
 def test_store_and_validate_data_files_stream(pids, store):
-    """Test _store_and_validate_data objects with stream for the path arg."""
+    """Test _store_and_validate_data with stream for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -288,7 +287,8 @@ def test_store_and_validate_data_hex_digests(pids, store):
 
 
 def test_store_and_validate_data_additional_algorithm(pids, store):
-    """Check _store_and_validate_data returns additional algorithm in hex digests."""
+    """Check _store_and_validate_data returns additional algorithm in hex digests
+    when provided an additional algo value."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -364,7 +364,7 @@ def test_store_data_only_hex_digests(pids, store):
 
 
 def test_move_and_get_checksums_id(pids, store):
-    """Test move returns correct id."""
+    """Test _move_and_get_checksums returns correct id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -380,7 +380,7 @@ def test_move_and_get_checksums_id(pids, store):
 
 
 def test_move_and_get_checksums_file_size(pids, store):
-    """Test move returns correct file size."""
+    """Test _move_and_get_checksums returns correct file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -396,7 +396,7 @@ def test_move_and_get_checksums_file_size(pids, store):
 
 
 def test_move_and_get_checksums_hex_digests(pids, store):
-    """Test move returns correct hex digests."""
+    """Test _move_and_get_checksums returns correct hex digests."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -415,8 +415,8 @@ def test_move_and_get_checksums_hex_digests(pids, store):
         assert hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
-def test_move_and_get_checksums_duplicates_raises_error(pids, store):
-    """Test move does not store duplicate objects and raises error."""
+def test_move_and_get_checksums_does_not_store_duplicate(pids, store):
+    """Test _move_and_get_checksums does not store duplicate objects."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -425,6 +425,19 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
         # pylint: disable=W0212
         store._move_and_get_checksums(pid, input_stream)
         input_stream.close()
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        # pylint: disable=W0212
+        store._move_and_get_checksums(pid, input_stream)
+        input_stream.close()
+    assert store._count(entity) == 3
+
+
+def test_move_and_get_checksums_raises_error_with_nonmatching_checksum(pids, store):
+    """Test _move_and_get_checksums raises error when incorrect checksum supplied."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
@@ -437,7 +450,7 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
                 checksum_algorithm="sha256",
             )
             input_stream.close()
-    assert store._count(entity) == 3
+    assert store._count(entity) == 0
 
 
 def test_move_and_get_checksums_incorrect_file_size(pids, store):
@@ -480,7 +493,7 @@ def test_write_to_tmp_file_and_get_hex_digests_additional_algo(store):
 
 def test_write_to_tmp_file_and_get_hex_digests_checksum_algo(store):
     """Test _write...hex_digests returns correct hex digests when given a checksum_algorithm
-    is provided."""
+    and checksum."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -641,6 +654,7 @@ def test_put_metadata_with_string(pids, store):
 
 def test_put_metadata_cid(pids, store):
     """Test put metadata returns correct id."""
+    # TODO: Review after fixing put_metadata's permanent address (pid+format_id)
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
@@ -1031,6 +1045,7 @@ def test_get_real_path_with_object_id_sharded(pids, store):
 
 def test_get_real_path_with_metadata_id(store, pids):
     """Test get_real_path returns absolute path given a metadata id."""
+    # TODO: Review after fixing put_metadata's permanent address (pid+format_id)
     entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"

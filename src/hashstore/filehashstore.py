@@ -583,7 +583,7 @@ class FileHashStore(HashStore):
                 with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
                     pid_refs_cid = pid_ref_file.read()
 
-                if pid_refs_cid == cid:
+                if self._is_string_in_refs_file(cid, pid_ref_abs_path):
                     # The pid correctly references the given cid, but the cid refs file is missing
                     cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
                     self._create_path(os.path.dirname(cid_ref_abs_path))

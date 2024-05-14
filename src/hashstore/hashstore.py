@@ -1,4 +1,5 @@
 """Hashstore Interface"""
+
 from abc import ABC, abstractmethod
 from collections import namedtuple
 import importlib.metadata
@@ -25,12 +26,10 @@ class HashStore(ABC):
         checksum_algorithm,
         expected_object_size,
     ):
-        """Atomic storage of objects to disk using a given stream. The `store_object` method
-        ensures atomic storage of objects to disk. Upon successful storage, it returns an
-        `ObjectMetadata` object containing relevant file information, such as the file's id
-        (used to locate the object on disk), the file's size, and a hex digest dictionary of
-        algorithms and checksums. The method also tags the object, creating references for
-        discoverability.
+        """Atomic storage of objects to disk using a given stream. Upon successful storage,
+        it returns an `ObjectMetadata` object containing relevant file information, such as
+        the file's id, the file's size, and a hex digest dictionary of algorithms and checksums.
+        The method also tags the object, creating references for discoverability.
 
         `store_object` ensures that an object is stored only once by synchronizing multiple calls
         and rejecting attempts to store duplicate objects. If called without a pid, it stores the
@@ -67,9 +66,9 @@ class HashStore(ABC):
 
     @abstractmethod
     def tag_object(self, pid, cid):
-        """Creates references that allow objects stored in HashStore to be discoverable. Retrieving,
-        deleting or calculating a hex digest of an object is based on a pid argument; and to
-        proceed, we must be able to find the object associated with the pid.
+        """Creates references that allow objects stored in HashStore to be discoverable.
+        Retrieving, deleting or calculating a hex digest of an object is based on a pid
+        argument, to proceed, we must be able to find the object associated with the pid.
 
         :param str pid: Authority-based or persistent identifier of the object.
         :param str cid: Content identifier of the object.
@@ -112,8 +111,8 @@ class HashStore(ABC):
         `store_metadata` method uses a persistent identifier `pid` and a metadata `format_id`
         to determine the permanent address of the metadata object. All metadata documents for a
         given `pid` will be stored in a directory (under ../metadata) that is determined by
-        calculating the hash of the given pid, with the document name being the hash of the
-        metadata format (`format_id`).
+        calculating the hash of the given pid, with the document name being the hash of the pid
+        and metadata format (`pid` + `format_id`).
 
         Upon successful storage of metadata, the method returns a string representing the file's
         permanent address. Metadata objects are stored in parallel to objects in the
@@ -161,7 +160,7 @@ class HashStore(ABC):
         'cid', only the object will be deleted if it is not referenced by other pids.
 
         :param str ab_id: Authority-based identifier.
-        :param str id_type: "pid" or "Cid
+        :param str id_type: "pid" or "cid"
         """
         raise NotImplementedError()
 

@@ -2056,38 +2056,6 @@ class FileHashStore(HashStore):
         shutil.move(path, delete_path)
         return delete_path
 
-    def _remove_empty(self, subpath):
-        """Successively remove all empty folders starting with `subpath` and
-        proceeding "up" through directory tree until reaching the `root`
-        folder.
-
-        :param str subpath: Name of directory.
-        """
-        # Don't attempt to remove any folders if subpath is not a
-        # subdirectory of the root directory.
-        if not self._has_subdir(subpath):
-            return
-
-        while subpath != self.root:
-            if len(os.listdir(subpath)) > 0 or os.path.islink(subpath):
-                break
-            os.rmdir(subpath)
-            subpath = os.path.dirname(subpath)
-
-    def _has_subdir(self, path):
-        """Return whether `path` is a subdirectory of the `root` directory.
-
-        :param str path: Name of path.
-
-        :return: `True` if subdirectory.
-        :rtype: bool
-        """
-        # Append os.sep so that paths like /usr/var2/log doesn't match /usr/var.
-        root_path = os.path.realpath(self.root) + os.sep
-        subpath = os.path.realpath(path)
-        is_subdir = subpath.startswith(root_path)
-        return is_subdir
-
     def _create_path(self, path):
         """Physically create the folder path (and all intermediate ones) on disk.
 

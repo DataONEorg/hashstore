@@ -9,6 +9,8 @@ import threading
 import time
 import pytest
 
+from hashstore.filehashstore import PidRefsDoesNotExist
+
 # pylint: disable=W0212
 
 
@@ -612,7 +614,7 @@ def test_find_object_pid_refs_cid_not_found(pids, store):
 
 def test_find_object_pid_object_does_not_exist(store):
     """Test find object throws exception when object doesn't exist."""
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(PidRefsDoesNotExist):
         store.find_object("dou.test.1")
 
 
@@ -839,7 +841,7 @@ def test_retrieve_object_pid_invalid(store):
     """Test retrieve_object raises error when supplied with bad pid."""
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(PidRefsDoesNotExist):
         store.retrieve_object(pid_does_not_exist)
 
 
@@ -1142,7 +1144,7 @@ def test_get_hex_digest_pid_not_found(store):
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
     algorithm = "sha256"
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(PidRefsDoesNotExist):
         store.get_hex_digest(pid_does_not_exist, algorithm)
 
 

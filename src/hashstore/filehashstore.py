@@ -707,7 +707,7 @@ class FileHashStore(HashStore):
                 f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
                 + pid_ref_abs_path
             )
-            raise FileNotFoundError(err_msg)
+            raise PidRefsDoesNotExist(err_msg)
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
@@ -842,11 +842,17 @@ class FileHashStore(HashStore):
 
             try:
                 cid = self.find_object(pid)
+            except PidRefsDoesNotExist:
+                warn_msg = (
+                    "FileHashStore - delete_object: pid refs file does not exist for pid: "
+                    + ab_id
+                    + ". Skipping deletion request."
+                )
+                logging.warning(warn_msg)
+                # Nothing to delete
+                return
             except FileNotFoundError as fnfe:
                 fnfe_string = str(fnfe)
-                if "pid refs file not found" in fnfe_string:
-                    # Nothing to delete
-                    return
                 if "cid refs file not found" in fnfe_string:
                     # Delete pid refs file
                     objects_to_delete.append(
@@ -2248,3 +2254,11 @@ class Stream(object):
             self._obj.close()
         else:
             self._obj.seek(self._pos)
+
+
+class PidRefsDoesNotExist(Exception):
+    """Custom exception thrown when a pid refs file does not exist."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors

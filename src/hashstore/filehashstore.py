@@ -694,7 +694,7 @@ class FileHashStore(HashStore):
                         + f", but is missing from cid refs file: {cid_ref_abs_path}"
                     )
                     logging.error(err_msg)
-                    raise ValueError(err_msg)
+                    raise PidNotFoundInCidRefsFile(err_msg)
             else:
                 err_msg = (
                     f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
@@ -878,18 +878,16 @@ class FileHashStore(HashStore):
                 for obj in objects_to_delete:
                     os.remove(obj)
                 return
-            except ValueError as ve:
-                ve_string = str(ve)
-                if "is missing from cid refs file" in ve_string:
-                    # Add pid refs file to be permanently deleted
-                    pid_ref_abs_path = self._resolve_path("pid", pid)
-                    objects_to_delete.append(
-                        self._rename_path_for_deletion(pid_ref_abs_path)
-                    )
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
+            except PidNotFoundInCidRefsFile:
+                # Add pid refs file to be permanently deleted
+                pid_ref_abs_path = self._resolve_path("pid", pid)
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(pid_ref_abs_path)
+                )
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
 
             # Proceed with next steps - cid has been retrieved without any issues
             while cid in self.reference_locked_cids:
@@ -2273,6 +2271,15 @@ class CidRefsDoesNotExist(Exception):
 class RefsFileExistsButCidObjMissing(Exception):
     """Custom exception thrown when pid and cid refs file exists, but the
     cid object does not."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class PidNotFoundInCidRefsFile(Exception):
+    """Custom exception thrown when pid reference file exists with a cid, but
+    the respective cid reference file does not contain the pid."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)

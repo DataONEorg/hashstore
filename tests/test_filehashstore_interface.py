@@ -11,6 +11,7 @@ import pytest
 
 from hashstore.filehashstore import (
     CidRefsDoesNotExist,
+    PidNotFoundInCidRefsFile,
     PidRefsDoesNotExist,
     RefsFileExistsButCidObjMissing,
 )
@@ -628,6 +629,24 @@ def test_find_object_cid_refs_not_found(pids, store):
             pid_ref_file.truncate()
 
         with pytest.raises(CidRefsDoesNotExist):
+            store.find_object(pid)
+
+
+def test_find_object_cid_refs_does_not_contain_pid(pids, store):
+    """Test find_object throws exception when pid refs file is found with a cid
+    but the cid refs file does not contain the pid."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+
+        # Remove the pid from the cid refs file
+        cid_ref_abs_path = store._resolve_path(
+            "cid", object_metadata.hex_digests.get("sha256")
+        )
+        store._update_refs_file(cid_ref_abs_path, pid, "remove")
+
+        with pytest.raises(PidNotFoundInCidRefsFile):
             store.find_object(pid)
 
 

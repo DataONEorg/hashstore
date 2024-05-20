@@ -701,7 +701,7 @@ class FileHashStore(HashStore):
                     + f", but cid refs file not found: {cid_ref_abs_path}"
                 )
                 logging.error(err_msg)
-                raise FileNotFoundError(err_msg)
+                raise CidRefsDoesNotExist(err_msg)
         else:
             err_msg = (
                 f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
@@ -851,17 +851,17 @@ class FileHashStore(HashStore):
                 logging.warning(warn_msg)
                 # Nothing to delete
                 return
+            except CidRefsDoesNotExist:
+                # Delete pid refs file
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(self._resolve_path("pid", pid))
+                )
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
             except FileNotFoundError as fnfe:
                 fnfe_string = str(fnfe)
-                if "cid refs file not found" in fnfe_string:
-                    # Delete pid refs file
-                    objects_to_delete.append(
-                        self._rename_path_for_deletion(self._resolve_path("pid", pid))
-                    )
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
                 if "object referenced does not exist" in fnfe_string:
                     # Add pid refs file to be permanently deleted
                     pid_ref_abs_path = self._resolve_path("pid", pid)
@@ -2258,6 +2258,14 @@ class Stream(object):
 
 class PidRefsDoesNotExist(Exception):
     """Custom exception thrown when a pid refs file does not exist."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class CidRefsDoesNotExist(Exception):
+    """Custom exception thrown when a cid refs file does not exist."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)

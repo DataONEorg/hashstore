@@ -9,7 +9,7 @@ import threading
 import time
 import pytest
 
-from hashstore.filehashstore import PidRefsDoesNotExist
+from hashstore.filehashstore import CidRefsDoesNotExist, PidRefsDoesNotExist
 
 # pylint: disable=W0212
 
@@ -608,7 +608,7 @@ def test_find_object_pid_refs_cid_not_found(pids, store):
             pid_ref_file.write("intentionally.wrong.pid")
             pid_ref_file.truncate()
 
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(CidRefsDoesNotExist):
             store.find_object(pid)
 
 

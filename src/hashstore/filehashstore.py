@@ -683,7 +683,7 @@ class FileHashStore(HashStore):
                             + pid_ref_abs_path
                             + f", but object referenced does not exist, cid: {pid_refs_cid}"
                         )
-                        raise FileNotFoundError(err_msg)
+                        raise RefsFileExistsButCidObjMissing(err_msg)
                     else:
                         return pid_refs_cid
                 else:
@@ -860,26 +860,24 @@ class FileHashStore(HashStore):
                 for obj in objects_to_delete:
                     os.remove(obj)
                 return
-            except FileNotFoundError as fnfe:
-                fnfe_string = str(fnfe)
-                if "object referenced does not exist" in fnfe_string:
-                    # Add pid refs file to be permanently deleted
-                    pid_ref_abs_path = self._resolve_path("pid", pid)
-                    objects_to_delete.append(
-                        self._rename_path_for_deletion(pid_ref_abs_path)
-                    )
-                    # Remove pid from cid refs file
-                    with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
-                        # Retrieve the cid
-                        pid_refs_cid = pid_ref_file.read()
-                    cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
-                    # Remove if the pid refs is found
-                    if self._is_string_in_refs_file(pid, cid_ref_abs_path):
-                        self._update_refs_file(cid_ref_abs_path, pid, "remove")
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
+            except RefsFileExistsButCidObjMissing:
+                # Add pid refs file to be permanently deleted
+                pid_ref_abs_path = self._resolve_path("pid", pid)
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(pid_ref_abs_path)
+                )
+                # Remove pid from cid refs file
+                with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                    # Retrieve the cid
+                    pid_refs_cid = pid_ref_file.read()
+                cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
+                # Remove if the pid refs is found
+                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
+                    self._update_refs_file(cid_ref_abs_path, pid, "remove")
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
             except ValueError as ve:
                 ve_string = str(ve)
                 if "is missing from cid refs file" in ve_string:
@@ -2266,6 +2264,15 @@ class PidRefsDoesNotExist(Exception):
 
 class CidRefsDoesNotExist(Exception):
     """Custom exception thrown when a cid refs file does not exist."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class RefsFileExistsButCidObjMissing(Exception):
+    """Custom exception thrown when pid and cid refs file exists, but the
+    cid object does not."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)

@@ -9,7 +9,11 @@ import threading
 import time
 import pytest
 
-from hashstore.filehashstore import CidRefsDoesNotExist, PidRefsDoesNotExist
+from hashstore.filehashstore import (
+    CidRefsDoesNotExist,
+    PidRefsDoesNotExist,
+    RefsFileExistsButCidObjMissing,
+)
 
 # pylint: disable=W0212
 
@@ -593,7 +597,22 @@ def test_find_object(pids, store):
         assert cid == object_metadata.hex_digests.get("sha256")
 
 
-def test_find_object_pid_refs_cid_not_found(pids, store):
+def test_find_object_refs_exist_but_obj_not_found(pids, store):
+    """Test find_object throws exception when refs file exist but the object does not."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        store.store_object(pid, path)
+
+        cid = store.find_object(pid)
+        obj_path = store._resolve_path("objects", cid)
+        os.remove(obj_path)
+
+        with pytest.raises(RefsFileExistsButCidObjMissing):
+            store.find_object(pid)
+
+
+def test_find_object_cid_refs_not_found(pids, store):
     """Test find_object throws exception when pid refs file is found with a cid
     but the cid does not exist."""
     test_dir = "tests/testdata/"
@@ -612,7 +631,7 @@ def test_find_object_pid_refs_cid_not_found(pids, store):
             store.find_object(pid)
 
 
-def test_find_object_pid_object_does_not_exist(store):
+def test_find_object_pid_refs_not_found(store):
     """Test find object throws exception when object doesn't exist."""
     with pytest.raises(PidRefsDoesNotExist):
         store.find_object("dou.test.1")

@@ -2100,24 +2100,27 @@ class FileHashStore(HashStore):
         :return: Path to file
         :rtype: str
         """
-        # Check for absolute path.
-        if os.path.isfile(file):
-            return file
-
         # Check for relative path.
-        rel_root = ""
         if entity == "objects":
             rel_root = self.objects
-        if entity == "metadata":
+            relpath = os.path.join(rel_root, file)
+            if os.path.isfile(relpath):
+                return relpath
+            else:
+                abspath = self._build_path(entity, file)
+                if os.path.isfile(abspath):
+                    return abspath
+        elif entity == "metadata":
             # TODO: The resolve_path method is not consistent in its usage regarding metadata
             # Review and refactor when time permitting.
+            if os.path.isfile(file):
+                return file
             rel_root = self.metadata
-        relpath = os.path.join(rel_root, file)
-        if os.path.isfile(relpath):
-            return relpath
-
+            relpath = os.path.join(rel_root, file)
+            if os.path.isfile(relpath):
+                return relpath
         # Check for sharded path.
-        if entity == "cid":
+        elif entity == "cid":
             # Note, we skip checking whether the file exists for refs
             cid_ref_file_abs_path = self._build_path(entity, file)
             return cid_ref_file_abs_path
@@ -2127,9 +2130,11 @@ class FileHashStore(HashStore):
             pid_ref_file_abs_path = self._build_path(entity, hash_id)
             return pid_ref_file_abs_path
         else:
-            abspath = self._build_path(entity, file)
-            if os.path.isfile(abspath):
-                return abspath
+            exception_string = (
+                "FileHashStore - _resolve_path: entity must be"
+                + " 'object', 'metadata', 'cid' or 'pid"
+            )
+            raise ValueError(exception_string)
 
     def _get_store_path(self, entity):
         """Return a path object of the root directory of the store.

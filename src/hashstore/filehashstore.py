@@ -2109,6 +2109,8 @@ class FileHashStore(HashStore):
         if entity == "objects":
             rel_root = self.objects
         if entity == "metadata":
+            # TODO: The resolve_path method is not consistent in its usage regarding metadata
+            # Review and refactor when time permitting.
             rel_root = self.metadata
         relpath = os.path.join(rel_root, file)
         if os.path.isfile(relpath):

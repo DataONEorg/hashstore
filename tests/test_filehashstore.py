@@ -1009,3 +1009,69 @@ def test_cast_to_bytes(store):
     # pylint: disable=W0212
     string_bytes = store._cast_to_bytes(string)
     assert isinstance(string_bytes, bytes)
+
+
+def test_resolve_path_objects(pids, store):
+    """Confirm resolve path returns correct object path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        obj_resolved_path = store._resolve_path("objects", cid)
+        calculated_obj_path = store.objects + "/" + "/".join(store._shard(cid))
+
+        assert calculated_obj_path == obj_resolved_path
+
+
+def test_resolve_path_metadata(pids, store):
+    """Confirm resolve path returns correct metadata path."""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+
+        metadata_directory = store._computehash(pid)
+        metadata_document_name = store._computehash(pid + format_id)
+        rel_path = "/".join(store._shard(metadata_directory))
+        full_path_without_dir = rel_path + "/" + metadata_document_name
+
+        metadata_resolved_path = store._resolve_path("metadata", full_path_without_dir)
+        calculated_metadata_path = (
+            store.metadata + "/" + rel_path + "/" + metadata_document_name
+        )
+
+        assert calculated_metadata_path == metadata_resolved_path
+
+
+def test_resolve_path_refs_pid(pids, store):
+    """Confirm resolve path returns correct object pid refs path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        _object_metadata = store.store_object(pid, path)
+
+        resolved_pid_ref_abs_path = store._resolve_path("pid", pid)
+        pid_refs_metadata_hashid = store._computehash(pid)
+        calculated_pid_ref_path = (
+            store.refs + "/pid/" + "/".join(store._shard(pid_refs_metadata_hashid))
+        )
+
+        assert resolved_pid_ref_abs_path == calculated_pid_ref_path
+
+
+def test_resolve_path_refs_cid(pids, store):
+    """Confirm resolve path returns correct object pid refs path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        resolved_cid_ref_abs_path = store._resolve_path("cid", cid)
+        calculated_cid_ref_path = store.refs + "/cid/" + "/".join(store._shard(cid))
+
+        assert resolved_cid_ref_abs_path == calculated_cid_ref_path

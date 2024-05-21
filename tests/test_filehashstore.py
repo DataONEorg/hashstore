@@ -18,8 +18,8 @@ def test_init_directories_created(store):
     assert os.path.exists(store.metadata + "/tmp")
     assert os.path.exists(store.refs)
     assert os.path.exists(store.refs + "/tmp")
-    assert os.path.exists(store.refs + "/pid")
-    assert os.path.exists(store.refs + "/cid")
+    assert os.path.exists(store.refs + "/pids")
+    assert os.path.exists(store.refs + "/cids")
 
 
 def test_init_existing_store_incorrect_algorithm_format(store):

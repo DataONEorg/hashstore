@@ -1689,7 +1689,7 @@ class FileHashStore(HashStore):
         if file_size_to_validate is not None and file_size_to_validate > 0:
             if file_size_to_validate != tmp_file_size:
                 exception_string = (
-                    "FileHashStore - _validate_arg_object: Object file size calculated: "
+                    "FileHashStore - _verify_object_information: Object file size calculated: "
                     + f" {tmp_file_size} does not match with expected size:"
                     + f" {file_size_to_validate}."
                 )
@@ -1707,7 +1707,7 @@ class FileHashStore(HashStore):
         if checksum_algorithm is not None and checksum is not None:
             if checksum_algorithm not in hex_digests:
                 exception_string = (
-                    "FileHashStore - _validate_arg_object: checksum_algorithm"
+                    "FileHashStore - _verify_object_information: checksum_algorithm"
                     + f" ({checksum_algorithm}) cannot be found in the hex digests dictionary."
                 )
                 logging.error(exception_string)
@@ -1716,7 +1716,7 @@ class FileHashStore(HashStore):
                 hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum.lower():
                     exception_string = (
-                        "FileHashStore - _validate_arg_object: Hex digest and checksum"
+                        "FileHashStore - _verify_object_information: Hex digest and checksum"
                         + f" do not match - file not stored for pid: {pid}. Algorithm:"
                         + f" {checksum_algorithm}. Checksum provided: {checksum} !="
                         + f" HexDigest: {hex_digest_stored}."

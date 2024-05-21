@@ -798,22 +798,21 @@ class FileHashStore(HashStore):
         else:
             metadata_document_name = self._computehash(pid + checked_format_id)
         rel_path = "/".join(self._shard(metadata_directory))
-        full_path_without_directory = rel_path + "/" + metadata_document_name
-        metadata_exists = self._exists(entity, full_path_without_directory)
+        metadata_rel_path = rel_path + "/" + metadata_document_name
+        metadata_exists = self._exists(entity, metadata_rel_path)
 
         if metadata_exists:
-            metadata_stream = self._open(entity, full_path_without_directory)
+            metadata_stream = self._open(entity, metadata_rel_path)
+            logging.info(
+                "FileHashStore - retrieve_metadata: Retrieved metadata for pid: %s", pid
+            )
+            return metadata_stream
         else:
             exception_string = (
                 f"FileHashStore - retrieve_metadata: No metadata found for pid: {pid}"
             )
             logging.error(exception_string)
             raise ValueError(exception_string)
-
-        logging.info(
-            "FileHashStore - retrieve_metadata: Retrieved metadata for pid: %s", pid
-        )
-        return metadata_stream
 
     def delete_object(self, ab_id, id_type=None):
         logging.debug(
@@ -2111,8 +2110,6 @@ class FileHashStore(HashStore):
                 if os.path.isfile(abspath):
                     return abspath
         elif entity == "metadata":
-            # TODO: The resolve_path method is not consistent in its usage regarding metadata
-            # Review and refactor when time permitting.
             if os.path.isfile(file):
                 return file
             rel_root = self.metadata
@@ -2132,7 +2129,7 @@ class FileHashStore(HashStore):
         else:
             exception_string = (
                 "FileHashStore - _resolve_path: entity must be"
-                + " 'object', 'metadata', 'cid' or 'pid"
+                + " 'objects', 'metadata', 'cid' or 'pid"
             )
             raise ValueError(exception_string)
 

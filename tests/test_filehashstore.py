@@ -654,7 +654,6 @@ def test_put_metadata_with_string(pids, store):
 
 def test_put_metadata_cid(pids, store):
     """Test put metadata returns correct id."""
-    # TODO: Review after fixing put_metadata's permanent address (pid+format_id)
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
@@ -960,7 +959,6 @@ def test_get_real_path_with_object_id_sharded(pids, store):
 
 def test_get_real_path_with_metadata_id(store, pids):
     """Test get_real_path returns absolute path given a metadata id."""
-    # TODO: Review after fixing put_metadata's permanent address (pid+format_id)
     entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"

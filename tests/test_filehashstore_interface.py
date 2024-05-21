@@ -679,7 +679,7 @@ def test_store_metadata(pids, store):
         metadata_cid = store.store_metadata(pid, syspath, format_id)
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
-        metadata_document_name = store._computehash(format_id)
+        metadata_document_name = store._computehash(pid + format_id)
         rel_path = "/".join(store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
@@ -703,9 +703,9 @@ def test_store_metadata_one_pid_multiple_docs_correct_location(store):
     metadata_cid = store.store_metadata(pid, syspath, format_id)
     metadata_cid3 = store.store_metadata(pid, syspath, format_id3)
     metadata_cid4 = store.store_metadata(pid, syspath, format_id4)
-    metadata_document_name = store._computehash(format_id)
-    metadata_document_name3 = store._computehash(format_id3)
-    metadata_document_name4 = store._computehash(format_id4)
+    metadata_document_name = store._computehash(pid + format_id)
+    metadata_document_name3 = store._computehash(pid + format_id3)
+    metadata_document_name4 = store._computehash(pid + format_id4)
     full_path = store._get_store_path("metadata") / rel_path / metadata_document_name
     full_path3 = store._get_store_path("metadata") / rel_path / metadata_document_name3
     full_path4 = store._get_store_path("metadata") / rel_path / metadata_document_name4
@@ -725,7 +725,7 @@ def test_store_metadata_default_format_id(pids, store):
         metadata_cid = store.store_metadata(pid, syspath)
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
-        metadata_document_name = store._computehash(format_id)
+        metadata_document_name = store._computehash(pid + format_id)
         rel_path = "/".join(store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name

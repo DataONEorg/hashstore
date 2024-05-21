@@ -794,9 +794,9 @@ class FileHashStore(HashStore):
         entity = "metadata"
         metadata_directory = self._computehash(pid)
         if format_id is None:
-            metadata_document_name = self._computehash(self.sysmeta_ns)
+            metadata_document_name = self._computehash(pid + self.sysmeta_ns)
         else:
-            metadata_document_name = self._computehash(checked_format_id)
+            metadata_document_name = self._computehash(pid + checked_format_id)
         rel_path = "/".join(self._shard(metadata_directory))
         full_path_without_directory = rel_path + "/" + metadata_document_name
         metadata_exists = self._exists(entity, full_path_without_directory)
@@ -1065,7 +1065,7 @@ class FileHashStore(HashStore):
             return
         else:
             # Delete a specific metadata file
-            metadata_document_name = self._computehash(checked_format_id)
+            metadata_document_name = self._computehash(pid + checked_format_id)
             full_path_without_directory = rel_path + "/" + metadata_document_name
             metadata_exists = self._exists(entity, full_path_without_directory)
             if metadata_exists:
@@ -1598,7 +1598,7 @@ class FileHashStore(HashStore):
 
         # Get target and related paths (permanent location)
         metadata_directory = self._computehash(pid)
-        metadata_document_name = self._computehash(format_id)
+        metadata_document_name = self._computehash(pid + format_id)
         rel_path = "/".join(self._shard(metadata_directory))
         full_path = self._get_store_path("metadata") / rel_path / metadata_document_name
 

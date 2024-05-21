@@ -664,7 +664,7 @@ def test_put_metadata_cid(pids, store):
 
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
-        metadata_document_name = store._computehash(format_id)
+        metadata_document_name = store._computehash(pid + format_id)
         rel_path = "/".join(store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name

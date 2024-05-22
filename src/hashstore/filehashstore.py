@@ -477,7 +477,7 @@ class FileHashStore(HashStore):
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,
                 )
-            except ObjectMetadataError as ome:
+            except PidObjectMetadataError as ome:
                 # Note, using '.__cause__' allows the original exception msg to be displayed
                 exception_string = (
                     f"FileHashStore - store_object: failed to store object for pid: {pid}."

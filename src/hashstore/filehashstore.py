@@ -1701,10 +1701,10 @@ class FileHashStore(HashStore):
                         exception_string
                         + f" Tmp file deleted and file not stored for pid: {pid}"
                     )
-                    logging.error(exception_string_for_pid)
+                    logging.warning(exception_string_for_pid)
                     raise ValueError(exception_string_for_pid)
                 else:
-                    logging.error(exception_string)
+                    logging.warning(exception_string)
                     raise ValueError(exception_string)
         if checksum_algorithm is not None and checksum is not None:
             if checksum_algorithm not in hex_digests:
@@ -1712,7 +1712,7 @@ class FileHashStore(HashStore):
                     "FileHashStore - _verify_object_information: checksum_algorithm"
                     + f" ({checksum_algorithm}) cannot be found in the hex digests dictionary."
                 )
-                logging.error(exception_string)
+                logging.warning(exception_string)
                 raise KeyError(exception_string)
             else:
                 hex_digest_stored = hex_digests[checksum_algorithm]
@@ -1729,14 +1729,14 @@ class FileHashStore(HashStore):
                         exception_string_for_pid = (
                             exception_string + f" Tmp file ({tmp_file_name}) deleted."
                         )
-                        logging.error(exception_string_for_pid)
+                        logging.warning(exception_string_for_pid)
                         raise ValueError(exception_string_for_pid)
                     else:
                         # Delete the object
                         cid = hex_digests[self.algorithm]
                         cid_abs_path = self._resolve_path("cid", cid)
                         self._delete(entity, cid_abs_path)
-                        logging.error(exception_string)
+                        logging.warning(exception_string)
                         raise ValueError(exception_string)
 
     def _verify_hashstore_references(self, pid, cid, additional_log_string):

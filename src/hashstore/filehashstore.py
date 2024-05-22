@@ -477,10 +477,18 @@ class FileHashStore(HashStore):
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,
                 )
+            except ObjectMetadataError as ome:
+                # Note, using '.__cause__' allows the original exception msg to be displayed
+                exception_string = (
+                    f"FileHashStore - store_object: failed to store object for pid: {pid}."
+                    + f" Reference files will not be created or tagged. {ome.__cause__}"
+                )
+                logging.error(exception_string)
+                raise ome
             except Exception as err:
                 exception_string = (
                     f"FileHashStore - store_object: failed to store object for pid: {pid}."
-                    + f" Unexpected {err=}, {type(err)=}"
+                    + f" Unexpected error: {err.__cause__}"
                 )
                 logging.error(exception_string)
                 raise err
@@ -1343,11 +1351,11 @@ class FileHashStore(HashStore):
             except ValueError as ve:
                 # If any exception is thrown during validation,
                 exception_string = (
-                    "FileHashStore - _move_and_get_checksums: Object exists but cannot be verified"
-                    + f" (validation error): {abs_file_path}, deleting temporary file. Error: {ve}"
+                    f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
+                    + " , deleting temp file. Ref files will not be created/tagged."
                 )
-                logging.error(exception_string)
-                raise ValueError from ve
+                logging.warning(exception_string)
+                raise PidObjectMetadataError(exception_string) from ve
             finally:
                 # Delete the temporary file, it already exists so it is redundant
                 self._delete(entity, tmp_file_name)
@@ -1701,10 +1709,10 @@ class FileHashStore(HashStore):
                         exception_string
                         + f" Tmp file deleted and file not stored for pid: {pid}"
                     )
-                    logging.warning(exception_string_for_pid)
+                    logging.debug(exception_string_for_pid)
                     raise ValueError(exception_string_for_pid)
                 else:
-                    logging.warning(exception_string)
+                    logging.debug(exception_string)
                     raise ValueError(exception_string)
         if checksum_algorithm is not None and checksum is not None:
             if checksum_algorithm not in hex_digests:
@@ -1712,7 +1720,7 @@ class FileHashStore(HashStore):
                     "FileHashStore - _verify_object_information: checksum_algorithm"
                     + f" ({checksum_algorithm}) cannot be found in the hex digests dictionary."
                 )
-                logging.warning(exception_string)
+                logging.debug(exception_string)
                 raise KeyError(exception_string)
             else:
                 hex_digest_stored = hex_digests[checksum_algorithm]
@@ -1729,14 +1737,14 @@ class FileHashStore(HashStore):
                         exception_string_for_pid = (
                             exception_string + f" Tmp file ({tmp_file_name}) deleted."
                         )
-                        logging.warning(exception_string_for_pid)
+                        logging.debug(exception_string_for_pid)
                         raise ValueError(exception_string_for_pid)
                     else:
                         # Delete the object
                         cid = hex_digests[self.algorithm]
                         cid_abs_path = self._resolve_path("cid", cid)
                         self._delete(entity, cid_abs_path)
-                        logging.warning(exception_string)
+                        logging.debug(exception_string)
                         raise ValueError(exception_string)
 
     def _verify_hashstore_references(self, pid, cid, additional_log_string):
@@ -2317,6 +2325,15 @@ class Stream(object):
             self._obj.close()
         else:
             self._obj.seek(self._pos)
+
+
+class PidObjectMetadataError(Exception):
+    """Custom exception thrown when an object cannot be verified due
+    to an error with the metadata provided to validate against."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
 
 
 class PidRefsDoesNotExist(Exception):

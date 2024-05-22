@@ -478,11 +478,10 @@ class FileHashStore(HashStore):
                     pid,
                 )
             except PidObjectMetadataError as ome:
-                # Note, using '.__cause__' allows the original exception msg to be displayed
                 exception_string = (
                     f"FileHashStore - store_object: failed to store object for pid: {pid}."
-                    + " Reference files will not be created or tagged. PidObjectMetadataError:"
-                    + ome.__cause__
+                    + " Reference files will not be created or tagged. PidObjectMetadataError: "
+                    + str(ome)
                 )
                 logging.error(exception_string)
                 raise ome
@@ -490,7 +489,7 @@ class FileHashStore(HashStore):
                 exception_string = (
                     f"FileHashStore - store_object: failed to store object for pid: {pid}."
                     + " Reference files will not be created or tagged. Unexpected error: "
-                    + err.__cause__
+                    + str(err)
                 )
                 logging.error(exception_string)
                 raise err
@@ -1361,9 +1360,9 @@ class FileHashStore(HashStore):
                 exception_string = (
                     f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
                     + " , deleting temp file. Reference files will not be created and/or tagged"
-                    + " due to an issue with the supplied pid object metadata."
+                    + f" due to an issue with the supplied pid object metadata. {ve}"
                 )
-                logging.warning(exception_string)
+                logging.debug(exception_string)
                 raise PidObjectMetadataError(exception_string) from ve
             finally:
                 # Delete the temporary file, it already exists so it is redundant

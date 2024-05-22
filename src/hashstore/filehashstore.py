@@ -691,6 +691,8 @@ class FileHashStore(HashStore):
                     err_msg = (
                         "FileHashStore - find_object: pid refs file exists with cid: "
                         + pid_refs_cid
+                        + " for pid: "
+                        + pid
                         + f", but is missing from cid refs file: {cid_ref_abs_path}"
                     )
                     logging.error(err_msg)
@@ -698,7 +700,7 @@ class FileHashStore(HashStore):
             else:
                 err_msg = (
                     f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
-                    + f", but cid refs file not found: {cid_ref_abs_path}"
+                    + f", but cid refs file not found: {cid_ref_abs_path} for pid: {pid}"
                 )
                 logging.error(err_msg)
                 raise CidRefsDoesNotExist(err_msg)

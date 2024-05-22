@@ -77,6 +77,7 @@ def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory)
 
 def test_objectmetadata():
     """Test ObjectMetadata class returns correct values via dot notation."""
+    pid = "hashstore"
     ab_id = "hashstoretest"
     obj_size = 1234
     hex_digest_dict = {
@@ -86,7 +87,8 @@ def test_objectmetadata():
         "sha256": "sha256value",
         "sha512": "sha512value",
     }
-    object_metadata = ObjectMetadata(ab_id, obj_size, hex_digest_dict)
+    object_metadata = ObjectMetadata(pid, ab_id, obj_size, hex_digest_dict)
+    assert object_metadata.pid == pid
     assert object_metadata.cid == ab_id
     assert object_metadata.obj_size == obj_size
     assert object_metadata.hex_digests.get("md5") == hex_digest_dict["md5"]

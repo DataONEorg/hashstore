@@ -1,6 +1,6 @@
 ## HashStore: hash-based object storage for DataONE data packages
 
-- **Author**: Matthew B. Jones, Dou Mok, Jing Tao, Matthew Brooke
+- **Author**: Dou Mok, Matthew Brooke, Jing Tao, Matthew B. Jones
 - **License**: [Apache 2](http://opensource.org/licenses/Apache-2.0)
 - [Package source code on GitHub](https://github.com/DataONEorg/hashstore)
 - [**Submit Bugs and feature requests**](https://github.com/DataONEorg/hashstore/issues)
@@ -62,7 +62,7 @@ properties = {
 # Get HashStore from factory
 module_name = "hashstore.filehashstore.filehashstore"
 class_name = "FileHashStore"
-my_store = factory.get_hashstore(module_name, class_name, properties)
+my_store = hashstore_factory.get_hashstore(module_name, class_name, properties)
 
 # Store objects (.../[hashstore_path]/objects/)
 pid = "j.tao.1700.1"
@@ -112,8 +112,9 @@ tag_object(pid, cid)
 - If desired, this cid can then be used to locate the object on disk by following HashStore's store configuration.
 
 **How do I delete an object if I have the pid?**
-- To delete an object, call the Public API method `delete_object` which will delete the object and its associated references and reference files where relevant.
-- Note, `delete_object` and `tag_object` calls are synchronized on their content identifier values so that the shared reference files are not unintentionally modified concurrently. An object that is in the process of being deleted should not be tagged, and vice versa. These calls have been implemented to occur sequentially to improve clarity in the event of an unexpected conflict or issue.
+- To delete an object and all its associated reference files, call the Public API method `delete_object` with `id_type` 'pid'.
+- To delete only an object, call `delete_object` with `id_type` 'cid' which will remove the object if it is not referenced by any pids.
+- Note, `delete_object` and `store_object` are synchronized based on a given 'pid'. An object that is in the process of being stored based on a pid should not be deleted at the same time. Additionally, `delete_object` further synchronizes with `tag_object` based on a `cid`. Every object is stored once, is unique and shares one cid reference file. The API calls to access this cid reference file must be coordinated to prevent file system locking exceptions.
 
 
 ###### Working with metadata (store, retrieve, delete)
@@ -125,8 +126,8 @@ HashStore's '/metadata' directory holds all metadata for objects stored in HashS
 - If there are multiple metadata objects, a 'format_id' must be specified when calling `retrieve_metadata` (ex. `retrieve_metadata(pid, format_id)`)
 
 **How do I delete a metadata file?**
-- Like `retrieve_metadata`, call the Public API method `delete_metadata` which will delete the metadata object associated with the given pid.
-- If there are multiple metadata objects, a 'format_id' must be specified when calling `delete_metadata` to ensure the expected metadata object is deleted.
+- Like `retrieve_metadata`, call the Public API method `delete_metadata` to delete all metadata documents associated with the given pid.
+- If there are multiple metadata objects, and you wish to only delete one type, a 'format_id' must be specified when calling `delete_metadata(pid, format_id)` to ensure the expected metadata object is deleted.
 
 
 ###### What are HashStore reference files?
@@ -139,21 +140,21 @@ These reference files are implemented in HashStore underneath the hood with no e
 
 **'pid' Reference Files**
 - Pid (persistent identifier) reference files are created when storing an object with an identifier.
-- Pid reference files are located in HashStores '/refs/pid' directory
+- Pid reference files are located in HashStores '/refs/pids' directory
 - If an identifier is not available at the time of storing an object, the calling app/client must create this association between a pid and the object it represents by calling `tag_object` separately.
 - Each pid reference file contains a string that represents the content identifier of the object it references
 - Like how objects are stored once and only once, there is also only one pid reference file for each object.
 
 **'cid' Reference Files**
 - Cid (content identifier) reference files are created at the same time as pid reference files when storing an object with an identifier.
-- Cid reference files are located in HashStore's '/refs/cid' directory
+- Cid reference files are located in HashStore's '/refs/cids' directory
 - A cid reference file is a list of all the pids that reference a cid, delimited by a new line ("\n") character
 
 
 ###### What does HashStore look like?
 
 ```shell
-# Example layout in HashStore with a single file stored along with its metadata and reference files.
+# Example layout in HashStore with three files stored along with its metadata and reference files.
 # This uses a store depth of 3, with a width of 2 and "SHA-256" as its default store algorithm
 ## Notes:
 ## - Objects are stored using their content identifier as the file address
@@ -161,14 +162,66 @@ These reference files are implemented in HashStore underneath the hood with no e
 ## - The reference file for each cid contains multiple pids each on its own line
 
 .../metacat/hashstore/
-└─ objects
-    └─ /d5/95/3b/d802fa74edea72eb941...00d154a727ed7c2
-└─ metadata
-    └─ /15/8d/7e/55c36a810d7c14479c9...b20d7df66768b04
-└─ refs
-    └─ pid/0d/55/5e/d77052d7e166017f779...7230bcf7abcef65e
-    └─ cid/d5/95/3b/d802fa74edea72eb941...00d154a727ed7c2
-hashstore.yaml
+   ├── hashstore.yaml
+   ├── objects
+   |   ├── 4d
+   |   │   └── 19
+   |   │       └── 81
+   |   |           └── 71eef969d553d4c9537b1811a7b078f9a3804fc978a761bc014c05972c
+   |   ├── 94
+   |   │   └── f9
+   |   │       └── b6
+   |   |           └── c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a
+   |   └── 44
+   |       └── 73
+   |           └── 51
+   |               └── 6a592209cbcd3a7ba4edeebbdb374ee8e4a49d19896fafb8f278dc25fa
+   └── metadata
+   |   ├── 0d
+   |   │   └── 55
+   |   │       └── 55
+   |   |           └── 5ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e
+   |   |               └── 323e0799524cec4c7e14d31289cefd884b563b5c052f154a066de5ec1e477da7
+   |   |               └── sha256(pid+formatId_annotations)
+   |   ├── a8
+   |   │   └── 24
+   |   │       └── 19
+   |   |           └── 25740d5dcd719596639e780e0a090c9d55a5d0372b0eaf55ed711d4edf
+   |   |               └── ddf07952ef28efc099d10d8b682480f7d2da60015f5d8873b6e1ea75b4baf689
+   |   |               └── sha256(pid+formatId_annotations)
+   |   └── 7f
+   |       └── 5c
+   |           └── c1
+   |               └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
+   |                   └── 9a2e08c666b728e6cbd04d247b9e556df3de5b2ca49f7c5a24868eb27cddbff2
+   |                   └── sha256(pid+formatId_annotations)
+   └── refs
+       ├── cids
+       |   ├── 4d
+       |   |   └── 19
+       |   |       └── 81
+       |   |           └── 71eef969d553d4c9537b1811a7b078f9a3804fc978a761bc014c05972c
+       |   ├── 94
+       |   │   └── f9
+       |   │       └── b6
+       |   |           └── c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a
+       |   └── 44
+       |       └── 73
+       |           └── 51
+       |               └── 6a592209cbcd3a7ba4edeebbdb374ee8e4a49d19896fafb8f278dc25fa
+       └── pids
+           ├── 0d
+           |   └── 55
+           |       └── 55
+           |           └── 5ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e
+           ├── a8
+           │   └── 24
+           │       └── 19
+           |           └── 25740d5dcd719596639e780e0a090c9d55a5d0372b0eaf55ed711d4edf
+           └── 7f
+               └── 5c
+                   └── c1
+                       └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
 ```
 
 ## Development build

@@ -1,4 +1,5 @@
 """Test module for FileHashStore init, core, utility and supporting methods."""
+
 import io
 import os
 from pathlib import Path
@@ -6,11 +7,6 @@ import pytest
 from hashstore.filehashstore import FileHashStore
 
 # pylint: disable=W0212
-
-
-def test_pids_length(pids):
-    """Ensure test harness pids are present."""
-    assert len(pids) == 3
 
 
 def test_init_directories_created(store):
@@ -22,8 +18,8 @@ def test_init_directories_created(store):
     assert os.path.exists(store.metadata + "/tmp")
     assert os.path.exists(store.refs)
     assert os.path.exists(store.refs + "/tmp")
-    assert os.path.exists(store.refs + "/pid")
-    assert os.path.exists(store.refs + "/cid")
+    assert os.path.exists(store.refs + "/pids")
+    assert os.path.exists(store.refs + "/cids")
 
 
 def test_init_existing_store_incorrect_algorithm_format(store):
@@ -157,7 +153,7 @@ def test_load_properties_hashstore_yaml_missing(store):
 
 
 def test_validate_properties(store):
-    """Confirm properties validated when all key/values are supplied."""
+    """Confirm no exceptions are thrown when all key/values are supplied."""
     properties = {
         "store_path": "/etc/test",
         "store_depth": 3,
@@ -183,7 +179,7 @@ def test_validate_properties_missing_key(store):
 
 
 def test_validate_properties_key_value_is_none(store):
-    """Confirm exception raised when value from key is 'None'."""
+    """Confirm exception raised when a value from a key is 'None'."""
     properties = {
         "store_path": "/etc/test",
         "store_depth": 3,
@@ -221,7 +217,7 @@ def test_set_default_algorithms_missing_yaml(store, pids):
 
 
 def test_store_and_validate_data_files_path(pids, store):
-    """Test _store_and_validate_data objects with path object for the path arg."""
+    """Test _store_and_validate_data with path object for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -232,7 +228,7 @@ def test_store_and_validate_data_files_path(pids, store):
 
 
 def test_store_and_validate_data_files_string(pids, store):
-    """Test _store_and_validate_data objects with string for the path arg."""
+    """Test _store_and_validate_data with string for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -243,7 +239,7 @@ def test_store_and_validate_data_files_string(pids, store):
 
 
 def test_store_and_validate_data_files_stream(pids, store):
-    """Test _store_and_validate_data objects with stream for the path arg."""
+    """Test _store_and_validate_data with stream for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -291,7 +287,8 @@ def test_store_and_validate_data_hex_digests(pids, store):
 
 
 def test_store_and_validate_data_additional_algorithm(pids, store):
-    """Check _store_and_validate_data returns additional algorithm in hex digests."""
+    """Check _store_and_validate_data returns additional algorithm in hex digests
+    when provided an additional algo value."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -367,7 +364,7 @@ def test_store_data_only_hex_digests(pids, store):
 
 
 def test_move_and_get_checksums_id(pids, store):
-    """Test move returns correct id."""
+    """Test _move_and_get_checksums returns correct id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -383,7 +380,7 @@ def test_move_and_get_checksums_id(pids, store):
 
 
 def test_move_and_get_checksums_file_size(pids, store):
-    """Test move returns correct file size."""
+    """Test _move_and_get_checksums returns correct file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -399,7 +396,7 @@ def test_move_and_get_checksums_file_size(pids, store):
 
 
 def test_move_and_get_checksums_hex_digests(pids, store):
-    """Test move returns correct hex digests."""
+    """Test _move_and_get_checksums returns correct hex digests."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -418,8 +415,8 @@ def test_move_and_get_checksums_hex_digests(pids, store):
         assert hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
-def test_move_and_get_checksums_duplicates_raises_error(pids, store):
-    """Test move does not store duplicate objects and raises error."""
+def test_move_and_get_checksums_does_not_store_duplicate(pids, store):
+    """Test _move_and_get_checksums does not store duplicate objects."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -431,7 +428,20 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        with pytest.raises(FileExistsError):
+        # pylint: disable=W0212
+        store._move_and_get_checksums(pid, input_stream)
+        input_stream.close()
+    assert store._count(entity) == 3
+
+
+def test_move_and_get_checksums_raises_error_with_nonmatching_checksum(pids, store):
+    """Test _move_and_get_checksums raises error when incorrect checksum supplied."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        input_stream = io.open(path, "rb")
+        with pytest.raises(ValueError):
             # pylint: disable=W0212
             store._move_and_get_checksums(
                 pid,
@@ -440,7 +450,7 @@ def test_move_and_get_checksums_duplicates_raises_error(pids, store):
                 checksum_algorithm="sha256",
             )
             input_stream.close()
-    assert store._count(entity) == 3
+    assert store._count(entity) == 0
 
 
 def test_move_and_get_checksums_incorrect_file_size(pids, store):
@@ -483,7 +493,7 @@ def test_write_to_tmp_file_and_get_hex_digests_additional_algo(store):
 
 def test_write_to_tmp_file_and_get_hex_digests_checksum_algo(store):
     """Test _write...hex_digests returns correct hex digests when given a checksum_algorithm
-    is provided."""
+    and checksum."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -650,7 +660,15 @@ def test_put_metadata_cid(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         metadata_cid = store._put_metadata(syspath, pid, format_id)
-        assert metadata_cid == pids[pid]["metadata_cid"]
+
+        # Manually calculate expected path
+        metadata_directory = store._computehash(pid)
+        metadata_document_name = store._computehash(pid + format_id)
+        rel_path = "/".join(store._shard(metadata_directory))
+        full_path = (
+            store._get_store_path("metadata") / rel_path / metadata_document_name
+        )
+        assert metadata_cid == full_path
 
 
 def test_mktmpmetadata(pids, store):
@@ -817,7 +835,7 @@ def test_get_store_path_refs(store):
     assert path_metadata_string.endswith("/metacat/refs")
 
 
-def test_exists_with_object_metadata_id(pids, store):
+def test_exists_object_with_object_metadata_id(pids, store):
     """Test exists method with an absolute file path."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -827,7 +845,7 @@ def test_exists_with_object_metadata_id(pids, store):
         assert store._exists(entity, object_metadata.cid)
 
 
-def test_exists_with_sharded_path(pids, store):
+def test_exists_object_with_sharded_path(pids, store):
     """Test exists method with an absolute file path."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -839,7 +857,19 @@ def test_exists_with_sharded_path(pids, store):
         assert store._exists(entity, object_metadata_shard_path)
 
 
-def test_exists_with_nonexistent_file(store):
+def test_exists_metadata_files_path(pids, store):
+    """Test exists works as expected for metadata."""
+    test_dir = "tests/testdata/"
+    entity = "metadata"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        assert store._exists(entity, metadata_cid)
+
+
+def test_exists_object_with_nonexistent_file(store):
     """Test exists method with a nonexistent file."""
     entity = "objects"
     non_existent_file = "tests/testdata/filedoesnotexist"
@@ -873,7 +903,7 @@ def test_open_objects(pids, store):
         io_buffer.close()
 
 
-def test_delete_by_object_metadata_id(pids, store):
+def test_delete_with_object_metadata_id(pids, store):
     """Check objects are deleted after calling delete with object id."""
     test_dir = "tests/testdata/"
     entity = "objects"
@@ -883,91 +913,6 @@ def test_delete_by_object_metadata_id(pids, store):
         object_metadata_id = object_metadata.cid
         store._delete(entity, object_metadata_id)
     assert store._count(entity) == 0
-
-
-def test_remove_empty_removes_empty_folders_string(store):
-    """Test empty folders (via string) are removed."""
-    three_dirs = "dir1/dir2/dir3"
-    two_dirs = "dir1/dir4"
-    one_dir = "dir5"
-    os.makedirs(os.path.join(store.root, three_dirs))
-    os.makedirs(os.path.join(store.root, two_dirs))
-    os.makedirs(os.path.join(store.root, one_dir))
-    assert os.path.exists(os.path.join(store.root, three_dirs))
-    assert os.path.exists(os.path.join(store.root, two_dirs))
-    assert os.path.exists(os.path.join(store.root, one_dir))
-    # pylint: disable=W0212
-    store._remove_empty(os.path.join(store.root, three_dirs))
-    store._remove_empty(os.path.join(store.root, two_dirs))
-    store._remove_empty(os.path.join(store.root, one_dir))
-    assert not os.path.exists(os.path.join(store.root, three_dirs))
-    assert not os.path.exists(os.path.join(store.root, two_dirs))
-    assert not os.path.exists(os.path.join(store.root, one_dir))
-
-
-def test_remove_empty_removes_empty_folders_path(store):
-    """Test empty folders (via Path object) are removed."""
-    three_dirs = Path("dir1/dir2/dir3")
-    two_dirs = Path("dir1/dir4")
-    one_dir = Path("dir5")
-    (store.root / three_dirs).mkdir(parents=True)
-    (store.root / two_dirs).mkdir(parents=True)
-    (store.root / one_dir).mkdir(parents=True)
-    assert (store.root / three_dirs).exists()
-    assert (store.root / two_dirs).exists()
-    assert (store.root / one_dir).exists()
-    # pylint: disable=W0212
-    store._remove_empty(store.root / three_dirs)
-    store._remove_empty(store.root / two_dirs)
-    store._remove_empty(store.root / one_dir)
-    assert not (store.root / three_dirs).exists()
-    assert not (store.root / two_dirs).exists()
-    assert not (store.root / one_dir).exists()
-
-
-def test_remove_empty_does_not_remove_nonempty_folders(pids, store):
-    """Test non-empty folders are not removed."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store._store_and_validate_data(pid, path)
-        object_metadata_shard = store._shard(object_metadata.cid)
-        object_metadata_shard_path = "/".join(object_metadata_shard)
-        # Get parent directory of the relative path
-        parent_dir = os.path.dirname(object_metadata_shard_path)
-        # Attempt to remove the parent directory
-        # pylint: disable=W0212
-        store._remove_empty(parent_dir)
-        abs_parent_dir = store.objects + "/" + parent_dir
-        assert os.path.exists(abs_parent_dir)
-
-
-def test_has_subdir_subdirectory_string(store):
-    """Test that subdirectory is recognized."""
-    sub_dir = store.root + "/filehashstore/test"
-    os.makedirs(sub_dir)
-    # pylint: disable=W0212
-    is_sub_dir = store._has_subdir(sub_dir)
-    assert is_sub_dir
-
-
-def test_has_subdir_subdirectory_path(store):
-    """Test that subdirectory is recognized."""
-    sub_dir = Path(store.root) / "filehashstore" / "test"
-    sub_dir.mkdir(parents=True)
-    # pylint: disable=W0212
-    is_sub_dir = store._has_subdir(sub_dir)
-    assert is_sub_dir
-
-
-def test_has_subdir_non_subdirectory(store):
-    """Test that non-subdirectory is not recognized."""
-    parent_dir = os.path.dirname(store.root)
-    non_sub_dir = parent_dir + "/filehashstore/test"
-    os.makedirs(non_sub_dir)
-    # pylint: disable=W0212
-    is_sub_dir = store._has_subdir(non_sub_dir)
-    assert not is_sub_dir
 
 
 def test_create_path(pids, store):
@@ -1064,3 +1009,69 @@ def test_cast_to_bytes(store):
     # pylint: disable=W0212
     string_bytes = store._cast_to_bytes(string)
     assert isinstance(string_bytes, bytes)
+
+
+def test_resolve_path_objects(pids, store):
+    """Confirm resolve path returns correct object path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        obj_resolved_path = store._resolve_path("objects", cid)
+        calculated_obj_path = store.objects + "/" + "/".join(store._shard(cid))
+
+        assert calculated_obj_path == obj_resolved_path
+
+
+def test_resolve_path_metadata(pids, store):
+    """Confirm resolve path returns correct metadata path."""
+    test_dir = "tests/testdata/"
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+
+        metadata_directory = store._computehash(pid)
+        metadata_document_name = store._computehash(pid + format_id)
+        rel_path = "/".join(store._shard(metadata_directory))
+        full_path_without_dir = rel_path + "/" + metadata_document_name
+
+        metadata_resolved_path = store._resolve_path("metadata", full_path_without_dir)
+        calculated_metadata_path = (
+            store.metadata + "/" + rel_path + "/" + metadata_document_name
+        )
+
+        assert calculated_metadata_path == metadata_resolved_path
+
+
+def test_resolve_path_refs_pid(pids, store):
+    """Confirm resolve path returns correct object pid refs path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        _object_metadata = store.store_object(pid, path)
+
+        resolved_pid_ref_abs_path = store._resolve_path("pid", pid)
+        pid_refs_metadata_hashid = store._computehash(pid)
+        calculated_pid_ref_path = (
+            store.refs + "/pid/" + "/".join(store._shard(pid_refs_metadata_hashid))
+        )
+
+        assert resolved_pid_ref_abs_path == calculated_pid_ref_path
+
+
+def test_resolve_path_refs_cid(pids, store):
+    """Confirm resolve path returns correct object pid refs path"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        resolved_cid_ref_abs_path = store._resolve_path("cid", cid)
+        calculated_cid_ref_path = store.refs + "/cid/" + "/".join(store._shard(cid))
+
+        assert resolved_cid_ref_abs_path == calculated_cid_ref_path

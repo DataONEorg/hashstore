@@ -114,7 +114,7 @@ tag_object(pid, cid)
 **How do I delete an object if I have the pid?**
 - To delete an object and all its associated reference files, call the Public API method `delete_object` with `id_type` 'pid'.
 - To delete only an object, call `delete_object` with `id_type` 'cid' which will remove the object if it is not referenced by any pids.
-- Note, `delete_object` and `tag_object` calls are synchronized on their content identifier values so that the shared reference files are not unintentionally modified concurrently. An object that is in the process of being deleted should not be tagged, and vice versa. These calls have been implemented to occur sequentially to improve clarity in the event of an unexpected conflict or issue.
+- Note, `delete_object` and `store_object` are synchronized based on a given 'pid'. An object that is in the process of being stored based on a pid should not be deleted at the same time. Additionally, `delete_object` further synchronizes with `tag_object` based on a `cid`. Every object is stored once, is unique and shares one cid reference file. The API calls to access this cid reference file must be coordinated to prevent file system locking exceptions.
 
 
 ###### Working with metadata (store, retrieve, delete)
@@ -126,8 +126,8 @@ HashStore's '/metadata' directory holds all metadata for objects stored in HashS
 - If there are multiple metadata objects, a 'format_id' must be specified when calling `retrieve_metadata` (ex. `retrieve_metadata(pid, format_id)`)
 
 **How do I delete a metadata file?**
-- Like `retrieve_metadata`, call the Public API method `delete_metadata` which will delete the metadata object associated with the given pid.
-- If there are multiple metadata objects, a 'format_id' must be specified when calling `delete_metadata` to ensure the expected metadata object is deleted.
+- Like `retrieve_metadata`, call the Public API method `delete_metadata` to delete all metadata documents associated with the given pid.
+- If there are multiple metadata objects, and you wish to only delete one type, a 'format_id' must be specified when calling `delete_metadata(pid, format_id)` to ensure the expected metadata object is deleted.
 
 
 ###### What are HashStore reference files?

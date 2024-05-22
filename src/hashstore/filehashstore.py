@@ -481,14 +481,16 @@ class FileHashStore(HashStore):
                 # Note, using '.__cause__' allows the original exception msg to be displayed
                 exception_string = (
                     f"FileHashStore - store_object: failed to store object for pid: {pid}."
-                    + f" Reference files will not be created or tagged. {ome.__cause__}"
+                    + " Reference files will not be created or tagged. PidObjectMetadataError:"
+                    + ome.__cause__
                 )
                 logging.error(exception_string)
                 raise ome
             except Exception as err:
                 exception_string = (
                     f"FileHashStore - store_object: failed to store object for pid: {pid}."
-                    + f" Unexpected error: {err.__cause__}"
+                    + " Reference files will not be created or tagged. Unexpected error: "
+                    + err.__cause__
                 )
                 logging.error(exception_string)
                 raise err

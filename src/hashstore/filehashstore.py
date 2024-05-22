@@ -1298,11 +1298,11 @@ class FileHashStore(HashStore):
                 # Revert storage process
                 exception_string = (
                     "FileHashStore - _move_and_get_checksums:"
-                    + f" Unexpected {err=}, {type(err)=}"
+                    + f" Unexpected Error: {err}"
                 )
-                logging.error(exception_string)
+                logging.warning(exception_string)
                 if os.path.isfile(abs_file_path):
-                    # Check to see if object has moved successfully before deleting
+                    # Check to see if object exists before determining whether to delete
                     debug_msg = (
                         "FileHashStore - _move_and_get_checksums: Permanent file"
                         + f" found during exception, checking hex digest for pid: {pid}"
@@ -1312,28 +1312,34 @@ class FileHashStore(HashStore):
                     if pid_checksum == hex_digests.get(self.algorithm):
                         # If the checksums match, return and log warning
                         exception_string = (
-                            "FileHashStore - _move_and_get_checksums: File moved"
-                            + f" successfully but unexpected issue encountered: {exception_string}",
+                            "FileHashStore - _move_and_get_checksums: Object exists at:"
+                            + f" {abs_file_path} but an unexpected issue has been encountered."
+                            + " Reference files will not be created and/or tagged."
                         )
-                        logging.error(exception_string)
+                        logging.warning(exception_string)
                         raise err
                     else:
                         debug_msg = (
-                            "FileHashStore - _move_and_get_checksums: Permanent file"
-                            + f" found but with incomplete state, deleting file: {abs_file_path}",
+                            "FileHashStore - _move_and_get_checksums: Object exists at"
+                            + f"{abs_file_path} but the pid object checksum provided does not"
+                            + " match what has been calculated. Deleting object. References will"
+                            + " not be created and/or tagged.",
                         )
                         logging.debug(debug_msg)
                         self._delete(entity, abs_file_path)
+                        raise err
+
                 logging.debug(
                     "FileHashStore - _move_and_get_checksums: Deleting temporary file: %s",
                     tmp_file_name,
                 )
                 self._delete(entity, tmp_file_name)
                 err_msg = (
-                    "Aborting store_object upload - an unexpected error has occurred when moving"
-                    + f" file to: {object_cid} - Error: {err}"
+                    f"Object has not been stored for pid: {pid} - an unexpected error has occurred"
+                    + f" when moving tmp file to: {object_cid}. Reference files will not be"
+                    + f" created and/or tagged. Error: {err}"
                 )
-                logging.error("FileHashStore - _move_and_get_checksums: %s", err_msg)
+                logging.warning("FileHashStore - _move_and_get_checksums: %s", err_msg)
                 raise
         else:
             # If the file exists, determine if the object is what the client states it to be
@@ -1352,12 +1358,14 @@ class FileHashStore(HashStore):
                 # If any exception is thrown during validation,
                 exception_string = (
                     f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
-                    + " , deleting temp file. Ref files will not be created/tagged."
+                    + " , deleting temp file. Reference files will not be created and/or tagged"
+                    + " due to an issue with the supplied pid object metadata."
                 )
                 logging.warning(exception_string)
                 raise PidObjectMetadataError(exception_string) from ve
             finally:
                 # Delete the temporary file, it already exists so it is redundant
+                # No exception is thrown so 'store_object' can proceed to tag object
                 self._delete(entity, tmp_file_name)
 
         return object_cid, tmp_file_size, hex_digests

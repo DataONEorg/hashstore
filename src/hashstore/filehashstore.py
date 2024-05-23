@@ -602,6 +602,12 @@ class FileHashStore(HashStore):
                     self._verify_hashstore_references(
                         pid, cid, "Created missing cid refs file"
                     )
+                    info_msg = (
+                        f"FileHashStore - tag_object: pid refs file exists for pid: {pid}"
+                        + f", with the expected cid: {cid} - but cid refs file is missing."
+                        + " Cid refs file created, tagged and verified."
+                    )
+                    logging.info(info_msg)
                     return True
                 else:
                     # Check if the retrieved cid refs file exists and pid is referenced
@@ -694,6 +700,7 @@ class FileHashStore(HashStore):
                             + pid_ref_abs_path
                             + f", but object referenced does not exist, cid: {pid_refs_cid}"
                         )
+                        logging.error(err_msg)
                         raise RefsFileExistsButCidObjMissing(err_msg)
                     else:
                         return pid_refs_cid
@@ -720,6 +727,7 @@ class FileHashStore(HashStore):
                 f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
                 + pid_ref_abs_path
             )
+            logging.error(err_msg)
             raise PidRefsDoesNotExist(err_msg)
 
     def store_metadata(self, pid, metadata, format_id=None):
@@ -1571,6 +1579,11 @@ class FileHashStore(HashStore):
                     ref_file.seek(0)
                     ref_file.writelines(new_pid_lines)
                     ref_file.truncate()
+            debug_msg = (
+                f"FileHashStore - _update_refs_file: Update ({update_type}) for ref_id: {ref_id}"
+                + f" completed on refs file: {refs_file_path}."
+            )
+            logging.debug(debug_msg)
         except Exception as err:
             exception_string = (
                 f"FileHashStore - _update_refs_file: failed to {update_type} for ref_id: {ref_id}"

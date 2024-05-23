@@ -130,7 +130,7 @@ class FileHashStore(HashStore):
     # Configuration and Related Methods
 
     @staticmethod
-    def _load_properties(hahstore_yaml_path, hashstore_required_prop_keys):
+    def _load_properties(hashstore_yaml_path, hashstore_required_prop_keys):
         """Get and return the contents of the current HashStore configuration.
 
         :return: HashStore properties with the following keys (and values):
@@ -140,7 +140,7 @@ class FileHashStore(HashStore):
             - ``store_metadata_namespace`` (str): Namespace for the HashStore's system metadata.
         :rtype: dict
         """
-        if not os.path.exists(hahstore_yaml_path):
+        if not os.path.exists(hashstore_yaml_path):
             exception_string = (
                 "FileHashStore - load_properties: hashstore.yaml not found"
                 + " in store root path."
@@ -149,7 +149,7 @@ class FileHashStore(HashStore):
             raise FileNotFoundError(exception_string)
 
         # Open file
-        with open(hahstore_yaml_path, "r", encoding="utf-8") as hs_yaml_file:
+        with open(hashstore_yaml_path, "r", encoding="utf-8") as hs_yaml_file:
             yaml_data = yaml.safe_load(hs_yaml_file)
 
         # Get hashstore properties

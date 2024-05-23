@@ -1,4 +1,5 @@
 """HashStore Command Line App"""
+
 import logging
 import os
 from argparse import ArgumentParser
@@ -741,6 +742,13 @@ def main():
             f"Missing config file (hashstore.yaml) at store path: {store_path}."
             + " HashStore must first be initialized, use `--help` for more information."
         )
+    else:
+        # Get the default format_id for sysmeta
+        with open(store_path_config_yaml, "r", encoding="utf-8") as hs_yaml_file:
+            yaml_data = yaml.safe_load(hs_yaml_file)
+
+        default_formatid = yaml_data["store_metadata_namespace"]
+
     # Setup logging, create log file if it doesn't already exist
     hashstore_py_log = store_path + "/python_client.log"
     python_log_file_path = Path(hashstore_py_log)
@@ -768,6 +776,8 @@ def main():
     checksum_algorithm = getattr(args, "object_checksum_algorithm")
     size = getattr(args, "object_size")
     formatid = getattr(args, "object_formatid")
+    if formatid is None:
+        formatid = default_formatid
     knbvm_test = getattr(args, "knbvm_flag")
     # Instantiate HashStore Client
     props = parser.load_store_properties(store_path_config_yaml)

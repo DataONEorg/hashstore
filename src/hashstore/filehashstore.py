@@ -105,6 +105,8 @@ class FileHashStore(HashStore):
             self.objects = self.root + "/objects"
             self.metadata = self.root + "/metadata"
             self.refs = self.root + "/refs"
+            self.cids = self.refs + "/cids"
+            self.pids = self.refs + "/pids"
             if not os.path.exists(self.objects):
                 self._create_path(self.objects + "/tmp")
             if not os.path.exists(self.metadata):
@@ -128,7 +130,7 @@ class FileHashStore(HashStore):
     # Configuration and Related Methods
 
     @staticmethod
-    def _load_properties(hahstore_yaml_path, hashstore_required_prop_keys):
+    def _load_properties(hashstore_yaml_path, hashstore_required_prop_keys):
         """Get and return the contents of the current HashStore configuration.
 
         :return: HashStore properties with the following keys (and values):
@@ -138,7 +140,7 @@ class FileHashStore(HashStore):
             - ``store_metadata_namespace`` (str): Namespace for the HashStore's system metadata.
         :rtype: dict
         """
-        if not os.path.exists(hahstore_yaml_path):
+        if not os.path.exists(hashstore_yaml_path):
             exception_string = (
                 "FileHashStore - load_properties: hashstore.yaml not found"
                 + " in store root path."
@@ -147,7 +149,7 @@ class FileHashStore(HashStore):
             raise FileNotFoundError(exception_string)
 
         # Open file
-        with open(hahstore_yaml_path, "r", encoding="utf-8") as hs_yaml_file:
+        with open(hashstore_yaml_path, "r", encoding="utf-8") as hs_yaml_file:
             yaml_data = yaml.safe_load(hs_yaml_file)
 
         # Get hashstore properties
@@ -2167,9 +2169,9 @@ class FileHashStore(HashStore):
         elif entity == "refs":
             return Path(self.refs)
         elif entity == "cid":
-            return Path(self.refs) / "cid"
+            return Path(self.cids)
         elif entity == "pid":
-            return Path(self.refs) / "pid"
+            return Path(self.pids)
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
@@ -2210,9 +2212,9 @@ class FileHashStore(HashStore):
         elif entity == "metadata":
             directory_to_count = self.metadata
         elif entity == "pid":
-            directory_to_count = self.refs + "/pid"
+            directory_to_count = self.pids
         elif entity == "cid":
-            directory_to_count = self.refs + "/cid"
+            directory_to_count = self.cids
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"

@@ -1057,7 +1057,7 @@ def test_resolve_path_refs_pid(pids, store):
         resolved_pid_ref_abs_path = store._resolve_path("pid", pid)
         pid_refs_metadata_hashid = store._computehash(pid)
         calculated_pid_ref_path = (
-            store.refs + "/pid/" + "/".join(store._shard(pid_refs_metadata_hashid))
+            store.pids + "/" + "/".join(store._shard(pid_refs_metadata_hashid))
         )
 
         assert resolved_pid_ref_abs_path == calculated_pid_ref_path
@@ -1072,6 +1072,6 @@ def test_resolve_path_refs_cid(pids, store):
         cid = object_metadata.cid
 
         resolved_cid_ref_abs_path = store._resolve_path("cid", cid)
-        calculated_cid_ref_path = store.refs + "/cid/" + "/".join(store._shard(cid))
+        calculated_cid_ref_path = store.cids + "/" + "/".join(store._shard(cid))
 
         assert resolved_cid_ref_abs_path == calculated_cid_ref_path

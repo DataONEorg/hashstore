@@ -1243,15 +1243,17 @@ def test_store_and_delete_objects_100_pids_1_cid(store):
     for i in range(1, upper_limit):
         pid_modified = f"dou.test.{str(i)}"
         store.store_object(pid_modified, path)
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 100
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 1
+    assert (
+        sum([len(files) for _, _, files in os.walk(store.root + "/refs/pids")]) == 100
+    )
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cids")]) == 1
     assert store._count("objects") == 1
     # Delete
     for i in range(1, upper_limit):
         pid_modified = f"dou.test.{str(i)}"
         store.delete_object(pid_modified)
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 0
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 0
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pids")]) == 0
+    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cids")]) == 0
     assert store._count("objects") == 0
 
 

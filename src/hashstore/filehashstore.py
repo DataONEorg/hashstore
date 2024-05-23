@@ -105,6 +105,8 @@ class FileHashStore(HashStore):
             self.objects = self.root + "/objects"
             self.metadata = self.root + "/metadata"
             self.refs = self.root + "/refs"
+            self.cids = self.refs + "/cids"
+            self.pids = self.refs + "/pids"
             if not os.path.exists(self.objects):
                 self._create_path(self.objects + "/tmp")
             if not os.path.exists(self.metadata):
@@ -2167,9 +2169,9 @@ class FileHashStore(HashStore):
         elif entity == "refs":
             return Path(self.refs)
         elif entity == "cid":
-            return Path(self.refs) / "cid"
+            return Path(self.cids)
         elif entity == "pid":
-            return Path(self.refs) / "pid"
+            return Path(self.pids)
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
@@ -2210,9 +2212,9 @@ class FileHashStore(HashStore):
         elif entity == "metadata":
             directory_to_count = self.metadata
         elif entity == "pid":
-            directory_to_count = self.refs + "/pid"
+            directory_to_count = self.pids
         elif entity == "cid":
-            directory_to_count = self.refs + "/cid"
+            directory_to_count = self.cids
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"

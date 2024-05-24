@@ -478,7 +478,15 @@ class FileHashStore(HashStore):
                     "FileHashStore - store_object: Attempting to tag object for pid: %s",
                     pid,
                 )
-                self.tag_object(pid, object_metadata.cid)
+                cid = object_metadata.cid
+                while cid in self.reference_locked_cids:
+                    logging.debug(
+                        "FileHashStore - store_object: Waiting to tag pid (%s) with cid (%s)",
+                        pid,
+                        cid,
+                    )
+                    time.sleep(self.time_out_sec)
+                self.tag_object(pid, cid)
                 logging.info(
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,
@@ -1804,7 +1812,12 @@ class FileHashStore(HashStore):
                         raise ValueError(exception_string)
 
     def _verify_hashstore_references(
-        self, pid, cid, pid_refs_path=None, cid_refs_path=None, additional_log_string=None
+        self,
+        pid,
+        cid,
+        pid_refs_path=None,
+        cid_refs_path=None,
+        additional_log_string=None,
     ):
         """Verifies that the supplied pid and pid reference file and content have been
         written successfully.

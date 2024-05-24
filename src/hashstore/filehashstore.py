@@ -574,8 +574,8 @@ class FileHashStore(HashStore):
         # Modify reference_locked_cids consecutively
         with self.reference_lock:
             logging.debug(
-                "FileHashStore - tag_object: Adding cid: %s to reference_locked_cids.",
-                cid,
+                "FileHashStore - tag_object: Locking cid: %s to to tag pid: %s.",
+                cid, pid
             )
             self.reference_locked_cids.append(cid)
         try:

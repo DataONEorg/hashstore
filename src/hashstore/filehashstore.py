@@ -474,6 +474,10 @@ class FileHashStore(HashStore):
                     checksum_algorithm=checksum_algorithm_checked,
                     file_size_to_validate=expected_object_size,
                 )
+                logging.debug(
+                    "FileHashStore - store_object: Attempting to tag object for pid: %s",
+                    pid,
+                )
                 self.tag_object(pid, object_metadata.cid)
                 logging.info(
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
@@ -589,6 +593,12 @@ class FileHashStore(HashStore):
                 )
                 return True
             elif pid_ref_abs_path_exists and not cid_ref_abs_path_exists:
+                debug_msg = (
+                    f"FileHashStore - tag_object: pid refs file exists ({pid_ref_abs_path})"
+                    + f" for pid: {pid}, but cid refs file doesn't at: {cid_ref_abs_path}"
+                    + f" for cid: {cid}"
+                )
+                logging.debug(debug_msg)
                 # A pid reference file can only contain and reference one cid
                 # First, confirm that the expected cid refs file exists by getting the cid
                 with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
@@ -629,6 +639,11 @@ class FileHashStore(HashStore):
                     # but doesn't contain the cid. Proceed to overwrite the pid refs file.
                     # There is no return statement, so we move out of this if block.
             elif not pid_ref_abs_path_exists and cid_ref_abs_path_exists:
+                debug_msg = (
+                    f"FileHashStore - tag_object: pid refs file does not exists for pid {pid}"
+                    + f" but cid refs file exists at: {cid_ref_abs_path}  for cid: {cid}"
+                )
+                logging.debug(debug_msg)
                 # Create the pid refs file
                 pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
                 self._create_path(os.path.dirname(pid_ref_abs_path))
@@ -660,7 +675,8 @@ class FileHashStore(HashStore):
             shutil.move(cid_tmp_file_path, cid_ref_abs_path)
             # Ensure that the reference files have been written as expected
             # If there is an issue, client or user will have to manually review
-            self._verify_hashstore_references(pid, cid, "Created all refs files")
+            log_msg = "Reference files have been moved to their permanent location."
+            self._verify_hashstore_references(pid, cid, log_msg)
             logging.info(
                 "FileHashStore - tag_object: Successfully tagged cid: %s with pid %s",
                 cid,
@@ -932,6 +948,11 @@ class FileHashStore(HashStore):
                         self._update_refs_file(cid_ref_abs_path, pid, "remove")
                         # Delete cid reference file and object only if the cid refs file is empty
                         if os.path.getsize(cid_ref_abs_path) == 0:
+                            debug_msg = (
+                                "FileHashStore - delete_object: cid_refs_file is empty (size == 0):"
+                                + f" {cid_ref_abs_path} - deleting cid refs file and data object."
+                            )
+                            logging.debug(debug_msg)
                             objects_to_delete.append(
                                 self._rename_path_for_deletion(cid_ref_abs_path)
                             )
@@ -1507,7 +1528,7 @@ class FileHashStore(HashStore):
         difference being that a cid reference file can potentially contain multiple
         lines of `pid`s that reference the `cid`.
 
-        :param str path: Directory to write the temporary file
+        :param str path: Directory to write a temporary file into
         :param str ref_id: Authority-based, persistent or content identifier
         :param str ref_type: 'cid' or 'pid'
 
@@ -1515,7 +1536,7 @@ class FileHashStore(HashStore):
         :rtype: string
         """
         logging.debug(
-            "FileHashStore - write_cid_refs_file: Writing id (%s) into file: %s",
+            "FileHashStore - _write_refs_file: Writing id (%s) into a tmp file in: %s",
             ref_id,
             path,
         )
@@ -1779,6 +1800,11 @@ class FileHashStore(HashStore):
         :param str cid: Content identifier.
         :param str additional_log_string: String to append to exception statement
         """
+        debug_msg = (
+            f"FileHashStore - _verify_hashstore_references: verifying pid ({pid})"
+            + f" and cid ({cid}) refs files. Additional Note: {additional_log_string}"
+        )
+        logging.debug(debug_msg)
         # Check that reference files were created
         pid_ref_abs_path = self._resolve_path("pid", pid)
         cid_ref_abs_path = self._resolve_path("cid", cid)

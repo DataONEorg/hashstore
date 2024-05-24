@@ -575,15 +575,16 @@ class FileHashStore(HashStore):
         with self.reference_lock:
             logging.debug(
                 "FileHashStore - tag_object: Locking cid: %s to to tag pid: %s.",
-                cid, pid
+                cid,
+                pid,
             )
             self.reference_locked_cids.append(cid)
         try:
             tmp_root_path = self._get_store_path("refs") / "tmp"
-            pid_ref_abs_path = self._resolve_path("pid", pid)
-            cid_ref_abs_path = self._resolve_path("cid", cid)
-            pid_ref_abs_path_exists = os.path.exists(pid_ref_abs_path)
-            cid_ref_abs_path_exists = os.path.exists(cid_ref_abs_path)
+            pid_refs_path = self._resolve_path("pid", pid)
+            cid_refs_path = self._resolve_path("cid", cid)
+            pid_ref_abs_path_exists = os.path.exists(pid_refs_path)
+            cid_ref_abs_path_exists = os.path.exists(cid_refs_path)
 
             if pid_ref_abs_path_exists and cid_ref_abs_path_exists:
                 self._verify_hashstore_references(
@@ -594,21 +595,21 @@ class FileHashStore(HashStore):
                 return True
             elif pid_ref_abs_path_exists and not cid_ref_abs_path_exists:
                 debug_msg = (
-                    f"FileHashStore - tag_object: pid refs file exists ({pid_ref_abs_path})"
-                    + f" for pid: {pid}, but cid refs file doesn't at: {cid_ref_abs_path}"
+                    f"FileHashStore - tag_object: pid refs file exists ({pid_refs_path})"
+                    + f" for pid: {pid}, but cid refs file doesn't at: {cid_refs_path}"
                     + f" for cid: {cid}"
                 )
                 logging.debug(debug_msg)
                 # A pid reference file can only contain and reference one cid
                 # First, confirm that the expected cid refs file exists by getting the cid
-                with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                with open(pid_refs_path, "r", encoding="utf8") as pid_ref_file:
                     pid_refs_cid = pid_ref_file.read()
 
-                if self._is_string_in_refs_file(cid, pid_ref_abs_path):
+                if self._is_string_in_refs_file(cid, pid_refs_path):
                     # The pid correctly references the given cid, but the cid refs file is missing
                     cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
-                    self._create_path(os.path.dirname(cid_ref_abs_path))
-                    shutil.move(cid_tmp_file_path, cid_ref_abs_path)
+                    self._create_path(os.path.dirname(cid_refs_path))
+                    shutil.move(cid_tmp_file_path, cid_refs_path)
                     self._verify_hashstore_references(
                         pid, cid, "Created missing cid refs file"
                     )
@@ -641,16 +642,16 @@ class FileHashStore(HashStore):
             elif not pid_ref_abs_path_exists and cid_ref_abs_path_exists:
                 debug_msg = (
                     f"FileHashStore - tag_object: pid refs file does not exists for pid {pid}"
-                    + f" but cid refs file exists at: {cid_ref_abs_path}  for cid: {cid}"
+                    + f" but cid refs file exists at: {cid_refs_path}  for cid: {cid}"
                 )
                 logging.debug(debug_msg)
                 # Create the pid refs file
                 pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
-                self._create_path(os.path.dirname(pid_ref_abs_path))
-                shutil.move(pid_tmp_file_path, pid_ref_abs_path)
+                self._create_path(os.path.dirname(pid_refs_path))
+                shutil.move(pid_tmp_file_path, pid_refs_path)
                 # Update cid ref files as it already exists
-                if not self._is_string_in_refs_file(pid, cid_ref_abs_path):
-                    self._update_refs_file(cid_ref_abs_path, pid, "add")
+                if not self._is_string_in_refs_file(pid, cid_refs_path):
+                    self._update_refs_file(cid_refs_path, pid, "add")
                 self._verify_hashstore_references(
                     pid,
                     cid,
@@ -668,11 +669,11 @@ class FileHashStore(HashStore):
             pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
             cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
             # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
-            self._create_path(os.path.dirname(pid_ref_abs_path))
-            self._create_path(os.path.dirname(cid_ref_abs_path))
+            self._create_path(os.path.dirname(pid_refs_path))
+            self._create_path(os.path.dirname(cid_refs_path))
             # Move both files
-            shutil.move(pid_tmp_file_path, pid_ref_abs_path)
-            shutil.move(cid_tmp_file_path, cid_ref_abs_path)
+            shutil.move(pid_tmp_file_path, pid_refs_path)
+            shutil.move(cid_tmp_file_path, cid_refs_path)
             # Ensure that the reference files have been written as expected
             # If there is an issue, client or user will have to manually review
             log_msg = "Reference files have been moved to their permanent location."

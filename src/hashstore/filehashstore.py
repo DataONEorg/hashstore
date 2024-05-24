@@ -554,7 +554,7 @@ class FileHashStore(HashStore):
 
     def tag_object(self, pid, cid):
         logging.debug(
-            "FileHashStore - tag_object: Tagging object cid: {%s} with pid: {%s}.",
+            "FileHashStore - tag_object: Tagging object cid: %s with pid: %s.",
             cid,
             pid,
         )
@@ -892,7 +892,7 @@ class FileHashStore(HashStore):
             # Modify object_locked_pids consecutively
             with self.object_lock:
                 logging.debug(
-                    "FileHashStore - store_object: Adding pid: %s to object_locked_pids.",
+                    "FileHashStore - delete_object: Adding pid: %s to object_locked_pids.",
                     pid,
                 )
                 self.object_locked_pids.append(pid)

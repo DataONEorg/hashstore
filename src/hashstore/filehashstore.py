@@ -574,8 +574,10 @@ class FileHashStore(HashStore):
         if use_multiprocessing:
             while cid in self.reference_locked_cids_mp:
                 logging.debug(
-                    "FileHashStore - tag_object (mp): (cid) %s is currently locked. Waiting.",
+                    "FileHashStore - tag_object (mp): (cid) %s is currently locked. Waiting"
+                    + " to tag pid: %s",
                     cid,
+                    pid,
                 )
                 time.sleep(self.time_out_sec)
             with self.reference_lock_mp:
@@ -599,13 +601,7 @@ class FileHashStore(HashStore):
                     pid,
                 )
                 self.reference_locked_cids.append(cid)
-        # with self.reference_lock:
-        #     logging.debug(
-        #         "FileHashStore - tag_object: Locking cid: %s to to tag pid: %s.",
-        #         cid,
-        #         pid,
-        #     )
-        #     self.reference_locked_cids.append(cid)
+
         try:
             tmp_root_path = self._get_store_path("refs") / "tmp"
             pid_refs_path = self._resolve_path("pid", pid)
@@ -726,8 +722,8 @@ class FileHashStore(HashStore):
             if use_multiprocessing:
                 with self.reference_lock_mp:
                     logging.debug(
-                        "FileHashStore - tag_object (mp): Removing cid: %s from reference_locked_cids.",
-                        cid,
+                        "FileHashStore - tag_object (mp): Removing cid: %s from"
+                        + " reference_locked_cids.", cid,
                     )
                     self.reference_locked_cids_mp.remove(cid)
             else:
@@ -737,12 +733,6 @@ class FileHashStore(HashStore):
                         cid,
                     )
                     self.reference_locked_cids.remove(cid)
-            # with self.reference_lock:
-            #     logging.debug(
-            #         "FileHashStore - tag_object: Removing cid: %s from reference_locked_cids.",
-            #         cid,
-            #     )
-            #     self.reference_locked_cids.remove(cid)
 
     def find_object(self, pid):
         logging.debug(

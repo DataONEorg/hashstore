@@ -607,10 +607,10 @@ class FileHashStore(HashStore):
             tmp_root_path = self._get_store_path("refs") / "tmp"
             pid_refs_path = self._resolve_path("pid", pid)
             cid_refs_path = self._resolve_path("cid", cid)
-            pid_ref_abs_path_exists = os.path.exists(pid_refs_path)
-            cid_ref_abs_path_exists = os.path.exists(cid_refs_path)
+            # pid_ref_abs_path_exists = os.path.exists(pid_refs_path)
+            # cid_ref_abs_path_exists = os.path.exists(cid_refs_path)
 
-            if pid_ref_abs_path_exists and cid_ref_abs_path_exists:
+            if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
                 self._verify_hashstore_references(
                     pid,
                     cid,
@@ -619,7 +619,7 @@ class FileHashStore(HashStore):
                     "Refs file already exists, verifying.",
                 )
                 return True
-            elif pid_ref_abs_path_exists and not cid_ref_abs_path_exists:
+            elif os.path.exists(pid_refs_path) and not os.path.exists(cid_refs_path):
                 debug_msg = (
                     f"FileHashStore - tag_object: pid refs file exists ({pid_refs_path})"
                     + f" for pid: {pid}, but cid refs file doesn't at: {cid_refs_path}"
@@ -669,7 +669,7 @@ class FileHashStore(HashStore):
                     # Orphaned pid refs file found, the retrieved cid refs file exists
                     # but doesn't contain the cid. Proceed to overwrite the pid refs file.
                     # There is no return statement, so we move out of this if block.
-            elif not pid_ref_abs_path_exists and cid_ref_abs_path_exists:
+            elif not os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
                 debug_msg = (
                     f"FileHashStore - tag_object: pid refs file does not exists for pid {pid}"
                     + f" but cid refs file exists at: {cid_refs_path}  for cid: {cid}"

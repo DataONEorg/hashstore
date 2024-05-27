@@ -285,6 +285,15 @@ class HashStoreClient:
         )
         logging.info(info_msg)
 
+        # Test Begin
+        # Set multiprocessing to true
+        os.environ["USE_MULTIPROCESSING"] = "True"
+        use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+        logging.info(
+            "HashStoreClient - use_multiprocessing (bool): %s", use_multiprocessing
+        )
+        # Test End
+
         # Get list of objects to store from metacat db
         if obj_type == self.OBJ_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_objects(

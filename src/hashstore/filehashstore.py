@@ -450,6 +450,7 @@ class FileHashStore(HashStore):
                 additional_algorithm, checksum, checksum_algorithm
             )
 
+            # TODO: Implement multiprocessing lock check like 'tag_object'
             # Wait for the pid to release if it's in use
             while pid in self.object_locked_pids:
                 logging.debug(
@@ -723,7 +724,8 @@ class FileHashStore(HashStore):
                 with self.reference_lock_mp:
                     logging.debug(
                         "FileHashStore - tag_object (mp): Removing cid: %s from"
-                        + " reference_locked_cids.", cid,
+                        + " reference_locked_cids.",
+                        cid,
                     )
                     self.reference_locked_cids_mp.remove(cid)
             else:
@@ -797,6 +799,7 @@ class FileHashStore(HashStore):
         checked_format_id = self._check_arg_format_id(format_id, "store_metadata")
         self._check_arg_data(metadata)
 
+        # TODO: Implement multiprocessing lock check like 'tag_object'
         # Wait for the pid to release if it's in use
         while pid in self.metadata_locked_pids:
             logging.debug(
@@ -903,6 +906,7 @@ class FileHashStore(HashStore):
             # If the refs file still exists, do not delete the object
             if not os.path.exists(cid_refs_abs_path):
                 cid = ab_id
+                # TODO: Implement multiprocessing lock check like 'tag_object'
                 # Synchronize the cid
                 while cid in self.reference_locked_cids:
                     logging.debug(
@@ -1123,6 +1127,7 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
         )
+        # TODO: Implement multiprocessing lock check like 'tag_object'
         self._check_string(pid, "pid", "delete_metadata")
         checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
         # Get the metadata directory path for the given pid

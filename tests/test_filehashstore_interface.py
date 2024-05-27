@@ -497,6 +497,53 @@ def test_store_object_duplicates_threads(pids, store):
     assert store._exists(entity, pids[pid][store.algorithm])
 
 
+def test_store_object_threads_multiple_pids_one_cid(pids, store):
+    """Test store object thread lock."""
+    entity = "objects"
+    test_dir = "tests/testdata/"
+    path = test_dir + "jtao.1700.1"
+    pid_list = ["jtao.1700.1"]
+    for n in range(0, 5):
+        pid_list.append(f"dou.test.{n}")
+
+    def store_object_wrapper(obj_pid, obj_path):
+        store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
+
+    thread1 = Thread(target=store_object_wrapper, args=(pid_list[0], path))
+    thread2 = Thread(target=store_object_wrapper, args=(pid_list[1], path))
+    thread3 = Thread(target=store_object_wrapper, args=(pid_list[2], path))
+    thread4 = Thread(target=store_object_wrapper, args=(pid_list[3], path))
+    thread5 = Thread(target=store_object_wrapper, args=(pid_list[4], path))
+    thread6 = Thread(target=store_object_wrapper, args=(pid_list[5], path))
+    thread1.start()
+    thread2.start()
+    thread3.start()
+    thread4.start()
+    thread5.start()
+    thread6.start()
+    thread1.join()
+    thread2.join()
+    thread3.join()
+    thread4.join()
+    thread5.join()
+    thread6.join()
+    # One thread will succeed, file count must still be 1
+    assert store._count(entity) == 1
+    assert store._exists(entity, pids["jtao.1700.1"][store.algorithm])
+
+    cid_refs_path = store._resolve_path(
+        "cid", "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
+    )
+    number_of_pids_reffed = 0
+    with open(cid_refs_path, "r", encoding="utf8") as ref_file:
+        # Confirm that pid is not currently already tagged
+        for pid in ref_file:
+            number_of_pids_reffed += 1
+            assert pid.strip() in pid_list
+
+    assert number_of_pids_reffed == 6
+
+
 @slow_test
 def test_store_object_interrupt_process(store):
     """Test that tmp file created when storing a large object (2GB) and

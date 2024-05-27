@@ -2,6 +2,7 @@
 
 import atexit
 import io
+import multiprocessing
 import shutil
 import threading
 import time
@@ -62,6 +63,7 @@ class FileHashStore(HashStore):
     object_lock = threading.Lock()
     metadata_lock = threading.Lock()
     reference_lock = threading.Lock()
+    reference_lock_mp = multiprocessing.Lock()
     object_locked_pids = []
     metadata_locked_pids = []
     reference_locked_cids = []
@@ -573,13 +575,30 @@ class FileHashStore(HashStore):
             )
             time.sleep(self.time_out_sec)
         # Modify reference_locked_cids consecutively
-        with self.reference_lock:
-            logging.debug(
-                "FileHashStore - tag_object: Locking cid: %s to to tag pid: %s.",
-                cid,
-                pid,
-            )
-            self.reference_locked_cids.append(cid)
+        use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+        if use_multiprocessing:
+            with self.reference_lock_mp:
+                logging.debug(
+                    "FileHashStore - tag_object: (mp) Locking cid: %s to to tag pid: %s.",
+                    cid,
+                    pid,
+                )
+                self.reference_locked_cids.append(cid)
+        else:
+            with self.reference_lock:
+                logging.debug(
+                    "FileHashStore - tag_object: Locking cid: %s to to tag pid: %s.",
+                    cid,
+                    pid,
+                )
+                self.reference_locked_cids.append(cid)
+        # with self.reference_lock:
+        #     logging.debug(
+        #         "FileHashStore - tag_object: Locking cid: %s to to tag pid: %s.",
+        #         cid,
+        #         pid,
+        #     )
+        #     self.reference_locked_cids.append(cid)
         try:
             tmp_root_path = self._get_store_path("refs") / "tmp"
             pid_refs_path = self._resolve_path("pid", pid)
@@ -697,12 +716,26 @@ class FileHashStore(HashStore):
             return True
         finally:
             # Release cid
-            with self.reference_lock:
-                logging.debug(
-                    "FileHashStore - tag_object: Removing cid: %s from reference_locked_cids.",
-                    cid,
-                )
-                self.reference_locked_cids.remove(cid)
+            if use_multiprocessing:
+                with self.reference_lock_mp:
+                    logging.debug(
+                        "FileHashStore - tag_object: (mp) Removing cid: %s from reference_locked_cids.",
+                        cid,
+                    )
+                    self.reference_locked_cids.remove(cid)
+            else:
+                with self.reference_lock:
+                    logging.debug(
+                        "FileHashStore - tag_object: Removing cid: %s from reference_locked_cids.",
+                        cid,
+                    )
+                    self.reference_locked_cids.remove(cid)
+            # with self.reference_lock:
+            #     logging.debug(
+            #         "FileHashStore - tag_object: Removing cid: %s from reference_locked_cids.",
+            #         cid,
+            #     )
+            #     self.reference_locked_cids.remove(cid)
 
     def find_object(self, pid):
         logging.debug(

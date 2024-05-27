@@ -479,13 +479,6 @@ class FileHashStore(HashStore):
                     pid,
                 )
                 cid = object_metadata.cid
-                while cid in self.reference_locked_cids:
-                    logging.debug(
-                        "FileHashStore - store_object: Waiting to tag pid (%s) with cid (%s)",
-                        pid,
-                        cid,
-                    )
-                    time.sleep(self.time_out_sec)
                 self.tag_object(pid, cid)
                 logging.info(
                     "FileHashStore - store_object: Successfully stored object for pid: %s",

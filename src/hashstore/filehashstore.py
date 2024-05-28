@@ -653,22 +653,24 @@ class FileHashStore(HashStore):
                 else:
                     # Check if the retrieved cid refs file exists and pid is referenced
                     retrieved_cid_refs_path = self._resolve_path("cid", pid_refs_cid)
-                    retrieved_cid_refs_path_exists = os.path.exists(
+                    if os.path.exists(
                         retrieved_cid_refs_path
-                    )
-                    if retrieved_cid_refs_path_exists and self._is_string_in_refs_file(
-                        pid, retrieved_cid_refs_path
-                    ):
+                    ) and self._is_string_in_refs_file(pid, retrieved_cid_refs_path):
                         # Throw exception, this pid is accounted for
-                        exception_string = (
+                        error_msg = (
                             "FileHashStore - tag_object: Pid refs file exists with valid pid"
                             + f" and cid reference files for pid: {pid} with cid: {cid}."
                         )
-                        logging.error(exception_string)
-                        raise FileExistsError(exception_string)
-                    # Orphaned pid refs file found, the retrieved cid refs file exists
-                    # but doesn't contain the cid. Proceed to overwrite the pid refs file.
-                    # There is no return statement, so we move out of this if block.
+                        logging.error(error_msg)
+                        raise PidRefsExistsError(error_msg)
+                    else:
+                        debug_msg = (
+                            f"FileHashStore - tag_object: Orphan pid refs file found for {pid}."
+                            + f" Cid ({cid}) reference file does not contain the pid. Proceeding."
+                        )
+                        logging.debug(debug_msg)
+                        # Orphaned pid refs file found, the retrieved cid refs file exists
+                        # but doesn't contain the cid. Proceed to overwrite the pid refs file.
             elif not os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
                 debug_msg = (
                     f"FileHashStore - tag_object: pid refs file does not exists for pid {pid}"
@@ -2434,6 +2436,16 @@ class Stream(object):
             self._obj.close()
         else:
             self._obj.seek(self._pos)
+
+
+class PidRefsExistsError(Exception):
+    """Custom exception thrown when a client calls 'tag_object' and the pid
+    that is being tagged is already accounted for (has a pid refs file and
+    is found in the cid refs file)."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
 
 
 class PidObjectMetadataError(Exception):

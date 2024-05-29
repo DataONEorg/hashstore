@@ -569,17 +569,6 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid", "tag_object")
         self._check_string(cid, "cid", "tag_object")
-        # Prepare files and paths
-        tmp_root_path = self._get_store_path("refs") / "tmp"
-        pid_refs_path = self._resolve_path("pid", pid)
-        cid_refs_path = self._resolve_path("cid", cid)
-        # All ref files begin as tmp files and get moved sequentially at once
-        # Get tmp files with the expected cid and pid refs content
-        pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
-        cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
-        # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
-        self._create_path(os.path.dirname(pid_refs_path))
-        self._create_path(os.path.dirname(cid_refs_path))
 
         # Modify reference_locked_cids consecutively
         # Wait for the cid to release if it's being tagged
@@ -614,8 +603,19 @@ class FileHashStore(HashStore):
                     pid,
                 )
                 self.reference_locked_cids.append(cid)
-
         try:
+            # Prepare files and paths
+            tmp_root_path = self._get_store_path("refs") / "tmp"
+            pid_refs_path = self._resolve_path("pid", pid)
+            cid_refs_path = self._resolve_path("cid", cid)
+            # All ref files begin as tmp files and get moved sequentially at once
+            # Get tmp files with the expected cid and pid refs content
+            pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
+            cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
+            # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
+            self._create_path(os.path.dirname(pid_refs_path))
+            self._create_path(os.path.dirname(cid_refs_path))
+
             if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
                 self._verify_hashstore_references(
                     pid,

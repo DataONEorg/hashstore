@@ -1,7 +1,6 @@
 """Test module for FileHashStore HashStore interface methods."""
 
 import io
-import multiprocessing
 import os
 from pathlib import Path
 from threading import Thread

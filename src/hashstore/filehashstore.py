@@ -588,7 +588,7 @@ class FileHashStore(HashStore):
                     )
                     self.multiprocessing_condition.wait()
                 # Add cid to tracking array
-                self.reference_locked_cids.append(cid)
+                self.reference_locked_cids_mp.append(cid)
         else:
             with self.thread_condition:
                 while cid in self.reference_locked_cids:

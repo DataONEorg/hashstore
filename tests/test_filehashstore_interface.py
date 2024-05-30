@@ -503,7 +503,7 @@ def test_store_object_duplicates_threads(pids, store):
 # implement a multiprocessing test
 
 
-def test_store_object_threads_multiple_pids_one_cid(pids, store):
+def test_store_object_threads_multiple_pids_one_cid_content(pids, store):
     """Test store object thread lock."""
     entity = "objects"
     test_dir = "tests/testdata/"
@@ -548,6 +548,59 @@ def test_store_object_threads_multiple_pids_one_cid(pids, store):
             assert pid.strip() in pid_list
 
     assert number_of_pids_reffed == 6
+
+
+def test_store_object_threads_multiple_pids_one_cid_files(store):
+    """Test store object with threads produces the right amount of files"""
+    test_dir = "tests/testdata/"
+    path = test_dir + "jtao.1700.1"
+    pid_list = ["jtao.1700.1"]
+    for n in range(0, 5):
+        pid_list.append(f"dou.test.{n}")
+
+    def store_object_wrapper(obj_pid, obj_path):
+        store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
+
+    thread1 = Thread(target=store_object_wrapper, args=(pid_list[0], path))
+    thread2 = Thread(target=store_object_wrapper, args=(pid_list[1], path))
+    thread3 = Thread(target=store_object_wrapper, args=(pid_list[2], path))
+    thread4 = Thread(target=store_object_wrapper, args=(pid_list[3], path))
+    thread5 = Thread(target=store_object_wrapper, args=(pid_list[4], path))
+    thread6 = Thread(target=store_object_wrapper, args=(pid_list[5], path))
+    thread1.start()
+    thread2.start()
+    thread3.start()
+    thread4.start()
+    thread5.start()
+    thread6.start()
+    thread1.join()
+    thread2.join()
+    thread3.join()
+    thread4.join()
+    thread5.join()
+    thread6.join()
+
+    # Confirm that tmp files do not remain in refs
+    def folder_has_files(folder_path):
+        # Iterate over directory contents
+        for _, _, files in os.walk(folder_path):
+            if files:  # If there are any files in the folder
+                print(files)
+                return True
+        return False
+
+    # Confirm that tmp files do not remain in refs
+    def get_number_of_files(folder_path):
+        # Iterate over directory contents
+        file_count = 0
+        for _, _, files in os.walk(folder_path):
+            if files:  # If there are any files in the folder
+                file_count += len(files)
+        return file_count
+
+    assert get_number_of_files(store.refs + "/pids") == 6
+    assert get_number_of_files(store.refs + "/cids") == 1
+    assert folder_has_files(store.refs + "/tmp") is False
 
 
 @slow_test

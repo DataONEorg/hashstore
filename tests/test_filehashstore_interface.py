@@ -504,7 +504,7 @@ def test_store_object_duplicates_threads(pids, store):
 
 
 def test_store_object_threads_multiple_pids_one_cid_content(pids, store):
-    """Test store object thread lock."""
+    """Test store object thread lock and refs files content"""
     entity = "objects"
     test_dir = "tests/testdata/"
     path = test_dir + "jtao.1700.1"
@@ -551,7 +551,7 @@ def test_store_object_threads_multiple_pids_one_cid_content(pids, store):
 
 
 def test_store_object_threads_multiple_pids_one_cid_files(store):
-    """Test store object with threads produces the right amount of files"""
+    """Test store object with threads produces the expected amount of files"""
     test_dir = "tests/testdata/"
     path = test_dir + "jtao.1700.1"
     pid_list = ["jtao.1700.1"]

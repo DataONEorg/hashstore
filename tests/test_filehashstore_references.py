@@ -4,6 +4,8 @@ import os
 import shutil
 import pytest
 
+from hashstore.filehashstore import PidAlreadyExistsError
+
 # pylint: disable=W0212
 
 
@@ -112,7 +114,7 @@ def test_tag_object_pid_refs_found_cid_refs_not_found_different_cid_retrieved(st
     path = test_dir + pid.replace("/", "_")
     _object_metadata = store.store_object(pid, path)
 
-    with pytest.raises(FileExistsError):
+    with pytest.raises(PidAlreadyExistsError):
         store.tag_object(pid, "another_cid_value_that_is_not_found")
 
 
@@ -360,7 +362,7 @@ def test_verify_hashstore_references_pid_refs_file_missing(pids, store):
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         with pytest.raises(FileNotFoundError):
-            store._verify_hashstore_references(pid, cid, "create")
+            store._verify_hashstore_references(pid, cid)
 
 
 def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
@@ -371,17 +373,19 @@ def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
         cid_ref_abs_path = store._resolve_path("cid", cid)
+        print(cid_ref_abs_path)
         store._create_path(os.path.dirname(cid_ref_abs_path))
         shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
         # Write the pid refs file and move it where it needs to be with a bad cid
         pid_ref_abs_path = store._resolve_path("pid", pid)
+        print(pid_ref_abs_path)
         store._create_path(os.path.dirname(pid_ref_abs_path))
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, "bad_cid", "pid")
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
         with pytest.raises(ValueError):
-            store._verify_hashstore_references(pid, cid, "create")
+            store._verify_hashstore_references(pid, cid)
 
 
 def test_verify_hashstore_references_cid_refs_file_missing(pids, store):
@@ -395,7 +399,7 @@ def test_verify_hashstore_references_cid_refs_file_missing(pids, store):
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
         with pytest.raises(FileNotFoundError):
-            store._verify_hashstore_references(pid, cid, "create")
+            store._verify_hashstore_references(pid, cid)
 
 
 def test_verify_hashstore_references_cid_refs_file_missing_pid(pids, store):
@@ -417,7 +421,7 @@ def test_verify_hashstore_references_cid_refs_file_missing_pid(pids, store):
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
         with pytest.raises(ValueError):
-            store._verify_hashstore_references(pid, cid, "create")
+            store._verify_hashstore_references(pid, cid)
 
 
 def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pid(
@@ -446,4 +450,4 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
             cid_reference_list.append(f"dou.test.{i}")
 
         with pytest.raises(ValueError):
-            store._verify_hashstore_references(pid, cid, "create")
+            store._verify_hashstore_references(pid, cid)

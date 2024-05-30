@@ -58,16 +58,21 @@ class FileHashStore(HashStore):
         "blake2b",
         "blake2s",
     ]
-    # Variables to orchestrate thread locking and object store synchronization
+    # Variables to orchestrate parallelization
     time_out_sec = 1
+    # Thread Synchronization
     object_lock = threading.Lock()
     metadata_lock = threading.Lock()
     reference_lock = threading.Lock()
+    thread_condition = threading.Condition(reference_lock)
+    reference_locked_cids = []
+    # Multiprocessing Synchronization
     reference_lock_mp = multiprocessing.Lock()
     reference_locked_cids_mp = multiprocessing.Manager().list()  # Create a shared list
+
+    # TODO: To organize
     object_locked_pids = []
     metadata_locked_pids = []
-    reference_locked_cids = []
 
     def __init__(self, properties=None):
         if properties:
@@ -590,18 +595,14 @@ class FileHashStore(HashStore):
                 )
                 self.reference_locked_cids_mp.append(cid)
         else:
-            while cid in self.reference_locked_cids:
-                logging.debug(
-                    "FileHashStore - tag_object: (cid) %s is currently locked. Waiting.",
-                    cid,
-                )
-                time.sleep(self.time_out_sec)
-            with self.reference_lock:
-                logging.debug(
-                    "FileHashStore - tag_object: Locking cid: %s to to tag pid: %s.",
-                    cid,
-                    pid,
-                )
+            with self.thread_condition:
+                while cid in self.reference_locked_cids:
+                    logging.debug(
+                        "FileHashStore - tag_object: (cid) %s is currently locked. Waiting.",
+                        cid,
+                    )
+                    self.thread_condition.wait()
+                # with self.cid_lock:
                 self.reference_locked_cids.append(cid)
         try:
             # Prepare files and paths
@@ -722,12 +723,13 @@ class FileHashStore(HashStore):
                     )
                     self.reference_locked_cids_mp.remove(cid)
             else:
-                with self.reference_lock:
+                with self.thread_condition:
                     logging.debug(
                         "FileHashStore - tag_object: Removing cid: %s from reference_locked_cids.",
                         cid,
                     )
                     self.reference_locked_cids.remove(cid)
+                    self.thread_condition.notify()
 
     def find_object(self, pid):
         logging.debug(

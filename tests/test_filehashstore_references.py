@@ -4,7 +4,7 @@ import os
 import shutil
 import pytest
 
-from hashstore.filehashstore import PidRefsExistsError
+from hashstore.filehashstore import PidAlreadyExistsError
 
 # pylint: disable=W0212
 
@@ -114,7 +114,7 @@ def test_tag_object_pid_refs_found_cid_refs_not_found_different_cid_retrieved(st
     path = test_dir + pid.replace("/", "_")
     _object_metadata = store.store_object(pid, path)
 
-    with pytest.raises(PidRefsExistsError):
+    with pytest.raises(PidAlreadyExistsError):
         store.tag_object(pid, "another_cid_value_that_is_not_found")
 
 

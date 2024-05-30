@@ -662,7 +662,7 @@ class FileHashStore(HashStore):
                             + f" and cid reference files for pid: {pid} with cid: {cid}."
                         )
                         logging.error(error_msg)
-                        raise PidRefsExistsError(error_msg)
+                        raise PidAlreadyExistsError(error_msg)
                     else:
                         debug_msg = (
                             f"FileHashStore - tag_object: Orphan pid refs file found for {pid}."
@@ -2427,7 +2427,7 @@ class Stream(object):
             self._obj.seek(self._pos)
 
 
-class PidRefsExistsError(Exception):
+class PidAlreadyExistsError(Exception):
     """Custom exception thrown when a client calls 'tag_object' and the pid
     that is being tagged is already accounted for (has a pid refs file and
     is found in the cid refs file)."""

@@ -604,10 +604,6 @@ class FileHashStore(HashStore):
             tmp_root_path = self._get_store_path("refs") / "tmp"
             pid_refs_path = self._resolve_path("pid", pid)
             cid_refs_path = self._resolve_path("cid", cid)
-            # All ref files begin as tmp files and get moved sequentially at once
-            # Get tmp files with the expected cid and pid refs content
-            pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
-            cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
             # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
             self._create_path(os.path.dirname(pid_refs_path))
             self._create_path(os.path.dirname(cid_refs_path))
@@ -635,6 +631,7 @@ class FileHashStore(HashStore):
 
                 if self._is_string_in_refs_file(cid, pid_refs_path):
                     # The pid correctly references the given cid, but the cid refs file is missing
+                    cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
                     shutil.move(cid_tmp_file_path, cid_refs_path)
                     self._verify_hashstore_references(
                         pid,
@@ -676,6 +673,7 @@ class FileHashStore(HashStore):
                 )
                 logging.debug(debug_msg)
                 # Move the pid refs file
+                pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
                 shutil.move(pid_tmp_file_path, pid_refs_path)
                 # Update cid ref files as it already exists
                 if not self._is_string_in_refs_file(pid, cid_refs_path):
@@ -695,6 +693,8 @@ class FileHashStore(HashStore):
                 return True
 
             # Move both files after checking the existing status of refs files
+            pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
+            cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
             shutil.move(pid_tmp_file_path, pid_refs_path)
             shutil.move(cid_tmp_file_path, cid_refs_path)
             log_msg = "Reference files have been moved to their permanent location. Verifying refs."

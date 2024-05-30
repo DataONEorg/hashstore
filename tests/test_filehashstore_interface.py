@@ -1,6 +1,7 @@
 """Test module for FileHashStore HashStore interface methods."""
 
 import io
+import multiprocessing
 import os
 from pathlib import Path
 from threading import Thread
@@ -497,6 +498,12 @@ def test_store_object_duplicates_threads(pids, store):
     assert store._exists(entity, pids[pid][store.algorithm])
 
 
+# Note:
+# Multiprocessing has been tested through the HashStore client using
+# metacat db data from 'test.arcticdata.io'. When time-permitting,
+# implement a multiprocessing test
+
+
 def test_store_object_threads_multiple_pids_one_cid(pids, store):
     """Test store object thread lock."""
     entity = "objects"
@@ -527,7 +534,7 @@ def test_store_object_threads_multiple_pids_one_cid(pids, store):
     thread4.join()
     thread5.join()
     thread6.join()
-    # One thread will succeed, file count must still be 1
+    # All threads will succeed, file count must still be 1
     assert store._count(entity) == 1
     assert store._exists(entity, pids["jtao.1700.1"][store.algorithm])
 

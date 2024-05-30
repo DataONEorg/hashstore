@@ -68,6 +68,7 @@ class FileHashStore(HashStore):
     reference_locked_cids = []
     # Multiprocessing Synchronization
     reference_lock_mp = multiprocessing.Lock()
+    multiprocessing_condition = multiprocessing.Condition(reference_lock_mp)
     reference_locked_cids_mp = multiprocessing.Manager().list()  # Create a shared list
 
     # TODO: To organize
@@ -579,21 +580,15 @@ class FileHashStore(HashStore):
         # Wait for the cid to release if it's being tagged
         use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
         if use_multiprocessing:
-            while cid in self.reference_locked_cids_mp:
-                logging.debug(
-                    "FileHashStore - tag_object (mp): (cid) %s is currently locked. Waiting"
-                    + " to tag pid: %s",
-                    cid,
-                    pid,
-                )
-                time.sleep(self.time_out_sec)
-            with self.reference_lock_mp:
-                logging.debug(
-                    "FileHashStore - tag_object (mp): Locking cid: %s to to tag pid: %s.",
-                    cid,
-                    pid,
-                )
-                self.reference_locked_cids_mp.append(cid)
+            with self.multiprocessing_condition:
+                while cid in self.reference_locked_cids_mp:
+                    logging.debug(
+                        "FileHashStore - tag_object: (cid) %s is currently locked. Waiting.",
+                        cid,
+                    )
+                    self.multiprocessing_condition.wait()
+                # Add cid to tracking array
+                self.reference_locked_cids.append(cid)
         else:
             with self.thread_condition:
                 while cid in self.reference_locked_cids:
@@ -602,7 +597,7 @@ class FileHashStore(HashStore):
                         cid,
                     )
                     self.thread_condition.wait()
-                # with self.cid_lock:
+                # Add cid to tracking array
                 self.reference_locked_cids.append(cid)
         try:
             # Prepare files and paths
@@ -715,13 +710,14 @@ class FileHashStore(HashStore):
         finally:
             # Release cid
             if use_multiprocessing:
-                with self.reference_lock_mp:
+                with self.multiprocessing_condition:
                     logging.debug(
                         "FileHashStore - tag_object (mp): Removing cid: %s from"
                         + " reference_locked_cids.",
                         cid,
                     )
                     self.reference_locked_cids_mp.remove(cid)
+                    self.multiprocessing_condition.notify()
             else:
                 with self.thread_condition:
                     logging.debug(

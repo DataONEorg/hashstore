@@ -5,7 +5,6 @@ import io
 import multiprocessing
 import shutil
 import threading
-import time
 import hashlib
 import os
 import logging
@@ -59,7 +58,6 @@ class FileHashStore(HashStore):
         "blake2s",
     ]
     # Variables to orchestrate parallelization
-    time_out_sec = 1
     # Thread Synchronization
     object_lock = threading.Lock()
     object_condition = threading.Condition(object_lock)

@@ -936,48 +936,45 @@ class FileHashStore(HashStore):
             # If the refs file still exists, do not delete the object
             if not os.path.exists(cid_refs_abs_path):
                 cid = ab_id
-                # Synchronize the cid
+                sync_begin_debug_msg = (
+                    f"FileHashStore - delete_object: Cid ({cid}) to locked list."
+                )
+                sync_wait_msg = (
+                    f"FileHashStore - delete_object: Cid ({cid}) is locked. Waiting."
+                )
                 if use_multiprocessing:
                     with self.reference_condition_mp:
+                        # Wait for the cid to release if it's in use
                         while cid in self.reference_locked_cids_mp:
-                            logging.debug(
-                                "FileHashStore - delete_object: (cid) %s is locked. Waiting",
-                                cid,
-                            )
+                            logging.debug(sync_wait_msg)
                             self.reference_condition_mp.wait()
-                        # Add cid to tracking array
+                        # Modify reference_locked_cids consecutively
+                        logging.debug(sync_begin_debug_msg)
                         self.reference_locked_cids_mp.append(cid)
                 else:
                     with self.reference_condition:
                         while cid in self.reference_locked_cids:
-                            logging.debug(
-                                "FileHashStore - delete_object: (cid) %s is locked. Waiting",
-                                cid,
-                            )
+                            logging.debug(sync_wait_msg)
                             self.reference_condition.wait()
-                        # Modify reference_locked_cids consecutively
+                        logging.debug(sync_begin_debug_msg)
                         self.reference_locked_cids.append(cid)
 
                 try:
                     self._delete("objects", cid)
                 finally:
                     # Release cid
+                    end_sync_debug_msg = (
+                        f"FileHashStore - delete_object: Releasing cid ({cid})"
+                        + " from locked list"
+                    )
                     if use_multiprocessing:
                         with self.reference_condition_mp:
-                            logging.debug(
-                                "FileHashStore - delete_object: Removing cid: %s from"
-                                + "lock array.",
-                                cid,
-                            )
+                            logging.debug(end_sync_debug_msg)
                             self.reference_locked_cids_mp.remove(cid)
                             self.reference_condition_mp.notify()
                     else:
                         with self.reference_condition:
-                            logging.debug(
-                                "FileHashStore - delete_object: Removing cid: %s from"
-                                + "lock array.",
-                                cid,
-                            )
+                            logging.debug(end_sync_debug_msg)
                             self.reference_locked_cids.remove(cid)
                             self.reference_condition.notify()
         else:
@@ -992,24 +989,27 @@ class FileHashStore(HashStore):
             # Storing and deleting objects are synchronized together
             # Duplicate store object requests for a pid are rejected, but deleting an object
             # will wait for a pid to be released if it's found to be in use before proceeding.
+            sync_begin_debug_msg = (
+                f"FileHashStore - delete_object: Pid ({pid}) to locked list."
+            )
+            sync_wait_msg = (
+                f"FileHashStore - delete_object: Pid ({pid}) is locked. Waiting."
+            )
             if use_multiprocessing:
                 with self.object_condition_mp:
+                    # Wait for the pid to release if it's in use
                     while pid in self.object_locked_pids_mp:
-                        logging.debug(
-                            "FileHashStore - delete_object: pid (%s) is currently locked. Waiting.",
-                            pid,
-                        )
+                        logging.debug(sync_wait_msg)
                         self.object_condition_mp.wait()
+                    # Modify object_locked_pids consecutively
+                    logging.debug(sync_begin_debug_msg)
                     self.object_locked_pids_mp.append(pid)
             else:
                 with self.object_condition:
                     while pid in self.object_locked_pids:
-                        logging.debug(
-                            "FileHashStore - delete_object: pid (%s) is currently locked. Waiting.",
-                            pid,
-                        )
+                        logging.debug(sync_wait_msg)
                         self.object_condition.wait()
-                    # Modify object_locked_pids consecutively
+                    logging.debug(sync_begin_debug_msg)
                     self.object_locked_pids.append(pid)
 
             try:
@@ -1022,15 +1022,29 @@ class FileHashStore(HashStore):
                     # Proceed with next steps - cid has been retrieved without any issues
                     # We must synchronized here based on the `cid` because multiple threads may
                     # try to access the `cid_reference_file`
-                    with self.reference_condition:
-                        while cid in self.reference_locked_cids:
-                            logging.debug(
-                                "FileHashStore - delete_object: (cid) %s is locked. Waiting",
-                                cid,
-                            )
-                            self.reference_condition.wait()
-                        # Modify reference_locked_cids consecutively
-                        self.reference_locked_cids.append(cid)
+                    sync_begin_debug_msg = (
+                        f"FileHashStore - delete_object: Cid ({cid}) to locked list."
+                    )
+                    sync_wait_msg = (
+                        f"FileHashStore - delete_object: Cid ({cid}) is locked."
+                        + " Waiting."
+                    )
+                    if use_multiprocessing:
+                        with self.reference_condition_mp:
+                            # Wait for the cid to release if it's in use
+                            while cid in self.reference_locked_cids_mp:
+                                logging.debug(sync_wait_msg)
+                                self.reference_condition_mp.wait()
+                            # Modify reference_locked_cids consecutively
+                            logging.debug(sync_begin_debug_msg)
+                            self.reference_locked_cids_mp.append(cid)
+                    else:
+                        with self.reference_condition:
+                            while cid in self.reference_locked_cids:
+                                logging.debug(sync_wait_msg)
+                                self.reference_condition.wait()
+                            logging.debug(sync_begin_debug_msg)
+                            self.reference_locked_cids.append(cid)
 
                     try:
                         cid_ref_abs_path = self._resolve_path("cid", cid)
@@ -1075,22 +1089,18 @@ class FileHashStore(HashStore):
 
                     finally:
                         # Release cid
+                        end_sync_debug_msg = (
+                            f"FileHashStore - delete_object: Releasing cid ({cid})"
+                            + " from locked list"
+                        )
                         if use_multiprocessing:
                             with self.reference_condition_mp:
-                                debug_msg = (
-                                    "FileHashStore - delete_object:"
-                                    + f" Removing cid: {cid} from reference_locked_cids."
-                                )
-                                logging.debug(debug_msg)
+                                logging.debug(end_sync_debug_msg)
                                 self.reference_locked_cids_mp.remove(cid)
                                 self.reference_condition_mp.notify()
                         else:
                             with self.reference_condition:
-                                debug_msg = (
-                                    "FileHashStore - delete_object:"
-                                    + f" Removing cid: {cid} from reference_locked_cids."
-                                )
-                                logging.debug(debug_msg)
+                                logging.debug(end_sync_debug_msg)
                                 self.reference_locked_cids.remove(cid)
                                 self.reference_condition.notify()
 
@@ -1113,7 +1123,6 @@ class FileHashStore(HashStore):
                     for obj in objects_to_delete:
                         os.remove(obj)
                     return
-
                 except CidRefsDoesNotExist:
                     # Delete pid refs file
                     objects_to_delete.append(
@@ -1130,7 +1139,6 @@ class FileHashStore(HashStore):
                     for obj in objects_to_delete:
                         os.remove(obj)
                     return
-
                 except RefsFileExistsButCidObjMissing:
                     # Add pid refs file to be permanently deleted
                     pid_ref_abs_path = self._resolve_path("pid", pid)
@@ -1156,7 +1164,6 @@ class FileHashStore(HashStore):
                     for obj in objects_to_delete:
                         os.remove(obj)
                     return
-
                 except PidNotFoundInCidRefsFile:
                     # Add pid refs file to be permanently deleted
                     pid_ref_abs_path = self._resolve_path("pid", pid)
@@ -1175,20 +1182,19 @@ class FileHashStore(HashStore):
                     return
             finally:
                 # Release pid
+                end_sync_debug_msg = (
+                    f"FileHashStore - delete_object: Releasing pid ({pid})"
+                    + " from locked list"
+                )
                 if use_multiprocessing:
                     with self.object_condition_mp:
-                        logging.debug(
-                            "FileHashStore - delete_object: Removing pid: %s from object_locked_pids.",
-                            pid,
-                        )
+                        logging.debug(end_sync_debug_msg)
                         self.object_locked_pids_mp.remove(pid)
                         self.object_condition_mp.notify()
                 else:
+                    # Release pid
                     with self.object_condition:
-                        logging.debug(
-                            "FileHashStore - delete_object: Removing pid: %s from object_locked_pids.",
-                            pid,
-                        )
+                        logging.debug(end_sync_debug_msg)
                         self.object_locked_pids.remove(pid)
                         self.object_condition.notify()
 

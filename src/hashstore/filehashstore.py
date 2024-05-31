@@ -81,7 +81,6 @@ class FileHashStore(HashStore):
     reference_condition_mp = multiprocessing.Condition(reference_lock_mp)
     reference_locked_cids_mp = multiprocessing.Manager().list()
 
-    # TODO: Review store/delete object/metadata debug messaging for consistency
     # TODO: Review if there is a better way to retrieve global env 'use_multiprocessing'
 
     def __init__(self, properties=None):
@@ -1208,23 +1207,27 @@ class FileHashStore(HashStore):
 
         # Wait for the pid to release if it's in use
         use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+        sync_begin_debug_msg = (
+            f"FileHashStore - delete_metadata: Adding pid ({pid}) to locked list."
+        )
+        sync_wait_msg = (
+            f"FileHashStore - delete_metadata: Pid ({pid}) is locked. Waiting."
+        )
         if use_multiprocessing:
             with self.metadata_condition_mp:
+                # Wait for the pid to release if it's in use
                 while pid in self.metadata_locked_pids_mp:
-                    logging.debug(
-                        "FileHashStore - store_metadata (mp): %s (pid) is locked. Waiting.",
-                        pid,
-                    )
+                    logging.debug(sync_wait_msg)
                     self.metadata_condition_mp.wait()
+                # Modify metadata_locked_pids consecutively
+                logging.debug(sync_begin_debug_msg)
                 self.metadata_locked_pids_mp.append(pid)
         else:
             with self.metadata_condition:
                 while pid in self.metadata_locked_pids:
-                    logging.debug(
-                        "FileHashStore - store_metadata: %s (pid) is locked. Waiting.",
-                        pid,
-                    )
+                    logging.debug(sync_wait_msg)
                     self.metadata_condition.wait()
+                logging.debug(sync_begin_debug_msg)
                 self.metadata_locked_pids.append(pid)
         try:
             # Get the metadata directory path for the given pid
@@ -1243,8 +1246,8 @@ class FileHashStore(HashStore):
                     os.remove(obj)
 
                 info_string = (
-                    "FileHashStore - delete_metadata: Successfully deleted all metadata for pid: %s",
-                    pid,
+                    "FileHashStore - delete_metadata: Successfully deleted all metadata"
+                    + f"for pid: {pid}",
                 )
                 logging.info(info_string)
                 return
@@ -1264,20 +1267,18 @@ class FileHashStore(HashStore):
                 return
         finally:
             # Release pid
+            end_sync_debug_msg = (
+                f"FileHashStore - delete_metadata: Releasing pid ({pid})"
+                + " from locked list"
+            )
             if use_multiprocessing:
                 with self.metadata_condition_mp:
-                    logging.debug(
-                        "FileHashStore - store_metadata (mp): Removing pid: %s from lock array",
-                        pid,
-                    )
+                    logging.debug(end_sync_debug_msg)
                     self.metadata_locked_pids_mp.remove(pid)
                     self.metadata_condition_mp.notify()
             else:
                 with self.metadata_condition:
-                    logging.debug(
-                        "FileHashStore - store_metadata: Removing pid: %s from lock array.",
-                        pid,
-                    )
+                    logging.debug(end_sync_debug_msg)
                     self.metadata_locked_pids.remove(pid)
                     self.metadata_condition.notify()
 

@@ -465,7 +465,6 @@ class FileHashStore(HashStore):
                 additional_algorithm, checksum, checksum_algorithm
             )
 
-            # Wait for the pid to release if it's in use
             use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
             sync_begin_debug_msg = (
                 f"FileHashStore - store_object: Adding pid ({pid}) to locked list."
@@ -475,9 +474,11 @@ class FileHashStore(HashStore):
             )
             if use_multiprocessing:
                 with self.object_condition_mp:
+                    # Wait for the pid to release if it's in use
                     while pid in self.object_locked_pids_mp:
                         logging.debug(sync_wait_msg)
                         self.object_condition_mp.wait()
+                    # Modify object_locked_pids consecutively
                     logging.debug(sync_begin_debug_msg)
                     self.object_locked_pids_mp.append(pid)
             else:
@@ -527,8 +528,10 @@ class FileHashStore(HashStore):
                 logging.error(exception_string)
                 raise err
             finally:
+                # Release pid
                 end_sync_debug_msg = (
-                    f"FileHashStore - store_object: Releasing pid ({pid}) from locked list"
+                    f"FileHashStore - store_object: Releasing pid ({pid})"
+                    + " from locked list"
                 )
                 if use_multiprocessing:
                     with self.object_condition_mp:
@@ -599,28 +602,26 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid", "tag_object")
         self._check_string(cid, "cid", "tag_object")
 
-        # Modify reference_locked_cids consecutively
-        # Wait for the cid to release if it's being tagged
         use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+        sync_begin_debug_msg = (
+            f"FileHashStore - tag_object: Adding cid ({pid}) to locked list."
+        )
+        sync_wait_msg = f"FileHashStore - tag_object: Cid ({cid}) is locked. Waiting."
         if use_multiprocessing:
             with self.reference_condition_mp:
+                # Wait for the cid to release if it's being tagged
                 while cid in self.reference_locked_cids_mp:
-                    logging.debug(
-                        "FileHashStore - tag_object: (cid) %s is currently locked. Waiting.",
-                        cid,
-                    )
+                    logging.debug(sync_wait_msg)
                     self.reference_condition_mp.wait()
-                # Add cid to tracking array
+                # Modify reference_locked_cids consecutively
+                logging.debug(sync_begin_debug_msg)
                 self.reference_locked_cids_mp.append(cid)
         else:
             with self.reference_condition:
                 while cid in self.reference_locked_cids:
-                    logging.debug(
-                        "FileHashStore - tag_object: (cid) %s is currently locked. Waiting.",
-                        cid,
-                    )
+                    logging.debug(sync_wait_msg)
                     self.reference_condition.wait()
-                # Add cid to tracking array
+                logging.debug(sync_begin_debug_msg)
                 self.reference_locked_cids.append(cid)
         try:
             # Prepare files and paths
@@ -732,21 +733,18 @@ class FileHashStore(HashStore):
             return True
         finally:
             # Release cid
+            end_sync_debug_msg = (
+                f"FileHashStore - tag_object: Releasing cid ({cid}) from"
+                + " reference_locked_cids."
+            )
             if use_multiprocessing:
                 with self.reference_condition_mp:
-                    logging.debug(
-                        "FileHashStore - tag_object (mp): Removing cid: %s from"
-                        + " reference_locked_cids.",
-                        cid,
-                    )
+                    logging.debug(end_sync_debug_msg)
                     self.reference_locked_cids_mp.remove(cid)
                     self.reference_condition_mp.notify()
             else:
                 with self.reference_condition:
-                    logging.debug(
-                        "FileHashStore - tag_object: Removing cid: %s from reference_locked_cids.",
-                        cid,
-                    )
+                    logging.debug(end_sync_debug_msg)
                     self.reference_locked_cids.remove(cid)
                     self.reference_condition.notify()
 

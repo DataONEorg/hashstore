@@ -62,7 +62,11 @@ class FileHashStore(HashStore):
     time_out_sec = 1
     # Thread Synchronization
     object_lock = threading.Lock()
+    object_condition = threading.Condition(object_lock)
+    object_locked_pids = []
     metadata_lock = threading.Lock()
+    # metadata_condition = threading.Condition(object_lock)
+    metadata_locked_pids = []
     reference_lock = threading.Lock()
     thread_condition = threading.Condition(reference_lock)
     reference_locked_cids = []
@@ -70,10 +74,6 @@ class FileHashStore(HashStore):
     reference_lock_mp = multiprocessing.Lock()
     multiprocessing_condition = multiprocessing.Condition(reference_lock_mp)
     reference_locked_cids_mp = multiprocessing.Manager().list()  # Create a shared list
-
-    # TODO: To organize
-    object_locked_pids = []
-    metadata_locked_pids = []
 
     def __init__(self, properties=None):
         if properties:

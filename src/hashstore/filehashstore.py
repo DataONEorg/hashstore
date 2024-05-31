@@ -458,18 +458,14 @@ class FileHashStore(HashStore):
 
             # TODO: Implement multiprocessing lock check like 'tag_object'
             # Wait for the pid to release if it's in use
-            while pid in self.object_locked_pids:
-                logging.debug(
-                    "FileHashStore - store_object: %s is currently being stored. Waiting.",
-                    pid,
-                )
-                time.sleep(self.time_out_sec)
-            # Modify object_locked_pids consecutively
-            with self.object_lock:
-                logging.debug(
-                    "FileHashStore - store_object: Adding pid: %s to object_locked_pids.",
-                    pid,
-                )
+            with self.object_condition:
+                while pid in self.object_locked_pids:
+                    logging.debug(
+                        "FileHashStore - store_object: %s is currently being stored. Waiting.",
+                        pid,
+                    )
+                    self.object_condition.wait()
+                # Modify object_locked_pids consecutively
                 self.object_locked_pids.append(pid)
             try:
                 logging.debug(
@@ -512,12 +508,13 @@ class FileHashStore(HashStore):
                 raise err
             finally:
                 # Release pid
-                with self.object_lock:
+                with self.object_condition:
                     logging.debug(
                         "FileHashStore - store_object: Removing pid: %s from object_locked_pids.",
                         pid,
                     )
                     self.object_locked_pids.remove(pid)
+                    self.object_condition.notify()
 
         return object_metadata
 

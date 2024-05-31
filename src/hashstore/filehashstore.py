@@ -65,7 +65,7 @@ class FileHashStore(HashStore):
     object_condition = threading.Condition(object_lock)
     object_locked_pids = []
     metadata_lock = threading.Lock()
-    # metadata_condition = threading.Condition(object_lock)
+    metadata_condition = threading.Condition(metadata_lock)
     metadata_locked_pids = []
     reference_lock = threading.Lock()
     thread_condition = threading.Condition(reference_lock)
@@ -809,20 +809,13 @@ class FileHashStore(HashStore):
         self._check_arg_data(metadata)
 
         # TODO: Implement multiprocessing lock check like 'tag_object'
-        # Wait for the pid to release if it's in use
-        while pid in self.metadata_locked_pids:
-            logging.debug(
-                "FileHashStore - store_metadata: %s is currently being stored. Waiting.",
-                pid,
-            )
-            time.sleep(self.time_out_sec)
-
-        with self.metadata_lock:
-            logging.debug(
-                "FileHashStore - store_metadata: Adding pid: %s to metadata_locked_pids.",
-                pid,
-            )
-            # Modify metadata_locked_pids consecutively
+        with self.metadata_condition:
+            while pid in self.metadata_locked_pids:
+                logging.debug(
+                    "FileHashStore - store_metadata: %s is currently being stored. Waiting.",
+                    pid,
+                )
+                self.metadata_condition.wait()
             self.metadata_locked_pids.append(pid)
 
         try:
@@ -839,12 +832,13 @@ class FileHashStore(HashStore):
             return metadata_cid
         finally:
             # Release pid
-            with self.metadata_lock:
+            with self.metadata_condition:
                 logging.debug(
                     "FileHashStore - store_metadata: Removing pid: %s from metadata_locked_pids.",
                     pid,
                 )
                 self.metadata_locked_pids.remove(pid)
+                self.metadata_condition.notify()
 
     def retrieve_object(self, pid):
         logging.debug(

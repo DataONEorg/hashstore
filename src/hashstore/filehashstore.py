@@ -1199,44 +1199,83 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
         )
-        # TODO: Implement multiprocessing lock check like 'tag_object'
         self._check_string(pid, "pid", "delete_metadata")
         checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
-        # Get the metadata directory path for the given pid
-        entity = "metadata"
-        metadata_directory = self._computehash(pid)
-        rel_path = "/".join(self._shard(metadata_directory))
-        metadata_rel_path = self._get_store_path("metadata") / rel_path
-        if format_id is None:
-            # Delete all metadata files
-            objects_to_delete = []
-            metadata_file_paths = self._get_file_paths(metadata_rel_path)
-            if metadata_file_paths is not None:
-                for path in metadata_file_paths:
-                    objects_to_delete.append(self._rename_path_for_deletion(path))
-            for obj in objects_to_delete:
-                os.remove(obj)
 
-            info_string = (
-                "FileHashStore - delete_metadata: Successfully deleted all metadata for pid: %s",
-                pid,
-            )
-            logging.info(info_string)
-            return
+        # Wait for the pid to release if it's in use
+        use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+        if use_multiprocessing:
+            with self.metadata_condition_mp:
+                while pid in self.metadata_locked_pids_mp:
+                    logging.debug(
+                        "FileHashStore - store_metadata (mp): %s (pid) is locked. Waiting.",
+                        pid,
+                    )
+                    self.metadata_condition_mp.wait()
+                self.metadata_locked_pids_mp.append(pid)
         else:
-            # Delete a specific metadata file
-            metadata_document_name = self._computehash(pid + checked_format_id)
-            full_path_without_directory = rel_path + "/" + metadata_document_name
-            metadata_exists = self._exists(entity, full_path_without_directory)
-            if metadata_exists:
-                self._delete(entity, full_path_without_directory)
+            with self.metadata_condition:
+                while pid in self.metadata_locked_pids:
+                    logging.debug(
+                        "FileHashStore - store_metadata: %s (pid) is locked. Waiting.",
+                        pid,
+                    )
+                    self.metadata_condition.wait()
+                self.metadata_locked_pids.append(pid)
+        try:
+            # Get the metadata directory path for the given pid
+            entity = "metadata"
+            metadata_directory = self._computehash(pid)
+            rel_path = "/".join(self._shard(metadata_directory))
+            metadata_rel_path = self._get_store_path("metadata") / rel_path
+            if format_id is None:
+                # Delete all metadata files
+                objects_to_delete = []
+                metadata_file_paths = self._get_file_paths(metadata_rel_path)
+                if metadata_file_paths is not None:
+                    for path in metadata_file_paths:
+                        objects_to_delete.append(self._rename_path_for_deletion(path))
+                for obj in objects_to_delete:
+                    os.remove(obj)
 
-            info_string = (
-                "FileHashStore - delete_metadata: Successfully deleted metadata for pid:"
-                + f" {pid} for format_id: {format_id}"
-            )
-            logging.info(info_string)
-            return
+                info_string = (
+                    "FileHashStore - delete_metadata: Successfully deleted all metadata for pid: %s",
+                    pid,
+                )
+                logging.info(info_string)
+                return
+            else:
+                # Delete a specific metadata file
+                metadata_document_name = self._computehash(pid + checked_format_id)
+                full_path_without_directory = rel_path + "/" + metadata_document_name
+                metadata_exists = self._exists(entity, full_path_without_directory)
+                if metadata_exists:
+                    self._delete(entity, full_path_without_directory)
+
+                info_string = (
+                    "FileHashStore - delete_metadata: Successfully deleted metadata for pid:"
+                    + f" {pid} for format_id: {format_id}"
+                )
+                logging.info(info_string)
+                return
+        finally:
+            # Release pid
+            if use_multiprocessing:
+                with self.metadata_condition_mp:
+                    logging.debug(
+                        "FileHashStore - store_metadata (mp): Removing pid: %s from lock array",
+                        pid,
+                    )
+                    self.metadata_locked_pids_mp.remove(pid)
+                    self.metadata_condition_mp.notify()
+            else:
+                with self.metadata_condition:
+                    logging.debug(
+                        "FileHashStore - store_metadata: Removing pid: %s from lock array.",
+                        pid,
+                    )
+                    self.metadata_locked_pids.remove(pid)
+                    self.metadata_condition.notify()
 
     def get_hex_digest(self, pid, algorithm):
         logging.debug(

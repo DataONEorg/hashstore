@@ -74,6 +74,9 @@ class FileHashStore(HashStore):
     object_lock_mp = multiprocessing.Lock()
     object_condition_mp = multiprocessing.Condition(object_lock_mp)
     object_locked_pids_mp = multiprocessing.Manager().list()
+    metadata_lock_mp = multiprocessing.Lock()
+    metadata_condition_mp = multiprocessing.Condition(metadata_lock_mp)
+    metadata_locked_pids_mp = multiprocessing.Manager().list()
     reference_lock_mp = multiprocessing.Lock()
     reference_condition_mp = multiprocessing.Condition(reference_lock_mp)
     reference_locked_cids_mp = multiprocessing.Manager().list()
@@ -808,15 +811,26 @@ class FileHashStore(HashStore):
         checked_format_id = self._check_arg_format_id(format_id, "store_metadata")
         self._check_arg_data(metadata)
 
-        # TODO: Implement multiprocessing lock check like 'tag_object'
-        with self.metadata_condition:
-            while pid in self.metadata_locked_pids:
-                logging.debug(
-                    "FileHashStore - store_metadata: %s is currently being stored. Waiting.",
-                    pid,
-                )
-                self.metadata_condition.wait()
-            self.metadata_locked_pids.append(pid)
+        # Wait for the pid to release if it's in use
+        use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+        if use_multiprocessing:
+            with self.metadata_condition_mp:
+                while pid in self.metadata_locked_pids_mp:
+                    logging.debug(
+                        "FileHashStore - store_metadata (mp): %s (pid) is locked. Waiting.",
+                        pid,
+                    )
+                    self.metadata_condition_mp.wait()
+                self.metadata_locked_pids_mp.append(pid)
+        else:
+            with self.metadata_condition:
+                while pid in self.metadata_locked_pids:
+                    logging.debug(
+                        "FileHashStore - store_metadata: %s (pid) is locked. Waiting.",
+                        pid,
+                    )
+                    self.metadata_condition.wait()
+                self.metadata_locked_pids.append(pid)
 
         try:
             logging.debug(
@@ -832,13 +846,22 @@ class FileHashStore(HashStore):
             return metadata_cid
         finally:
             # Release pid
-            with self.metadata_condition:
-                logging.debug(
-                    "FileHashStore - store_metadata: Removing pid: %s from metadata_locked_pids.",
-                    pid,
-                )
-                self.metadata_locked_pids.remove(pid)
-                self.metadata_condition.notify()
+            if use_multiprocessing:
+                with self.metadata_condition_mp:
+                    logging.debug(
+                        "FileHashStore - store_metadata (mp): Removing pid: %s from lock array",
+                        pid,
+                    )
+                    self.metadata_locked_pids_mp.remove(pid)
+                    self.metadata_condition_mp.notify()
+            else:
+                with self.metadata_condition:
+                    logging.debug(
+                        "FileHashStore - store_metadata: Removing pid: %s from lock array.",
+                        pid,
+                    )
+                    self.metadata_locked_pids.remove(pid)
+                    self.metadata_condition.notify()
 
     def retrieve_object(self, pid):
         logging.debug(

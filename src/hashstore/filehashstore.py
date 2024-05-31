@@ -71,9 +71,12 @@ class FileHashStore(HashStore):
     thread_condition = threading.Condition(reference_lock)
     reference_locked_cids = []
     # Multiprocessing Synchronization
+    object_lock_mp = multiprocessing.Lock()
+    object_condition_mp = multiprocessing.Condition(object_lock_mp)
+    object_locked_pids_mp = multiprocessing.Manager().list()
     reference_lock_mp = multiprocessing.Lock()
-    multiprocessing_condition = multiprocessing.Condition(reference_lock_mp)
-    reference_locked_cids_mp = multiprocessing.Manager().list()  # Create a shared list
+    reference_condition_mp = multiprocessing.Condition(reference_lock_mp)
+    reference_locked_cids_mp = multiprocessing.Manager().list()
 
     def __init__(self, properties=None):
         if properties:
@@ -456,17 +459,26 @@ class FileHashStore(HashStore):
                 additional_algorithm, checksum, checksum_algorithm
             )
 
-            # TODO: Implement multiprocessing lock check like 'tag_object'
             # Wait for the pid to release if it's in use
-            with self.object_condition:
-                while pid in self.object_locked_pids:
-                    logging.debug(
-                        "FileHashStore - store_object: %s is currently being stored. Waiting.",
-                        pid,
-                    )
-                    self.object_condition.wait()
-                # Modify object_locked_pids consecutively
-                self.object_locked_pids.append(pid)
+            use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+            if use_multiprocessing:
+                with self.object_condition_mp:
+                    while pid in self.object_locked_pids_mp:
+                        logging.debug(
+                            "FileHashStore - store_object (mp): pid (%s) is locked. Waiting.",
+                            pid,
+                        )
+                        self.object_condition_mp.wait()
+                    self.object_locked_pids_mp.append(pid)
+            else:
+                with self.object_condition:
+                    while pid in self.object_locked_pids:
+                        logging.debug(
+                            "FileHashStore - store_object: pid (%s) is locked. Waiting.",
+                            pid,
+                        )
+                        self.object_condition.wait()
+                    self.object_locked_pids.append(pid)
             try:
                 logging.debug(
                     "FileHashStore - store_object: Attempting to store object for pid: %s",
@@ -507,14 +519,23 @@ class FileHashStore(HashStore):
                 logging.error(exception_string)
                 raise err
             finally:
-                # Release pid
-                with self.object_condition:
-                    logging.debug(
-                        "FileHashStore - store_object: Removing pid: %s from object_locked_pids.",
-                        pid,
-                    )
-                    self.object_locked_pids.remove(pid)
-                    self.object_condition.notify()
+                if use_multiprocessing:
+                    with self.object_condition_mp:
+                        logging.debug(
+                            "FileHashStore - store_object (mp): Removing pid: %s from lock array",
+                            pid,
+                        )
+                        self.object_locked_pids_mp.remove(pid)
+                        self.object_condition_mp.notify()
+                else:
+                    # Release pid
+                    with self.object_condition:
+                        logging.debug(
+                            "FileHashStore - store_object: Removing pid: %s from lock array",
+                            pid,
+                        )
+                        self.object_locked_pids.remove(pid)
+                        self.object_condition.notify()
 
         return object_metadata
 
@@ -577,13 +598,13 @@ class FileHashStore(HashStore):
         # Wait for the cid to release if it's being tagged
         use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
         if use_multiprocessing:
-            with self.multiprocessing_condition:
+            with self.reference_condition_mp:
                 while cid in self.reference_locked_cids_mp:
                     logging.debug(
                         "FileHashStore - tag_object: (cid) %s is currently locked. Waiting.",
                         cid,
                     )
-                    self.multiprocessing_condition.wait()
+                    self.reference_condition_mp.wait()
                 # Add cid to tracking array
                 self.reference_locked_cids_mp.append(cid)
         else:
@@ -707,14 +728,14 @@ class FileHashStore(HashStore):
         finally:
             # Release cid
             if use_multiprocessing:
-                with self.multiprocessing_condition:
+                with self.reference_condition_mp:
                     logging.debug(
                         "FileHashStore - tag_object (mp): Removing cid: %s from"
                         + " reference_locked_cids.",
                         cid,
                     )
                     self.reference_locked_cids_mp.remove(cid)
-                    self.multiprocessing_condition.notify()
+                    self.reference_condition_mp.notify()
             else:
                 with self.thread_condition:
                     logging.debug(

@@ -813,23 +813,27 @@ class FileHashStore(HashStore):
 
         # Wait for the pid to release if it's in use
         use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+        sync_begin_debug_msg = (
+            f"FileHashStore - store_metadata: Adding pid ({pid}) to locked list."
+        )
+        sync_wait_msg = (
+            f"FileHashStore - store_metadata: Pid ({pid}) is locked. Waiting."
+        )
         if use_multiprocessing:
             with self.metadata_condition_mp:
+                # Wait for the pid to release if it's in use
                 while pid in self.metadata_locked_pids_mp:
-                    logging.debug(
-                        "FileHashStore - store_metadata (mp): %s (pid) is locked. Waiting.",
-                        pid,
-                    )
+                    logging.debug(sync_wait_msg)
                     self.metadata_condition_mp.wait()
+                # Modify metadata_locked_pids consecutively
+                logging.debug(sync_begin_debug_msg)
                 self.metadata_locked_pids_mp.append(pid)
         else:
             with self.metadata_condition:
                 while pid in self.metadata_locked_pids:
-                    logging.debug(
-                        "FileHashStore - store_metadata: %s (pid) is locked. Waiting.",
-                        pid,
-                    )
+                    logging.debug(sync_wait_msg)
                     self.metadata_condition.wait()
+                logging.debug(sync_begin_debug_msg)
                 self.metadata_locked_pids.append(pid)
 
         try:
@@ -846,20 +850,18 @@ class FileHashStore(HashStore):
             return metadata_cid
         finally:
             # Release pid
+            end_sync_debug_msg = (
+                f"FileHashStore - store_metadata: Releasing pid ({pid})"
+                + " from locked list"
+            )
             if use_multiprocessing:
                 with self.metadata_condition_mp:
-                    logging.debug(
-                        "FileHashStore - store_metadata (mp): Removing pid: %s from lock array",
-                        pid,
-                    )
+                    logging.debug(end_sync_debug_msg)
                     self.metadata_locked_pids_mp.remove(pid)
                     self.metadata_condition_mp.notify()
             else:
                 with self.metadata_condition:
-                    logging.debug(
-                        "FileHashStore - store_metadata: Removing pid: %s from lock array.",
-                        pid,
-                    )
+                    logging.debug(end_sync_debug_msg)
                     self.metadata_locked_pids.remove(pid)
                     self.metadata_condition.notify()
 
@@ -934,7 +936,6 @@ class FileHashStore(HashStore):
             # If the refs file still exists, do not delete the object
             if not os.path.exists(cid_refs_abs_path):
                 cid = ab_id
-
                 # Synchronize the cid
                 if use_multiprocessing:
                     with self.reference_condition_mp:

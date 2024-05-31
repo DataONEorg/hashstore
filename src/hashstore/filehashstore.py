@@ -467,23 +467,25 @@ class FileHashStore(HashStore):
 
             # Wait for the pid to release if it's in use
             use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+            sync_begin_debug_msg = (
+                f"FileHashStore - store_object: Adding pid ({pid}) to locked list."
+            )
+            sync_wait_msg = (
+                f"FileHashStore - store_object: Pid ({pid}) is locked. Waiting."
+            )
             if use_multiprocessing:
                 with self.object_condition_mp:
                     while pid in self.object_locked_pids_mp:
-                        logging.debug(
-                            "FileHashStore - store_object (mp): pid (%s) is locked. Waiting.",
-                            pid,
-                        )
+                        logging.debug(sync_wait_msg)
                         self.object_condition_mp.wait()
+                    logging.debug(sync_begin_debug_msg)
                     self.object_locked_pids_mp.append(pid)
             else:
                 with self.object_condition:
                     while pid in self.object_locked_pids:
-                        logging.debug(
-                            "FileHashStore - store_object: pid (%s) is locked. Waiting.",
-                            pid,
-                        )
+                        logging.debug(sync_wait_msg)
                         self.object_condition.wait()
+                    logging.debug(sync_begin_debug_msg)
                     self.object_locked_pids.append(pid)
             try:
                 logging.debug(
@@ -525,21 +527,18 @@ class FileHashStore(HashStore):
                 logging.error(exception_string)
                 raise err
             finally:
+                end_sync_debug_msg = (
+                    f"FileHashStore - store_object: Releasing pid ({pid}) from locked list"
+                )
                 if use_multiprocessing:
                     with self.object_condition_mp:
-                        logging.debug(
-                            "FileHashStore - store_object (mp): Removing pid: %s from lock array",
-                            pid,
-                        )
+                        logging.debug(end_sync_debug_msg)
                         self.object_locked_pids_mp.remove(pid)
                         self.object_condition_mp.notify()
                 else:
                     # Release pid
                     with self.object_condition:
-                        logging.debug(
-                            "FileHashStore - store_object: Removing pid: %s from lock array",
-                            pid,
-                        )
+                        logging.debug(end_sync_debug_msg)
                         self.object_locked_pids.remove(pid)
                         self.object_condition.notify()
 

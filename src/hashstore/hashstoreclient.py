@@ -258,6 +258,13 @@ class HashStoreClient:
         module_name = "filehashstore"
         class_name = "FileHashStore"
 
+        # Set multiprocessing to true
+        os.environ["USE_MULTIPROCESSING"] = "True"
+        use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+        logging.info(
+            "HashStoreClient - use_multiprocessing (bool): %s", use_multiprocessing
+        )
+
         # Instance attributes
         self.hashstore = factory.get_hashstore(module_name, class_name, properties)
         logging.info("HashStoreClient - HashStore initialized.")
@@ -284,15 +291,6 @@ class HashStoreClient:
             origin_dir, num, skip_obj_size
         )
         logging.info(info_msg)
-
-        # Test Begin
-        # Set multiprocessing to true
-        os.environ["USE_MULTIPROCESSING"] = "True"
-        use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
-        logging.info(
-            "HashStoreClient - use_multiprocessing (bool): %s", use_multiprocessing
-        )
-        # Test End
 
         # Get list of objects to store from metacat db
         if obj_type == self.OBJ_TYPE:

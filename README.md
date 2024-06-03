@@ -224,6 +224,19 @@ These reference files are implemented in HashStore underneath the hood with no e
                        └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
 ```
 
+## Concurrency in HashStore
+
+HashStore is both thread and process safe, and by default synchronizes calls to store & delete objects/metadata with Python's threading module. If you wish to use multiprocessing to parallelize your application, please declare a global environment variable `USE_MULTIPROCESSING` as `True` before initializing Hashstore. This will direct the relevant Public API calls to synchronize using the Python `multiprocessing` module's locks and conditions. Please see below for example:
+
+```py
+# Set the global environment variable
+os.environ["USE_MULTIPROCESSING"] = "True"
+
+# Check that the global environment variable has been set
+use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+```
+
+
 ## Development build
 
 HashStore is a python package, and built using the [Python Poetry](https://python-poetry.org) build tool.

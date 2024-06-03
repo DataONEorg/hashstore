@@ -688,8 +688,8 @@ class FileHashStore(HashStore):
                         logging.debug(debug_msg)
             elif not os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
                 debug_msg = (
-                    f"FileHashStore - tag_object: pid refs file does not exists for pid {pid}"
-                    + f" but cid refs file exists at: {cid_refs_path}  for cid: {cid}"
+                    f"FileHashStore - tag_object: pid refs file does not exist for pid {pid}"
+                    + f" but cid refs file found at: {cid_refs_path} for cid: {cid}"
                 )
                 logging.debug(debug_msg)
                 # Move the pid refs file
@@ -703,7 +703,7 @@ class FileHashStore(HashStore):
                     cid,
                     pid_refs_path,
                     cid_refs_path,
-                    "Pid refs file doesn't exist, but cid refs exists.",
+                    f"Updated existing cid refs file: {cid_refs_path} with pid: {pid}",
                 )
                 logging.info(
                     "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",

@@ -262,32 +262,35 @@ Client API Options:
 
 How to use HashStore client (command line app)
 ```sh
+# Step 0: Install hashstore via poetry to create an executable script
+$ poetry install
+
 # Step 1: Create a HashStore
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -chs -dp=3 -wp=2 -ap=SHA-256 -nsp="http://www.ns.test/v1"
+$ hashstore /path/to/store/ -chs -dp=3 -wp=2 -ap=SHA-256 -nsp="http://www.ns.test/v1"
 
 # Get the checksum of a data object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -getchecksum -pid=persistent_identifier -algo=SHA-256
+$ hashstore /path/to/store/ -getchecksum -pid=persistent_identifier -algo=SHA-256
 
 # Find an object (returns the content identifier)
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -findobject -pid=persistent_identifier
+$ hashstore /path/to/store/ -findobject -pid=persistent_identifier
 
 # Store a data object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -storeobject -pid=persistent_identifier -path=/path/to/object
+$ hashstore /path/to/store/ -storeobject -pid=persistent_identifier -path=/path/to/object
 
 # Store a metadata object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -storemetadata -pid=persistent_identifier  -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
+$ hashstore /path/to/store/ -storemetadata -pid=persistent_identifier -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
 
 # Retrieve a data object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -retrieveobject -pid=persistent_identifier
+$ hashstore /path/to/store/ -retrieveobject -pid=persistent_identifier
 
 # Retrieve a metadata object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -retrievemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ hashstore /path/to/store/ -retrievemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
 
 # Delete a data object
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -deleteobject -pid=persistent_identifier
+$ hashstore /path/to/store/ -deleteobject -pid=persistent_identifier
 
 # Delete a metadata file
-$ python './src/hashstore/hashstoreclient.py' /path/to/store/ -deletemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ hashstore /path/to/store/ -deletemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
 ```
 
 ## License

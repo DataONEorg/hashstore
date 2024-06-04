@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """HashStore Command Line App"""
 
 import logging
@@ -255,7 +256,7 @@ class HashStoreClient:
         factory = HashStoreFactory()
 
         # Get HashStore from factory
-        module_name = "filehashstore"
+        module_name = "hashstore.filehashstore"
         class_name = "FileHashStore"
 
         # Set multiprocessing to true

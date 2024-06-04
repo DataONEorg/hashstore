@@ -2,7 +2,7 @@
 name = "hashstore"
 version = "1.1.0"
 description = "HashStore, a hash-based object store for data packages."
-authors = ["Matt Jones <gitcode@magisa.org>", "Dou Mok <douming.mok@gmail.com>"]
+authors = ["Dou Mok <douming.mok@gmail.com>", "Matt Jones <gitcode@magisa.org>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -15,6 +15,9 @@ pytest = "^7.2.0"
 black = "^22.10.0"
 pylint = "^2.17.4"
 pg8000 = "^1.29.8"
+
+[tool.poetry.scripts]
+hashstore = "hashstore.hashstoreclient:main"
 
 [build-system]
 requires = ["poetry-core"]

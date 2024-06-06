@@ -973,10 +973,6 @@ class FileHashStore(HashStore):
             # id_type is "pid"
             pid = ab_id
             objects_to_delete = []
-            # Get the metadata documents to minimize time spent in synchronization
-            rel_path = "/".join(self._shard(self._computehash(pid)))
-            metadata_rel_path = self._get_store_path("metadata") / rel_path
-            metadata_file_paths = self._get_file_paths(metadata_rel_path)
 
             # Storing and deleting objects are synchronized together
             # Duplicate store object requests for a pid are rejected, but deleting an object
@@ -1061,16 +1057,12 @@ class FileHashStore(HashStore):
                             objects_to_delete.append(
                                 self._rename_path_for_deletion(obj_real_path)
                             )
-                        # Remove metadata files if they exist
-                        if metadata_file_paths is not None:
-                            for path in metadata_file_paths:
-                                # Rename files by appending _delete to the file name
-                                objects_to_delete.append(
-                                    self._rename_path_for_deletion(path)
-                                )
                         # Remove all files confirmed for deletion
                         for obj in objects_to_delete:
                             os.remove(obj)
+
+                        # Remove metadata files if they exist
+                        self.delete_metadata(pid)
 
                         info_string = (
                             "FileHashStore - delete_object: Successfully deleted references,"
@@ -1105,12 +1097,8 @@ class FileHashStore(HashStore):
                     logging.warning(warn_msg)
 
                     # Remove metadata files if they exist
-                    if metadata_file_paths is not None:
-                        for path in metadata_file_paths:
-                            # Rename files by appending _delete to the file name
-                            objects_to_delete.append(
-                                self._rename_path_for_deletion(path)
-                            )
+                    self.delete_metadata(pid)
+
                     # Remove all files confirmed for deletion
                     for obj in objects_to_delete:
                         os.remove(obj)
@@ -1121,12 +1109,7 @@ class FileHashStore(HashStore):
                         self._rename_path_for_deletion(self._resolve_path("pid", pid))
                     )
                     # Remove metadata files if they exist
-                    if metadata_file_paths is not None:
-                        for path in metadata_file_paths:
-                            # Rename files by appending _delete to the file name
-                            objects_to_delete.append(
-                                self._rename_path_for_deletion(path)
-                            )
+                    self.delete_metadata(pid)
                     # Remove all files confirmed for deletion
                     for obj in objects_to_delete:
                         os.remove(obj)
@@ -1146,12 +1129,7 @@ class FileHashStore(HashStore):
                     if self._is_string_in_refs_file(pid, cid_ref_abs_path):
                         self._update_refs_file(cid_ref_abs_path, pid, "remove")
                     # Remove metadata files if they exist
-                    if metadata_file_paths is not None:
-                        for path in metadata_file_paths:
-                            # Rename files by appending _delete to the file name
-                            objects_to_delete.append(
-                                self._rename_path_for_deletion(path)
-                            )
+                    self.delete_metadata(pid)
                     # Remove all files confirmed for deletion
                     for obj in objects_to_delete:
                         os.remove(obj)
@@ -1162,12 +1140,8 @@ class FileHashStore(HashStore):
                     objects_to_delete.append(
                         self._rename_path_for_deletion(pid_ref_abs_path)
                     )
-                    if metadata_file_paths is not None:
-                        for path in metadata_file_paths:
-                            # Rename files by appending _delete to the file name
-                            objects_to_delete.append(
-                                self._rename_path_for_deletion(path)
-                            )
+                    # Remove metadata files if they exist
+                    self.delete_metadata(pid)
                     # Remove all files confirmed for deletion
                     for obj in objects_to_delete:
                         os.remove(obj)

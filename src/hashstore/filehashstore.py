@@ -834,7 +834,7 @@ class FileHashStore(HashStore):
                 self.metadata_locked_pids.append(pid_doc)
 
         try:
-            metadata_cid = self._put_metadata(metadata, pid, checked_format_id)
+            metadata_cid = self._put_metadata(metadata, pid, pid_doc)
             info_msg = (
                 "FileHashStore - store_metadata: Successfully stored metadata for"
                 + f" pid: {pid} with format_id: {checked_format_id}"
@@ -1786,13 +1786,13 @@ class FileHashStore(HashStore):
                     return True
         return False
 
-    def _put_metadata(self, metadata, pid, format_id):
+    def _put_metadata(self, metadata, pid, metadata_doc_name):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the
         given PID and format ID as the permanent address.
 
-        :param str pid: Authority-based identifier.
-        :param str format_id: Metadata format.
         :param mixed metadata: String or path to metadata document.
+        :param str pid: Authority-based identifier.
+        :param str metadata_doc_name: Metadata document name
 
         :return: Address of the metadata document.
         :rtype: str
@@ -1807,7 +1807,7 @@ class FileHashStore(HashStore):
 
         # Get target and related paths (permanent location)
         metadata_directory = self._computehash(pid)
-        metadata_document_name = self._computehash(pid + format_id)
+        metadata_document_name = metadata_doc_name
         rel_path = "/".join(self._shard(metadata_directory))
         full_path = self._get_store_path("metadata") / rel_path / metadata_document_name
 

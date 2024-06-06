@@ -1202,14 +1202,14 @@ class FileHashStore(HashStore):
                                 self.metadata_condition_mp.wait()
                             # Modify metadata_locked_docs consecutively
                             logging.debug(sync_begin_debug_msg)
-                            self.metadata_locked_docs_mp.append(pid)
+                            self.metadata_locked_docs_mp.append(pid_doc)
                     else:
                         with self.metadata_condition:
                             while pid in self.metadata_locked_docs:
                                 logging.debug(sync_wait_msg)
                                 self.metadata_condition.wait()
                             logging.debug(sync_begin_debug_msg)
-                            self.metadata_locked_docs.append(pid)
+                            self.metadata_locked_docs.append(pid_doc)
                     try:
                         # Mark metadata doc for deletion
                         objects_to_delete.append(self._rename_path_for_deletion(path))
@@ -1223,12 +1223,12 @@ class FileHashStore(HashStore):
                         if self.use_multiprocessing:
                             with self.metadata_condition_mp:
                                 logging.debug(end_sync_debug_msg)
-                                self.metadata_locked_docs_mp.remove(pid)
+                                self.metadata_locked_docs_mp.remove(pid_doc)
                                 self.metadata_condition_mp.notify()
                         else:
                             with self.metadata_condition:
                                 logging.debug(end_sync_debug_msg)
-                                self.metadata_locked_docs.remove(pid)
+                                self.metadata_locked_docs.remove(pid_doc)
                                 self.metadata_condition.notify()
 
                 # Delete metadata objects
@@ -1260,14 +1260,14 @@ class FileHashStore(HashStore):
                         self.metadata_condition_mp.wait()
                     # Modify metadata_locked_docs consecutively
                     logging.debug(sync_begin_debug_msg)
-                    self.metadata_locked_docs_mp.append(pid)
+                    self.metadata_locked_docs_mp.append(pid_doc)
             else:
                 with self.metadata_condition:
                     while pid in self.metadata_locked_docs:
                         logging.debug(sync_wait_msg)
                         self.metadata_condition.wait()
                     logging.debug(sync_begin_debug_msg)
-                    self.metadata_locked_docs.append(pid)
+                    self.metadata_locked_docs.append(pid_doc)
             try:
                 full_path_without_directory = rel_path + "/" + pid_doc
                 self._delete(entity, full_path_without_directory)
@@ -1286,12 +1286,12 @@ class FileHashStore(HashStore):
                 if self.use_multiprocessing:
                     with self.metadata_condition_mp:
                         logging.debug(end_sync_debug_msg)
-                        self.metadata_locked_docs_mp.remove(pid)
+                        self.metadata_locked_docs_mp.remove(pid_doc)
                         self.metadata_condition_mp.notify()
                 else:
                     with self.metadata_condition:
                         logging.debug(end_sync_debug_msg)
-                        self.metadata_locked_docs.remove(pid)
+                        self.metadata_locked_docs.remove(pid_doc)
                         self.metadata_condition.notify()
 
     def get_hex_digest(self, pid, algorithm):

@@ -1197,82 +1197,128 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid", "delete_metadata")
         checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
+        metadata_directory = self._computehash(pid)
+        rel_path = "/".join(self._shard(metadata_directory))
 
-        # Wait for the pid to release if it's in use
-        sync_begin_debug_msg = (
-            f"FileHashStore - delete_metadata: Adding pid ({pid}) to locked list."
-        )
-        sync_wait_msg = (
-            f"FileHashStore - delete_metadata: Pid ({pid}) is locked. Waiting."
-        )
-        if self.use_multiprocessing:
-            with self.metadata_condition_mp:
-                # Wait for the pid to release if it's in use
-                while pid in self.metadata_locked_pids_mp:
-                    logging.debug(sync_wait_msg)
-                    self.metadata_condition_mp.wait()
-                # Modify metadata_locked_pids consecutively
-                logging.debug(sync_begin_debug_msg)
-                self.metadata_locked_pids_mp.append(pid)
-        else:
-            with self.metadata_condition:
-                while pid in self.metadata_locked_pids:
-                    logging.debug(sync_wait_msg)
-                    self.metadata_condition.wait()
-                logging.debug(sync_begin_debug_msg)
-                self.metadata_locked_pids.append(pid)
-        try:
-            # Get the metadata directory path for the given pid
-            entity = "metadata"
-            metadata_directory = self._computehash(pid)
-            rel_path = "/".join(self._shard(metadata_directory))
+        if format_id is None:
+            # Delete all metadata documents
+            objects_to_delete = []
+            # Retrieve all metadata doc names
             metadata_rel_path = self._get_store_path("metadata") / rel_path
-            if format_id is None:
-                # Delete all metadata files
-                objects_to_delete = []
-                metadata_file_paths = self._get_file_paths(metadata_rel_path)
-                if metadata_file_paths is not None:
-                    for path in metadata_file_paths:
+            metadata_file_paths = self._get_file_paths(metadata_rel_path)
+            if metadata_file_paths is not None:
+                for path in metadata_file_paths:
+                    # Get document name
+                    pid_doc = os.path.basename(path)
+                    # Synchronize based on doc name
+                    # Wait for the pid to release if it's in use
+                    sync_begin_debug_msg = (
+                        f"FileHashStore - delete_metadata: Adding pid: {pid} to locked list, "
+                        + f"with format_id: {checked_format_id} with doc name: {pid_doc}"
+                    )
+                    sync_wait_msg = (
+                        f"FileHashStore - delete_metadata: Pid: {pid} is locked for format_id:"
+                        + f" {checked_format_id} with doc name: {pid_doc}. Waiting."
+                    )
+                    if self.use_multiprocessing:
+                        with self.metadata_condition_mp:
+                            # Wait for the pid to release if it's in use
+                            while pid in self.metadata_locked_pids_mp:
+                                logging.debug(sync_wait_msg)
+                                self.metadata_condition_mp.wait()
+                            # Modify metadata_locked_pids consecutively
+                            logging.debug(sync_begin_debug_msg)
+                            self.metadata_locked_pids_mp.append(pid)
+                    else:
+                        with self.metadata_condition:
+                            while pid in self.metadata_locked_pids:
+                                logging.debug(sync_wait_msg)
+                                self.metadata_condition.wait()
+                            logging.debug(sync_begin_debug_msg)
+                            self.metadata_locked_pids.append(pid)
+                    try:
+                        # Mark metadata doc for deletion
                         objects_to_delete.append(self._rename_path_for_deletion(path))
+                    finally:
+                        # Release pid
+                        end_sync_debug_msg = (
+                            f"FileHashStore - delete_metadata: Releasing pid doc ({pid_doc})"
+                            + f" from locked list for pid: {pid} with format_id:"
+                            + checked_format_id
+                        )
+                        if self.use_multiprocessing:
+                            with self.metadata_condition_mp:
+                                logging.debug(end_sync_debug_msg)
+                                self.metadata_locked_pids_mp.remove(pid)
+                                self.metadata_condition_mp.notify()
+                        else:
+                            with self.metadata_condition:
+                                logging.debug(end_sync_debug_msg)
+                                self.metadata_locked_pids.remove(pid)
+                                self.metadata_condition.notify()
+
+                # Delete metadata objects
                 for obj in objects_to_delete:
                     os.remove(obj)
-
                 info_string = (
                     "FileHashStore - delete_metadata: Successfully deleted all metadata"
                     + f"for pid: {pid}",
                 )
                 logging.info(info_string)
-                return
+        else:
+            # Delete a specific metadata file
+            entity = "metadata"
+            pid_doc = self._computehash(pid + checked_format_id)
+            # Wait for the pid to release if it's in use
+            sync_begin_debug_msg = (
+                f"FileHashStore - delete_metadata: Adding pid: {pid} to locked list, "
+                + f"with format_id: {checked_format_id} with doc name: {pid_doc}"
+            )
+            sync_wait_msg = (
+                f"FileHashStore - delete_metadata: Pid: {pid} is locked for format_id:"
+                + f" {checked_format_id} with doc name: {pid_doc}. Waiting."
+            )
+            if self.use_multiprocessing:
+                with self.metadata_condition_mp:
+                    # Wait for the pid to release if it's in use
+                    while pid in self.metadata_locked_pids_mp:
+                        logging.debug(sync_wait_msg)
+                        self.metadata_condition_mp.wait()
+                    # Modify metadata_locked_pids consecutively
+                    logging.debug(sync_begin_debug_msg)
+                    self.metadata_locked_pids_mp.append(pid)
             else:
-                # Delete a specific metadata file
-                metadata_document_name = self._computehash(pid + checked_format_id)
-                full_path_without_directory = rel_path + "/" + metadata_document_name
-                metadata_exists = self._exists(entity, full_path_without_directory)
-                if metadata_exists:
-                    self._delete(entity, full_path_without_directory)
-
+                with self.metadata_condition:
+                    while pid in self.metadata_locked_pids:
+                        logging.debug(sync_wait_msg)
+                        self.metadata_condition.wait()
+                    logging.debug(sync_begin_debug_msg)
+                    self.metadata_locked_pids.append(pid)
+            try:
+                full_path_without_directory = rel_path + "/" + pid_doc
+                self._delete(entity, full_path_without_directory)
                 info_string = (
                     "FileHashStore - delete_metadata: Successfully deleted metadata for pid:"
                     + f" {pid} for format_id: {format_id}"
                 )
                 logging.info(info_string)
-                return
-        finally:
-            # Release pid
-            end_sync_debug_msg = (
-                f"FileHashStore - delete_metadata: Releasing pid ({pid})"
-                + " from locked list"
-            )
-            if self.use_multiprocessing:
-                with self.metadata_condition_mp:
-                    logging.debug(end_sync_debug_msg)
-                    self.metadata_locked_pids_mp.remove(pid)
-                    self.metadata_condition_mp.notify()
-            else:
-                with self.metadata_condition:
-                    logging.debug(end_sync_debug_msg)
-                    self.metadata_locked_pids.remove(pid)
-                    self.metadata_condition.notify()
+            finally:
+                # Release pid
+                end_sync_debug_msg = (
+                    f"FileHashStore - delete_metadata: Releasing pid doc ({pid_doc})"
+                    + f" from locked list for pid: {pid} with format_id:"
+                    + checked_format_id
+                )
+                if self.use_multiprocessing:
+                    with self.metadata_condition_mp:
+                        logging.debug(end_sync_debug_msg)
+                        self.metadata_locked_pids_mp.remove(pid)
+                        self.metadata_condition_mp.notify()
+                else:
+                    with self.metadata_condition:
+                        logging.debug(end_sync_debug_msg)
+                        self.metadata_locked_pids.remove(pid)
+                        self.metadata_condition.notify()
 
     def get_hex_digest(self, pid, algorithm):
         logging.debug(

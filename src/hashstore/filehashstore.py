@@ -213,7 +213,6 @@ class FileHashStore(HashStore):
         ]
 
         # Standardize algorithm value for cross-language compatibility
-        checked_store_algorithm = None
         # Note, this must be declared here because HashStore has not yet been initialized
         accepted_store_algorithms = ["MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512"]
         if store_algorithm in accepted_store_algorithms:
@@ -1008,7 +1007,7 @@ class FileHashStore(HashStore):
                     cid = self.find_object(pid)
 
                     # Proceed with next steps - cid has been retrieved without any issues
-                    # We must synchronized here based on the `cid` because multiple threads may
+                    # We must synchronize here based on the `cid` because multiple threads may
                     # try to access the `cid_reference_file`
                     sync_begin_debug_msg = (
                         f"FileHashStore - delete_object: Cid ({cid}) to locked list."
@@ -1571,7 +1570,7 @@ class FileHashStore(HashStore):
                 logging.debug(exception_string)
                 raise PidObjectMetadataError(exception_string) from ve
             finally:
-                # Delete the temporary file, it already exists so it is redundant
+                # Delete the temporary file, it already exists, so it is redundant
                 # No exception is thrown so 'store_object' can proceed to tag object
                 self._delete(entity, tmp_file_name)
 
@@ -2113,7 +2112,6 @@ class FileHashStore(HashStore):
         :return: Valid metadata namespace.
         :rtype: str
         """
-        checked_format_id = None
         if format_id and not format_id.strip():
             exception_string = f"FileHashStore - {method}: Format_id cannot be empty."
             logging.error(exception_string)
@@ -2432,7 +2430,6 @@ class FileHashStore(HashStore):
         :rtype: int
         """
         count = 0
-        directory_to_count = ""
         if entity == "objects":
             directory_to_count = self.objects
         elif entity == "metadata":

@@ -806,57 +806,56 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid", "store_metadata")
         checked_format_id = self._check_arg_format_id(format_id, "store_metadata")
         self._check_arg_data(metadata)
+        pid_doc = self._computehash(pid + checked_format_id)
 
         sync_begin_debug_msg = (
-            f"FileHashStore - store_metadata: Adding pid ({pid}) to locked list."
+            f"FileHashStore - store_metadata: Adding pid: {pid} to locked list, "
+            + f"with format_id: {checked_format_id} with doc name: {pid_doc}"
         )
         sync_wait_msg = (
-            f"FileHashStore - store_metadata: Pid ({pid}) is locked. Waiting."
+            f"FileHashStore - store_metadata: Pid: {pid} is locked for format_id:"
+            + f" {checked_format_id} with doc name: {pid_doc}. Waiting."
         )
         if self.use_multiprocessing:
             with self.metadata_condition_mp:
                 # Wait for the pid to release if it's in use
-                while pid in self.metadata_locked_pids_mp:
+                while pid_doc in self.metadata_locked_pids_mp:
                     logging.debug(sync_wait_msg)
                     self.metadata_condition_mp.wait()
                 # Modify metadata_locked_pids consecutively
                 logging.debug(sync_begin_debug_msg)
-                self.metadata_locked_pids_mp.append(pid)
+                self.metadata_locked_pids_mp.append(pid_doc)
         else:
             with self.metadata_condition:
-                while pid in self.metadata_locked_pids:
+                while pid_doc in self.metadata_locked_pids:
                     logging.debug(sync_wait_msg)
                     self.metadata_condition.wait()
                 logging.debug(sync_begin_debug_msg)
-                self.metadata_locked_pids.append(pid)
+                self.metadata_locked_pids.append(pid_doc)
 
         try:
-            logging.debug(
-                "FileHashStore - store_metadata: Attempting to store metadata for pid: %s",
-                pid,
-            )
             metadata_cid = self._put_metadata(metadata, pid, checked_format_id)
-
-            logging.info(
-                "FileHashStore - store_metadata: Successfully stored metadata for pid: %s",
-                pid,
+            info_msg = (
+                "FileHashStore - store_metadata: Successfully stored metadata for"
+                + f" pid: {pid} with format_id: {checked_format_id}"
             )
+            logging.info(info_msg)
             return metadata_cid
         finally:
             # Release pid
             end_sync_debug_msg = (
-                f"FileHashStore - store_metadata: Releasing pid ({pid})"
-                + " from locked list"
+                f"FileHashStore - store_metadata: Releasing pid doc ({pid_doc})"
+                + f" from locked list for pid: {pid} with format_id: {checked_format_id}"
             )
             if self.use_multiprocessing:
                 with self.metadata_condition_mp:
                     logging.debug(end_sync_debug_msg)
-                    self.metadata_locked_pids_mp.remove(pid)
+                    self.metadata_locked_pids_mp.remove(pid_doc)
                     self.metadata_condition_mp.notify()
             else:
                 with self.metadata_condition:
                     logging.debug(end_sync_debug_msg)
-                    self.metadata_locked_pids.remove(pid)
+                    self.metadata_locked_pids.remove(pid_doc)
                     self.metadata_condition.notify()
 
     def retrieve_object(self, pid):

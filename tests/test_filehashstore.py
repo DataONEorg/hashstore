@@ -657,13 +657,13 @@ def test_put_metadata_cid(pids, store):
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
     for pid in pids.keys():
+        metadata_document_name = store._computehash(pid + format_id)
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        metadata_cid = store._put_metadata(syspath, pid, format_id)
+        metadata_cid = store._put_metadata(syspath, pid, metadata_document_name)
 
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
-        metadata_document_name = store._computehash(pid + format_id)
         rel_path = "/".join(store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name

@@ -256,7 +256,10 @@ class HashStoreClient:
         factory = HashStoreFactory()
 
         # Get HashStore from factory
-        module_name = "hashstore.filehashstore"
+        if testflag is "knbvm":
+            module_name = "filehashstore"
+        else:
+            module_name = "hashstore.filehashstore"
         class_name = "FileHashStore"
 
         # Set multiprocessing to true

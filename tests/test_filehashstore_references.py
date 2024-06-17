@@ -151,7 +151,7 @@ def test_tag_object_pid_refs_not_found_cid_refs_found(store):
 
 
 def test_verify_object(pids, store):
-    """Test verify_object succeeds given good arguments."""
+    """Test verify_object does not throw exception given good arguments."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -164,8 +164,19 @@ def test_verify_object(pids, store):
         )
 
 
+def test_verify_object_supported_other_algo_not_in_default(pids, store):
+    """Test verify_object throws exception when incorrect algorithm is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = pids[pid]["sha224"]
+        expected_file_size = object_metadata.obj_size
+        store.verify_object(object_metadata, checksum, "sha224", expected_file_size)
+
+
 def test_verify_object_exception_incorrect_object_metadata_type(pids, store):
-    """Test verify_object returns false when incorrect object is given to
+    """Test verify_object throws exception when incorrect object is given to
     object_metadata arg."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -181,7 +192,7 @@ def test_verify_object_exception_incorrect_object_metadata_type(pids, store):
 
 
 def test_verify_object_exception_incorrect_size(pids, store):
-    """Test verify_object returns false when incorrect size is supplied."""
+    """Test verify_object throws exception when incorrect size is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -199,7 +210,7 @@ def test_verify_object_exception_incorrect_size(pids, store):
 
 
 def test_verify_object_exception_incorrect_checksum(pids, store):
-    """Test verify_object returns false when incorrect checksum is supplied."""
+    """Test verify_object throws exception when incorrect checksum is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -210,7 +221,7 @@ def test_verify_object_exception_incorrect_checksum(pids, store):
         expected_file_size = object_metadata.obj_size
 
         with pytest.raises(NonMatchingChecksum):
-            is_valid = store.verify_object(
+            store.verify_object(
                 object_metadata, "abc123", checksum_algorithm, expected_file_size
             )
 
@@ -221,7 +232,7 @@ def test_verify_object_exception_incorrect_checksum(pids, store):
 
 
 def test_verify_object_exception_incorrect_checksum_algo(pids, store):
-    """Test verify_object returns false when incorrect algorithm is supplied."""
+    """Test verify_object throws exception when unsupported algorithm is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -230,6 +241,18 @@ def test_verify_object_exception_incorrect_checksum_algo(pids, store):
         expected_file_size = object_metadata.obj_size
         with pytest.raises(UnsupportedAlgorithm):
             store.verify_object(object_metadata, checksum, "md2", expected_file_size)
+
+
+def test_verify_object_exception_supported_other_algo_bad_checksum(pids, store):
+    """Test verify_object throws exception when incorrect algorithm is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(NonMatchingChecksum):
+            store.verify_object(object_metadata, checksum, "sha224", expected_file_size)
 
 
 def test_write_refs_file_ref_type_cid(store):

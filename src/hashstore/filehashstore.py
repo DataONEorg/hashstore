@@ -1930,13 +1930,28 @@ class FileHashStore(HashStore):
             if checksum_algorithm not in hex_digests:
                 # Check to see if it is a supported algorithm
                 self._clean_algorithm(checksum_algorithm)
-                # TODO: If so, calculate the checksum and compare it
-                exception_string = (
-                    "FileHashStore - _verify_object_information: checksum_algorithm"
-                    + f" ({checksum_algorithm}) cannot be found in the hex digests dictionary."
-                )
-                logging.debug(exception_string)
-                raise KeyError(exception_string)
+                # If so, calculate the checksum and compare it
+                if tmp_file_name is not None and pid is not None:
+                    # Calculate the checksum from the tmp file
+                    hex_digest_calculated = self._computehash(
+                        tmp_file_name, algorithm=checksum_algorithm
+                    )
+                else:
+                    # Otherwise, a data object has been stored without a pid
+                    object_cid = hex_digests[self.algorithm]
+                    cid_stream = self._open(entity, object_cid)
+                    hex_digest_calculated = self._computehash(
+                        cid_stream, algorithm=checksum_algorithm
+                    )
+                if hex_digest_calculated != checksum:
+                    exception_string = (
+                        "FileHashStore - _verify_object_information: checksum_algorithm"
+                        + f" ({checksum_algorithm}) cannot be found in the default hex digests"
+                        + " dict, but is supported. New checksum calculated but does not match"
+                        + " what has been provided."
+                    )
+                    logging.debug(exception_string)
+                    raise NonMatchingChecksum(exception_string)
             else:
                 hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum.lower():

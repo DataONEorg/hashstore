@@ -768,9 +768,37 @@ def test_verify_object_information_incorrect_size_with_pid(pids, store):
             assert not os.path.isfile(tmp_file.name)
 
 
-def test_verify_object_information_missing_key_in_hex_digests(pids, store):
+def test_verify_object_information_missing_key_in_hex_digests_unsupported_algo(
+    pids, store
+):
     """Test _verify_object_information throws exception when algorithm is not found
-    in hex digests."""
+    in hex digests and is not supported."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = "md10"
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(UnsupportedAlgorithm):
+            # pylint: disable=W0212
+            store._verify_object_information(
+                None,
+                checksum,
+                checksum_algorithm,
+                "objects",
+                object_metadata.hex_digests,
+                None,
+                expected_file_size,
+                expected_file_size,
+            )
+
+
+def test_verify_object_information_missing_key_in_hex_digests_supported_algo(
+    pids, store
+):
+    """Test _verify_object_information throws exception when algorithm is not found
+    in hex digests but is supported, however the checksum calculated does not match."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -778,13 +806,13 @@ def test_verify_object_information_missing_key_in_hex_digests(pids, store):
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = "blake2s"
         expected_file_size = object_metadata.obj_size
-        with pytest.raises(KeyError):
+        with pytest.raises(NonMatchingChecksum):
             # pylint: disable=W0212
             store._verify_object_information(
                 None,
                 checksum,
                 checksum_algorithm,
-                None,
+                "objects",
                 object_metadata.hex_digests,
                 None,
                 expected_file_size,

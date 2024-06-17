@@ -1928,6 +1928,9 @@ class FileHashStore(HashStore):
                     raise NonMatchingObjSize(exception_string)
         if checksum_algorithm is not None and checksum is not None:
             if checksum_algorithm not in hex_digests:
+                # Check to see if it is a supported algorithm
+                self._clean_algorithm(checksum_algorithm)
+                # TODO: If so, calculate the checksum and compare it
                 exception_string = (
                     "FileHashStore - _verify_object_information: checksum_algorithm"
                     + f" ({checksum_algorithm}) cannot be found in the hex digests dictionary."
@@ -2176,7 +2179,7 @@ class FileHashStore(HashStore):
                 + cleaned_string
             )
             logging.error(exception_string)
-            raise ValueError(exception_string)
+            raise UnsupportedAlgorithm(exception_string)
         return cleaned_string
 
     def _computehash(self, stream, algorithm=None):
@@ -2610,6 +2613,15 @@ class NonMatchingObjSize(Exception):
 class NonMatchingChecksum(Exception):
     """Custom exception thrown when verifying an object and the expected checksum
     does not match what has been calculated."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class UnsupportedAlgorithm(Exception):
+    """Custom exception thrown when a given algorithm is not supported in HashStore for
+    calculating hashes/checksums, as the default store algo and/or other operations."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)

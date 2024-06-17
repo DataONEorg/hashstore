@@ -8,6 +8,7 @@ from hashstore.filehashstore import (
     NonMatchingChecksum,
     NonMatchingObjSize,
     PidAlreadyExistsError,
+    UnsupportedAlgorithm,
 )
 
 # pylint: disable=W0212
@@ -227,7 +228,7 @@ def test_verify_object_exception_incorrect_checksum_algo(pids, store):
         object_metadata = store.store_object(data=path)
         checksum = object_metadata.hex_digests.get(store.algorithm)
         expected_file_size = object_metadata.obj_size
-        with pytest.raises(ValueError):
+        with pytest.raises(UnsupportedAlgorithm):
             store.verify_object(object_metadata, checksum, "md2", expected_file_size)
 
 

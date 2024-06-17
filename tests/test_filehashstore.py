@@ -8,6 +8,7 @@ from hashstore.filehashstore import (
     FileHashStore,
     NonMatchingChecksum,
     NonMatchingObjSize,
+    UnsupportedAlgorithm,
 )
 
 # pylint: disable=W0212
@@ -608,12 +609,12 @@ def test_write_to_tmp_file_and_get_hex_digests_with_unsupported_algorithm(pids, 
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         algo = "md2"
-        with pytest.raises(ValueError):
+        with pytest.raises(UnsupportedAlgorithm):
             # pylint: disable=W0212
             _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
                 input_stream, additional_algorithm=algo
             )
-        with pytest.raises(ValueError):
+        with pytest.raises(UnsupportedAlgorithm):
             # pylint: disable=W0212
             _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
                 input_stream, checksum_algorithm=algo

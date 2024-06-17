@@ -16,6 +16,7 @@ from hashstore.filehashstore import (
     PidNotFoundInCidRefsFile,
     PidRefsDoesNotExist,
     RefsFileExistsButCidObjMissing,
+    UnsupportedAlgorithm,
 )
 
 # pylint: disable=W0212
@@ -178,7 +179,7 @@ def test_store_object_additional_algorithm_invalid(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_not_in_list = "abc"
-    with pytest.raises(ValueError, match="Algorithm not supported"):
+    with pytest.raises(UnsupportedAlgorithm):
         store.store_object(pid, path, algorithm_not_in_list)
 
 
@@ -345,11 +346,26 @@ def test_store_object_checksum_incorrect_checksum(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
+    algorithm_other = "sha224"
+    checksum_incorrect = (
+        "bbbb069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    with pytest.raises(NonMatchingChecksum):
+        store.store_object(
+            pid, path, checksum=checksum_incorrect, checksum_algorithm=algorithm_other
+        )
+
+
+def test_store_object_checksum_unsupported_checksum_algo(store):
+    """Test store object raises error when supplied with unsupported checksum algo."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
     algorithm_other = "sha3_256"
     checksum_incorrect = (
         "bbbb069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(UnsupportedAlgorithm):
         store.store_object(
             pid, path, checksum=algorithm_other, checksum_algorithm=checksum_incorrect
         )
@@ -1304,7 +1320,7 @@ def test_get_hex_digest_pid_unsupported_algorithm(store):
     syspath.read_bytes()
     _object_metadata = store.store_object(pid, path)
     algorithm = "sm3"
-    with pytest.raises(ValueError):
+    with pytest.raises(UnsupportedAlgorithm):
         store.get_hex_digest(pid, algorithm)
 
 

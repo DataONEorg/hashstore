@@ -523,7 +523,7 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo(stor
     path = test_dir + pid
     input_stream = io.open(path, "rb")
     additional_algo = "sha224"
-    additional_algo_checksum = (
+    additional_algo_checksum_correct = (
         "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
     )
     checksum_algo = "sha3_256"
@@ -538,7 +538,7 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo(stor
     )
     input_stream.close()
     assert hex_digests.get("sha3_256") == checksum_correct
-    assert hex_digests.get("sha224") == additional_algo_checksum
+    assert hex_digests.get("sha224") == additional_algo_checksum_correct
 
 
 def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo_duplicate(
@@ -831,6 +831,13 @@ def test_clean_algorithm(store):
     assert cleaned_algo_underscore == "sha256"
     assert cleaned_algo_hyphen == "sha256"
     assert cleaned_algo_other_hyphen == "sha3_256"
+
+
+def test_clean_algorithm_unsupported_algo(store):
+    """Check that algorithm values get formatted as expected."""
+    algorithm_unsupported = "mok22"
+    with pytest.raises(UnsupportedAlgorithm):
+        _ = store._clean_algorithm(algorithm_unsupported)
 
 
 def test_computehash(pids, store):

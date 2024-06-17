@@ -2012,7 +2012,7 @@ class FileHashStore(HashStore):
                 + f" . Additional Context: {additional_log_string}"
             )
             logging.error(exception_string)
-            raise FileNotFoundError(exception_string)
+            raise PidRefsFileNotFound(exception_string)
         if not os.path.exists(cid_refs_path):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file missing: "
@@ -2020,7 +2020,7 @@ class FileHashStore(HashStore):
                 + f" . Additional Context: {additional_log_string}"
             )
             logging.error(exception_string)
-            raise FileNotFoundError(exception_string)
+            raise CidRefsFileNotFound(exception_string)
         # Check the content of the reference files
         # Start with the cid
         with open(pid_refs_path, "r", encoding="utf8") as f:
@@ -2032,7 +2032,7 @@ class FileHashStore(HashStore):
                 + f" Additional Context: {additional_log_string}"
             )
             logging.error(exception_string)
-            raise ValueError(exception_string)
+            raise PidRefsContentError(exception_string)
         # Then the pid
         pid_found = self._is_string_in_refs_file(pid, cid_refs_path)
         if not pid_found:
@@ -2042,7 +2042,7 @@ class FileHashStore(HashStore):
                 + f" Additional Context:  {additional_log_string}"
             )
             logging.error(exception_string)
-            raise ValueError(exception_string)
+            raise CidRefsContentError(exception_string)
 
     @staticmethod
     def _check_arg_data(data):
@@ -2570,6 +2570,42 @@ class Stream(object):
             self._obj.close()
         else:
             self._obj.seek(self._pos)
+
+
+class PidRefsFileNotFound(Exception):
+    """Custom exception thrown when verifying reference files and a pid refs
+    file is not found."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class CidRefsFileNotFound(Exception):
+    """Custom exception thrown when verifying reference files and a cid refs
+    file is not found."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class PidRefsContentError(Exception):
+    """Custom exception thrown when verifying reference files and a pid refs
+    file does not contain the cid that it is expected."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class CidRefsContentError(Exception):
+    """Custom exception thrown when verifying reference files and a cid refs
+    file does not have a pid that is expected to be found."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
 
 
 class PidAlreadyExistsError(Exception):

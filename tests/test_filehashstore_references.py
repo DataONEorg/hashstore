@@ -5,9 +5,13 @@ import shutil
 import pytest
 
 from hashstore.filehashstore import (
+    CidRefsContentError,
+    CidRefsFileNotFound,
     NonMatchingChecksum,
     NonMatchingObjSize,
     PidAlreadyExistsError,
+    PidRefsContentError,
+    PidRefsFileNotFound,
     UnsupportedAlgorithm,
 )
 
@@ -61,7 +65,7 @@ def test_tag_object_pid_refs_file_content(pids, store):
 
 
 def test_tag_object_cid_refs_file_content(pids, store):
-    """Test tag_object creates the cid reference file successfully with pid."""
+    """Test tag_object creates the cid reference file successfully with pid tagged."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -168,15 +172,18 @@ def test_verify_object_supported_other_algo_not_in_default(pids, store):
     """Test verify_object throws exception when incorrect algorithm is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
+        supported_algo = "sha224"
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
-        checksum = pids[pid]["sha224"]
+        checksum = pids[pid][supported_algo]
         expected_file_size = object_metadata.obj_size
-        store.verify_object(object_metadata, checksum, "sha224", expected_file_size)
+        store.verify_object(
+            object_metadata, checksum, supported_algo, expected_file_size
+        )
 
 
 def test_verify_object_exception_incorrect_object_metadata_type(pids, store):
-    """Test verify_object throws exception when incorrect object is given to
+    """Test verify_object throws exception when incorrect class type is given to
     object_metadata arg."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -244,7 +251,7 @@ def test_verify_object_exception_incorrect_checksum_algo(pids, store):
 
 
 def test_verify_object_exception_supported_other_algo_bad_checksum(pids, store):
-    """Test verify_object throws exception when incorrect algorithm is supplied."""
+    """Test verify_object throws exception when incorrect checksum is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -346,7 +353,6 @@ def test_update_refs_file_remove(pids, store):
         with open(tmp_cid_refs_file, "r", encoding="utf8") as f:
             for _, line in enumerate(f, start=1):
                 value = line.strip()
-                print(value)
                 assert value == pid_other
 
 
@@ -387,7 +393,7 @@ def test_verify_hashstore_references_pid_refs_file_missing(pids, store):
     """Test _verify_hashstore_references throws exception when pid refs file is missing."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(PidRefsFileNotFound):
             store._verify_hashstore_references(pid, cid)
 
 
@@ -410,7 +416,7 @@ def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, "bad_cid", "pid")
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(PidRefsContentError):
             store._verify_hashstore_references(pid, cid)
 
 
@@ -424,7 +430,7 @@ def test_verify_hashstore_references_cid_refs_file_missing(pids, store):
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, "bad_cid", "pid")
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(CidRefsFileNotFound):
             store._verify_hashstore_references(pid, cid)
 
 
@@ -446,7 +452,7 @@ def test_verify_hashstore_references_cid_refs_file_missing_pid(pids, store):
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(CidRefsContentError):
             store._verify_hashstore_references(pid, cid)
 
 
@@ -475,5 +481,5 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
             store._update_refs_file(cid_ref_abs_path, f"dou.test.{i}", "add")
             cid_reference_list.append(f"dou.test.{i}")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(CidRefsContentError):
             store._verify_hashstore_references(pid, cid)

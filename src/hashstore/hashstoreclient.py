@@ -256,7 +256,7 @@ class HashStoreClient:
         factory = HashStoreFactory()
 
         # Get HashStore from factory
-        if testflag is "knbvm":
+        if testflag:
             module_name = "filehashstore"
         else:
             module_name = "hashstore.filehashstore"

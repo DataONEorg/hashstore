@@ -4,7 +4,7 @@ import os
 import shutil
 import pytest
 
-from hashstore.filehashstore import PidAlreadyExistsError
+from hashstore.filehashstore import NonMatchingObjSize, PidAlreadyExistsError
 
 # pylint: disable=W0212
 
@@ -184,10 +184,8 @@ def test_verify_object_exception_incorrect_size(pids, store):
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
 
-        is_valid = store.verify_object(
-            object_metadata, checksum, checksum_algorithm, 1000
-        )
-        assert not is_valid
+        with pytest.raises(NonMatchingObjSize):
+            store.verify_object(object_metadata, checksum, checksum_algorithm, 1000)
 
         cid = object_metadata.cid
         cid = object_metadata.hex_digests[store.algorithm]

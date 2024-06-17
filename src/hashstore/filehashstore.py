@@ -565,29 +565,21 @@ class FileHashStore(HashStore):
             object_metadata_file_size = object_metadata.obj_size
             checksum_algorithm_checked = self._clean_algorithm(checksum_algorithm)
 
-            try:
-                self._verify_object_information(
-                    pid=None,
-                    checksum=checksum,
-                    checksum_algorithm=checksum_algorithm_checked,
-                    entity="objects",
-                    hex_digests=object_metadata_hex_digests,
-                    tmp_file_name=None,
-                    tmp_file_size=object_metadata_file_size,
-                    file_size_to_validate=expected_file_size,
-                )
-                logging.info(
-                    "FileHashStore - verify_object: object has been validated for cid: %s",
-                    object_metadata.cid,
-                )
-                return True
-            # pylint: disable=W0718
-            except Exception as err:
-                exception_string = (
-                    f"FileHashStore - verify_object: object not valid: {err}."
-                )
-                logging.info(exception_string)
-                return False
+            # Throws exceptions if there's an issue
+            self._verify_object_information(
+                pid=None,
+                checksum=checksum,
+                checksum_algorithm=checksum_algorithm_checked,
+                entity="objects",
+                hex_digests=object_metadata_hex_digests,
+                tmp_file_name=None,
+                tmp_file_size=object_metadata_file_size,
+                file_size_to_validate=expected_file_size,
+            )
+            logging.info(
+                "FileHashStore - verify_object: object has been validated for cid: %s",
+                object_metadata.cid,
+            )
 
     def tag_object(self, pid, cid):
         logging.debug(
@@ -1929,10 +1921,10 @@ class FileHashStore(HashStore):
                         + f" Tmp file deleted and file not stored for pid: {pid}"
                     )
                     logging.debug(exception_string_for_pid)
-                    raise ValueError(exception_string_for_pid)
+                    raise NonMatchingObjSize(exception_string_for_pid)
                 else:
                     logging.debug(exception_string)
-                    raise ValueError(exception_string)
+                    raise NonMatchingObjSize(exception_string)
         if checksum_algorithm is not None and checksum is not None:
             if checksum_algorithm not in hex_digests:
                 exception_string = (
@@ -2606,6 +2598,15 @@ class RefsFileExistsButCidObjMissing(Exception):
 
 
 class PidNotFoundInCidRefsFile(Exception):
+    """Custom exception thrown when pid reference file exists with a cid, but
+    the respective cid reference file does not contain the pid."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class NonMatchingObjSize(Exception):
     """Custom exception thrown when pid reference file exists with a cid, but
     the respective cid reference file does not contain the pid."""
 

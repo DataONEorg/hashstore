@@ -4,7 +4,7 @@ import io
 import os
 from pathlib import Path
 import pytest
-from hashstore.filehashstore import FileHashStore
+from hashstore.filehashstore import FileHashStore, NonMatchingObjSize
 
 # pylint: disable=W0212
 
@@ -457,7 +457,7 @@ def test_move_and_get_checksums_incorrect_file_size(pids, store):
     """Test move and get checksum raises error with an incorrect file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingObjSize):
             path = test_dir + pid.replace("/", "_")
             input_stream = io.open(path, "rb")
             incorrect_file_size = 1000
@@ -719,7 +719,7 @@ def test_verify_object_information_incorrect_size(pids, store):
         hex_digests = object_metadata.hex_digests
         checksum = hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingObjSize):
             # pylint: disable=W0212
             store._verify_object_information(
                 None,

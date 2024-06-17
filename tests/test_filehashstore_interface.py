@@ -11,6 +11,7 @@ import pytest
 
 from hashstore.filehashstore import (
     CidRefsDoesNotExist,
+    NonMatchingObjSize,
     PidObjectMetadataError,
     PidNotFoundInCidRefsFile,
     PidRefsDoesNotExist,
@@ -448,7 +449,7 @@ def test_store_object_with_obj_file_size_incorrect(store, pids):
     for pid in pids.keys():
         obj_file_size = 1234
         path = test_dir + pid.replace("/", "_")
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingObjSize):
             store.store_object(pid, path, expected_object_size=obj_file_size)
 
 

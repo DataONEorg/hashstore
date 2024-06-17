@@ -1,6 +1,9 @@
-class PidRefsFileNotFound(Exception):
-    """Custom exception thrown when verifying reference files and a pid refs
-    file is not found."""
+"""FileHashStore custom exception module."""
+
+
+class CidRefsContentError(Exception):
+    """Custom exception thrown when verifying reference files and a cid refs
+    file does not have a pid that is expected to be found."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)
@@ -16,6 +19,14 @@ class CidRefsFileNotFound(Exception):
         self.errors = errors
 
 
+class CidRefsDoesNotExist(Exception):
+    """Custom exception thrown when a cid refs file does not exist."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
 class PidRefsContentError(Exception):
     """Custom exception thrown when verifying reference files and a pid refs
     file does not contain the cid that it is expected."""
@@ -25,9 +36,9 @@ class PidRefsContentError(Exception):
         self.errors = errors
 
 
-class CidRefsContentError(Exception):
-    """Custom exception thrown when verifying reference files and a cid refs
-    file does not have a pid that is expected to be found."""
+class PidRefsFileNotFound(Exception):
+    """Custom exception thrown when verifying reference files and a pid refs
+    file is not found."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)
@@ -46,23 +57,6 @@ class PidAlreadyExistsError(Exception):
 
 class PidRefsDoesNotExist(Exception):
     """Custom exception thrown when a pid refs file does not exist."""
-
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
-
-
-class CidRefsDoesNotExist(Exception):
-    """Custom exception thrown when a cid refs file does not exist."""
-
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
-
-
-class RefsFileExistsButCidObjMissing(Exception):
-    """Custom exception thrown when pid and cid refs file exists, but the
-    cid object does not."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)
@@ -90,6 +84,15 @@ class NonMatchingObjSize(Exception):
 class NonMatchingChecksum(Exception):
     """Custom exception thrown when verifying an object and the expected checksum
     does not match what has been calculated."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class RefsFileExistsButCidObjMissing(Exception):
+    """Custom exception thrown when pid and cid refs file exists, but the
+    cid object does not."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)

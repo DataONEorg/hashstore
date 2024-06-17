@@ -88,8 +88,6 @@ class HashStore(ABC):
         :param str checksum: Value of the checksum.
         :param str checksum_algorithm: Algorithm of the checksum.
         :param int expected_file_size: Size of the temporary file.
-
-        :return: bool - `True` if valid
         """
         raise NotImplementedError()
 

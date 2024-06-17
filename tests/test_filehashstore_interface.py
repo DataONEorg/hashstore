@@ -13,7 +13,6 @@ from hashstore.filehashstore import (
     CidRefsDoesNotExist,
     NonMatchingChecksum,
     NonMatchingObjSize,
-    PidObjectMetadataError,
     PidNotFoundInCidRefsFile,
     PidRefsDoesNotExist,
     RefsFileExistsButCidObjMissing,

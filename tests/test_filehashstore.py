@@ -4,7 +4,11 @@ import io
 import os
 from pathlib import Path
 import pytest
-from hashstore.filehashstore import FileHashStore, NonMatchingObjSize
+from hashstore.filehashstore import (
+    FileHashStore,
+    NonMatchingChecksum,
+    NonMatchingObjSize,
+)
 
 # pylint: disable=W0212
 
@@ -322,7 +326,7 @@ def test_store_and_validate_data_with_incorrect_checksum(pids, store):
         algo = "sha224"
         algo_checksum = "badChecksumValue"
         path = test_dir + pid.replace("/", "_")
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingChecksum):
             store._store_and_validate_data(
                 pid, path, checksum=algo_checksum, checksum_algorithm=algo
             )
@@ -441,7 +445,7 @@ def test_move_and_get_checksums_raises_error_with_nonmatching_checksum(pids, sto
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingChecksum):
             # pylint: disable=W0212
             store._move_and_get_checksums(
                 pid,

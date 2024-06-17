@@ -11,6 +11,7 @@ import pytest
 
 from hashstore.filehashstore import (
     CidRefsDoesNotExist,
+    NonMatchingChecksum,
     NonMatchingObjSize,
     PidObjectMetadataError,
     PidNotFoundInCidRefsFile,
@@ -422,7 +423,7 @@ def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, stor
     # Store first blob
     _object_metadata_one = store.store_object(pid, path)
     # Store second blob
-    with pytest.raises(PidObjectMetadataError):
+    with pytest.raises(NonMatchingChecksum):
         _object_metadata_two = store.store_object(
             pid, path, checksum="nonmatchingchecksum", checksum_algorithm="sha256"
         )

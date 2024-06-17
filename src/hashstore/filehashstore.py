@@ -507,14 +507,6 @@ class FileHashStore(HashStore):
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,
                 )
-            except PidObjectMetadataError as ome:
-                exception_string = (
-                    f"FileHashStore - store_object: failed to store object for pid: {pid}."
-                    + " Reference files will not be created or tagged. PidObjectMetadataError: "
-                    + str(ome)
-                )
-                logging.error(exception_string)
-                raise ome
             except Exception as err:
                 exception_string = (
                     f"FileHashStore - store_object: failed to store object for pid: {pid}."
@@ -1540,7 +1532,7 @@ class FileHashStore(HashStore):
                 logging.warning("FileHashStore - _move_and_get_checksums: %s", err_msg)
                 raise
         else:
-            # If the file exists, determine if the object is what the client states it to be
+            # If the data object already exists, do not move the file but attempt to verify it
             try:
                 self._verify_object_information(
                     pid,
@@ -1552,17 +1544,26 @@ class FileHashStore(HashStore):
                     tmp_file_size,
                     file_size_to_validate,
                 )
-            except ValueError as ve:
-                # If any exception is thrown during validation,
+            except NonMatchingObjSize as nmose:
+                # If any exception is thrown during validation, we do not tag.
                 exception_string = (
                     f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
                     + " , deleting temp file. Reference files will not be created and/or tagged"
-                    + f" due to an issue with the supplied pid object metadata. {ve}"
+                    + f" due to an issue with the supplied pid object metadata. {str(nmose)}"
                 )
                 logging.debug(exception_string)
-                raise PidObjectMetadataError(exception_string) from ve
+                raise NonMatchingObjSize(exception_string) from nmose
+            except NonMatchingChecksum as nmce:
+                # If any exception is thrown during validation, we do not tag.
+                exception_string = (
+                    f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
+                    + " , deleting temp file. Reference files will not be created and/or tagged"
+                    + f" due to an issue with the supplied pid object metadata. {str(nmce)}"
+                )
+                logging.debug(exception_string)
+                raise NonMatchingChecksum(exception_string) from nmce
             finally:
-                # Delete the temporary file, it already exists, so it is redundant
+                # Delete the temporary file, the data object already exists, so it is redundant
                 # No exception is thrown so 'store_object' can proceed to tag object
                 self._delete(entity, tmp_file_name)
 
@@ -1949,14 +1950,14 @@ class FileHashStore(HashStore):
                             exception_string + f" Tmp file ({tmp_file_name}) deleted."
                         )
                         logging.debug(exception_string_for_pid)
-                        raise ValueError(exception_string_for_pid)
+                        raise NonMatchingChecksum(exception_string_for_pid)
                     else:
                         # Delete the object
                         cid = hex_digests[self.algorithm]
                         cid_abs_path = self._resolve_path("cid", cid)
                         self._delete(entity, cid_abs_path)
                         logging.debug(exception_string)
-                        raise ValueError(exception_string)
+                        raise NonMatchingChecksum(exception_string)
 
     def _verify_hashstore_references(
         self,
@@ -2563,15 +2564,6 @@ class PidAlreadyExistsError(Exception):
         self.errors = errors
 
 
-class PidObjectMetadataError(Exception):
-    """Custom exception thrown when an object cannot be verified due
-    to an error with the metadata provided to validate against."""
-
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
-
-
 class PidRefsDoesNotExist(Exception):
     """Custom exception thrown when a pid refs file does not exist."""
 
@@ -2607,8 +2599,17 @@ class PidNotFoundInCidRefsFile(Exception):
 
 
 class NonMatchingObjSize(Exception):
-    """Custom exception thrown when pid reference file exists with a cid, but
-    the respective cid reference file does not contain the pid."""
+    """Custom exception thrown when verifying an object and the expected file size
+    does not match what has been calculated."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class NonMatchingChecksum(Exception):
+    """Custom exception thrown when verifying an object and the expected checksum
+    does not match what has been calculated."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)

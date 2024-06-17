@@ -4,8 +4,8 @@ import io
 import os
 from pathlib import Path
 import pytest
-from hashstore.filehashstore import (
-    FileHashStore,
+from hashstore.filehashstore import FileHashStore
+from hashstore.filehashstore_exceptions import (
     NonMatchingChecksum,
     NonMatchingObjSize,
     UnsupportedAlgorithm,

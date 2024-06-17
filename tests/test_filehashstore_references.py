@@ -4,7 +4,7 @@ import os
 import shutil
 import pytest
 
-from hashstore.filehashstore import (
+from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
     NonMatchingChecksum,

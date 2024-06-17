@@ -9,7 +9,7 @@ import threading
 import time
 import pytest
 
-from hashstore.filehashstore import (
+from hashstore.filehashstore_exceptions import (
     CidRefsDoesNotExist,
     NonMatchingChecksum,
     NonMatchingObjSize,

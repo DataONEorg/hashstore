@@ -14,6 +14,20 @@ from tempfile import NamedTemporaryFile
 import fcntl
 import yaml
 from hashstore import HashStore, ObjectMetadata
+from hashstore.filehashstore_exceptions import (
+    CidRefsContentError,
+    CidRefsDoesNotExist,
+    CidRefsFileNotFound,
+    NonMatchingChecksum,
+    NonMatchingObjSize,
+    PidAlreadyExistsError,
+    PidNotFoundInCidRefsFile,
+    PidRefsContentError,
+    PidRefsDoesNotExist,
+    PidRefsFileNotFound,
+    RefsFileExistsButCidObjMissing,
+    UnsupportedAlgorithm,
+)
 
 
 class FileHashStore(HashStore):
@@ -507,14 +521,6 @@ class FileHashStore(HashStore):
                     "FileHashStore - store_object: Successfully stored object for pid: %s",
                     pid,
                 )
-            except PidObjectMetadataError as ome:
-                exception_string = (
-                    f"FileHashStore - store_object: failed to store object for pid: {pid}."
-                    + " Reference files will not be created or tagged. PidObjectMetadataError: "
-                    + str(ome)
-                )
-                logging.error(exception_string)
-                raise ome
             except Exception as err:
                 exception_string = (
                     f"FileHashStore - store_object: failed to store object for pid: {pid}."
@@ -565,29 +571,21 @@ class FileHashStore(HashStore):
             object_metadata_file_size = object_metadata.obj_size
             checksum_algorithm_checked = self._clean_algorithm(checksum_algorithm)
 
-            try:
-                self._verify_object_information(
-                    pid=None,
-                    checksum=checksum,
-                    checksum_algorithm=checksum_algorithm_checked,
-                    entity="objects",
-                    hex_digests=object_metadata_hex_digests,
-                    tmp_file_name=None,
-                    tmp_file_size=object_metadata_file_size,
-                    file_size_to_validate=expected_file_size,
-                )
-                logging.info(
-                    "FileHashStore - verify_object: object has been validated for cid: %s",
-                    object_metadata.cid,
-                )
-                return True
-            # pylint: disable=W0718
-            except Exception as err:
-                exception_string = (
-                    f"FileHashStore - verify_object: object not valid: {err}."
-                )
-                logging.info(exception_string)
-                return False
+            # Throws exceptions if there's an issue
+            self._verify_object_information(
+                pid=None,
+                checksum=checksum,
+                checksum_algorithm=checksum_algorithm_checked,
+                entity="objects",
+                hex_digests=object_metadata_hex_digests,
+                tmp_file_name=None,
+                tmp_file_size=object_metadata_file_size,
+                file_size_to_validate=expected_file_size,
+            )
+            logging.info(
+                "FileHashStore - verify_object: object has been validated for cid: %s",
+                object_metadata.cid,
+            )
 
     def tag_object(self, pid, cid):
         logging.debug(
@@ -1548,7 +1546,7 @@ class FileHashStore(HashStore):
                 logging.warning("FileHashStore - _move_and_get_checksums: %s", err_msg)
                 raise
         else:
-            # If the file exists, determine if the object is what the client states it to be
+            # If the data object already exists, do not move the file but attempt to verify it
             try:
                 self._verify_object_information(
                     pid,
@@ -1560,17 +1558,26 @@ class FileHashStore(HashStore):
                     tmp_file_size,
                     file_size_to_validate,
                 )
-            except ValueError as ve:
-                # If any exception is thrown during validation,
+            except NonMatchingObjSize as nmose:
+                # If any exception is thrown during validation, we do not tag.
                 exception_string = (
                     f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
                     + " , deleting temp file. Reference files will not be created and/or tagged"
-                    + f" due to an issue with the supplied pid object metadata. {ve}"
+                    + f" due to an issue with the supplied pid object metadata. {str(nmose)}"
                 )
                 logging.debug(exception_string)
-                raise PidObjectMetadataError(exception_string) from ve
+                raise NonMatchingObjSize(exception_string) from nmose
+            except NonMatchingChecksum as nmce:
+                # If any exception is thrown during validation, we do not tag.
+                exception_string = (
+                    f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
+                    + " , deleting temp file. Reference files will not be created and/or tagged"
+                    + f" due to an issue with the supplied pid object metadata. {str(nmce)}"
+                )
+                logging.debug(exception_string)
+                raise NonMatchingChecksum(exception_string) from nmce
             finally:
-                # Delete the temporary file, it already exists, so it is redundant
+                # Delete the temporary file, the data object already exists, so it is redundant
                 # No exception is thrown so 'store_object' can proceed to tag object
                 self._delete(entity, tmp_file_name)
 
@@ -1929,18 +1936,36 @@ class FileHashStore(HashStore):
                         + f" Tmp file deleted and file not stored for pid: {pid}"
                     )
                     logging.debug(exception_string_for_pid)
-                    raise ValueError(exception_string_for_pid)
+                    raise NonMatchingObjSize(exception_string_for_pid)
                 else:
                     logging.debug(exception_string)
-                    raise ValueError(exception_string)
+                    raise NonMatchingObjSize(exception_string)
         if checksum_algorithm is not None and checksum is not None:
             if checksum_algorithm not in hex_digests:
-                exception_string = (
-                    "FileHashStore - _verify_object_information: checksum_algorithm"
-                    + f" ({checksum_algorithm}) cannot be found in the hex digests dictionary."
-                )
-                logging.debug(exception_string)
-                raise KeyError(exception_string)
+                # Check to see if it is a supported algorithm
+                self._clean_algorithm(checksum_algorithm)
+                # If so, calculate the checksum and compare it
+                if tmp_file_name is not None and pid is not None:
+                    # Calculate the checksum from the tmp file
+                    hex_digest_calculated = self._computehash(
+                        tmp_file_name, algorithm=checksum_algorithm
+                    )
+                else:
+                    # Otherwise, a data object has been stored without a pid
+                    object_cid = hex_digests[self.algorithm]
+                    cid_stream = self._open(entity, object_cid)
+                    hex_digest_calculated = self._computehash(
+                        cid_stream, algorithm=checksum_algorithm
+                    )
+                if hex_digest_calculated != checksum:
+                    exception_string = (
+                        "FileHashStore - _verify_object_information: checksum_algorithm"
+                        + f" ({checksum_algorithm}) cannot be found in the default hex digests"
+                        + " dict, but is supported. New checksum calculated but does not match"
+                        + " what has been provided."
+                    )
+                    logging.debug(exception_string)
+                    raise NonMatchingChecksum(exception_string)
             else:
                 hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum.lower():
@@ -1957,14 +1982,14 @@ class FileHashStore(HashStore):
                             exception_string + f" Tmp file ({tmp_file_name}) deleted."
                         )
                         logging.debug(exception_string_for_pid)
-                        raise ValueError(exception_string_for_pid)
+                        raise NonMatchingChecksum(exception_string_for_pid)
                     else:
                         # Delete the object
                         cid = hex_digests[self.algorithm]
                         cid_abs_path = self._resolve_path("cid", cid)
                         self._delete(entity, cid_abs_path)
                         logging.debug(exception_string)
-                        raise ValueError(exception_string)
+                        raise NonMatchingChecksum(exception_string)
 
     def _verify_hashstore_references(
         self,
@@ -2001,7 +2026,7 @@ class FileHashStore(HashStore):
                 + f" . Additional Context: {additional_log_string}"
             )
             logging.error(exception_string)
-            raise FileNotFoundError(exception_string)
+            raise PidRefsFileNotFound(exception_string)
         if not os.path.exists(cid_refs_path):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file missing: "
@@ -2009,7 +2034,7 @@ class FileHashStore(HashStore):
                 + f" . Additional Context: {additional_log_string}"
             )
             logging.error(exception_string)
-            raise FileNotFoundError(exception_string)
+            raise CidRefsFileNotFound(exception_string)
         # Check the content of the reference files
         # Start with the cid
         with open(pid_refs_path, "r", encoding="utf8") as f:
@@ -2021,7 +2046,7 @@ class FileHashStore(HashStore):
                 + f" Additional Context: {additional_log_string}"
             )
             logging.error(exception_string)
-            raise ValueError(exception_string)
+            raise PidRefsContentError(exception_string)
         # Then the pid
         pid_found = self._is_string_in_refs_file(pid, cid_refs_path)
         if not pid_found:
@@ -2031,7 +2056,7 @@ class FileHashStore(HashStore):
                 + f" Additional Context:  {additional_log_string}"
             )
             logging.error(exception_string)
-            raise ValueError(exception_string)
+            raise CidRefsContentError(exception_string)
 
     @staticmethod
     def _check_arg_data(data):
@@ -2183,7 +2208,7 @@ class FileHashStore(HashStore):
                 + cleaned_string
             )
             logging.error(exception_string)
-            raise ValueError(exception_string)
+            raise UnsupportedAlgorithm(exception_string)
         return cleaned_string
 
     def _computehash(self, stream, algorithm=None):
@@ -2559,56 +2584,3 @@ class Stream(object):
             self._obj.close()
         else:
             self._obj.seek(self._pos)
-
-
-class PidAlreadyExistsError(Exception):
-    """Custom exception thrown when a client calls 'tag_object' and the pid
-    that is being tagged is already accounted for (has a pid refs file and
-    is found in the cid refs file)."""
-
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
-
-
-class PidObjectMetadataError(Exception):
-    """Custom exception thrown when an object cannot be verified due
-    to an error with the metadata provided to validate against."""
-
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
-
-
-class PidRefsDoesNotExist(Exception):
-    """Custom exception thrown when a pid refs file does not exist."""
-
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
-
-
-class CidRefsDoesNotExist(Exception):
-    """Custom exception thrown when a cid refs file does not exist."""
-
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
-
-
-class RefsFileExistsButCidObjMissing(Exception):
-    """Custom exception thrown when pid and cid refs file exists, but the
-    cid object does not."""
-
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
-
-
-class PidNotFoundInCidRefsFile(Exception):
-    """Custom exception thrown when pid reference file exists with a cid, but
-    the respective cid reference file does not contain the pid."""
-
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors

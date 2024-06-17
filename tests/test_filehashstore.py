@@ -5,6 +5,11 @@ import os
 from pathlib import Path
 import pytest
 from hashstore.filehashstore import FileHashStore
+from hashstore.filehashstore_exceptions import (
+    NonMatchingChecksum,
+    NonMatchingObjSize,
+    UnsupportedAlgorithm,
+)
 
 # pylint: disable=W0212
 
@@ -322,7 +327,7 @@ def test_store_and_validate_data_with_incorrect_checksum(pids, store):
         algo = "sha224"
         algo_checksum = "badChecksumValue"
         path = test_dir + pid.replace("/", "_")
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingChecksum):
             store._store_and_validate_data(
                 pid, path, checksum=algo_checksum, checksum_algorithm=algo
             )
@@ -441,7 +446,7 @@ def test_move_and_get_checksums_raises_error_with_nonmatching_checksum(pids, sto
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingChecksum):
             # pylint: disable=W0212
             store._move_and_get_checksums(
                 pid,
@@ -457,7 +462,7 @@ def test_move_and_get_checksums_incorrect_file_size(pids, store):
     """Test move and get checksum raises error with an incorrect file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingObjSize):
             path = test_dir + pid.replace("/", "_")
             input_stream = io.open(path, "rb")
             incorrect_file_size = 1000
@@ -518,7 +523,7 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo(stor
     path = test_dir + pid
     input_stream = io.open(path, "rb")
     additional_algo = "sha224"
-    additional_algo_checksum = (
+    additional_algo_checksum_correct = (
         "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
     )
     checksum_algo = "sha3_256"
@@ -533,7 +538,7 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo(stor
     )
     input_stream.close()
     assert hex_digests.get("sha3_256") == checksum_correct
-    assert hex_digests.get("sha224") == additional_algo_checksum
+    assert hex_digests.get("sha224") == additional_algo_checksum_correct
 
 
 def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo_duplicate(
@@ -604,12 +609,12 @@ def test_write_to_tmp_file_and_get_hex_digests_with_unsupported_algorithm(pids, 
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         algo = "md2"
-        with pytest.raises(ValueError):
+        with pytest.raises(UnsupportedAlgorithm):
             # pylint: disable=W0212
             _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
                 input_stream, additional_algorithm=algo
             )
-        with pytest.raises(ValueError):
+        with pytest.raises(UnsupportedAlgorithm):
             # pylint: disable=W0212
             _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
                 input_stream, checksum_algorithm=algo
@@ -719,7 +724,7 @@ def test_verify_object_information_incorrect_size(pids, store):
         hex_digests = object_metadata.hex_digests
         checksum = hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingObjSize):
             # pylint: disable=W0212
             store._verify_object_information(
                 None,
@@ -763,9 +768,37 @@ def test_verify_object_information_incorrect_size_with_pid(pids, store):
             assert not os.path.isfile(tmp_file.name)
 
 
-def test_verify_object_information_missing_key_in_hex_digests(pids, store):
+def test_verify_object_information_missing_key_in_hex_digests_unsupported_algo(
+    pids, store
+):
     """Test _verify_object_information throws exception when algorithm is not found
-    in hex digests."""
+    in hex digests and is not supported."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = "md10"
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(UnsupportedAlgorithm):
+            # pylint: disable=W0212
+            store._verify_object_information(
+                None,
+                checksum,
+                checksum_algorithm,
+                "objects",
+                object_metadata.hex_digests,
+                None,
+                expected_file_size,
+                expected_file_size,
+            )
+
+
+def test_verify_object_information_missing_key_in_hex_digests_supported_algo(
+    pids, store
+):
+    """Test _verify_object_information throws exception when algorithm is not found
+    in hex digests but is supported, however the checksum calculated does not match."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -773,13 +806,13 @@ def test_verify_object_information_missing_key_in_hex_digests(pids, store):
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = "blake2s"
         expected_file_size = object_metadata.obj_size
-        with pytest.raises(KeyError):
+        with pytest.raises(NonMatchingChecksum):
             # pylint: disable=W0212
             store._verify_object_information(
                 None,
                 checksum,
                 checksum_algorithm,
-                None,
+                "objects",
                 object_metadata.hex_digests,
                 None,
                 expected_file_size,
@@ -798,6 +831,13 @@ def test_clean_algorithm(store):
     assert cleaned_algo_underscore == "sha256"
     assert cleaned_algo_hyphen == "sha256"
     assert cleaned_algo_other_hyphen == "sha3_256"
+
+
+def test_clean_algorithm_unsupported_algo(store):
+    """Check that algorithm values get formatted as expected."""
+    algorithm_unsupported = "mok22"
+    with pytest.raises(UnsupportedAlgorithm):
+        _ = store._clean_algorithm(algorithm_unsupported)
 
 
 def test_computehash(pids, store):

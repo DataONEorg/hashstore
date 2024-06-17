@@ -4,7 +4,16 @@ import os
 import shutil
 import pytest
 
-from hashstore.filehashstore import PidAlreadyExistsError
+from hashstore.filehashstore_exceptions import (
+    CidRefsContentError,
+    CidRefsFileNotFound,
+    NonMatchingChecksum,
+    NonMatchingObjSize,
+    PidAlreadyExistsError,
+    PidRefsContentError,
+    PidRefsFileNotFound,
+    UnsupportedAlgorithm,
+)
 
 # pylint: disable=W0212
 
@@ -56,7 +65,7 @@ def test_tag_object_pid_refs_file_content(pids, store):
 
 
 def test_tag_object_cid_refs_file_content(pids, store):
-    """Test tag_object creates the cid reference file successfully with pid."""
+    """Test tag_object creates the cid reference file successfully with pid tagged."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -146,7 +155,7 @@ def test_tag_object_pid_refs_not_found_cid_refs_found(store):
 
 
 def test_verify_object(pids, store):
-    """Test verify_object succeeds given good arguments."""
+    """Test verify_object does not throw exception given good arguments."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -159,8 +168,22 @@ def test_verify_object(pids, store):
         )
 
 
+def test_verify_object_supported_other_algo_not_in_default(pids, store):
+    """Test verify_object throws exception when incorrect algorithm is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        supported_algo = "sha224"
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = pids[pid][supported_algo]
+        expected_file_size = object_metadata.obj_size
+        store.verify_object(
+            object_metadata, checksum, supported_algo, expected_file_size
+        )
+
+
 def test_verify_object_exception_incorrect_object_metadata_type(pids, store):
-    """Test verify_object returns false when incorrect object is given to
+    """Test verify_object throws exception when incorrect class type is given to
     object_metadata arg."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -176,7 +199,7 @@ def test_verify_object_exception_incorrect_object_metadata_type(pids, store):
 
 
 def test_verify_object_exception_incorrect_size(pids, store):
-    """Test verify_object returns false when incorrect size is supplied."""
+    """Test verify_object throws exception when incorrect size is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -184,10 +207,8 @@ def test_verify_object_exception_incorrect_size(pids, store):
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
 
-        is_valid = store.verify_object(
-            object_metadata, checksum, checksum_algorithm, 1000
-        )
-        assert not is_valid
+        with pytest.raises(NonMatchingObjSize):
+            store.verify_object(object_metadata, checksum, checksum_algorithm, 1000)
 
         cid = object_metadata.cid
         cid = object_metadata.hex_digests[store.algorithm]
@@ -196,7 +217,7 @@ def test_verify_object_exception_incorrect_size(pids, store):
 
 
 def test_verify_object_exception_incorrect_checksum(pids, store):
-    """Test verify_object returns false when incorrect checksum is supplied."""
+    """Test verify_object throws exception when incorrect checksum is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -206,10 +227,10 @@ def test_verify_object_exception_incorrect_checksum(pids, store):
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
 
-        is_valid = store.verify_object(
-            object_metadata, "abc123", checksum_algorithm, expected_file_size
-        )
-        assert not is_valid
+        with pytest.raises(NonMatchingChecksum):
+            store.verify_object(
+                object_metadata, "abc123", checksum_algorithm, expected_file_size
+            )
 
         cid = object_metadata.cid
         cid = object_metadata.hex_digests[store.algorithm]
@@ -218,15 +239,27 @@ def test_verify_object_exception_incorrect_checksum(pids, store):
 
 
 def test_verify_object_exception_incorrect_checksum_algo(pids, store):
-    """Test verify_object returns false when incorrect algorithm is supplied."""
+    """Test verify_object throws exception when unsupported algorithm is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
         checksum = object_metadata.hex_digests.get(store.algorithm)
         expected_file_size = object_metadata.obj_size
-        with pytest.raises(ValueError):
+        with pytest.raises(UnsupportedAlgorithm):
             store.verify_object(object_metadata, checksum, "md2", expected_file_size)
+
+
+def test_verify_object_exception_supported_other_algo_bad_checksum(pids, store):
+    """Test verify_object throws exception when incorrect checksum is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(NonMatchingChecksum):
+            store.verify_object(object_metadata, checksum, "sha224", expected_file_size)
 
 
 def test_write_refs_file_ref_type_cid(store):
@@ -320,7 +353,6 @@ def test_update_refs_file_remove(pids, store):
         with open(tmp_cid_refs_file, "r", encoding="utf8") as f:
             for _, line in enumerate(f, start=1):
                 value = line.strip()
-                print(value)
                 assert value == pid_other
 
 
@@ -361,7 +393,7 @@ def test_verify_hashstore_references_pid_refs_file_missing(pids, store):
     """Test _verify_hashstore_references throws exception when pid refs file is missing."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(PidRefsFileNotFound):
             store._verify_hashstore_references(pid, cid)
 
 
@@ -384,7 +416,7 @@ def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, "bad_cid", "pid")
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(PidRefsContentError):
             store._verify_hashstore_references(pid, cid)
 
 
@@ -398,7 +430,7 @@ def test_verify_hashstore_references_cid_refs_file_missing(pids, store):
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, "bad_cid", "pid")
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(CidRefsFileNotFound):
             store._verify_hashstore_references(pid, cid)
 
 
@@ -420,7 +452,7 @@ def test_verify_hashstore_references_cid_refs_file_missing_pid(pids, store):
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(CidRefsContentError):
             store._verify_hashstore_references(pid, cid)
 
 
@@ -449,5 +481,5 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
             store._update_refs_file(cid_ref_abs_path, f"dou.test.{i}", "add")
             cid_reference_list.append(f"dou.test.{i}")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(CidRefsContentError):
             store._verify_hashstore_references(pid, cid)

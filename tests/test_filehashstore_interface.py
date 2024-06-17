@@ -9,12 +9,14 @@ import threading
 import time
 import pytest
 
-from hashstore.filehashstore import (
+from hashstore.filehashstore_exceptions import (
     CidRefsDoesNotExist,
-    PidObjectMetadataError,
+    NonMatchingChecksum,
+    NonMatchingObjSize,
     PidNotFoundInCidRefsFile,
     PidRefsDoesNotExist,
     RefsFileExistsButCidObjMissing,
+    UnsupportedAlgorithm,
 )
 
 # pylint: disable=W0212
@@ -177,12 +179,12 @@ def test_store_object_additional_algorithm_invalid(store):
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_not_in_list = "abc"
-    with pytest.raises(ValueError, match="Algorithm not supported"):
+    with pytest.raises(UnsupportedAlgorithm):
         store.store_object(pid, path, algorithm_not_in_list)
 
 
 def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
-    """Test store object formats an additional algorithm in uppercase."""
+    """Test store object accepts an additional algo that's supported in uppercase."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -195,7 +197,7 @@ def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
 
 
 def test_store_object_additional_algorithm_hyphen_lowercase(pids, store):
-    """Test store object formats an with additional algorithm in lowercase."""
+    """Test store object accepts an with additional algo that's supported in lowercase."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -211,7 +213,7 @@ def test_store_object_additional_algorithm_hyphen_lowercase(pids, store):
 
 
 def test_store_object_additional_algorithm_underscore(pids, store):
-    """Test store object with formats an additional algorithm with underscore."""
+    """Test store object accepts an additional algo that's supported with underscore."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"
@@ -267,7 +269,7 @@ def test_store_object_checksum_correct_and_additional_algo(store):
 
 
 def test_store_object_checksum_correct_and_additional_algo_duplicate(store):
-    """Test store object does not throw exception with duplicate algorithms."""
+    """Test store object does not throw exception with duplicate algorithms (de-dupes)."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -344,11 +346,26 @@ def test_store_object_checksum_incorrect_checksum(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
+    algorithm_other = "sha224"
+    checksum_incorrect = (
+        "bbbb069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    with pytest.raises(NonMatchingChecksum):
+        store.store_object(
+            pid, path, checksum=checksum_incorrect, checksum_algorithm=algorithm_other
+        )
+
+
+def test_store_object_checksum_unsupported_checksum_algo(store):
+    """Test store object raises error when supplied with unsupported checksum algo."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
     algorithm_other = "sha3_256"
     checksum_incorrect = (
         "bbbb069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(UnsupportedAlgorithm):
         store.store_object(
             pid, path, checksum=algorithm_other, checksum_algorithm=checksum_incorrect
         )
@@ -390,8 +407,8 @@ def test_store_object_duplicate_object_references_file_count(store):
 
 
 def test_store_object_duplicate_object_references_file_content(pids, store):
-    """Test that storing duplicate object but different pid creates the expected
-    amount of reference files."""
+    """Test that storing duplicate object but different pid updates the cid refs file
+    with the correct amount of pids."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -412,8 +429,8 @@ def test_store_object_duplicate_object_references_file_content(pids, store):
 
 
 def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, store):
-    """Test store duplicate object throws ValueError when object exists
-    but the data to validate against is incorrect."""
+    """Test store duplicate object throws exception when the data to validate against
+    is incorrect."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -421,7 +438,7 @@ def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, stor
     # Store first blob
     _object_metadata_one = store.store_object(pid, path)
     # Store second blob
-    with pytest.raises(PidObjectMetadataError):
+    with pytest.raises(NonMatchingChecksum):
         _object_metadata_two = store.store_object(
             pid, path, checksum="nonmatchingchecksum", checksum_algorithm="sha256"
         )
@@ -443,17 +460,17 @@ def test_store_object_with_obj_file_size(store, pids):
 
 
 def test_store_object_with_obj_file_size_incorrect(store, pids):
-    """Test store object throws exception with incorrect file sizes."""
+    """Test store object throws exception with incorrect file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         obj_file_size = 1234
         path = test_dir + pid.replace("/", "_")
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingObjSize):
             store.store_object(pid, path, expected_object_size=obj_file_size)
 
 
 def test_store_object_with_obj_file_size_non_integer(store, pids):
-    """Test store object throws exception with a non integer value (ex. a stirng)
+    """Test store object throws exception with a non integer value (ex. a string)
     as the file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -544,8 +561,8 @@ def test_store_object_threads_multiple_pids_one_cid_content(pids, store):
     with open(cid_refs_path, "r", encoding="utf8") as ref_file:
         # Confirm that pid is not currently already tagged
         for pid in ref_file:
-            number_of_pids_reffed += 1
-            assert pid.strip() in pid_list
+            if pid.strip() in pid_list:
+                number_of_pids_reffed += 1
 
     assert number_of_pids_reffed == 6
 
@@ -1085,7 +1102,7 @@ def test_delete_object_metadata_deleted(pids, store):
     assert store._count("metadata") == 0
 
 
-def test_delete_object_refs_files_deleted(pids, store):
+def test_delete_object_all_refs_files_deleted(pids, store):
     """Test delete_object successfully deletes refs files."""
     test_dir = "tests/testdata/"
     format_id = "http://ns.dataone.org/service/types/v2.0"
@@ -1221,6 +1238,24 @@ def test_delete_metadata_one_pid_multiple_metadata_documents(store):
     assert store._count(entity) == 0
 
 
+def test_delete_metadata_specific_pid_multiple_metadata_documents(store):
+    """Test delete_metadata for a pid with multiple metadata documents deletes
+    only the specified metadata file."""
+    test_dir = "tests/testdata/"
+    entity = "metadata"
+    pid = "jtao.1700.1"
+    filename = pid.replace("/", "_") + ".xml"
+    syspath = Path(test_dir) / filename
+    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id3 = "http://ns.dataone.org/service/types/v3.0"
+    format_id4 = "http://ns.dataone.org/service/types/v4.0"
+    _metadata_cid = store.store_metadata(pid, syspath, format_id)
+    _metadata_cid3 = store.store_metadata(pid, syspath, format_id3)
+    _metadata_cid4 = store.store_metadata(pid, syspath, format_id4)
+    store.delete_metadata(pid, format_id4)
+    assert store._count(entity) == 2
+
+
 def test_delete_metadata_does_not_exist(pids, store):
     """Test delete_metadata does not throw exception when called to delete
     metadata that does not exist."""
@@ -1303,7 +1338,7 @@ def test_get_hex_digest_pid_unsupported_algorithm(store):
     syspath.read_bytes()
     _object_metadata = store.store_object(pid, path)
     algorithm = "sm3"
-    with pytest.raises(ValueError):
+    with pytest.raises(UnsupportedAlgorithm):
         store.get_hex_digest(pid, algorithm)
 
 

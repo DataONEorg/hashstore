@@ -31,9 +31,10 @@ from hashstore.filehashstore_exceptions import (
 
 
 class FileHashStore(HashStore):
-    """FileHashStore is a content-addressable file manager based on Derrick
-    Gilland's 'hashfs' library. It supports the storage of objects on disk using
-    a content identifier to address files.
+    """FileHashStore is an object storage system that was extended from Derrick Gilland's
+    'hashfs' library. It supports the storage of objects on disk using a content identifier
+    to address files (data objects are de-duplicated) and provides a content identifier-based
+    API to interact with a HashStore.
 
     FileHashStore initializes using a given properties dictionary containing the
     required keys (see Args). Upon initialization, FileHashStore verifies the provided

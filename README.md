@@ -278,19 +278,19 @@ $ hashstore /path/to/store/ -findobject -pid=persistent_identifier
 $ hashstore /path/to/store/ -storeobject -pid=persistent_identifier -path=/path/to/object
 
 # Store a metadata object
-$ hashstore /path/to/store/ -storemetadata -pid=persistent_identifier -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
+$ hashstore /path/to/store/ -storemetadata -pid=persistent_identifier -path=/path/to/metadata/object -formatid=https://ns.dataone.org/service/types/v2.0#SystemMetadata
 
 # Retrieve a data object
 $ hashstore /path/to/store/ -retrieveobject -pid=persistent_identifier
 
 # Retrieve a metadata object
-$ hashstore /path/to/store/ -retrievemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ hashstore /path/to/store/ -retrievemetadata -pid=persistent_identifier -formatid=https://ns.dataone.org/service/types/v2.0#SystemMetadata
 
 # Delete a data object
 $ hashstore /path/to/store/ -deleteobject -pid=persistent_identifier
 
 # Delete a metadata file
-$ hashstore /path/to/store/ -deletemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ hashstore /path/to/store/ -deletemetadata -pid=persistent_identifier -formatid=https://ns.dataone.org/service/types/v2.0#SystemMetadata
 ```
 
 ## License

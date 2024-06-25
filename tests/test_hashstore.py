@@ -54,7 +54,7 @@ def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "MD2",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(ValueError):
         factory.get_hashstore(module_name, class_name, properties)
@@ -70,7 +70,7 @@ def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory)
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "dou_algo",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(ValueError):
         factory.get_hashstore(module_name, class_name, properties)
@@ -90,7 +90,7 @@ def test_factory_get_hashstore_filehashstore_conflicting_obj_dir(factory, tmp_pa
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(RuntimeError):
         factory.get_hashstore(module_name, class_name, properties)
@@ -112,7 +112,7 @@ def test_factory_get_hashstore_filehashstore_conflicting_metadata_dir(
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(RuntimeError):
         factory.get_hashstore(module_name, class_name, properties)
@@ -132,7 +132,7 @@ def test_factory_get_hashstore_filehashstore_conflicting_refs_dir(factory, tmp_p
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(RuntimeError):
         factory.get_hashstore(module_name, class_name, properties)
@@ -152,7 +152,7 @@ def test_factory_get_hashstore_filehashstore_nonconflicting_dir(factory, tmp_pat
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
 
     factory.get_hashstore(module_name, class_name, properties)

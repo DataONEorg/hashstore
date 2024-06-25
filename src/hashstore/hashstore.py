@@ -99,7 +99,12 @@ class HashStore(ABC):
 
         :param str pid: Authority-based or persistent identifier of the object.
 
-        :return: str - Content identifier of the object.
+        :return: obj_info_dict (dict):
+            - cid: content identifier
+            - cid_object_path: path to the object
+            - cid_refs_path: path to the cid refs file
+            - pid_refs_path: path to the pid refs file
+            - sysmeta_path: path to the sysmeta file
         """
         raise NotImplementedError()
 

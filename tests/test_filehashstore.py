@@ -856,7 +856,7 @@ def test_get_store_path_object(store):
     # pylint: disable=W0212
     path_objects = store._get_store_path("objects")
     path_objects_string = str(path_objects)
-    assert path_objects_string.endswith("/metacat/objects")
+    assert path_objects_string.endswith("/metacat/hashstore/objects")
 
 
 def test_get_store_path_metadata(store):
@@ -864,7 +864,7 @@ def test_get_store_path_metadata(store):
     # pylint: disable=W0212
     path_metadata = store._get_store_path("metadata")
     path_metadata_string = str(path_metadata)
-    assert path_metadata_string.endswith("/metacat/metadata")
+    assert path_metadata_string.endswith("/metacat/hashstore/metadata")
 
 
 def test_get_store_path_refs(store):
@@ -872,7 +872,7 @@ def test_get_store_path_refs(store):
     # pylint: disable=W0212
     path_metadata = store._get_store_path("refs")
     path_metadata_string = str(path_metadata)
-    assert path_metadata_string.endswith("/metacat/refs")
+    assert path_metadata_string.endswith("/metacat/hashstore/refs")
 
 
 def test_exists_object_with_object_metadata_id(pids, store):

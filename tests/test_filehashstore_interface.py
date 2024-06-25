@@ -11,7 +11,6 @@ import pytest
 
 from hashstore.filehashstore_exceptions import (
     CidRefsDoesNotExist,
-    HashStoreRefsAlreadyExists,
     NonMatchingChecksum,
     NonMatchingObjSize,
     PidNotFoundInCidRefsFile,
@@ -501,6 +500,7 @@ def test_store_object_duplicates_threads(pids, store):
     def store_object_wrapper(obj_pid, obj_path):
         try:
             store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
+        # pylint: disable=W0718
         except Exception as e:
             assert type(e).__name__ == "HashStoreRefsAlreadyExists"
 

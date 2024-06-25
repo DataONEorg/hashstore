@@ -116,7 +116,7 @@ def test_init_with_existing_hashstore_mismatched_config_metadata_ns(store):
 
 
 def test_init_with_existing_hashstore_missing_yaml(store, pids):
-    """Test init with existing store raises FileNotFoundError when hashstore.yaml
+    """Test init with existing store raises RuntimeError when hashstore.yaml
     not found but objects exist."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -130,7 +130,7 @@ def test_init_with_existing_hashstore_missing_yaml(store, pids):
         "store_algorithm": "SHA-256",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
     }
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(RuntimeError):
         FileHashStore(properties)
 
 

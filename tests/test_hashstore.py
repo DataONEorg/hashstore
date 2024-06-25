@@ -1,4 +1,5 @@
 """Test module for HashStore's HashStoreFactory and ObjectMetadata class."""
+
 import os
 import pytest
 from hashstore.hashstore import ObjectMetadata, HashStoreFactory
@@ -49,7 +50,7 @@ def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
     class_name = "FileHashStore"
 
     properties = {
-        "store_path": os.getcwd() + "/metacat/test",
+        "store_path": os.getcwd() + "/metacat/hashstore",
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "MD2",
@@ -65,7 +66,7 @@ def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory)
     class_name = "FileHashStore"
 
     properties = {
-        "store_path": os.getcwd() + "/metacat/test",
+        "store_path": os.getcwd() + "/metacat/hashstore",
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "dou_algo",

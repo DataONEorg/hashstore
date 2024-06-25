@@ -355,14 +355,19 @@ class FileHashStore(HashStore):
         else:
             if os.path.exists(prop_store_path):
                 # Check if HashStore exists and throw exception if found
-                if any(Path(prop_store_path).iterdir()):
+                subfolders = ["objects", "metadata", "refs"]
+                if any(
+                    os.path.isdir(os.path.join(prop_store_path, sub))
+                    for sub in subfolders
+                ):
                     exception_string = (
-                        "FileHashStore - HashStore directories and/or objects found at:"
-                        + f" {prop_store_path} but missing configuration file at: "
-                        + self.hashstore_configuration_yaml
+                        "FileHashStore - Unable to initialize HashStore. `hashstore.yaml` is not"
+                        + " present but conflicting HashStore directory exists. Please delete"
+                        + " '/objects', '/metadata' and/or '/refs' at the store path or supply"
+                        + " a new path."
                     )
                     logging.critical(exception_string)
-                    raise FileNotFoundError(exception_string)
+                    raise RuntimeError(exception_string)
 
     def _validate_properties(self, properties):
         """Validate a properties dictionary by checking if it contains all the

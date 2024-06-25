@@ -81,7 +81,7 @@ def test_get_checksum(capsys, store, pids):
 
 
 def test_find_object_sysmeta_does_not_exist(capsys, store, pids):
-    """Test find_object returns a content identifier if it exists."""
+    """Test client's find_object prints the required values when sysmeta does not exist."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -125,7 +125,7 @@ def test_find_object_sysmeta_does_not_exist(capsys, store, pids):
 
 
 def test_find_object_sysmeta_exists(capsys, store, pids):
-    """Test find_object returns a content identifier if it exists."""
+    """Test client's find_object prints the required values when sysmeta exists"""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"

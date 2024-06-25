@@ -850,8 +850,17 @@ def main():
         if pid is None:
             raise ValueError("'-pid' option is required")
         # Find the content identifier of the object
-        cid = hashstore_c.hashstore.find_object(pid)
-        print(f"Content identifier: {cid}")
+        object_info_dict = hashstore_c.hashstore.find_object(pid)
+        cid = object_info_dict.get("cid")
+        cid_object_path = object_info_dict.get("cid")
+        cid_refs_path = object_info_dict.get("cid_refs_path")
+        pid_refs_path = object_info_dict.get("pid_refs_path")
+        sysmeta_path = object_info_dict.get("sysmeta_path")
+        print(f"Content identifier:\n{cid}")
+        print(f"Cid Object Path:\n:{cid_object_path}")
+        print(f"Cid Reference File Path:\n:{cid_refs_path}")
+        print(f"Pid Reference File Path:\n:{pid_refs_path}")
+        print(f"Sysmeta Path:\n:{sysmeta_path}")
 
     elif getattr(args, "client_storeobject"):
         if pid is None:

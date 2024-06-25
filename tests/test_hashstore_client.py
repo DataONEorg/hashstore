@@ -106,8 +106,21 @@ def test_find_object(capsys, store, pids):
         sys.argv = chs_args
         hashstoreclient.main()
 
+        object_info_dict = store.find_object(pid)
+        cid = object_info_dict.get("cid")
+        cid_object_path = object_info_dict.get("cid")
+        cid_refs_path = object_info_dict.get("cid_refs_path")
+        pid_refs_path = object_info_dict.get("pid_refs_path")
+        sysmeta_path = object_info_dict.get("sysmeta_path")
+
         capsystext = capsys.readouterr().out
-        expected_output = f"Content identifier: {cid}\n"
+        expected_output = (
+            f"Content identifier:\n{cid}\n"
+            + f"Cid Object Path:\n:{cid_object_path}\n"
+            + f"Cid Reference File Path:\n:{cid_refs_path}\n"
+            + f"Pid Reference File Path:\n:{pid_refs_path}\n"
+            + f"Sysmeta Path:\n:{sysmeta_path}\n"
+        )
         assert capsystext == expected_output
 
 

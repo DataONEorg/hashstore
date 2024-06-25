@@ -108,7 +108,7 @@ def test_find_object(capsys, store, pids):
 
         object_info_dict = store.find_object(pid)
         cid = object_info_dict.get("cid")
-        cid_object_path = object_info_dict.get("cid")
+        cid_object_path = object_info_dict.get("cid_object_path")
         cid_refs_path = object_info_dict.get("cid_refs_path")
         pid_refs_path = object_info_dict.get("pid_refs_path")
         sysmeta_path = object_info_dict.get("sysmeta_path")

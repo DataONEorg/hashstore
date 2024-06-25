@@ -265,7 +265,7 @@ How to use HashStore client (command line app)
 # Step 0: Install hashstore via poetry to create an executable script
 $ poetry install
 
-# Step 1: Create a HashStore
+# Step 1: Create a HashStore at your desired store path (ex. /var/metacat/hashstore)
 $ hashstore /path/to/store/ -chs -dp=3 -wp=2 -ap=SHA-256 -nsp="http://www.ns.test/v1"
 
 # Get the checksum of a data object

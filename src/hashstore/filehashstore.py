@@ -18,6 +18,7 @@ from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsDoesNotExist,
     CidRefsFileNotFound,
+    HashStoreRefsAlreadyExists,
     NonMatchingChecksum,
     NonMatchingObjSize,
     PidAlreadyExistsError,
@@ -639,7 +640,12 @@ class FileHashStore(HashStore):
                     cid_refs_path,
                     "Refs file already exists, verifying.",
                 )
-                return True
+                error_msg = (
+                    f"FileHashStore - tag_object: Object with cid: {cid}"
+                    + f" already exists and is tagged with pid: {pid}"
+                )
+                logging.error(error_msg)
+                raise HashStoreRefsAlreadyExists(error_msg)
             elif os.path.exists(pid_refs_path) and not os.path.exists(cid_refs_path):
                 debug_msg = (
                     f"FileHashStore - tag_object: pid refs file exists ({pid_refs_path})"

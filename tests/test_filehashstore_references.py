@@ -7,6 +7,7 @@ import pytest
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
+    HashStoreRefsAlreadyExists,
     NonMatchingChecksum,
     NonMatchingObjSize,
     PidAlreadyExistsError,
@@ -86,7 +87,9 @@ def test_tag_object_pid_refs_found_cid_refs_found(pids, store):
         object_metadata = store.store_object(None, path)
         cid = object_metadata.cid
         store.tag_object(pid, cid)
-        store.tag_object(pid, cid)
+
+        with pytest.raises(HashStoreRefsAlreadyExists):
+            store.tag_object(pid, cid)
 
         cid_refs_file_path = store._resolve_path("cid", object_metadata.cid)
         line_count = 0

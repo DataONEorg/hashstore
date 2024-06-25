@@ -774,14 +774,33 @@ class FileHashStore(HashStore):
                         logging.error(err_msg)
                         raise RefsFileExistsButCidObjMissing(err_msg)
                     else:
-                        return pid_refs_cid
+                        sysmeta_doc_name = self._computehash(pid + self.sysmeta_ns)
+                        metadata_directory = self._computehash(pid)
+                        metadata_rel_path = "/".join(self._shard(metadata_directory))
+                        sysmeta_full_path = (
+                            self._get_store_path("metadata")
+                            / metadata_rel_path
+                            / sysmeta_doc_name
+                        )
+                        obj_info_dict = {
+                            "cid": pid_refs_cid,
+                            "cid_object_path": self._resolve_path(
+                                "objects", pid_refs_cid
+                            ),
+                            "cid_refs_path": cid_ref_abs_path,
+                            "pid_refs_path": pid_ref_abs_path,
+                            "sysmeta_path": (
+                                sysmeta_full_path
+                                if os.path.isdir(sysmeta_full_path)
+                                else "Does not exist."
+                            ),
+                        }
+                        return obj_info_dict
                 else:
                     # If not, it is an orphan pid refs file
                     err_msg = (
                         "FileHashStore - find_object: pid refs file exists with cid: "
-                        + pid_refs_cid
-                        + " for pid: "
-                        + pid
+                        + f"{pid_refs_cid} for pid: {pid}"
                         + f", but is missing from cid refs file: {cid_ref_abs_path}"
                     )
                     logging.error(err_msg)
@@ -868,7 +887,8 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid", "retrieve_object")
 
-        object_cid = self.find_object(pid)
+        object_info_dict = self.find_object(pid)
+        object_cid = object_info_dict.get("cid")
         entity = "objects"
 
         if object_cid:
@@ -1008,7 +1028,8 @@ class FileHashStore(HashStore):
                 # `find_object` which will throw custom exceptions if there is an issue with
                 # the reference files, which help us determine the path to proceed with.
                 try:
-                    cid = self.find_object(pid)
+                    object_info_dict = self.find_object(pid)
+                    cid = object_info_dict.get("cid")
 
                     # Proceed with next steps - cid has been retrieved without any issues
                     # We must synchronize here based on the `cid` because multiple threads may
@@ -1038,8 +1059,8 @@ class FileHashStore(HashStore):
                             self.reference_locked_cids.append(cid)
 
                     try:
-                        cid_ref_abs_path = self._resolve_path("cid", cid)
-                        pid_ref_abs_path = self._resolve_path("pid", pid)
+                        cid_ref_abs_path = object_info_dict.get("cid_refs_path")
+                        pid_ref_abs_path = object_info_dict.get("pid_refs_path")
                         # Add pid refs file to be permanently deleted
                         objects_to_delete.append(
                             self._rename_path_for_deletion(pid_ref_abs_path)
@@ -1056,7 +1077,7 @@ class FileHashStore(HashStore):
                             objects_to_delete.append(
                                 self._rename_path_for_deletion(cid_ref_abs_path)
                             )
-                            obj_real_path = self._resolve_path("objects", cid)
+                            obj_real_path = object_info_dict.get("cid_object_path")
                             objects_to_delete.append(
                                 self._rename_path_for_deletion(obj_real_path)
                             )
@@ -1095,7 +1116,7 @@ class FileHashStore(HashStore):
                     warn_msg = (
                         "FileHashStore - delete_object: pid refs file does not exist for pid: "
                         + ab_id
-                        + ". Skipping deletion request."
+                        + ". Skipping object deletion. Deleting pid metadata documents."
                     )
                     logging.warning(warn_msg)
 
@@ -1307,7 +1328,7 @@ class FileHashStore(HashStore):
 
         entity = "objects"
         algorithm = self._clean_algorithm(algorithm)
-        object_cid = self.find_object(pid)
+        object_cid = self.find_object(pid).get("cid")
         if not self._exists(entity, object_cid):
             exception_string = (
                 f"FileHashStore - get_hex_digest: No object found for pid: {pid}"

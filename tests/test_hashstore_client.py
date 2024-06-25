@@ -80,8 +80,8 @@ def test_get_checksum(capsys, store, pids):
         assert capsystext == expected_output
 
 
-def test_find_object(capsys, store, pids):
-    """Test find_object returns a content identifier if it exists."""
+def test_find_object_sysmeta_does_not_exist(capsys, store, pids):
+    """Test client's find_object prints the required values when sysmeta does not exist."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -106,8 +106,70 @@ def test_find_object(capsys, store, pids):
         sys.argv = chs_args
         hashstoreclient.main()
 
+        object_info_dict = store.find_object(pid)
+        cid = object_info_dict.get("cid")
+        cid_object_path = object_info_dict.get("cid_object_path")
+        cid_refs_path = object_info_dict.get("cid_refs_path")
+        pid_refs_path = object_info_dict.get("pid_refs_path")
+        sysmeta_path = object_info_dict.get("sysmeta_path")
+
         capsystext = capsys.readouterr().out
-        expected_output = f"Content identifier: {cid}\n"
+        expected_output = (
+            f"Content identifier:\n{cid}\n"
+            + f"Cid Object Path:\n:{cid_object_path}\n"
+            + f"Cid Reference File Path:\n:{cid_refs_path}\n"
+            + f"Pid Reference File Path:\n:{pid_refs_path}\n"
+            + f"Sysmeta Path:\n:{sysmeta_path}\n"
+        )
+        assert capsystext == expected_output
+
+
+def test_find_object_sysmeta_exists(capsys, store, pids):
+    """Test client's find_object prints the required values when sysmeta exists"""
+    client_directory = os.getcwd() + "/src/hashstore"
+    test_dir = "tests/testdata/"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        store.store_metadata(pid, syspath, format_id)
+
+        client_module_path = f"{client_directory}/client.py"
+        test_store = store.root
+        find_object_opt = "-findobject"
+        client_pid_arg = f"-pid={pid}"
+        chs_args = [
+            client_module_path,
+            test_store,
+            find_object_opt,
+            client_pid_arg,
+        ]
+
+        # Add file path of HashStore to sys so modules can be discovered
+        sys.path.append(client_directory)
+        # Manually change sys args to simulate command line arguments
+        sys.argv = chs_args
+        hashstoreclient.main()
+
+        object_info_dict = store.find_object(pid)
+        cid = object_info_dict.get("cid")
+        cid_object_path = object_info_dict.get("cid_object_path")
+        cid_refs_path = object_info_dict.get("cid_refs_path")
+        pid_refs_path = object_info_dict.get("pid_refs_path")
+        sysmeta_path = object_info_dict.get("sysmeta_path")
+
+        capsystext = capsys.readouterr().out
+        expected_output = (
+            f"Content identifier:\n{cid}\n"
+            + f"Cid Object Path:\n:{cid_object_path}\n"
+            + f"Cid Reference File Path:\n:{cid_refs_path}\n"
+            + f"Pid Reference File Path:\n:{pid_refs_path}\n"
+            + f"Sysmeta Path:\n:{sysmeta_path}\n"
+        )
         assert capsystext == expected_output
 
 

@@ -718,8 +718,8 @@ def test_find_object(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        cid = store.find_object(pid)
-        assert cid == object_metadata.hex_digests.get("sha256")
+        obj_info_dict = store.find_object(pid)
+        assert obj_info_dict.get("cid") == object_metadata.hex_digests.get("sha256")
 
 
 def test_find_object_refs_exist_but_obj_not_found(pids, store):
@@ -729,7 +729,7 @@ def test_find_object_refs_exist_but_obj_not_found(pids, store):
         path = test_dir + pid.replace("/", "_")
         store.store_object(pid, path)
 
-        cid = store.find_object(pid)
+        cid = store.find_object(pid).get("cid")
         obj_path = store._resolve_path("objects", cid)
         os.remove(obj_path)
 

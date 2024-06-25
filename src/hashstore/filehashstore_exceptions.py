@@ -99,6 +99,14 @@ class RefsFileExistsButCidObjMissing(Exception):
         self.errors = errors
 
 
+class HashStoreRefsAlreadyExists(Exception):
+    """Custom exception thrown when called to tag an object that is already tagged appropriately."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
 class UnsupportedAlgorithm(Exception):
     """Custom exception thrown when a given algorithm is not supported in HashStore for
     calculating hashes/checksums, as the default store algo and/or other operations."""

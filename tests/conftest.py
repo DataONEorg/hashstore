@@ -1,4 +1,5 @@
 """Pytest overall configuration file for fixtures"""
+
 import pytest
 from hashstore.filehashstore import FileHashStore
 
@@ -16,8 +17,8 @@ def pytest_addoption(parser):
 @pytest.fixture(name="props")
 def init_props(tmp_path):
     """Properties to initialize HashStore."""
-    directory = tmp_path / "metacat"
-    directory.mkdir()
+    directory = tmp_path / "metacat" / "hashstore"
+    directory.mkdir(parents=True)
     hashstore_path = directory.as_posix()
     # Note, objects generated via tests are placed in a temporary folder
     # with the 'directory' parameter above appended
@@ -26,7 +27,7 @@ def init_props(tmp_path):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     return properties
 

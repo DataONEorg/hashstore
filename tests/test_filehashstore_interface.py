@@ -796,7 +796,7 @@ def test_store_metadata(pids, store):
     """Test store metadata."""
     test_dir = "tests/testdata/"
     entity = "metadata"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -821,7 +821,7 @@ def test_store_metadata_one_pid_multiple_docs_correct_location(store):
     syspath = Path(test_dir) / filename
     metadata_directory = store._computehash(pid)
     rel_path = "/".join(store._shard(metadata_directory))
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     format_id3 = "http://ns.dataone.org/service/types/v3.0"
     format_id4 = "http://ns.dataone.org/service/types/v4.0"
     metadata_cid = store.store_metadata(pid, syspath, format_id)
@@ -842,7 +842,7 @@ def test_store_metadata_one_pid_multiple_docs_correct_location(store):
 def test_store_metadata_default_format_id(pids, store):
     """Test store metadata returns expected id when storing with default format_id."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -861,7 +861,7 @@ def test_store_metadata_files_string(pids, store):
     """Test store metadata with a string object to the metadata."""
     test_dir = "tests/testdata/"
     entity = "metadata"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
@@ -874,7 +874,7 @@ def test_store_metadata_files_input_stream(pids, store):
     """Test store metadata with an input stream to metadata."""
     test_dir = "tests/testdata/"
     entity = "metadata"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
@@ -887,7 +887,7 @@ def test_store_metadata_files_input_stream(pids, store):
 def test_store_metadata_pid_empty(store):
     """Test store metadata raises error with an empty string as the pid."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = ""
     filename = pid.replace("/", "_") + ".xml"
     syspath_string = str(Path(test_dir) / filename)
@@ -898,7 +898,7 @@ def test_store_metadata_pid_empty(store):
 def test_store_metadata_pid_empty_spaces(store):
     """Test store metadata raises error with empty spaces as the pid."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "   "
     filename = pid.replace("/", "_") + ".xml"
     syspath_string = str(Path(test_dir) / filename)
@@ -920,7 +920,7 @@ def test_store_metadata_pid_format_id_spaces(store):
 def test_store_metadata_metadata_empty(store):
     """Test store metadata raises error with empty spaces as the metadata path."""
     pid = "jtao.1700.1"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     syspath_string = "   "
     with pytest.raises(TypeError):
         store.store_metadata(pid, syspath_string, format_id)
@@ -929,7 +929,7 @@ def test_store_metadata_metadata_empty(store):
 def test_store_metadata_metadata_none(store):
     """Test store metadata raises error with empty None metadata path."""
     pid = "jtao.1700.1"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     syspath_string = None
     with pytest.raises(TypeError):
         store.store_metadata(pid, syspath_string, format_id)
@@ -938,7 +938,7 @@ def test_store_metadata_metadata_none(store):
 def test_store_metadata_metadata_path(pids, store):
     """Test store metadata returns expected path to metadata document."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
@@ -953,7 +953,7 @@ def test_store_metadata_thread_lock(store):
     """Test store metadata thread lock."""
     test_dir = "tests/testdata/"
     entity = "metadata"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "jtao.1700.1"
     path = test_dir + pid
     filename = pid + ".xml"
@@ -979,7 +979,7 @@ def test_store_metadata_thread_lock(store):
 def test_retrieve_object(pids, store):
     """Test retrieve_object returns a stream to the correct object data."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
@@ -1010,7 +1010,7 @@ def test_retrieve_object_pid_invalid(store):
 def test_retrieve_metadata(store):
     """Test retrieve_metadata returns a stream to the correct metadata."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "jtao.1700.1"
     path = test_dir + pid
     filename = pid + ".xml"
@@ -1042,7 +1042,7 @@ def test_retrieve_metadata_default_format_id(store):
 
 def test_retrieve_metadata_bytes_pid_invalid(store):
     """Test retrieve_metadata raises error when supplied with bad pid."""
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "jtao.1700.1"
     pid_does_not_exist = pid + "test"
     with pytest.raises(ValueError):
@@ -1051,7 +1051,7 @@ def test_retrieve_metadata_bytes_pid_invalid(store):
 
 def test_retrieve_metadata_bytes_pid_empty(store):
     """Test retrieve_metadata raises error when supplied with empty pid."""
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "    "
     with pytest.raises(ValueError):
         store.retrieve_metadata(pid, format_id)
@@ -1076,7 +1076,7 @@ def test_retrieve_metadata_format_id_empty_spaces(store):
 def test_delete_object_object_deleted(pids, store):
     """Test delete_object successfully deletes object."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
@@ -1091,7 +1091,7 @@ def test_delete_object_metadata_deleted(pids, store):
     """Test delete_object successfully deletes relevant metadata
     files and refs files."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
@@ -1105,7 +1105,7 @@ def test_delete_object_metadata_deleted(pids, store):
 def test_delete_object_all_refs_files_deleted(pids, store):
     """Test delete_object successfully deletes refs files."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
@@ -1120,7 +1120,7 @@ def test_delete_object_all_refs_files_deleted(pids, store):
 def test_delete_object_pid_refs_file_deleted(pids, store):
     """Test delete_object deletes the associated pid refs file for the object."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
@@ -1135,7 +1135,7 @@ def test_delete_object_pid_refs_file_deleted(pids, store):
 def test_delete_object_cid_refs_file_deleted(pids, store):
     """Test delete_object deletes the associated cid refs file for the object."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
@@ -1178,7 +1178,7 @@ def test_delete_object_idtype_cid_refs_file_exists(pids, store):
     """Test delete_object does not delete object if a cid refs file still exists."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
@@ -1209,7 +1209,7 @@ def test_delete_metadata(pids, store):
     """Test delete_metadata successfully deletes metadata."""
     test_dir = "tests/testdata/"
     entity = "metadata"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
@@ -1228,7 +1228,7 @@ def test_delete_metadata_one_pid_multiple_metadata_documents(store):
     pid = "jtao.1700.1"
     filename = pid.replace("/", "_") + ".xml"
     syspath = Path(test_dir) / filename
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     format_id3 = "http://ns.dataone.org/service/types/v3.0"
     format_id4 = "http://ns.dataone.org/service/types/v4.0"
     _metadata_cid = store.store_metadata(pid, syspath, format_id)
@@ -1246,7 +1246,7 @@ def test_delete_metadata_specific_pid_multiple_metadata_documents(store):
     pid = "jtao.1700.1"
     filename = pid.replace("/", "_") + ".xml"
     syspath = Path(test_dir) / filename
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     format_id3 = "http://ns.dataone.org/service/types/v3.0"
     format_id4 = "http://ns.dataone.org/service/types/v4.0"
     _metadata_cid = store.store_metadata(pid, syspath, format_id)
@@ -1259,7 +1259,7 @@ def test_delete_metadata_specific_pid_multiple_metadata_documents(store):
 def test_delete_metadata_does_not_exist(pids, store):
     """Test delete_metadata does not throw exception when called to delete
     metadata that does not exist."""
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         store.delete_metadata(pid, format_id)
 
@@ -1280,7 +1280,7 @@ def test_delete_metadata_default_format_id(store, pids):
 
 def test_delete_metadata_pid_empty(store):
     """Test delete_object raises error when empty pid supplied."""
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "    "
     with pytest.raises(ValueError):
         store.delete_metadata(pid, format_id)
@@ -1288,7 +1288,7 @@ def test_delete_metadata_pid_empty(store):
 
 def test_delete_metadata_pid_none(store):
     """Test delete_object raises error when pid is 'None'."""
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = None
     with pytest.raises(ValueError):
         store.delete_metadata(pid, format_id)
@@ -1305,7 +1305,7 @@ def test_delete_metadata_format_id_empty(store):
 def test_get_hex_digest(store):
     """Test get_hex_digest for expected value."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "jtao.1700.1"
     path = test_dir + pid
     filename = pid + ".xml"

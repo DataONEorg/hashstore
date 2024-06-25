@@ -142,7 +142,7 @@ def test_store_metadata(capsys, store, pids):
     """Test storing metadata to HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    namespace = "http://ns.dataone.org/service/types/v2.0"
+    namespace = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     entity = "metadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
@@ -223,7 +223,7 @@ def test_retrieve_metadata(capsys, pids, store):
     """Test retrieving metadata from a HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    namespace = "http://ns.dataone.org/service/types/v2.0"
+    namespace = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -293,7 +293,7 @@ def test_delete_metadata(pids, store):
     """Test deleting metadata from a HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    namespace = "http://ns.dataone.org/service/types/v2.0"
+    namespace = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename

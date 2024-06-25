@@ -35,7 +35,7 @@ def test_init_existing_store_incorrect_algorithm_format(store):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(ValueError):
         FileHashStore(properties)
@@ -48,7 +48,7 @@ def test_init_existing_store_correct_algorithm_format(store):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     hashstore_instance = FileHashStore(properties)
     assert isinstance(hashstore_instance, FileHashStore)
@@ -67,7 +67,7 @@ def test_init_with_existing_hashstore_mismatched_config_depth(store):
         "store_depth": 1,
         "store_width": 2,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(ValueError):
         FileHashStore(properties)
@@ -81,7 +81,7 @@ def test_init_with_existing_hashstore_mismatched_config_width(store):
         "store_depth": 3,
         "store_width": 1,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(ValueError):
         FileHashStore(properties)
@@ -95,7 +95,7 @@ def test_init_with_existing_hashstore_mismatched_config_algo(store):
         "store_depth": 3,
         "store_width": 1,
         "store_algorithm": "SHA-512",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(ValueError):
         FileHashStore(properties)
@@ -116,7 +116,7 @@ def test_init_with_existing_hashstore_mismatched_config_metadata_ns(store):
 
 
 def test_init_with_existing_hashstore_missing_yaml(store, pids):
-    """Test init with existing store raises FileNotFoundError when hashstore.yaml
+    """Test init with existing store raises RuntimeError when hashstore.yaml
     not found but objects exist."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -128,9 +128,9 @@ def test_init_with_existing_hashstore_missing_yaml(store, pids):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(RuntimeError):
         FileHashStore(properties)
 
 
@@ -144,7 +144,7 @@ def test_load_properties(store):
     assert hashstore_yaml_dict.get("store_algorithm") == "SHA-256"
     assert (
         hashstore_yaml_dict.get("store_metadata_namespace")
-        == "http://ns.dataone.org/service/types/v2.0"
+        == "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     )
 
 
@@ -164,7 +164,7 @@ def test_validate_properties(store):
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     # pylint: disable=W0212
     assert store._validate_properties(properties)
@@ -635,7 +635,7 @@ def test_put_metadata_with_path(pids, store):
     """Test _put_metadata with path object for the path arg."""
     entity = "metadata"
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -648,7 +648,7 @@ def test_put_metadata_with_string(pids, store):
     """Test_put metadata with string for the path arg."""
     entity = "metadata"
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = str(Path(test_dir) / filename)
@@ -660,7 +660,7 @@ def test_put_metadata_with_string(pids, store):
 def test_put_metadata_cid(pids, store):
     """Test put metadata returns correct id."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         metadata_document_name = store._computehash(pid + format_id)
         filename = pid.replace("/", "_") + ".xml"
@@ -856,7 +856,7 @@ def test_get_store_path_object(store):
     # pylint: disable=W0212
     path_objects = store._get_store_path("objects")
     path_objects_string = str(path_objects)
-    assert path_objects_string.endswith("/metacat/objects")
+    assert path_objects_string.endswith("/metacat/hashstore/objects")
 
 
 def test_get_store_path_metadata(store):
@@ -864,7 +864,7 @@ def test_get_store_path_metadata(store):
     # pylint: disable=W0212
     path_metadata = store._get_store_path("metadata")
     path_metadata_string = str(path_metadata)
-    assert path_metadata_string.endswith("/metacat/metadata")
+    assert path_metadata_string.endswith("/metacat/hashstore/metadata")
 
 
 def test_get_store_path_refs(store):
@@ -872,7 +872,7 @@ def test_get_store_path_refs(store):
     # pylint: disable=W0212
     path_metadata = store._get_store_path("refs")
     path_metadata_string = str(path_metadata)
-    assert path_metadata_string.endswith("/metacat/refs")
+    assert path_metadata_string.endswith("/metacat/hashstore/refs")
 
 
 def test_exists_object_with_object_metadata_id(pids, store):
@@ -901,7 +901,7 @@ def test_exists_metadata_files_path(pids, store):
     """Test exists works as expected for metadata."""
     test_dir = "tests/testdata/"
     entity = "metadata"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -1001,7 +1001,7 @@ def test_get_real_path_with_metadata_id(store, pids):
     """Test get_real_path returns absolute path given a metadata id."""
     entity = "metadata"
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -1068,7 +1068,7 @@ def test_resolve_path_objects(pids, store):
 def test_resolve_path_metadata(pids, store):
     """Confirm resolve path returns correct metadata path."""
     test_dir = "tests/testdata/"
-    format_id = "http://ns.dataone.org/service/types/v2.0"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename

@@ -265,7 +265,7 @@ How to use HashStore client (command line app)
 # Step 0: Install hashstore via poetry to create an executable script
 $ poetry install
 
-# Step 1: Create a HashStore
+# Step 1: Create a HashStore at your desired store path (ex. /var/metacat/hashstore)
 $ hashstore /path/to/store/ -chs -dp=3 -wp=2 -ap=SHA-256 -nsp="http://www.ns.test/v1"
 
 # Get the checksum of a data object
@@ -278,19 +278,19 @@ $ hashstore /path/to/store/ -findobject -pid=persistent_identifier
 $ hashstore /path/to/store/ -storeobject -pid=persistent_identifier -path=/path/to/object
 
 # Store a metadata object
-$ hashstore /path/to/store/ -storemetadata -pid=persistent_identifier -path=/path/to/metadata/object -formatid=http://ns.dataone.org/service/types/v2.0
+$ hashstore /path/to/store/ -storemetadata -pid=persistent_identifier -path=/path/to/metadata/object -formatid=https://ns.dataone.org/service/types/v2.0#SystemMetadata
 
 # Retrieve a data object
 $ hashstore /path/to/store/ -retrieveobject -pid=persistent_identifier
 
 # Retrieve a metadata object
-$ hashstore /path/to/store/ -retrievemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ hashstore /path/to/store/ -retrievemetadata -pid=persistent_identifier -formatid=https://ns.dataone.org/service/types/v2.0#SystemMetadata
 
 # Delete a data object
 $ hashstore /path/to/store/ -deleteobject -pid=persistent_identifier
 
 # Delete a metadata file
-$ hashstore /path/to/store/ -deletemetadata -pid=persistent_identifier -formatid=http://ns.dataone.org/service/types/v2.0
+$ hashstore /path/to/store/ -deletemetadata -pid=persistent_identifier -formatid=https://ns.dataone.org/service/types/v2.0#SystemMetadata
 ```
 
 ## License

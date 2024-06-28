@@ -11,8 +11,7 @@ import shutil
 import yaml
 import pg8000
 from hashstore import HashStoreFactory
-from hashstore.filehashstore import FileHashStore
-from hashstore.filehashstore_exceptions import NonMatchingChecksum, NonMatchingObjSize
+from . import filehashstore, filehashstore_exceptions
 
 
 class HashStoreParser:
@@ -243,7 +242,7 @@ class HashStoreParser:
         return self.parser.parse_args()
 
 
-class FileHashStoreWithLinks(FileHashStore):
+class FileHashStoreWithLinks(filehashstore.FileHashStore):
     """This class extends FileHashStore and overrides the process for
     'store_object' so that hard links are created over actual copies
     of existing data objects."""
@@ -385,7 +384,7 @@ class FileHashStoreWithLinks(FileHashStore):
                     tmp_file_size,
                     file_size_to_validate,
                 )
-            except NonMatchingObjSize as nmose:
+            except filehashstore_exceptions.NonMatchingObjSize as nmose:
                 # If any exception is thrown during validation, we do not tag.
                 exception_string = (
                     f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
@@ -393,8 +392,10 @@ class FileHashStoreWithLinks(FileHashStore):
                     + f" due to an issue with the supplied pid object metadata. {str(nmose)}"
                 )
                 logging.debug(exception_string)
-                raise NonMatchingObjSize(exception_string) from nmose
-            except NonMatchingChecksum as nmce:
+                raise filehashstore_exceptions.NonMatchingObjSize(
+                    exception_string
+                ) from nmose
+            except filehashstore_exceptions.NonMatchingChecksum as nmce:
                 # If any exception is thrown during validation, we do not tag.
                 exception_string = (
                     f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
@@ -402,7 +403,9 @@ class FileHashStoreWithLinks(FileHashStore):
                     + f" due to an issue with the supplied pid object metadata. {str(nmce)}"
                 )
                 logging.debug(exception_string)
-                raise NonMatchingChecksum(exception_string) from nmce
+                raise filehashstore_exceptions.NonMatchingChecksum(
+                    exception_string
+                ) from nmce
             finally:
                 # Delete the temporary file, the data object already exists, so it is redundant
                 # No exception is thrown so 'store_object' can proceed to tag object

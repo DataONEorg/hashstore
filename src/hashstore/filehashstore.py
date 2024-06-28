@@ -2617,3 +2617,171 @@ class Stream(object):
             self._obj.close()
         else:
             self._obj.seek(self._pos)
+
+
+class FileHashStoreWithLinks(FileHashStore):
+    """This class extends FileHashStore and overrides the process for
+    'store_object' so that hard links are created over actual copies
+    of existing data objects."""
+
+    def _move_and_get_checksums(
+        self,
+        pid,
+        stream,
+        extension=None,
+        additional_algorithm=None,
+        checksum=None,
+        checksum_algorithm=None,
+        file_size_to_validate=None,
+    ):
+        """Copy the contents of `stream` onto disk with an optional file
+        extension appended. The copy process uses a temporary file to store the
+        initial contents and returns a dictionary of algorithms and their
+        hex digest values. If the file already exists, the method will immediately
+        raise an exception. If an algorithm and checksum are provided, it will proceed to
+        validate the object (and delete the tmpFile if the hex digest stored does
+        not match what is provided).
+
+        :param str pid: Authority-based identifier.
+        :param io.BufferedReader stream: Object stream.
+        :param str extension: Optional extension to append to the file
+            when saving.
+        :param str additional_algorithm: Optional algorithm value to include
+            when returning hex digests.
+        :param str checksum: Optional checksum to validate the object
+            against hex digest before moving to the permanent location.
+        :param str checksum_algorithm: Algorithm value of the given checksum.
+        :param bytes file_size_to_validate: Expected size of the object.
+
+        :return: tuple - Object ID, object file size, and hex digest dictionary.
+        """
+        # TODO: Remove this print statement later
+        print("FileHashStoreWithLinks - _move_and_get_checksums - Called")
+        debug_msg = (
+            "FileHashStore - _move_and_get_checksums: Creating temp"
+            + f" file and calculating checksums for pid: {pid}"
+        )
+        logging.debug(debug_msg)
+        (
+            hex_digests,
+            tmp_file_name,
+            tmp_file_size,
+        ) = self._write_to_tmp_file_and_get_hex_digests(
+            stream, additional_algorithm, checksum_algorithm
+        )
+        logging.debug(
+            "FileHashStore - _move_and_get_checksums: Temp file created: %s",
+            tmp_file_name,
+        )
+
+        # Objects are stored with their content identifier based on the store algorithm
+        entity = "objects"
+        object_cid = hex_digests.get(self.algorithm)
+        abs_file_path = self._build_path(entity, object_cid, extension)
+
+        # Only move file if it doesn't exist. We do not check before we create the tmp
+        # file and calculate the hex digests because the given checksum could be incorrect.
+        if not os.path.isfile(abs_file_path):
+            # Files are stored once and only once
+            self._verify_object_information(
+                pid,
+                checksum,
+                checksum_algorithm,
+                entity,
+                hex_digests,
+                tmp_file_name,
+                tmp_file_size,
+                file_size_to_validate,
+            )
+            self._create_path(os.path.dirname(abs_file_path))
+            try:
+                debug_msg = (
+                    "FileHashStore - _move_and_get_checksums: Moving temp file to permanent"
+                    + f" location: {abs_file_path}",
+                )
+                logging.debug(debug_msg)
+                shutil.move(tmp_file_name, abs_file_path)
+            except Exception as err:
+                # Revert storage process
+                exception_string = (
+                    "FileHashStore - _move_and_get_checksums:"
+                    + f" Unexpected Error: {err}"
+                )
+                logging.warning(exception_string)
+                if os.path.isfile(abs_file_path):
+                    # Check to see if object exists before determining whether to delete
+                    debug_msg = (
+                        "FileHashStore - _move_and_get_checksums: Permanent file"
+                        + f" found during exception, checking hex digest for pid: {pid}"
+                    )
+                    logging.debug(debug_msg)
+                    pid_checksum = self.get_hex_digest(pid, self.algorithm)
+                    if pid_checksum == hex_digests.get(self.algorithm):
+                        # If the checksums match, return and log warning
+                        exception_string = (
+                            "FileHashStore - _move_and_get_checksums: Object exists at:"
+                            + f" {abs_file_path} but an unexpected issue has been encountered."
+                            + " Reference files will not be created and/or tagged."
+                        )
+                        logging.warning(exception_string)
+                        raise err
+                    else:
+                        debug_msg = (
+                            "FileHashStore - _move_and_get_checksums: Object exists at"
+                            + f"{abs_file_path} but the pid object checksum provided does not"
+                            + " match what has been calculated. Deleting object. References will"
+                            + " not be created and/or tagged.",
+                        )
+                        logging.debug(debug_msg)
+                        self._delete(entity, abs_file_path)
+                        raise err
+
+                logging.debug(
+                    "FileHashStore - _move_and_get_checksums: Deleting temporary file: %s",
+                    tmp_file_name,
+                )
+                self._delete(entity, tmp_file_name)
+                err_msg = (
+                    f"Object has not been stored for pid: {pid} - an unexpected error has occurred"
+                    + f" when moving tmp file to: {object_cid}. Reference files will not be"
+                    + f" created and/or tagged. Error: {err}"
+                )
+                logging.warning("FileHashStore - _move_and_get_checksums: %s", err_msg)
+                raise
+        else:
+            # If the data object already exists, do not move the file but attempt to verify it
+            try:
+                self._verify_object_information(
+                    pid,
+                    checksum,
+                    checksum_algorithm,
+                    entity,
+                    hex_digests,
+                    tmp_file_name,
+                    tmp_file_size,
+                    file_size_to_validate,
+                )
+            except NonMatchingObjSize as nmose:
+                # If any exception is thrown during validation, we do not tag.
+                exception_string = (
+                    f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
+                    + " , deleting temp file. Reference files will not be created and/or tagged"
+                    + f" due to an issue with the supplied pid object metadata. {str(nmose)}"
+                )
+                logging.debug(exception_string)
+                raise NonMatchingObjSize(exception_string) from nmose
+            except NonMatchingChecksum as nmce:
+                # If any exception is thrown during validation, we do not tag.
+                exception_string = (
+                    f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
+                    + " , deleting temp file. Reference files will not be created and/or tagged"
+                    + f" due to an issue with the supplied pid object metadata. {str(nmce)}"
+                )
+                logging.debug(exception_string)
+                raise NonMatchingChecksum(exception_string) from nmce
+            finally:
+                # Delete the temporary file, the data object already exists, so it is redundant
+                # No exception is thrown so 'store_object' can proceed to tag object
+                self._delete(entity, tmp_file_name)
+
+        return object_cid, tmp_file_size, hex_digests

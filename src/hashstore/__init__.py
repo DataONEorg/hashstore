@@ -16,5 +16,6 @@ processes that function across a cluster environment. Some properties:
 """
 
 from hashstore.hashstore import HashStore, HashStoreFactory, ObjectMetadata
+from hashstore.filehashstore import FileHashStore
 
-__all__ = ("HashStore", "HashStoreFactory", "ObjectMetadata")
+__all__ = ("HashStore", "HashStoreFactory", "ObjectMetadata", "FileHashStore")

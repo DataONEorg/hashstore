@@ -1,6 +1,6 @@
 ## HashStore: hash-based object storage for DataONE data packages
 
-- **Author**: Dou Mok, Matthew Brooke, Jing Tao, Matthew B. Jones
+- **Author**: Dou Mok, Matthew Brooke, Jing Tao, Jeanette Clarke, Ian Nesbitt, Matthew B. Jones
 - **License**: [Apache 2](http://opensource.org/licenses/Apache-2.0)
 - [Package source code on GitHub](https://github.com/DataONEorg/hashstore)
 - [**Submit Bugs and feature requests**](https://github.com/DataONEorg/hashstore/issues)
@@ -55,7 +55,7 @@ properties = {
     "store_path": "/path/to/your/store",
     "store_depth": 3,
     "store_width": 2,
-    "store_algorithm": "sha256",
+    "store_algorithm": "SHA-256",
     "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
 }
 

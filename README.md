@@ -56,7 +56,7 @@ properties = {
     "store_depth": 3,
     "store_width": 2,
     "store_algorithm": "SHA-256",
-    "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
 }
 
 # Get HashStore from factory

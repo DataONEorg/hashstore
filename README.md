@@ -60,7 +60,7 @@ properties = {
 }
 
 # Get HashStore from factory
-module_name = "hashstore.filehashstore.filehashstore"
+module_name = "hashstore.filehashstore"
 class_name = "FileHashStore"
 my_store = hashstore_factory.get_hashstore(module_name, class_name, properties)
 

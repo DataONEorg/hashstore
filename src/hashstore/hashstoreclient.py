@@ -257,13 +257,13 @@ class HashStoreClient:
 
         # Get HashStore from factory
         if testflag:
+            # Set multiprocessing to true if testing in knbvm
             module_name = "filehashstore"
+            os.environ["USE_MULTIPROCESSING"] = "True"
         else:
             module_name = "hashstore.filehashstore"
         class_name = "FileHashStore"
 
-        # Set multiprocessing to true
-        os.environ["USE_MULTIPROCESSING"] = "True"
         use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
         logging.info(
             "HashStoreClient - use_multiprocessing (bool): %s", use_multiprocessing

@@ -55,12 +55,12 @@ properties = {
     "store_path": "/path/to/your/store",
     "store_depth": 3,
     "store_width": 2,
-    "store_algorithm": "sha256",
-    "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+    "store_algorithm": "SHA-256",
+    "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
 }
 
 # Get HashStore from factory
-module_name = "hashstore.filehashstore.filehashstore"
+module_name = "hashstore.filehashstore"
 class_name = "FileHashStore"
 my_store = hashstore_factory.get_hashstore(module_name, class_name, properties)
 

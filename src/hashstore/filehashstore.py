@@ -73,31 +73,37 @@ class FileHashStore(HashStore):
         "blake2b",
         "blake2s",
     ]
-    # Variables to orchestrate parallelization
-    # Thread Synchronization
-    object_lock = threading.Lock()
-    object_condition = threading.Condition(object_lock)
-    object_locked_pids = []
-    metadata_lock = threading.Lock()
-    metadata_condition = threading.Condition(metadata_lock)
-    metadata_locked_docs = []
-    reference_lock = threading.Lock()
-    reference_condition = threading.Condition(reference_lock)
-    reference_locked_cids = []
-    # Multiprocessing Synchronization
-    object_lock_mp = multiprocessing.Lock()
-    object_condition_mp = multiprocessing.Condition(object_lock_mp)
-    object_locked_pids_mp = multiprocessing.Manager().list()
-    metadata_lock_mp = multiprocessing.Lock()
-    metadata_condition_mp = multiprocessing.Condition(metadata_lock_mp)
-    metadata_locked_docs_mp = multiprocessing.Manager().list()
-    reference_lock_mp = multiprocessing.Lock()
-    reference_condition_mp = multiprocessing.Condition(reference_lock_mp)
-    reference_locked_cids_mp = multiprocessing.Manager().list()
 
     def __init__(self, properties=None):
+        # Variables to orchestrate parallelization
         # Check to see whether a multiprocessing or threading sync lock should be used
         self.use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+        if self.use_multiprocessing == "True":
+            # Create multiprocessing synchronization variables
+            self.object_lock_mp = multiprocessing.Lock()
+            self.object_condition_mp = multiprocessing.Condition(self.object_lock_mp)
+            self.object_locked_pids_mp = multiprocessing.Manager().list()
+            self.metadata_lock_mp = multiprocessing.Lock()
+            self.metadata_condition_mp = multiprocessing.Condition(
+                self.metadata_lock_mp
+            )
+            self.metadata_locked_docs_mp = multiprocessing.Manager().list()
+            self.reference_lock_mp = multiprocessing.Lock()
+            self.reference_condition_mp = multiprocessing.Condition(
+                self.reference_lock_mp
+            )
+            self.reference_locked_cids_mp = multiprocessing.Manager().list()
+        else:
+            # Create threading synchronization variables
+            self.object_lock = threading.Lock()
+            self.object_condition = threading.Condition(self.object_lock)
+            self.object_locked_pids = []
+            self.metadata_lock = threading.Lock()
+            self.metadata_condition = threading.Condition(self.metadata_lock)
+            self.metadata_locked_docs = []
+            self.reference_lock = threading.Lock()
+            self.reference_condition = threading.Condition(self.reference_lock)
+            self.reference_locked_cids = []
         # Now check properties
         if properties:
             # Validate properties against existing configuration if present

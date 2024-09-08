@@ -1114,8 +1114,8 @@ def test_resolve_path_refs_cid(pids, store):
 
 
 def test_check_string(store):
-    """Confirm that an exception is raised when a string is None, empty or an illegal character
-    (ex. tabs or new lines)"""
+    """Confirm that an exception is raised when a string is None, empty or contains an illegal
+    character (ex. tabs or new lines)"""
     empty_pid_with_spaces = "   "
     with pytest.raises(ValueError):
         store._check_string(empty_pid_with_spaces, "empty_pid_with_spaces")

@@ -2525,7 +2525,8 @@ class FileHashStore(HashStore):
 
     @staticmethod
     def _check_string(string, arg):
-        """Check whether a string is None or empty; throw an exception if so.
+        """Check whether a string is None or empty - or if it contains an illegal character;
+        throws an exception if so.
 
         :param str string: Value to check.
         :param str arg: Name of the argument to check.

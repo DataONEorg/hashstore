@@ -1375,7 +1375,7 @@ class FileHashStore(HashStore):
         :param str checksum: Optional checksum to validate object against hex digest before moving
             to permanent location.
         :param str checksum_algorithm: Algorithm value of the given checksum.
-        :param bytes file_size_to_validate: Expected size of the object.
+        :param int file_size_to_validate: Expected size of the object.
 
         :return: ObjectMetadata - object that contains the object id, object file size,
             and hex digest dictionary.
@@ -1484,7 +1484,7 @@ class FileHashStore(HashStore):
         :param str checksum: Optional checksum to validate the object
             against hex digest before moving to the permanent location.
         :param str checksum_algorithm: Algorithm value of the given checksum.
-        :param bytes file_size_to_validate: Expected size of the object.
+        :param int file_size_to_validate: Expected size of the object.
 
         :return: tuple - Object ID, object file size, and hex digest dictionary.
         """

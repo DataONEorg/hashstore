@@ -2530,7 +2530,7 @@ class FileHashStore(HashStore):
         :param str string: Value to check.
         :param str arg: Name of the argument to check.
         """
-        if string is None or string.strip() == "":
+        if string is None or string.strip() == "" or any(ch.isspace() for ch in string):
             method = inspect.stack()[1].function
             exception_string = (
                 f"FileHashStore - {method}: {arg} cannot be None"

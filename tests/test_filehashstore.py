@@ -11,6 +11,7 @@ from hashstore.filehashstore_exceptions import (
     UnsupportedAlgorithm,
 )
 
+
 # pylint: disable=W0212
 
 
@@ -355,7 +356,7 @@ def test_store_data_only_file_size(pids, store):
 
 
 def test_store_data_only_hex_digests(pids, store):
-    """Check _store_data_only generates hex digests dictionary."""
+    """Check _store_data_only generates a hex digests dictionary."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -467,12 +468,7 @@ def test_move_and_get_checksums_incorrect_file_size(pids, store):
             input_stream = io.open(path, "rb")
             incorrect_file_size = 1000
             # pylint: disable=W0212
-            (
-                _,
-                _,
-                _,
-                _,
-            ) = store._move_and_get_checksums(
+            (_, _, _, _,) = store._move_and_get_checksums(
                 pid, input_stream, file_size_to_validate=incorrect_file_size
             )
             input_stream.close()
@@ -1115,3 +1111,27 @@ def test_resolve_path_refs_cid(pids, store):
         calculated_cid_ref_path = store.cids + "/" + "/".join(store._shard(cid))
 
         assert resolved_cid_ref_abs_path == calculated_cid_ref_path
+
+
+def test_check_string(store):
+    """Confirm that an exception is raised when a string is None, empty or an illegal character
+    (ex. tabs or new lines)"""
+    empty_pid_with_spaces = "   "
+    with pytest.raises(ValueError):
+        store._check_string(empty_pid_with_spaces, "empty_pid_with_spaces")
+
+    none_value = None
+    with pytest.raises(ValueError):
+        store._check_string(none_value, "none_value")
+
+    new_line = "\n"
+    with pytest.raises(ValueError):
+        store._check_string(new_line, "new_line")
+
+    new_line_with_other_chars = "hello \n"
+    with pytest.raises(ValueError):
+        store._check_string(new_line_with_other_chars, "new_line_with_other_chars")
+
+    tab_line = "\t"
+    with pytest.raises(ValueError):
+        store._check_string(tab_line, "tab_line")

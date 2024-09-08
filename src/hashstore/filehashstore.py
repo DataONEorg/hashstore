@@ -630,8 +630,8 @@ class FileHashStore(HashStore):
             pid_refs_path = self._resolve_path("pid", pid)
             cid_refs_path = self._resolve_path("cid", cid)
             # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
-            self._create_path(os.path.dirname(pid_refs_path))
-            self._create_path(os.path.dirname(cid_refs_path))
+            self._create_path(Path(os.path.dirname(pid_refs_path)))
+            self._create_path(Path(os.path.dirname(cid_refs_path)))
 
             if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
                 self._verify_hashstore_references(
@@ -1476,7 +1476,7 @@ class FileHashStore(HashStore):
         not match what is provided).
 
         :param str pid: Authority-based identifier.
-        :param io.BufferedReader stream: Object stream.
+        :param Stream stream: Object stream.
         :param str extension: Optional extension to append to the file
             when saving.
         :param str additional_algorithm: Optional algorithm value to include
@@ -1524,7 +1524,7 @@ class FileHashStore(HashStore):
                 tmp_file_size,
                 file_size_to_validate,
             )
-            self._create_path(os.path.dirname(abs_file_path))
+            self._create_path(Path(os.path.dirname(abs_file_path)))
             try:
                 debug_msg = (
                     "FileHashStore - _move_and_get_checksums: Moving temp file to permanent"
@@ -1625,7 +1625,7 @@ class FileHashStore(HashStore):
         algorithm is provided, it will add the respective hex digest to the dictionary if
         it is supported.
 
-        :param io.BufferedReader stream: Object stream.
+        :param Stream stream: Object stream.
         :param str additional_algorithm: Algorithm of additional hex digest to generate.
         :param str checksum_algorithm: Algorithm of additional checksum algo to generate.
 
@@ -1711,7 +1711,7 @@ class FileHashStore(HashStore):
     def _mktmpfile(self, path):
         """Create a temporary file at the given path ready to be written.
 
-        :param str path: Path to the file location.
+        :param Path path: Path to the file location.
 
         :return: file object - object with a file-like interface.
         """
@@ -1743,7 +1743,7 @@ class FileHashStore(HashStore):
         difference being that a cid reference file can potentially contain multiple
         lines of `pid`s that reference the `cid`.
 
-        :param str path: Directory to write a temporary file into
+        :param path path: Directory to write a temporary file into
         :param str ref_id: Authority-based, persistent or content identifier
         :param str ref_type: 'cid' or 'pid'
 
@@ -1907,7 +1907,7 @@ class FileHashStore(HashStore):
     def _mktmpmetadata(self, stream):
         """Create a named temporary file with `stream` (metadata).
 
-        :param io.BufferedReader stream: Metadata stream.
+        :param Stream stream: Metadata stream.
 
         :return: Path/name of temporary file created and written into.
         :rtype: str
@@ -1947,12 +1947,12 @@ class FileHashStore(HashStore):
         """Evaluates an object's integrity - if there is a mismatch, deletes the object
         in question and raises an exception.
 
-        :param str pid: For logging purposes.
+        :param Optional[str] pid: For logging purposes.
         :param str checksum: Value of the checksum to check.
         :param str checksum_algorithm: Algorithm of the checksum.
         :param str entity: Type of object ('objects' or 'metadata').
         :param dict hex_digests: Dictionary of hex digests to parse.
-        :param str tmp_file_name: Name of the temporary file.
+        :param Optional[str] tmp_file_name: Name of the temporary file.
         :param int tmp_file_size: Size of the temporary file.
         :param int file_size_to_validate: Expected size of the object.
         """
@@ -2340,7 +2340,7 @@ class FileHashStore(HashStore):
     def _rename_path_for_deletion(path):
         """Rename a given path by appending '_delete' and move it to the renamed path.
 
-        :param Path path: Path to file to rename
+        :param string path: Path to file to rename
 
         :return: Path to the renamed file
         :rtype: str
@@ -2354,7 +2354,7 @@ class FileHashStore(HashStore):
     def _create_path(self, path):
         """Physically create the folder path (and all intermediate ones) on disk.
 
-        :param str path: The path to create.
+        :param Path path: The path to create.
         :raises AssertionError: If the path already exists but is not a directory.
         """
         try:
@@ -2544,7 +2544,7 @@ class FileHashStore(HashStore):
     def _cast_to_bytes(text):
         """Convert text to a sequence of bytes using utf-8 encoding.
 
-        :param str text: String to convert.
+        :param Any text: String to convert.
         :return: Bytes with utf-8 encoding.
         :rtype: bytes
         """

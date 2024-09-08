@@ -8,6 +8,7 @@ import threading
 import hashlib
 import os
 import logging
+import inspect
 from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
@@ -223,13 +224,7 @@ class FileHashStore(HashStore):
         checked_properties = self._validate_properties(properties)
 
         # Collect configuration properties from validated & supplied dictionary
-        (
-            _,
-            store_depth,
-            store_width,
-            store_algorithm,
-            store_metadata_namespace,
-        ) = [
+        (_, store_depth, store_width, store_algorithm, store_metadata_namespace,) = [
             checked_properties[property_name]
             for property_name in self.property_required_keys
         ]
@@ -479,7 +474,7 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_object: Request to store object for pid: %s", pid
             )
             # Validate input parameters
-            self._check_string(pid, "pid", "store_object")
+            self._check_string(pid, "pid")
             self._check_arg_data(data)
             self._check_integer(expected_object_size)
             (
@@ -2537,18 +2532,19 @@ class FileHashStore(HashStore):
                 raise ValueError(exception_string)
 
     @staticmethod
-    def _check_string(string, arg, method):
+    def _check_string(string, arg):
         """Check whether a string is None or empty; throw an exception if so.
 
         :param str string: Value to check.
         :param str arg: Name of the argument to check.
-        :param str method: Calling method for logging purposes.
         """
         if string is None or string.strip() == "":
+            method = inspect.stack()[1].function
             exception_string = (
                 f"FileHashStore - {method}: {arg} cannot be None"
                 + f" or empty, {arg}: {string}."
             )
+            print(exception_string)
             logging.error(exception_string)
             raise ValueError(exception_string)
 

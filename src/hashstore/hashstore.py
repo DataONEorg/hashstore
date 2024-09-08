@@ -216,8 +216,8 @@ class HashStoreFactory:
                 "store_path": "var/metacat",
                 "store_depth": 3,
                 "store_width": 2,
-                "store_algorithm": "sha256",
-                "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0"
+                "store_algorithm": "SHA-256",
+                "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
             }
 
         :return: HashStore - A hash store object based on the given `module_name` and `class_name`.

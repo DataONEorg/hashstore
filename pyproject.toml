@@ -1,20 +1,35 @@
 [tool.poetry]
 name = "hashstore"
-version = "1.1.0"
-description = "HashStore, a hash-based object store for data packages."
+version = "1.0.0"
+description = "HashStore, an object storage system using content identifiers."
 authors = ["Dou Mok <douming.mok@gmail.com>", "Matt Jones <gitcode@magisa.org>"]
 readme = "README.md"
+keywords = ["filesystem", "object storage", "hashstore", "storage"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Filesystems"
+]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-pathlib = "^1.0.1"
-pyyaml = "^6.0"
+python = ">=3.9"
+pathlib = ">=1.0.1"
+pyyaml = ">=6.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.2.0"
-black = "^22.10.0"
-pylint = "^2.17.4"
-pg8000 = "^1.29.8"
+pytest = ">=7.2.0"
+black = ">=22.10.0"
+pylint = ">=2.17.4"
+pg8000 = ">=1.29.8"
 
 [tool.poetry.scripts]
 hashstore = "hashstore.hashstoreclient:main"

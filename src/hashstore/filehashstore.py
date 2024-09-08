@@ -560,8 +560,8 @@ class FileHashStore(HashStore):
     def verify_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
-        self._check_string(checksum, "checksum", "verify_object")
-        self._check_string(checksum_algorithm, "checksum_algorithm", "verify_object")
+        self._check_string(checksum, "checksum")
+        self._check_string(checksum_algorithm, "checksum_algorithm")
         self._check_integer(expected_file_size)
         if object_metadata is None or not isinstance(object_metadata, ObjectMetadata):
             exception_string = (
@@ -601,8 +601,8 @@ class FileHashStore(HashStore):
             cid,
             pid,
         )
-        self._check_string(pid, "pid", "tag_object")
-        self._check_string(cid, "cid", "tag_object")
+        self._check_string(pid, "pid")
+        self._check_string(cid, "cid")
 
         sync_begin_debug_msg = (
             f"FileHashStore - tag_object: Adding cid ({pid}) to locked list."
@@ -758,7 +758,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - find_object: Request to find object for for pid: %s", pid
         )
-        self._check_string(pid, "pid", "find_object")
+        self._check_string(pid, "pid")
 
         pid_ref_abs_path = self._resolve_path("pid", pid)
         if os.path.exists(pid_ref_abs_path):
@@ -832,7 +832,7 @@ class FileHashStore(HashStore):
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
         )
         # Validate input parameters
-        self._check_string(pid, "pid", "store_metadata")
+        self._check_string(pid, "pid")
         checked_format_id = self._check_arg_format_id(format_id, "store_metadata")
         self._check_arg_data(metadata)
         pid_doc = self._computehash(pid + checked_format_id)
@@ -892,7 +892,7 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_object: Request to retrieve object for pid: %s",
             pid,
         )
-        self._check_string(pid, "pid", "retrieve_object")
+        self._check_string(pid, "pid")
 
         object_info_dict = self.find_object(pid)
         object_cid = object_info_dict.get("cid")
@@ -921,7 +921,7 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_metadata: Request to retrieve metadata for pid: %s",
             pid,
         )
-        self._check_string(pid, "pid", "retrieve_metadata")
+        self._check_string(pid, "pid")
         checked_format_id = self._check_arg_format_id(format_id, "retrieve_metadata")
 
         entity = "metadata"
@@ -951,7 +951,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - delete_object: Request to delete object for id: %s", ab_id
         )
-        self._check_string(ab_id, "ab_id", "delete_object")
+        self._check_string(ab_id, "ab_id")
 
         if id_type == "cid":
             cid_refs_abs_path = self._resolve_path("cid", ab_id)
@@ -1200,7 +1200,7 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
         )
-        self._check_string(pid, "pid", "delete_metadata")
+        self._check_string(pid, "pid")
         checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
         metadata_directory = self._computehash(pid)
         rel_path = "/".join(self._shard(metadata_directory))
@@ -1330,8 +1330,8 @@ class FileHashStore(HashStore):
             "FileHashStore - get_hex_digest: Request to get hex digest for object with pid: %s",
             pid,
         )
-        self._check_string(pid, "pid", "get_hex_digest")
-        self._check_string(algorithm, "algorithm", "get_hex_digest")
+        self._check_string(pid, "pid")
+        self._check_string(algorithm, "algorithm")
 
         entity = "objects"
         algorithm = self._clean_algorithm(algorithm)
@@ -2146,17 +2146,9 @@ class FileHashStore(HashStore):
             additional_algorithm_checked = self._clean_algorithm(additional_algorithm)
         checksum_algorithm_checked = None
         if checksum is not None:
-            self._check_string(
-                checksum_algorithm,
-                "checksum_algorithm",
-                "_check_arg_algorithms_and_checksum (store_object)",
-            )
+            self._check_string(checksum_algorithm, "checksum_algorithm")
         if checksum_algorithm is not None:
-            self._check_string(
-                checksum,
-                "checksum",
-                "_check_arg_algorithms_and_checksum (store_object)",
-            )
+            self._check_string(checksum, "checksum")
             # Set checksum_algorithm
             checksum_algorithm_checked = self._clean_algorithm(checksum_algorithm)
         return additional_algorithm_checked, checksum_algorithm_checked
@@ -2544,7 +2536,6 @@ class FileHashStore(HashStore):
                 f"FileHashStore - {method}: {arg} cannot be None"
                 + f" or empty, {arg}: {string}."
             )
-            print(exception_string)
             logging.error(exception_string)
             raise ValueError(exception_string)
 

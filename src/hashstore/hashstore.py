@@ -253,7 +253,7 @@ class ObjectMetadata(
 
     :param str pid: An authority-based or persistent identifier
     :param str cid: A unique identifier for the object (Hash ID, hex digest).
-    :param bytes obj_size: The size of the object in bytes.
+    :param int obj_size: The size of the object in bytes.
     :param list hex_digests: A list of hex digests to validate objects
         (md5, sha1, sha256, sha384, sha512) (optional).
     """

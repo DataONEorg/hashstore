@@ -8,6 +8,7 @@ import threading
 import hashlib
 import os
 import logging
+import inspect
 from pathlib import Path
 from contextlib import closing
 from tempfile import NamedTemporaryFile
@@ -223,13 +224,7 @@ class FileHashStore(HashStore):
         checked_properties = self._validate_properties(properties)
 
         # Collect configuration properties from validated & supplied dictionary
-        (
-            _,
-            store_depth,
-            store_width,
-            store_algorithm,
-            store_metadata_namespace,
-        ) = [
+        (_, store_depth, store_width, store_algorithm, store_metadata_namespace,) = [
             checked_properties[property_name]
             for property_name in self.property_required_keys
         ]
@@ -479,7 +474,7 @@ class FileHashStore(HashStore):
                 "FileHashStore - store_object: Request to store object for pid: %s", pid
             )
             # Validate input parameters
-            self._check_string(pid, "pid", "store_object")
+            self._check_string(pid, "pid")
             self._check_arg_data(data)
             self._check_integer(expected_object_size)
             (
@@ -565,8 +560,8 @@ class FileHashStore(HashStore):
     def verify_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
-        self._check_string(checksum, "checksum", "verify_object")
-        self._check_string(checksum_algorithm, "checksum_algorithm", "verify_object")
+        self._check_string(checksum, "checksum")
+        self._check_string(checksum_algorithm, "checksum_algorithm")
         self._check_integer(expected_file_size)
         if object_metadata is None or not isinstance(object_metadata, ObjectMetadata):
             exception_string = (
@@ -606,8 +601,8 @@ class FileHashStore(HashStore):
             cid,
             pid,
         )
-        self._check_string(pid, "pid", "tag_object")
-        self._check_string(cid, "cid", "tag_object")
+        self._check_string(pid, "pid")
+        self._check_string(cid, "cid")
 
         sync_begin_debug_msg = (
             f"FileHashStore - tag_object: Adding cid ({pid}) to locked list."
@@ -635,8 +630,8 @@ class FileHashStore(HashStore):
             pid_refs_path = self._resolve_path("pid", pid)
             cid_refs_path = self._resolve_path("cid", cid)
             # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
-            self._create_path(os.path.dirname(pid_refs_path))
-            self._create_path(os.path.dirname(cid_refs_path))
+            self._create_path(Path(os.path.dirname(pid_refs_path)))
+            self._create_path(Path(os.path.dirname(cid_refs_path)))
 
             if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
                 self._verify_hashstore_references(
@@ -763,7 +758,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - find_object: Request to find object for for pid: %s", pid
         )
-        self._check_string(pid, "pid", "find_object")
+        self._check_string(pid, "pid")
 
         pid_ref_abs_path = self._resolve_path("pid", pid)
         if os.path.exists(pid_ref_abs_path):
@@ -837,7 +832,7 @@ class FileHashStore(HashStore):
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
         )
         # Validate input parameters
-        self._check_string(pid, "pid", "store_metadata")
+        self._check_string(pid, "pid")
         checked_format_id = self._check_arg_format_id(format_id, "store_metadata")
         self._check_arg_data(metadata)
         pid_doc = self._computehash(pid + checked_format_id)
@@ -897,7 +892,7 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_object: Request to retrieve object for pid: %s",
             pid,
         )
-        self._check_string(pid, "pid", "retrieve_object")
+        self._check_string(pid, "pid")
 
         object_info_dict = self.find_object(pid)
         object_cid = object_info_dict.get("cid")
@@ -926,7 +921,7 @@ class FileHashStore(HashStore):
             "FileHashStore - retrieve_metadata: Request to retrieve metadata for pid: %s",
             pid,
         )
-        self._check_string(pid, "pid", "retrieve_metadata")
+        self._check_string(pid, "pid")
         checked_format_id = self._check_arg_format_id(format_id, "retrieve_metadata")
 
         entity = "metadata"
@@ -956,7 +951,7 @@ class FileHashStore(HashStore):
         logging.debug(
             "FileHashStore - delete_object: Request to delete object for id: %s", ab_id
         )
-        self._check_string(ab_id, "ab_id", "delete_object")
+        self._check_string(ab_id, "ab_id")
 
         if id_type == "cid":
             cid_refs_abs_path = self._resolve_path("cid", ab_id)
@@ -1205,7 +1200,7 @@ class FileHashStore(HashStore):
             "FileHashStore - delete_metadata: Request to delete metadata for pid: %s",
             pid,
         )
-        self._check_string(pid, "pid", "delete_metadata")
+        self._check_string(pid, "pid")
         checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
         metadata_directory = self._computehash(pid)
         rel_path = "/".join(self._shard(metadata_directory))
@@ -1335,8 +1330,8 @@ class FileHashStore(HashStore):
             "FileHashStore - get_hex_digest: Request to get hex digest for object with pid: %s",
             pid,
         )
-        self._check_string(pid, "pid", "get_hex_digest")
-        self._check_string(algorithm, "algorithm", "get_hex_digest")
+        self._check_string(pid, "pid")
+        self._check_string(algorithm, "algorithm")
 
         entity = "objects"
         algorithm = self._clean_algorithm(algorithm)
@@ -1380,7 +1375,7 @@ class FileHashStore(HashStore):
         :param str checksum: Optional checksum to validate object against hex digest before moving
             to permanent location.
         :param str checksum_algorithm: Algorithm value of the given checksum.
-        :param bytes file_size_to_validate: Expected size of the object.
+        :param int file_size_to_validate: Expected size of the object.
 
         :return: ObjectMetadata - object that contains the object id, object file size,
             and hex digest dictionary.
@@ -1481,7 +1476,7 @@ class FileHashStore(HashStore):
         not match what is provided).
 
         :param str pid: Authority-based identifier.
-        :param io.BufferedReader stream: Object stream.
+        :param Stream stream: Object stream.
         :param str extension: Optional extension to append to the file
             when saving.
         :param str additional_algorithm: Optional algorithm value to include
@@ -1489,7 +1484,7 @@ class FileHashStore(HashStore):
         :param str checksum: Optional checksum to validate the object
             against hex digest before moving to the permanent location.
         :param str checksum_algorithm: Algorithm value of the given checksum.
-        :param bytes file_size_to_validate: Expected size of the object.
+        :param int file_size_to_validate: Expected size of the object.
 
         :return: tuple - Object ID, object file size, and hex digest dictionary.
         """
@@ -1529,7 +1524,7 @@ class FileHashStore(HashStore):
                 tmp_file_size,
                 file_size_to_validate,
             )
-            self._create_path(os.path.dirname(abs_file_path))
+            self._create_path(Path(os.path.dirname(abs_file_path)))
             try:
                 debug_msg = (
                     "FileHashStore - _move_and_get_checksums: Moving temp file to permanent"
@@ -1630,7 +1625,7 @@ class FileHashStore(HashStore):
         algorithm is provided, it will add the respective hex digest to the dictionary if
         it is supported.
 
-        :param io.BufferedReader stream: Object stream.
+        :param Stream stream: Object stream.
         :param str additional_algorithm: Algorithm of additional hex digest to generate.
         :param str checksum_algorithm: Algorithm of additional checksum algo to generate.
 
@@ -1716,7 +1711,7 @@ class FileHashStore(HashStore):
     def _mktmpfile(self, path):
         """Create a temporary file at the given path ready to be written.
 
-        :param str path: Path to the file location.
+        :param Path path: Path to the file location.
 
         :return: file object - object with a file-like interface.
         """
@@ -1748,7 +1743,7 @@ class FileHashStore(HashStore):
         difference being that a cid reference file can potentially contain multiple
         lines of `pid`s that reference the `cid`.
 
-        :param str path: Directory to write a temporary file into
+        :param path path: Directory to write a temporary file into
         :param str ref_id: Authority-based, persistent or content identifier
         :param str ref_type: 'cid' or 'pid'
 
@@ -1912,7 +1907,7 @@ class FileHashStore(HashStore):
     def _mktmpmetadata(self, stream):
         """Create a named temporary file with `stream` (metadata).
 
-        :param io.BufferedReader stream: Metadata stream.
+        :param Stream stream: Metadata stream.
 
         :return: Path/name of temporary file created and written into.
         :rtype: str
@@ -1952,12 +1947,12 @@ class FileHashStore(HashStore):
         """Evaluates an object's integrity - if there is a mismatch, deletes the object
         in question and raises an exception.
 
-        :param str pid: For logging purposes.
+        :param Optional[str] pid: For logging purposes.
         :param str checksum: Value of the checksum to check.
         :param str checksum_algorithm: Algorithm of the checksum.
         :param str entity: Type of object ('objects' or 'metadata').
         :param dict hex_digests: Dictionary of hex digests to parse.
-        :param str tmp_file_name: Name of the temporary file.
+        :param Optional[str] tmp_file_name: Name of the temporary file.
         :param int tmp_file_size: Size of the temporary file.
         :param int file_size_to_validate: Expected size of the object.
         """
@@ -2151,17 +2146,9 @@ class FileHashStore(HashStore):
             additional_algorithm_checked = self._clean_algorithm(additional_algorithm)
         checksum_algorithm_checked = None
         if checksum is not None:
-            self._check_string(
-                checksum_algorithm,
-                "checksum_algorithm",
-                "_check_arg_algorithms_and_checksum (store_object)",
-            )
+            self._check_string(checksum_algorithm, "checksum_algorithm")
         if checksum_algorithm is not None:
-            self._check_string(
-                checksum,
-                "checksum",
-                "_check_arg_algorithms_and_checksum (store_object)",
-            )
+            self._check_string(checksum, "checksum")
             # Set checksum_algorithm
             checksum_algorithm_checked = self._clean_algorithm(checksum_algorithm)
         return additional_algorithm_checked, checksum_algorithm_checked
@@ -2353,7 +2340,7 @@ class FileHashStore(HashStore):
     def _rename_path_for_deletion(path):
         """Rename a given path by appending '_delete' and move it to the renamed path.
 
-        :param Path path: Path to file to rename
+        :param string path: Path to file to rename
 
         :return: Path to the renamed file
         :rtype: str
@@ -2367,7 +2354,7 @@ class FileHashStore(HashStore):
     def _create_path(self, path):
         """Physically create the folder path (and all intermediate ones) on disk.
 
-        :param str path: The path to create.
+        :param Path path: The path to create.
         :raises AssertionError: If the path already exists but is not a directory.
         """
         try:
@@ -2537,14 +2524,15 @@ class FileHashStore(HashStore):
                 raise ValueError(exception_string)
 
     @staticmethod
-    def _check_string(string, arg, method):
-        """Check whether a string is None or empty; throw an exception if so.
+    def _check_string(string, arg):
+        """Check whether a string is None or empty - or if it contains an illegal character;
+        throws an exception if so.
 
         :param str string: Value to check.
         :param str arg: Name of the argument to check.
-        :param str method: Calling method for logging purposes.
         """
-        if string is None or string.strip() == "":
+        if string is None or string.strip() == "" or any(ch.isspace() for ch in string):
+            method = inspect.stack()[1].function
             exception_string = (
                 f"FileHashStore - {method}: {arg} cannot be None"
                 + f" or empty, {arg}: {string}."
@@ -2556,7 +2544,7 @@ class FileHashStore(HashStore):
     def _cast_to_bytes(text):
         """Convert text to a sequence of bytes using utf-8 encoding.
 
-        :param str text: String to convert.
+        :param Any text: String to convert.
         :return: Bytes with utf-8 encoding.
         :rtype: bytes
         """

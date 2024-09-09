@@ -1,7 +1,7 @@
 """Hashstore Interface"""
 
 from abc import ABC, abstractmethod
-from collections import namedtuple
+from dataclasses import dataclass
 import importlib.metadata
 import importlib.util
 
@@ -241,9 +241,8 @@ class HashStoreFactory:
         )
 
 
-class ObjectMetadata(
-    namedtuple("ObjectMetadata", ["pid", "cid", "obj_size", "hex_digests"])
-):
+@dataclass
+class ObjectMetadata:
     """Represents metadata associated with an object.
 
     The `ObjectMetadata` class represents metadata associated with an object, including
@@ -258,6 +257,7 @@ class ObjectMetadata(
         (md5, sha1, sha256, sha384, sha512) (optional).
     """
 
-    # Default value to prevent dangerous default value
-    def __new__(cls, pid, cid, obj_size, hex_digests=None):
-        return super(ObjectMetadata, cls).__new__(cls, pid, cid, obj_size, hex_digests)
+    pid: str
+    cid: str
+    obj_size: int
+    hex_digests: dict

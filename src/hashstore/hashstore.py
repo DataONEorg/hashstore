@@ -1,7 +1,6 @@
 """Hashstore Interface"""
 
 from abc import ABC, abstractmethod
-from collections import namedtuple
 import importlib.metadata
 import importlib.util
 
@@ -28,19 +27,20 @@ class HashStore(ABC):
     ):
         """Atomic storage of objects to disk using a given stream. Upon successful storage,
         it returns an `ObjectMetadata` object containing relevant file information, such as
-        the file's id, the file's size, and a hex digest dictionary of algorithms and checksums.
-        The method also tags the object, creating references for discoverability.
+        a persistent identifier that references the data file, the file's size, and a hex digest
+        dictionary of  algorithms and checksums. The method also tags the object, creating
+        references for discoverability.
 
         `store_object` ensures that an object is stored only once by synchronizing multiple calls
         and rejecting attempts to store duplicate objects. If called without a pid, it stores the
         object without tagging, and it becomes the caller's responsibility to finalize the process
         by calling `tag_object` after verifying the correct object is stored.
 
-        The file's id is determined by calculating the object's content identifier based on the
-        store's default algorithm, which is also the permanent address of the file. The file's
-        identifier is then sharded using the store's configured depth and width, delimited by '/',
-        and concatenated to produce the final permanent address. This address is stored in the
-        `/store_directory/objects/` directory.
+        The file's permanent address is determined by calculating the object's content identifier
+        based on the store's default algorithm, which is also the permanent address of the file.
+        The content identifier is then sharded using the store's configured depth and width,
+        delimited by '/', and concatenated to produce the final permanent address. This address
+        is stored in the `/store_directory/objects/` directory.
 
         By default, the hex digest map includes common hash algorithms (md5, sha1, sha256, sha384,
         sha512). If an additional algorithm is provided, the method checks if it is supported and
@@ -59,8 +59,8 @@ class HashStore(ABC):
         :param str checksum_algorithm: Algorithm of the supplied checksum.
         :param int expected_object_size: Size of the object to verify.
 
-        :return: ObjectMetadata - Object containing the permanent address, file size, and
-            hex digest dictionary.
+        :return: ObjectMetadata - Object containing the persistent identifier (pid),
+        content identifier (cid), object size and hex digests dictionary (checksums).
         """
         raise NotImplementedError()
 
@@ -113,8 +113,9 @@ class HashStore(ABC):
         """Add or update metadata, such as `sysmeta`, to disk using the given path/stream. The
         `store_metadata` method uses a persistent identifier `pid` and a metadata `format_id`
         to determine the permanent address of the metadata object. All metadata documents for a
-        given `pid` will be stored in a directory (under ../metadata) that is determined by
-        calculating the hash of the given pid, with the document name being the hash of the pid
+        given `pid` will be stored in a directory that follows the HashStore configuration
+        settings (under ../metadata) that is determined by calculating the hash of the given pid.
+        Metadata documents are stored in this directory, and is each named using the hash of the pid
         and metadata format (`pid` + `format_id`).
 
         Upon successful storage of metadata, the method returns a string representing the file's
@@ -239,25 +240,3 @@ class HashStoreFactory:
         raise AttributeError(
             f"Class name '{class_name}' is not an attribute of module '{module_name}'"
         )
-
-
-class ObjectMetadata(
-    namedtuple("ObjectMetadata", ["pid", "cid", "obj_size", "hex_digests"])
-):
-    """Represents metadata associated with an object.
-
-    The `ObjectMetadata` class represents metadata associated with an object, including
-    a persistent or authority-based identifier (`pid`), a content identifier (`cid`),
-    the size of the object in bytes (`obj_size`), and an optional list of hex digests
-    (`hex_digests`) to assist with validating objects.
-
-    :param str pid: An authority-based or persistent identifier
-    :param str cid: A unique identifier for the object (Hash ID, hex digest).
-    :param int obj_size: The size of the object in bytes.
-    :param list hex_digests: A list of hex digests to validate objects
-        (md5, sha1, sha256, sha384, sha512) (optional).
-    """
-
-    # Default value to prevent dangerous default value
-    def __new__(cls, pid, cid, obj_size, hex_digests=None):
-        return super(ObjectMetadata, cls).__new__(cls, pid, cid, obj_size, hex_digests)

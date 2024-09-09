@@ -1137,7 +1137,7 @@ def test_check_string(store):
         store._check_string(tab_line, "tab_line")
 
 
-def test_objectmetadata(store):
+def test_objectmetadata():
     """Test ObjectMetadata class returns correct values via dot notation."""
     pid = "hashstore"
     ab_id = "hashstoretest"

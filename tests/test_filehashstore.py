@@ -4,7 +4,7 @@ import io
 import os
 from pathlib import Path
 import pytest
-from hashstore.filehashstore import FileHashStore
+from hashstore.filehashstore import FileHashStore, ObjectMetadata
 from hashstore.filehashstore_exceptions import (
     NonMatchingChecksum,
     NonMatchingObjSize,
@@ -1135,3 +1135,26 @@ def test_check_string(store):
     tab_line = "\t"
     with pytest.raises(ValueError):
         store._check_string(tab_line, "tab_line")
+
+
+def test_objectmetadata(store):
+    """Test ObjectMetadata class returns correct values via dot notation."""
+    pid = "hashstore"
+    ab_id = "hashstoretest"
+    obj_size = 1234
+    hex_digest_dict = {
+        "md5": "md5value",
+        "sha1": "sha1value",
+        "sha224": "sha224value",
+        "sha256": "sha256value",
+        "sha512": "sha512value",
+    }
+    object_metadata = ObjectMetadata(pid, ab_id, obj_size, hex_digest_dict)
+    assert object_metadata.pid == pid
+    assert object_metadata.cid == ab_id
+    assert object_metadata.obj_size == obj_size
+    assert object_metadata.hex_digests.get("md5") == hex_digest_dict["md5"]
+    assert object_metadata.hex_digests.get("sha1") == hex_digest_dict["sha1"]
+    assert object_metadata.hex_digests.get("sha224") == hex_digest_dict["sha224"]
+    assert object_metadata.hex_digests.get("sha256") == hex_digest_dict["sha256"]
+    assert object_metadata.hex_digests.get("sha512") == hex_digest_dict["sha512"]

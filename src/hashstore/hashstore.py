@@ -1,7 +1,6 @@
 """Hashstore Interface"""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 import importlib.metadata
 import importlib.util
 

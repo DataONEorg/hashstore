@@ -1023,6 +1023,34 @@ def test_open_objects(pids, store):
         io_buffer.close()
 
 
+def test_delete_object_only(pids, store):
+    """Test delete_object successfully deletes only object."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid=None, data=path)
+        store.delete_object_only(object_metadata.cid)
+    assert store._count(entity) == 0
+
+
+def test_delete_object_only_cid_refs_file_exists(pids, store):
+    """Test delete_object does not delete object if a cid refs file still exists."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        object_metadata = store.store_object(pid, path)
+        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        store.delete_object_only(object_metadata.cid)
+    assert store._count(entity) == 3
+    assert store._count("pid") == 3
+    assert store._count("cid") == 3
+
+
 def test_delete_with_object_metadata_id(pids, store):
     """Check objects are deleted after calling delete with object id."""
     test_dir = "tests/testdata/"

@@ -1023,7 +1023,7 @@ class FileHashStore(HashStore):
             except PidRefsDoesNotExist:
                 warn_msg = (
                     "FileHashStore - delete_object: pid refs file does not exist for pid: "
-                    + ab_id
+                    + pid
                     + ". Skipping object deletion. Deleting pid metadata documents."
                 )
                 logging.warning(warn_msg)
@@ -1096,11 +1096,15 @@ class FileHashStore(HashStore):
                     self.object_locked_pids.remove(pid)
                     self.object_condition.notify()
 
-    def delete_object_only(self, ab_id):
-        cid_refs_abs_path = self._resolve_path("cid", ab_id)
+    def delete_object_only(self, cid):
+        """Attempt to delete an object based on the given content identifier (cid). If the object
+        has any pids references and/or a cid refs file exists, the object will not be deleted.
+
+        :param str cid: Content identifier
+        """
+        cid_refs_abs_path = self._resolve_path("cid", cid)
         # If the refs file still exists, do not delete the object
         if not os.path.exists(cid_refs_abs_path):
-            cid = ab_id
             sync_begin_debug_msg = (
                 f"FileHashStore - delete_object: Cid ({cid}) to locked list."
             )

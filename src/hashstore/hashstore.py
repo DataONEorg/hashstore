@@ -139,15 +139,13 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_object(self, ab_id, id_type):
+    def delete_object(self, pid):
         """Deletes an object and its related data permanently from HashStore using a given
-        persistent identifier. If the `id_type` is 'pid', the object associated with the pid will
-        be deleted if it is not referenced by any other pids, along with its reference files and
-        all metadata documents found in its respective metadata directory. If the `id_type` is
-        'cid', only the object will be deleted if it is not referenced by other pids.
+        persistent identifier. The object associated with the pid will be deleted if it is not
+        referenced by any other pids, along with its reference files and all metadata documents
+        found in its respective metadata directory.
 
-        :param str ab_id: Authority-based identifier.
-        :param str id_type: "pid" or "cid"
+        :param str pid: Persistent or Authority-based identifier.
         """
         raise NotImplementedError()
 

@@ -156,3 +156,34 @@ def test_factory_get_hashstore_filehashstore_nonconflicting_dir(factory, tmp_pat
     }
 
     factory.get_hashstore(module_name, class_name, properties)
+
+
+def test_factory_get_hashstore_filehashstore_string_int_prop(factory, tmp_path):
+    """Check factory does not raise exception when an integer is passed as a string in a
+    properties object."""
+    module_name = "hashstore.filehashstore"
+    class_name = "FileHashStore"
+
+    directory = tmp_path / "douhs" / "inttest"
+    directory.mkdir(parents=True)
+    douhspath = (tmp_path / "douhs").as_posix()
+
+    properties = {
+        "store_path": douhspath,
+        "store_depth": "3",
+        "store_width": "2",
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    }
+
+    factory.get_hashstore(module_name, class_name, properties)
+
+    properties = {
+        "store_path": douhspath,
+        "store_depth": str(3),
+        "store_width": str(2),
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    }
+
+    factory.get_hashstore(module_name, class_name, properties)

@@ -392,6 +392,9 @@ class FileHashStore(HashStore):
             logging.debug(exception_string)
             raise ValueError(exception_string)
 
+        # New dictionary for validated properties
+        checked_properties = {}
+
         for key in self.property_required_keys:
             if key not in properties:
                 exception_string = (
@@ -400,14 +403,33 @@ class FileHashStore(HashStore):
                 )
                 logging.debug(exception_string)
                 raise KeyError(exception_string)
-            if properties.get(key) is None:
+
+            value = properties.get(key)
+            if value is None:
                 exception_string = (
                     "FileHashStore - _validate_properties: Value for key:"
                     + f" {key} is none."
                 )
                 logging.debug(exception_string)
                 raise ValueError(exception_string)
-        return properties
+
+            # Add key and values to checked_properties
+            if key == "store_depth" or key == "store_width":
+                # Ensure store depth and width are integers
+                try:
+                    checked_properties[key] = int(value)
+                except Exception as err:
+                    exception_string = (
+                            "FileHashStore - _validate_properties: Unexpected exception when"
+                            " attempting to ensure store depth and width are integers. Details: "
+                            + str(err)
+                    )
+                    logging.debug(exception_string)
+                    raise ValueError(exception_string)
+            else:
+                checked_properties[key] = value
+
+        return checked_properties
 
     def _set_default_algorithms(self):
         """Set the default algorithms to calculate when storing objects."""

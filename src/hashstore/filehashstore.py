@@ -777,92 +777,6 @@ class FileHashStore(HashStore):
                     self.reference_locked_cids.remove(cid)
                     self.reference_condition.notify()
 
-    def find_object(self, pid):
-        """Check if an object referenced by a pid exists and retrieve its content identifier.
-        The `find_object` method validates the existence of an object based on the provided
-        pid and returns the associated content identifier.
-
-        :param str pid: Authority-based or persistent identifier of the object.
-
-        :return: obj_info_dict (dict):
-            - cid: content identifier
-            - cid_object_path: path to the object
-            - cid_refs_path: path to the cid refs file
-            - pid_refs_path: path to the pid refs file
-            - sysmeta_path: path to the sysmeta file
-        """
-        logging.debug(
-            "FileHashStore - find_object: Request to find object for for pid: %s", pid
-        )
-        self._check_string(pid, "pid")
-
-        pid_ref_abs_path = self._resolve_path("pid", pid)
-        if os.path.exists(pid_ref_abs_path):
-            # Read the file to get the cid from the pid reference
-            with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
-                pid_refs_cid = pid_ref_file.read()
-
-            # Confirm that the cid reference file exists
-            cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
-            if os.path.exists(cid_ref_abs_path):
-                # Check that the pid is actually found in the cid reference file
-                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
-                    # Object must also exist in order to return the cid retrieved
-                    if not self._exists("objects", pid_refs_cid):
-                        err_msg = (
-                            f"FileHashStore - find_object: Refs file found for pid ({pid}) at"
-                            + pid_ref_abs_path
-                            + f", but object referenced does not exist, cid: {pid_refs_cid}"
-                        )
-                        logging.error(err_msg)
-                        raise RefsFileExistsButCidObjMissing(err_msg)
-                    else:
-                        sysmeta_doc_name = self._computehash(pid + self.sysmeta_ns)
-                        metadata_directory = self._computehash(pid)
-                        metadata_rel_path = "/".join(self._shard(metadata_directory))
-                        sysmeta_full_path = (
-                            self._get_store_path("metadata")
-                            / metadata_rel_path
-                            / sysmeta_doc_name
-                        )
-                        obj_info_dict = {
-                            "cid": pid_refs_cid,
-                            "cid_object_path": self._resolve_path(
-                                "objects", pid_refs_cid
-                            ),
-                            "cid_refs_path": cid_ref_abs_path,
-                            "pid_refs_path": pid_ref_abs_path,
-                            "sysmeta_path": (
-                                sysmeta_full_path
-                                if os.path.isdir(sysmeta_full_path)
-                                else "Does not exist."
-                            ),
-                        }
-                        return obj_info_dict
-                else:
-                    # If not, it is an orphan pid refs file
-                    err_msg = (
-                        "FileHashStore - find_object: pid refs file exists with cid: "
-                        + f"{pid_refs_cid} for pid: {pid}"
-                        + f", but is missing from cid refs file: {cid_ref_abs_path}"
-                    )
-                    logging.error(err_msg)
-                    raise PidNotFoundInCidRefsFile(err_msg)
-            else:
-                err_msg = (
-                    f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
-                    + f", but cid refs file not found: {cid_ref_abs_path} for pid: {pid}"
-                )
-                logging.error(err_msg)
-                raise CidRefsDoesNotExist(err_msg)
-        else:
-            err_msg = (
-                f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
-                + pid_ref_abs_path
-            )
-            logging.error(err_msg)
-            raise PidRefsDoesNotExist(err_msg)
-
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
             "FileHashStore - store_metadata: Request to store metadata for pid: %s", pid
@@ -1444,6 +1358,92 @@ class FileHashStore(HashStore):
             pid,
         )
         return object_metadata
+
+    def find_object(self, pid):
+        """Check if an object referenced by a pid exists and retrieve its content identifier.
+        The `find_object` method validates the existence of an object based on the provided
+        pid and returns the associated content identifier.
+
+        :param str pid: Authority-based or persistent identifier of the object.
+
+        :return: obj_info_dict (dict):
+            - cid: content identifier
+            - cid_object_path: path to the object
+            - cid_refs_path: path to the cid refs file
+            - pid_refs_path: path to the pid refs file
+            - sysmeta_path: path to the sysmeta file
+        """
+        logging.debug(
+            "FileHashStore - find_object: Request to find object for for pid: %s", pid
+        )
+        self._check_string(pid, "pid")
+
+        pid_ref_abs_path = self._resolve_path("pid", pid)
+        if os.path.exists(pid_ref_abs_path):
+            # Read the file to get the cid from the pid reference
+            with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                pid_refs_cid = pid_ref_file.read()
+
+            # Confirm that the cid reference file exists
+            cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
+            if os.path.exists(cid_ref_abs_path):
+                # Check that the pid is actually found in the cid reference file
+                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
+                    # Object must also exist in order to return the cid retrieved
+                    if not self._exists("objects", pid_refs_cid):
+                        err_msg = (
+                                f"FileHashStore - find_object: Refs file found for pid ({pid}) at"
+                                + pid_ref_abs_path
+                                + f", but object referenced does not exist, cid: {pid_refs_cid}"
+                        )
+                        logging.error(err_msg)
+                        raise RefsFileExistsButCidObjMissing(err_msg)
+                    else:
+                        sysmeta_doc_name = self._computehash(pid + self.sysmeta_ns)
+                        metadata_directory = self._computehash(pid)
+                        metadata_rel_path = "/".join(self._shard(metadata_directory))
+                        sysmeta_full_path = (
+                                self._get_store_path("metadata")
+                                / metadata_rel_path
+                                / sysmeta_doc_name
+                        )
+                        obj_info_dict = {
+                            "cid": pid_refs_cid,
+                            "cid_object_path": self._resolve_path(
+                                "objects", pid_refs_cid
+                            ),
+                            "cid_refs_path": cid_ref_abs_path,
+                            "pid_refs_path": pid_ref_abs_path,
+                            "sysmeta_path": (
+                                sysmeta_full_path
+                                if os.path.isdir(sysmeta_full_path)
+                                else "Does not exist."
+                            ),
+                        }
+                        return obj_info_dict
+                else:
+                    # If not, it is an orphan pid refs file
+                    err_msg = (
+                            "FileHashStore - find_object: pid refs file exists with cid: "
+                            + f"{pid_refs_cid} for pid: {pid}"
+                            + f", but is missing from cid refs file: {cid_ref_abs_path}"
+                    )
+                    logging.error(err_msg)
+                    raise PidNotFoundInCidRefsFile(err_msg)
+            else:
+                err_msg = (
+                        f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
+                        + f", but cid refs file not found: {cid_ref_abs_path} for pid: {pid}"
+                )
+                logging.error(err_msg)
+                raise CidRefsDoesNotExist(err_msg)
+        else:
+            err_msg = (
+                    f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
+                    + pid_ref_abs_path
+            )
+            logging.error(err_msg)
+            raise PidRefsDoesNotExist(err_msg)
 
     def _store_data_only(self, data):
         """Store an object to HashStore and return the ID and a hex digest

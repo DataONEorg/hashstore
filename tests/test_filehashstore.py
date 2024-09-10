@@ -6,8 +6,12 @@ from pathlib import Path
 import pytest
 from hashstore.filehashstore import FileHashStore, ObjectMetadata
 from hashstore.filehashstore_exceptions import (
+    CidRefsDoesNotExist,
     NonMatchingChecksum,
     NonMatchingObjSize,
+    PidNotFoundInCidRefsFile,
+    PidRefsDoesNotExist,
+    RefsFileExistsButCidObjMissing,
     UnsupportedAlgorithm,
 )
 
@@ -814,6 +818,86 @@ def test_verify_object_information_missing_key_in_hex_digests_supported_algo(
                 expected_file_size,
                 expected_file_size,
             )
+
+
+def test_find_object(pids, store):
+    """Test find_object returns the correct content identifier (cid)."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+        obj_info_dict = store.find_object(pid)
+        assert obj_info_dict.get("cid") == object_metadata.hex_digests.get("sha256")
+
+
+def test_find_object_refs_exist_but_obj_not_found(pids, store):
+    """Test find_object throws exception when refs file exist but the object does not."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        store.store_object(pid, path)
+
+        cid = store.find_object(pid).get("cid")
+        obj_path = store._resolve_path("objects", cid)
+        os.remove(obj_path)
+
+        with pytest.raises(RefsFileExistsButCidObjMissing):
+            store.find_object(pid)
+
+
+def test_find_object_cid_refs_not_found(pids, store):
+    """Test find_object throws exception when pid refs file is found with a cid
+    but the cid does not exist."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        _object_metadata = store.store_object(pid, path)
+
+        # Place the wrong cid into the pid refs file that has already been created
+        pid_ref_abs_path = store._resolve_path("pid", pid)
+        with open(pid_ref_abs_path, "w", encoding="utf8") as pid_ref_file:
+            pid_ref_file.seek(0)
+            pid_ref_file.write("intentionally.wrong.pid")
+            pid_ref_file.truncate()
+
+        with pytest.raises(CidRefsDoesNotExist):
+            store.find_object(pid)
+
+
+def test_find_object_cid_refs_does_not_contain_pid(pids, store):
+    """Test find_object throws exception when pid refs file is found with a cid
+    but the cid refs file does not contain the pid."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+
+        # Remove the pid from the cid refs file
+        cid_ref_abs_path = store._resolve_path(
+            "cid", object_metadata.hex_digests.get("sha256")
+        )
+        store._update_refs_file(cid_ref_abs_path, pid, "remove")
+
+        with pytest.raises(PidNotFoundInCidRefsFile):
+            store.find_object(pid)
+
+
+def test_find_object_pid_refs_not_found(store):
+    """Test find object throws exception when object doesn't exist."""
+    with pytest.raises(PidRefsDoesNotExist):
+        store.find_object("dou.test.1")
+
+
+def test_find_object_pid_none(store):
+    """Test find object throws exception when pid is None."""
+    with pytest.raises(ValueError):
+        store.find_object(None)
+
+
+def test_find_object_pid_empty(store):
+    """Test find object throws exception when pid is empty."""
+    with pytest.raises(ValueError):
+        store.find_object("")
 
 
 def test_clean_algorithm(store):

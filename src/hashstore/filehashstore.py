@@ -778,6 +778,19 @@ class FileHashStore(HashStore):
                     self.reference_condition.notify()
 
     def find_object(self, pid):
+        """Check if an object referenced by a pid exists and retrieve its content identifier.
+        The `find_object` method validates the existence of an object based on the provided
+        pid and returns the associated content identifier.
+
+        :param str pid: Authority-based or persistent identifier of the object.
+
+        :return: obj_info_dict (dict):
+            - cid: content identifier
+            - cid_object_path: path to the object
+            - cid_refs_path: path to the cid refs file
+            - pid_refs_path: path to the pid refs file
+            - sysmeta_path: path to the sysmeta file
+        """
         logging.debug(
             "FileHashStore - find_object: Request to find object for for pid: %s", pid
         )

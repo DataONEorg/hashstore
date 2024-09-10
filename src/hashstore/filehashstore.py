@@ -897,22 +897,57 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise ValueError(exception_string)
 
-    def delete_object(self, ab_id, id_type=None):
+    def delete_object(self, pid):
         logging.debug(
-            "FileHashStore - delete_object: Request to delete object for id: %s", ab_id
+            "FileHashStore - delete_object: Request to delete object for id: %s", pid
         )
-        self._check_string(ab_id, "ab_id")
+        self._check_string(pid, "pid")
 
-        if id_type == "cid":
-            cid_refs_abs_path = self._resolve_path("cid", ab_id)
-            # If the refs file still exists, do not delete the object
-            if not os.path.exists(cid_refs_abs_path):
-                cid = ab_id
+        objects_to_delete = []
+
+        # Storing and deleting objects are synchronized together
+        # Duplicate store object requests for a pid are rejected, but deleting an object
+        # will wait for a pid to be released if it's found to be in use before proceeding.
+        sync_begin_debug_msg = (
+            f"FileHashStore - delete_object: Pid ({pid}) to locked list."
+        )
+        sync_wait_msg = (
+            f"FileHashStore - delete_object: Pid ({pid}) is locked. Waiting."
+        )
+        if self.use_multiprocessing:
+            with self.object_condition_mp:
+                # Wait for the pid to release if it's in use
+                while pid in self.object_locked_pids_mp:
+                    logging.debug(sync_wait_msg)
+                    self.object_condition_mp.wait()
+                # Modify object_locked_pids consecutively
+                logging.debug(sync_begin_debug_msg)
+                self.object_locked_pids_mp.append(pid)
+        else:
+            with self.object_condition:
+                while pid in self.object_locked_pids:
+                    logging.debug(sync_wait_msg)
+                    self.object_condition.wait()
+                logging.debug(sync_begin_debug_msg)
+                self.object_locked_pids.append(pid)
+
+        try:
+            # Before we begin deletion process, we look for the `cid` by calling
+            # `find_object` which will throw custom exceptions if there is an issue with
+            # the reference files, which help us determine the path to proceed with.
+            try:
+                object_info_dict = self.find_object(pid)
+                cid = object_info_dict.get("cid")
+
+                # Proceed with next steps - cid has been retrieved without any issues
+                # We must synchronize here based on the `cid` because multiple threads may
+                # try to access the `cid_reference_file`
                 sync_begin_debug_msg = (
                     f"FileHashStore - delete_object: Cid ({cid}) to locked list."
                 )
                 sync_wait_msg = (
-                    f"FileHashStore - delete_object: Cid ({cid}) is locked. Waiting."
+                    f"FileHashStore - delete_object: Cid ({cid}) is locked."
+                    + " Waiting."
                 )
                 if self.use_multiprocessing:
                     with self.reference_condition_mp:
@@ -932,7 +967,42 @@ class FileHashStore(HashStore):
                         self.reference_locked_cids.append(cid)
 
                 try:
-                    self._delete("objects", cid)
+                    cid_ref_abs_path = object_info_dict.get("cid_refs_path")
+                    pid_ref_abs_path = object_info_dict.get("pid_refs_path")
+                    # Add pid refs file to be permanently deleted
+                    objects_to_delete.append(
+                        self._rename_path_for_deletion(pid_ref_abs_path)
+                    )
+                    # Remove pid from cid reference file
+                    self._update_refs_file(cid_ref_abs_path, pid, "remove")
+                    # Delete cid reference file and object only if the cid refs file is empty
+                    if os.path.getsize(cid_ref_abs_path) == 0:
+                        debug_msg = (
+                            "FileHashStore - delete_object: cid_refs_file is empty (size == 0):"
+                            + f" {cid_ref_abs_path} - deleting cid refs file and data object."
+                        )
+                        logging.debug(debug_msg)
+                        objects_to_delete.append(
+                            self._rename_path_for_deletion(cid_ref_abs_path)
+                        )
+                        obj_real_path = object_info_dict.get("cid_object_path")
+                        objects_to_delete.append(
+                            self._rename_path_for_deletion(obj_real_path)
+                        )
+                    # Remove all files confirmed for deletion
+                    for obj in objects_to_delete:
+                        os.remove(obj)
+
+                    # Remove metadata files if they exist
+                    self.delete_metadata(pid)
+
+                    info_string = (
+                        "FileHashStore - delete_object: Successfully deleted references,"
+                        + f" metadata and object associated with pid: {pid}"
+                    )
+                    logging.info(info_string)
+                    return
+
                 finally:
                     # Release cid
                     end_sync_debug_msg = (
@@ -949,201 +1019,129 @@ class FileHashStore(HashStore):
                             logging.debug(end_sync_debug_msg)
                             self.reference_locked_cids.remove(cid)
                             self.reference_condition.notify()
-        else:
-            # id_type is "pid"
-            pid = ab_id
-            objects_to_delete = []
 
-            # Storing and deleting objects are synchronized together
-            # Duplicate store object requests for a pid are rejected, but deleting an object
-            # will wait for a pid to be released if it's found to be in use before proceeding.
-            sync_begin_debug_msg = (
-                f"FileHashStore - delete_object: Pid ({pid}) to locked list."
-            )
-            sync_wait_msg = (
-                f"FileHashStore - delete_object: Pid ({pid}) is locked. Waiting."
+            except PidRefsDoesNotExist:
+                warn_msg = (
+                    "FileHashStore - delete_object: pid refs file does not exist for pid: "
+                    + ab_id
+                    + ". Skipping object deletion. Deleting pid metadata documents."
+                )
+                logging.warning(warn_msg)
+
+                # Remove metadata files if they exist
+                self.delete_metadata(pid)
+
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
+            except CidRefsDoesNotExist:
+                # Delete pid refs file
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(self._resolve_path("pid", pid))
+                )
+                # Remove metadata files if they exist
+                self.delete_metadata(pid)
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
+            except RefsFileExistsButCidObjMissing:
+                # Add pid refs file to be permanently deleted
+                pid_ref_abs_path = self._resolve_path("pid", pid)
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(pid_ref_abs_path)
+                )
+                # Remove pid from cid refs file
+                with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                    # Retrieve the cid
+                    pid_refs_cid = pid_ref_file.read()
+                cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
+                # Remove if the pid refs is found
+                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
+                    self._update_refs_file(cid_ref_abs_path, pid, "remove")
+                # Remove metadata files if they exist
+                self.delete_metadata(pid)
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
+            except PidNotFoundInCidRefsFile:
+                # Add pid refs file to be permanently deleted
+                pid_ref_abs_path = self._resolve_path("pid", pid)
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(pid_ref_abs_path)
+                )
+                # Remove metadata files if they exist
+                self.delete_metadata(pid)
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
+        finally:
+            # Release pid
+            end_sync_debug_msg = (
+                f"FileHashStore - delete_object: Releasing pid ({pid})"
+                + " from locked list"
             )
             if self.use_multiprocessing:
                 with self.object_condition_mp:
-                    # Wait for the pid to release if it's in use
-                    while pid in self.object_locked_pids_mp:
-                        logging.debug(sync_wait_msg)
-                        self.object_condition_mp.wait()
-                    # Modify object_locked_pids consecutively
-                    logging.debug(sync_begin_debug_msg)
-                    self.object_locked_pids_mp.append(pid)
+                    logging.debug(end_sync_debug_msg)
+                    self.object_locked_pids_mp.remove(pid)
+                    self.object_condition_mp.notify()
             else:
+                # Release pid
                 with self.object_condition:
-                    while pid in self.object_locked_pids:
+                    logging.debug(end_sync_debug_msg)
+                    self.object_locked_pids.remove(pid)
+                    self.object_condition.notify()
+
+    def delete_object_only(self, ab_id):
+        cid_refs_abs_path = self._resolve_path("cid", ab_id)
+        # If the refs file still exists, do not delete the object
+        if not os.path.exists(cid_refs_abs_path):
+            cid = ab_id
+            sync_begin_debug_msg = (
+                f"FileHashStore - delete_object: Cid ({cid}) to locked list."
+            )
+            sync_wait_msg = (
+                f"FileHashStore - delete_object: Cid ({cid}) is locked. Waiting."
+            )
+            if self.use_multiprocessing:
+                with self.reference_condition_mp:
+                    # Wait for the cid to release if it's in use
+                    while cid in self.reference_locked_cids_mp:
                         logging.debug(sync_wait_msg)
-                        self.object_condition.wait()
+                        self.reference_condition_mp.wait()
+                    # Modify reference_locked_cids consecutively
                     logging.debug(sync_begin_debug_msg)
-                    self.object_locked_pids.append(pid)
+                    self.reference_locked_cids_mp.append(cid)
+            else:
+                with self.reference_condition:
+                    while cid in self.reference_locked_cids:
+                        logging.debug(sync_wait_msg)
+                        self.reference_condition.wait()
+                    logging.debug(sync_begin_debug_msg)
+                    self.reference_locked_cids.append(cid)
 
             try:
-                # Before we begin deletion process, we look for the `cid` by calling
-                # `find_object` which will throw custom exceptions if there is an issue with
-                # the reference files, which help us determine the path to proceed with.
-                try:
-                    object_info_dict = self.find_object(pid)
-                    cid = object_info_dict.get("cid")
-
-                    # Proceed with next steps - cid has been retrieved without any issues
-                    # We must synchronize here based on the `cid` because multiple threads may
-                    # try to access the `cid_reference_file`
-                    sync_begin_debug_msg = (
-                        f"FileHashStore - delete_object: Cid ({cid}) to locked list."
-                    )
-                    sync_wait_msg = (
-                        f"FileHashStore - delete_object: Cid ({cid}) is locked."
-                        + " Waiting."
-                    )
-                    if self.use_multiprocessing:
-                        with self.reference_condition_mp:
-                            # Wait for the cid to release if it's in use
-                            while cid in self.reference_locked_cids_mp:
-                                logging.debug(sync_wait_msg)
-                                self.reference_condition_mp.wait()
-                            # Modify reference_locked_cids consecutively
-                            logging.debug(sync_begin_debug_msg)
-                            self.reference_locked_cids_mp.append(cid)
-                    else:
-                        with self.reference_condition:
-                            while cid in self.reference_locked_cids:
-                                logging.debug(sync_wait_msg)
-                                self.reference_condition.wait()
-                            logging.debug(sync_begin_debug_msg)
-                            self.reference_locked_cids.append(cid)
-
-                    try:
-                        cid_ref_abs_path = object_info_dict.get("cid_refs_path")
-                        pid_ref_abs_path = object_info_dict.get("pid_refs_path")
-                        # Add pid refs file to be permanently deleted
-                        objects_to_delete.append(
-                            self._rename_path_for_deletion(pid_ref_abs_path)
-                        )
-                        # Remove pid from cid reference file
-                        self._update_refs_file(cid_ref_abs_path, pid, "remove")
-                        # Delete cid reference file and object only if the cid refs file is empty
-                        if os.path.getsize(cid_ref_abs_path) == 0:
-                            debug_msg = (
-                                "FileHashStore - delete_object: cid_refs_file is empty (size == 0):"
-                                + f" {cid_ref_abs_path} - deleting cid refs file and data object."
-                            )
-                            logging.debug(debug_msg)
-                            objects_to_delete.append(
-                                self._rename_path_for_deletion(cid_ref_abs_path)
-                            )
-                            obj_real_path = object_info_dict.get("cid_object_path")
-                            objects_to_delete.append(
-                                self._rename_path_for_deletion(obj_real_path)
-                            )
-                        # Remove all files confirmed for deletion
-                        for obj in objects_to_delete:
-                            os.remove(obj)
-
-                        # Remove metadata files if they exist
-                        self.delete_metadata(pid)
-
-                        info_string = (
-                            "FileHashStore - delete_object: Successfully deleted references,"
-                            + f" metadata and object associated with pid: {pid}"
-                        )
-                        logging.info(info_string)
-                        return
-
-                    finally:
-                        # Release cid
-                        end_sync_debug_msg = (
-                            f"FileHashStore - delete_object: Releasing cid ({cid})"
-                            + " from locked list"
-                        )
-                        if self.use_multiprocessing:
-                            with self.reference_condition_mp:
-                                logging.debug(end_sync_debug_msg)
-                                self.reference_locked_cids_mp.remove(cid)
-                                self.reference_condition_mp.notify()
-                        else:
-                            with self.reference_condition:
-                                logging.debug(end_sync_debug_msg)
-                                self.reference_locked_cids.remove(cid)
-                                self.reference_condition.notify()
-
-                except PidRefsDoesNotExist:
-                    warn_msg = (
-                        "FileHashStore - delete_object: pid refs file does not exist for pid: "
-                        + ab_id
-                        + ". Skipping object deletion. Deleting pid metadata documents."
-                    )
-                    logging.warning(warn_msg)
-
-                    # Remove metadata files if they exist
-                    self.delete_metadata(pid)
-
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
-                except CidRefsDoesNotExist:
-                    # Delete pid refs file
-                    objects_to_delete.append(
-                        self._rename_path_for_deletion(self._resolve_path("pid", pid))
-                    )
-                    # Remove metadata files if they exist
-                    self.delete_metadata(pid)
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
-                except RefsFileExistsButCidObjMissing:
-                    # Add pid refs file to be permanently deleted
-                    pid_ref_abs_path = self._resolve_path("pid", pid)
-                    objects_to_delete.append(
-                        self._rename_path_for_deletion(pid_ref_abs_path)
-                    )
-                    # Remove pid from cid refs file
-                    with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
-                        # Retrieve the cid
-                        pid_refs_cid = pid_ref_file.read()
-                    cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
-                    # Remove if the pid refs is found
-                    if self._is_string_in_refs_file(pid, cid_ref_abs_path):
-                        self._update_refs_file(cid_ref_abs_path, pid, "remove")
-                    # Remove metadata files if they exist
-                    self.delete_metadata(pid)
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
-                except PidNotFoundInCidRefsFile:
-                    # Add pid refs file to be permanently deleted
-                    pid_ref_abs_path = self._resolve_path("pid", pid)
-                    objects_to_delete.append(
-                        self._rename_path_for_deletion(pid_ref_abs_path)
-                    )
-                    # Remove metadata files if they exist
-                    self.delete_metadata(pid)
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
+                self._delete("objects", cid)
             finally:
-                # Release pid
+                # Release cid
                 end_sync_debug_msg = (
-                    f"FileHashStore - delete_object: Releasing pid ({pid})"
+                    f"FileHashStore - delete_object: Releasing cid ({cid})"
                     + " from locked list"
                 )
                 if self.use_multiprocessing:
-                    with self.object_condition_mp:
+                    with self.reference_condition_mp:
                         logging.debug(end_sync_debug_msg)
-                        self.object_locked_pids_mp.remove(pid)
-                        self.object_condition_mp.notify()
+                        self.reference_locked_cids_mp.remove(cid)
+                        self.reference_condition_mp.notify()
                 else:
-                    # Release pid
-                    with self.object_condition:
+                    with self.reference_condition:
                         logging.debug(end_sync_debug_msg)
-                        self.object_locked_pids.remove(pid)
-                        self.object_condition.notify()
+                        self.reference_locked_cids.remove(cid)
+                        self.reference_condition.notify()
 
     def delete_metadata(self, pid, format_id=None):
         logging.debug(

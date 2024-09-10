@@ -420,9 +420,9 @@ class FileHashStore(HashStore):
                     checked_properties[key] = int(value)
                 except Exception as err:
                     exception_string = (
-                            "FileHashStore - _validate_properties: Unexpected exception when"
-                            " attempting to ensure store depth and width are integers. Details: "
-                            + str(err)
+                        "FileHashStore - _validate_properties: Unexpected exception when"
+                        " attempting to ensure store depth and width are integers. Details: "
+                        + str(err)
                     )
                     logging.debug(exception_string)
                     raise ValueError(exception_string)
@@ -1392,9 +1392,9 @@ class FileHashStore(HashStore):
                     # Object must also exist in order to return the cid retrieved
                     if not self._exists("objects", pid_refs_cid):
                         err_msg = (
-                                f"FileHashStore - find_object: Refs file found for pid ({pid}) at"
-                                + pid_ref_abs_path
-                                + f", but object referenced does not exist, cid: {pid_refs_cid}"
+                            f"FileHashStore - find_object: Refs file found for pid ({pid}) at"
+                            + pid_ref_abs_path
+                            + f", but object referenced does not exist, cid: {pid_refs_cid}"
                         )
                         logging.error(err_msg)
                         raise RefsFileExistsButCidObjMissing(err_msg)
@@ -1403,9 +1403,9 @@ class FileHashStore(HashStore):
                         metadata_directory = self._computehash(pid)
                         metadata_rel_path = "/".join(self._shard(metadata_directory))
                         sysmeta_full_path = (
-                                self._get_store_path("metadata")
-                                / metadata_rel_path
-                                / sysmeta_doc_name
+                            self._get_store_path("metadata")
+                            / metadata_rel_path
+                            / sysmeta_doc_name
                         )
                         obj_info_dict = {
                             "cid": pid_refs_cid,
@@ -1424,23 +1424,23 @@ class FileHashStore(HashStore):
                 else:
                     # If not, it is an orphan pid refs file
                     err_msg = (
-                            "FileHashStore - find_object: pid refs file exists with cid: "
-                            + f"{pid_refs_cid} for pid: {pid}"
-                            + f", but is missing from cid refs file: {cid_ref_abs_path}"
+                        "FileHashStore - find_object: pid refs file exists with cid: "
+                        + f"{pid_refs_cid} for pid: {pid}"
+                        + f", but is missing from cid refs file: {cid_ref_abs_path}"
                     )
                     logging.error(err_msg)
                     raise PidNotFoundInCidRefsFile(err_msg)
             else:
                 err_msg = (
-                        f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
-                        + f", but cid refs file not found: {cid_ref_abs_path} for pid: {pid}"
+                    f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
+                    + f", but cid refs file not found: {cid_ref_abs_path} for pid: {pid}"
                 )
                 logging.error(err_msg)
                 raise CidRefsDoesNotExist(err_msg)
         else:
             err_msg = (
-                    f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
-                    + pid_ref_abs_path
+                f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
+                + pid_ref_abs_path
             )
             logging.error(err_msg)
             raise PidRefsDoesNotExist(err_msg)

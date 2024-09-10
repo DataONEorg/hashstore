@@ -10,12 +10,9 @@ import time
 import pytest
 
 from hashstore.filehashstore_exceptions import (
-    CidRefsDoesNotExist,
     NonMatchingChecksum,
     NonMatchingObjSize,
-    PidNotFoundInCidRefsFile,
     PidRefsDoesNotExist,
-    RefsFileExistsButCidObjMissing,
     UnsupportedAlgorithm,
 )
 
@@ -197,7 +194,7 @@ def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
 
 
 def test_store_object_additional_algorithm_hyphen_lowercase(pids, store):
-    """Test store object accepts an with additional algo that's supported in lowercase."""
+    """Test store object accepts an additional algo that's supported in lowercase."""
     test_dir = "tests/testdata/"
     entity = "objects"
     pid = "jtao.1700.1"

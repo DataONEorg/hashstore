@@ -1363,8 +1363,8 @@ class FileHashStore(HashStore):
                         )
                         obj_info_dict = {
                             "cid": pid_refs_cid,
-                            "cid_object_path": self._resolve_path(
-                                "objects", pid_refs_cid
+                            "cid_object_path": self._get_hashstore_data_object_path(
+                                pid_refs_cid
                             ),
                             "cid_refs_path": cid_ref_abs_path,
                             "pid_refs_path": pid_ref_abs_path,
@@ -2299,18 +2299,6 @@ class FileHashStore(HashStore):
         hex_digest = hashobj.hexdigest()
         return hex_digest
 
-    def _exists(self, entity, file):
-        """Check whether a given file id or path exists on disk.
-
-        :param str entity: Desired entity type (e.g., "objects", "metadata").
-        :param str file: The name of the file to check.
-
-        :return: True if the file exists.
-        :rtype: bool
-        """
-        file_exists = bool(self._resolve_path(entity, file))
-        return file_exists
-
     def _shard(self, digest):
         """Generates a list given a digest of `self.depth` number of tokens with width
         `self.width` from the first part of the digest plus the remainder.
@@ -2337,6 +2325,21 @@ class FileHashStore(HashStore):
 
         return hierarchical_list
 
+    def _exists(self, entity, file):
+        """Check whether a given file id or path exists on disk.
+
+        :param str entity: Desired entity type (e.g., "objects", "metadata").
+        :param str file: The name of the file to check.
+
+        :return: True if the file exists.
+        :rtype: bool
+        """
+        if entity == "objects":
+            return bool(self._get_hashstore_data_object_path(file))
+        else:
+            file_exists = bool(self._resolve_path(entity, file))
+        return file_exists
+
     def _open(self, entity, file, mode="rb"):
         """Return open buffer object from given id or path. Caller is responsible
         for closing the stream.
@@ -2348,9 +2351,12 @@ class FileHashStore(HashStore):
         :return: An `io` stream dependent on the `mode`.
         :rtype: io.BufferedReader
         """
-        realpath = self._resolve_path(entity, file)
-        if realpath is None:
-            raise IOError(f"Could not locate file: {file}")
+        if entity == "objects":
+            return bool(self._get_hashstore_data_object_path(file))
+        else:
+            realpath = self._resolve_path(entity, file)
+            if realpath is None:
+                raise IOError(f"Could not locate file: {file}")
 
         # pylint: disable=W1514
         # mode defaults to "rb"
@@ -2364,9 +2370,12 @@ class FileHashStore(HashStore):
         :param str entity: Desired entity type (ex. "objects", "metadata").
         :param str file: Address ID or path of file.
         """
-        realpath = self._resolve_path(entity, file)
-        if realpath is None:
-            return None
+        if entity == "objects":
+            return bool(self._get_hashstore_data_object_path(file))
+        else:
+            realpath = self._resolve_path(entity, file)
+            if realpath is None:
+                return None
 
         try:
             os.remove(realpath)
@@ -2437,16 +2446,7 @@ class FileHashStore(HashStore):
         :rtype: str
         """
         # Check for relative path.
-        if entity == "objects":
-            rel_root = self.objects
-            relpath = os.path.join(rel_root, file)
-            if os.path.isfile(relpath):
-                return relpath
-            else:
-                abspath = self._build_path(entity, file)
-                if os.path.isfile(abspath):
-                    return abspath
-        elif entity == "metadata":
+        if entity == "metadata":
             if os.path.isfile(file):
                 return file
             rel_root = self.metadata
@@ -2456,9 +2456,36 @@ class FileHashStore(HashStore):
         else:
             exception_string = (
                 "FileHashStore - _resolve_path: entity must be"
-                + " 'objects', 'metadata', 'cid' or 'pid"
+                + " 'objects', 'metadata', 'cid' or 'pid'. Supplied: "
+                + entity
             )
             raise ValueError(exception_string)
+
+    def _get_hashstore_data_object_path(self, cid):
+        """Return the expected path to a hashstore data object that exists.
+
+        :param str cid: Content identifier
+
+        :return: Path to the data object referenced by the pid
+        :rtype: Path
+        """
+        paths = self._shard(cid)
+        root_dir = self._get_store_path("objects")
+        absolute_path = os.path.join(root_dir, *paths)
+
+        if os.path.isfile(absolute_path):
+            return absolute_path
+        else:
+            # Check the relative path, for usage convenience
+            rel_root = self.objects
+            relpath = os.path.join(rel_root, cid)
+            if os.path.isfile(relpath):
+                return relpath
+            else:
+                raise FileNotFoundError(
+                    "FileHashStore - hashstore data object does not exist for cid: "
+                    "" + cid
+                )
 
     def _get_hashstore_pid_refs_path(self, pid):
         """Return the expected path to a pid reference file. The path may or may not exist.

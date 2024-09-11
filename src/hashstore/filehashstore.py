@@ -1496,7 +1496,7 @@ class FileHashStore(HashStore):
 
         # Objects are stored with their content identifier based on the store algorithm
         object_cid = hex_digests.get(self.algorithm)
-        abs_file_path = self._build_hashstore_data_object_path(object_cid, extension)
+        abs_file_path = self._build_hashstore_data_object_path(object_cid)
 
         # Only move file if it doesn't exist. We do not check before we create the tmp
         # file and calculate the hex digests because the given checksum could be incorrect.
@@ -2451,25 +2451,17 @@ class FileHashStore(HashStore):
         except FileExistsError:
             assert os.path.isdir(path), f"expected {path} to be a directory"
 
-    def _build_hashstore_data_object_path(self, hash_id, extension=""):
+    def _build_hashstore_data_object_path(self, hash_id):
         """Build the absolute file path for a given content identifier
 
-        :param str entity: Desired entity type (ex. "objects", "metadata").
         :param str hash_id: A hash ID to build a file path for.
-        :param str extension: An optional file extension to append to the file path.
 
         :return: An absolute file path for the specified hash ID.
         :rtype: str
         """
         paths = self._shard(hash_id)
         root_dir = self._get_store_path("objects")
-
-        if extension and not extension.startswith(os.extsep):
-            extension = os.extsep + extension
-        elif not extension:
-            extension = ""
-
-        absolute_path = os.path.join(root_dir, *paths) + extension
+        absolute_path = os.path.join(root_dir, *paths)
         return absolute_path
 
     def _get_hashstore_data_object_path(self, cid_or_path):
@@ -2480,12 +2472,10 @@ class FileHashStore(HashStore):
         :return: Path to the data object referenced by the pid
         :rtype: Path
         """
-        paths = self._shard(cid_or_path)
-        root_dir = self._get_store_path("objects")
-        absolute_path = os.path.join(root_dir, *paths)
+        expected_abs_path = self._build_hashstore_data_object_path(cid_or_path)
 
-        if os.path.isfile(absolute_path):
-            return absolute_path
+        if os.path.isfile(expected_abs_path):
+            return expected_abs_path
         else:
             # Check the relative path, for usage convenience
             rel_root = self.objects

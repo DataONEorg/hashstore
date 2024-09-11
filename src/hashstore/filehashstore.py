@@ -1496,7 +1496,7 @@ class FileHashStore(HashStore):
 
         # Objects are stored with their content identifier based on the store algorithm
         object_cid = hex_digests.get(self.algorithm)
-        abs_file_path = self._build_path("objects", object_cid, extension)
+        abs_file_path = self._build_hashstore_data_object_path(object_cid, extension)
 
         # Only move file if it doesn't exist. We do not check before we create the tmp
         # file and calculate the hex digests because the given checksum could be incorrect.
@@ -2326,6 +2326,35 @@ class FileHashStore(HashStore):
 
         return hierarchical_list
 
+    def _count(self, entity):
+        """Return the count of the number of files in the `root` directory.
+
+        :param str entity: Desired entity type (ex. "objects", "metadata").
+
+        :return: Number of files in the directory.
+        :rtype: int
+        """
+        count = 0
+        if entity == "objects":
+            directory_to_count = self.objects
+        elif entity == "metadata":
+            directory_to_count = self.metadata
+        elif entity == "pid":
+            directory_to_count = self.pids
+        elif entity == "cid":
+            directory_to_count = self.cids
+        elif entity == "tmp":
+            directory_to_count = self.objects + "tmp"
+        else:
+            raise ValueError(
+                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
+            )
+
+        for _, _, files in os.walk(directory_to_count):
+            for _ in files:
+                count += 1
+        return count
+
     def _exists(self, entity, file):
         """Check whether a given file id or path exists on disk.
 
@@ -2422,8 +2451,8 @@ class FileHashStore(HashStore):
         except FileExistsError:
             assert os.path.isdir(path), f"expected {path} to be a directory"
 
-    def _build_path(self, entity, hash_id, extension=""):
-        """Build the absolute file path for a given hash ID with an optional file extension.
+    def _build_hashstore_data_object_path(self, hash_id, extension=""):
+        """Build the absolute file path for a given content identifier
 
         :param str entity: Desired entity type (ex. "objects", "metadata").
         :param str hash_id: A hash ID to build a file path for.
@@ -2433,7 +2462,7 @@ class FileHashStore(HashStore):
         :rtype: str
         """
         paths = self._shard(hash_id)
-        root_dir = self._get_store_path(entity)
+        root_dir = self._get_store_path("objects")
 
         if extension and not extension.startswith(os.extsep):
             extension = os.extsep + extension
@@ -2554,35 +2583,6 @@ class FileHashStore(HashStore):
             return file_paths
         else:
             return None
-
-    def _count(self, entity):
-        """Return the count of the number of files in the `root` directory.
-
-        :param str entity: Desired entity type (ex. "objects", "metadata").
-
-        :return: Number of files in the directory.
-        :rtype: int
-        """
-        count = 0
-        if entity == "objects":
-            directory_to_count = self.objects
-        elif entity == "metadata":
-            directory_to_count = self.metadata
-        elif entity == "pid":
-            directory_to_count = self.pids
-        elif entity == "cid":
-            directory_to_count = self.cids
-        elif entity == "tmp":
-            directory_to_count = self.objects + "tmp"
-        else:
-            raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
-            )
-
-        for _, _, files in os.walk(directory_to_count):
-            for _ in files:
-                count += 1
-        return count
 
     # Other Static Methods
 

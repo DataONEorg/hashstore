@@ -1119,15 +1119,15 @@ def test_get_real_path_with_metadata_id(store, pids):
         assert os.path.exists(metadata_abs_path)
 
 
-def test_build_path(store, pids):
-    """Test build_abs_path builds the absolute file path."""
+def test_build_hashstore_data_object_path(store, pids):
+    """Test _build_hashstore_data_object_path builds the hashstore data object file path."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         _ = store._store_and_validate_data(pid, path)
         # pylint: disable=W0212
-        abs_path = store._build_path(entity, pids[pid][store.algorithm])
+        abs_path = store._build_hashstore_data_object_path(pids[pid][store.algorithm])
         assert os.path.exists(abs_path)
 
 

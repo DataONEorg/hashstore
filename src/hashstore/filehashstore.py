@@ -2312,7 +2312,8 @@ class FileHashStore(HashStore):
 
         :param str checksum: The checksum string to be split into tokens.
 
-        :return: A list where each element is a token of fixed width, with any leftover characters as the last element.
+        :return: A list where each element is a token of fixed width, with any leftover
+        characters as the last element.
         :rtype: list
         """
 

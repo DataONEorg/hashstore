@@ -1049,7 +1049,7 @@ def test_delete_object_pid_refs_file_deleted(pids, store):
         _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
-        pid_refs_file_path = store._resolve_path("pid", pid)
+        pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
         assert not os.path.exists(pid_refs_file_path)
 
 

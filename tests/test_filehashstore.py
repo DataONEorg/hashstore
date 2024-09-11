@@ -854,7 +854,7 @@ def test_find_object_cid_refs_not_found(pids, store):
         _object_metadata = store.store_object(pid, path)
 
         # Place the wrong cid into the pid refs file that has already been created
-        pid_ref_abs_path = store._resolve_path("pid", pid)
+        pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
         with open(pid_ref_abs_path, "w", encoding="utf8") as pid_ref_file:
             pid_ref_file.seek(0)
             pid_ref_file.write("intentionally.wrong.pid")
@@ -1195,14 +1195,14 @@ def test_resolve_path_metadata(pids, store):
         assert calculated_metadata_path == metadata_resolved_path
 
 
-def test_resolve_path_refs_pid(pids, store):
+def test_get_hashstore_pid_refs_path(pids, store):
     """Confirm resolve path returns correct object pid refs path"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = Path(test_dir + pid.replace("/", "_"))
         _object_metadata = store.store_object(pid, path)
 
-        resolved_pid_ref_abs_path = store._resolve_path("pid", pid)
+        resolved_pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
         pid_refs_metadata_hashid = store._computehash(pid)
         calculated_pid_ref_path = (
             store.pids + "/" + "/".join(store._shard(pid_refs_metadata_hashid))

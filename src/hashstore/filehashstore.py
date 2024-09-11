@@ -650,7 +650,7 @@ class FileHashStore(HashStore):
         try:
             # Prepare files and paths
             tmp_root_path = self._get_store_path("refs") / "tmp"
-            pid_refs_path = self._resolve_path("pid", pid)
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
             cid_refs_path = self._resolve_path("cid", cid)
             # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
             self._create_path(Path(os.path.dirname(pid_refs_path)))
@@ -1037,8 +1037,9 @@ class FileHashStore(HashStore):
                 return
             except CidRefsDoesNotExist:
                 # Delete pid refs file
+                pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
                 objects_to_delete.append(
-                    self._rename_path_for_deletion(self._resolve_path("pid", pid))
+                    self._rename_path_for_deletion(pid_ref_abs_path)
                 )
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
@@ -1048,7 +1049,7 @@ class FileHashStore(HashStore):
                 return
             except RefsFileExistsButCidObjMissing:
                 # Add pid refs file to be permanently deleted
-                pid_ref_abs_path = self._resolve_path("pid", pid)
+                pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
                 objects_to_delete.append(
                     self._rename_path_for_deletion(pid_ref_abs_path)
                 )
@@ -1068,7 +1069,7 @@ class FileHashStore(HashStore):
                 return
             except PidNotFoundInCidRefsFile:
                 # Add pid refs file to be permanently deleted
-                pid_ref_abs_path = self._resolve_path("pid", pid)
+                pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
                 objects_to_delete.append(
                     self._rename_path_for_deletion(pid_ref_abs_path)
                 )
@@ -1329,7 +1330,7 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid")
 
-        pid_ref_abs_path = self._resolve_path("pid", pid)
+        pid_ref_abs_path = self._get_hashstore_pid_refs_path(pid)
         if os.path.exists(pid_ref_abs_path):
             # Read the file to get the cid from the pid reference
             with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
@@ -2035,7 +2036,7 @@ class FileHashStore(HashStore):
         )
         logging.debug(debug_msg)
         if pid_refs_path is None:
-            pid_refs_path = self._resolve_path("pid", pid)
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
         if cid_refs_path is None:
             cid_refs_path = self._resolve_path("cid", cid)
 
@@ -2455,11 +2456,6 @@ class FileHashStore(HashStore):
             # Note, we skip checking whether the file exists for refs
             cid_ref_file_abs_path = self._build_path(entity, file)
             return cid_ref_file_abs_path
-        elif entity == "pid":
-            # Note, we skip checking whether the file exists for refs
-            hash_id = self._computehash(file, self.algorithm)
-            pid_ref_file_abs_path = self._build_path(entity, hash_id)
-            return pid_ref_file_abs_path
         else:
             exception_string = (
                 "FileHashStore - _resolve_path: entity must be"
@@ -2467,10 +2463,25 @@ class FileHashStore(HashStore):
             )
             raise ValueError(exception_string)
 
+    def _get_hashstore_pid_refs_path(self, pid):
+        """Return the expected path to a pid reference file. The path may or may not exist.
+
+        :param str pid: Persistent or authority-based identifier
+
+        :return: Path to pid reference file
+        :rtype: Path
+        """
+        hash_id = self._computehash(pid, self.algorithm)
+        root_dir = self._get_store_path("pid")
+        directories_and_path = self._shard(hash_id)
+        pid_ref_file_abs_path = os.path.join(root_dir, *directories_and_path)
+        return pid_ref_file_abs_path
+
     def _get_store_path(self, entity):
         """Return a path object of the root directory of the store.
 
-        :param str entity: Desired entity type: "objects" or "metadata"
+        :param str entity: Desired entity type: "objects", "metadata", "refs", "cid" and "pid".
+        Note, "cid" and "pid" are refs specific directories.
 
         :return: Path to requested store entity type
         :rtype: Path

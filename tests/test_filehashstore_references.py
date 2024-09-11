@@ -36,7 +36,7 @@ def test_tag_object_pid_refs_file_exists(pids, store):
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(None, path)
         store.tag_object(pid, object_metadata.cid)
-        pid_refs_file_path = store._resolve_path("pid", pid)
+        pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
         assert os.path.exists(pid_refs_file_path)
 
 
@@ -59,7 +59,7 @@ def test_tag_object_pid_refs_file_content(pids, store):
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(None, path)
         store.tag_object(pid, object_metadata.cid)
-        pid_refs_file_path = store._resolve_path("pid", pid)
+        pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
         with open(pid_refs_file_path, "r", encoding="utf8") as f:
             pid_refs_cid = f.read()
         assert pid_refs_cid == object_metadata.cid
@@ -412,7 +412,7 @@ def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
         store._create_path(os.path.dirname(cid_ref_abs_path))
         shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
         # Write the pid refs file and move it where it needs to be with a bad cid
-        pid_ref_abs_path = store._resolve_path("pid", pid)
+        pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
         print(pid_ref_abs_path)
         store._create_path(os.path.dirname(pid_ref_abs_path))
         tmp_root_path = store._get_store_path("refs") / "tmp"
@@ -427,7 +427,7 @@ def test_verify_hashstore_references_cid_refs_file_missing(pids, store):
     """Test _verify_hashstore_references throws exception when cid refs file is missing."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
-        pid_ref_abs_path = store._resolve_path("pid", pid)
+        pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
         store._create_path(os.path.dirname(pid_ref_abs_path))
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, "bad_cid", "pid")
@@ -449,7 +449,7 @@ def test_verify_hashstore_references_cid_refs_file_missing_pid(pids, store):
         store._create_path(os.path.dirname(cid_ref_abs_path))
         shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
         # Now write the pid refs file, both cid and pid refs must be present
-        pid_ref_abs_path = store._resolve_path("pid", pid)
+        pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
         store._create_path(os.path.dirname(pid_ref_abs_path))
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")
@@ -473,7 +473,7 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
         store._create_path(os.path.dirname(cid_ref_abs_path))
         shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
         # Now write the pid refs with expected values
-        pid_ref_abs_path = store._resolve_path("pid", pid)
+        pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
         store._create_path(os.path.dirname(pid_ref_abs_path))
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")

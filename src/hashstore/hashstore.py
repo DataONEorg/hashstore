@@ -78,20 +78,6 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def verify_object(
-        self, object_metadata, checksum, checksum_algorithm, expected_file_size
-    ):
-        """Confirm equality of content in an ObjectMetadata. The `verify_object` method verifies
-        that the content in the provided `object_metadata` matches the specified values.
-
-        :param ObjectMetadata object_metadata: ObjectMetadata object.
-        :param str checksum: Value of the checksum.
-        :param str checksum_algorithm: Algorithm of the checksum.
-        :param int expected_file_size: Size of the temporary file.
-        """
-        raise NotImplementedError()
-
-    @abstractmethod
     def store_metadata(self, pid, metadata, format_id):
         """Add or update metadata, such as `sysmeta`, to disk using the given path/stream. The
         `store_metadata` method uses a persistent identifier `pid` and a metadata `format_id`
@@ -146,6 +132,20 @@ class HashStore(ABC):
         found in its respective metadata directory.
 
         :param str pid: Persistent or Authority-based identifier.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def delete_invalid_object(
+        self, object_metadata, checksum, checksum_algorithm, expected_file_size
+    ):
+        """Confirm equality of content in an ObjectMetadata. The `delete_invalid_object` method
+        will delete a data object if the object_metadata does not match the specified values.
+
+        :param ObjectMetadata object_metadata: ObjectMetadata object.
+        :param str checksum: Value of the checksum.
+        :param str checksum_algorithm: Algorithm of the checksum.
+        :param int expected_file_size: Size of the temporary file.
         """
         raise NotImplementedError()
 

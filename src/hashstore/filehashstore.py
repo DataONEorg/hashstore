@@ -580,7 +580,7 @@ class FileHashStore(HashStore):
 
         return object_metadata
 
-    def verify_object(
+    def delete_invalid_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
         self._check_string(checksum, "checksum")
@@ -603,16 +603,24 @@ class FileHashStore(HashStore):
             checksum_algorithm_checked = self._clean_algorithm(checksum_algorithm)
 
             # Throws exceptions if there's an issue
-            self._verify_object_information(
-                pid=None,
-                checksum=checksum,
-                checksum_algorithm=checksum_algorithm_checked,
-                entity="objects",
-                hex_digests=object_metadata_hex_digests,
-                tmp_file_name=None,
-                tmp_file_size=object_metadata_file_size,
-                file_size_to_validate=expected_file_size,
-            )
+            try:
+                self._verify_object_information(
+                    pid=None,
+                    checksum=checksum,
+                    checksum_algorithm=checksum_algorithm_checked,
+                    entity="objects",
+                    hex_digests=object_metadata_hex_digests,
+                    tmp_file_name=None,
+                    tmp_file_size=object_metadata_file_size,
+                    file_size_to_validate=expected_file_size,
+                )
+            except NonMatchingObjSize as nmose:
+                self.delete_object_only(object_metadata.cid)
+                logging.error(nmose)
+                raise nmose
+            except NonMatchingChecksum as mmce:
+                self.delete_object_only(object_metadata.cid)
+                raise mmce
             logging.info(
                 "FileHashStore - verify_object: object has been validated for cid: %s",
                 object_metadata.cid,
@@ -2006,10 +2014,6 @@ class FileHashStore(HashStore):
                         logging.debug(exception_string_for_pid)
                         raise NonMatchingChecksum(exception_string_for_pid)
                     else:
-                        # Delete the object
-                        cid = hex_digests[self.algorithm]
-                        cid_abs_path = self._get_hashstore_cid_refs_path(cid)
-                        self._delete(entity, str(cid_abs_path))
                         logging.debug(exception_string)
                         raise NonMatchingChecksum(exception_string)
 

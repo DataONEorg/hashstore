@@ -1772,7 +1772,7 @@ class FileHashStore(HashStore):
     def _update_refs_file(self, refs_file_path, ref_id, update_type):
         """Add or remove an existing ref from a refs file.
 
-        :param str refs_file_path: Absolute path to the refs file.
+        :param path refs_file_path: Absolute path to the refs file.
         :param str ref_id: Authority-based or persistent identifier of the object.
         :param str update_type: 'add' or 'remove'
         """
@@ -1829,7 +1829,7 @@ class FileHashStore(HashStore):
         """Check a reference file for a ref_id (`cid` or `pid`).
 
         :param str ref_id: Authority-based, persistent identifier or content identifier
-        :param str refs_file_path: Path to the refs file
+        :param path refs_file_path: Path to the refs file
 
         :return: pid_found
         :rtype: boolean
@@ -2030,8 +2030,8 @@ class FileHashStore(HashStore):
 
         :param str pid: Authority-based or persistent identifier.
         :param str cid: Content identifier.
-        :param str pid_refs_path: Path to pid refs file
-        :param str cid_refs_path: Path to cid refs file
+        :param path pid_refs_path: Path to pid refs file
+        :param path cid_refs_path: Path to cid refs file
         :param str additional_log_string: String to append to exception statement
         """
         debug_msg = (

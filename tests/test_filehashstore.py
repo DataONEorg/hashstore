@@ -754,7 +754,7 @@ def test_verify_object_information_incorrect_size_with_pid(pids, store):
         # pylint: disable=W0212
         tmp_file = store._mktmpfile(objects_tmp_folder)
         assert os.path.isfile(tmp_file.name)
-        with pytest.raises(ValueError):
+        with pytest.raises(NonMatchingObjSize):
             store._verify_object_information(
                 "Test_Pid",
                 checksum,
@@ -838,7 +838,7 @@ def test_find_object_refs_exist_but_obj_not_found(pids, store):
         store.store_object(pid, path)
 
         cid = store.find_object(pid).get("cid")
-        obj_path = store._resolve_path("objects", cid)
+        obj_path = store._get_hashstore_data_object_path(cid)
         os.remove(obj_path)
 
         with pytest.raises(RefsFileExistsButCidObjMissing):
@@ -1077,8 +1077,9 @@ def test_get_real_path_file_does_not_exist(store):
     """Test get_real_path returns None when object does not exist."""
     entity = "objects"
     test_path = "tests/testdata/helloworld.txt"
-    real_path_exists = store._resolve_path(entity, test_path)
-    assert real_path_exists is None
+    with pytest.raises(FileNotFoundError):
+        real_path_exists = store._get_hashstore_data_object_path(test_path)
+    # assert real_path_exists is None
 
 
 def test_get_real_path_with_object_id(store, pids):
@@ -1088,7 +1089,7 @@ def test_get_real_path_with_object_id(store, pids):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
-        obj_abs_path = store._resolve_path(entity, object_metadata.cid)
+        obj_abs_path = store._get_hashstore_data_object_path(object_metadata.cid)
         assert os.path.exists(obj_abs_path)
 
 
@@ -1101,7 +1102,7 @@ def test_get_real_path_with_object_id_sharded(pids, store):
         object_metadata = store._store_and_validate_data(pid, path)
         object_metadata_shard = store._shard(object_metadata.cid)
         object_metadata_shard_path = "/".join(object_metadata_shard)
-        obj_abs_path = store._resolve_path(entity, object_metadata_shard_path)
+        obj_abs_path = store._get_hashstore_data_object_path(object_metadata_shard_path)
         assert os.path.exists(obj_abs_path)
 
 
@@ -1114,19 +1115,8 @@ def test_get_real_path_with_metadata_id(store, pids):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         metadata_cid = store.store_metadata(pid, syspath, format_id)
-        metadata_abs_path = store._resolve_path(entity, metadata_cid)
+        metadata_abs_path = store._get_hashstore_metadata_path(metadata_cid)
         assert os.path.exists(metadata_abs_path)
-
-
-def test_get_real_path_with_bad_entity(store, pids):
-    """Test get_real_path returns absolute path given an object id."""
-    test_dir = "tests/testdata/"
-    entity = "bad_entity"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store._store_and_validate_data(pid, path)
-        with pytest.raises(ValueError):
-            store._resolve_path(entity, object_metadata.cid)
 
 
 def test_build_path(store, pids):
@@ -1167,7 +1157,7 @@ def test_resolve_path_objects(pids, store):
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.cid
 
-        obj_resolved_path = store._resolve_path("objects", cid)
+        obj_resolved_path = store._get_hashstore_data_object_path(cid)
         calculated_obj_path = store.objects + "/" + "/".join(store._shard(cid))
 
         assert calculated_obj_path == obj_resolved_path
@@ -1187,7 +1177,9 @@ def test_resolve_path_metadata(pids, store):
         rel_path = "/".join(store._shard(metadata_directory))
         full_path_without_dir = rel_path + "/" + metadata_document_name
 
-        metadata_resolved_path = store._resolve_path("metadata", full_path_without_dir)
+        metadata_resolved_path = store._get_hashstore_metadata_path(
+            full_path_without_dir
+        )
         calculated_metadata_path = (
             store.metadata + "/" + rel_path + "/" + metadata_document_name
         )

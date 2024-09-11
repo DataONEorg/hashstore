@@ -1176,7 +1176,6 @@ class FileHashStore(HashStore):
                 logging.info(info_string)
         else:
             # Delete a specific metadata file
-            entity = "metadata"
             pid_doc = self._computehash(pid + checked_format_id)
             # Wait for the pid to release if it's in use
             sync_begin_debug_msg = (
@@ -1205,7 +1204,7 @@ class FileHashStore(HashStore):
                     self.metadata_locked_docs.append(pid_doc)
             try:
                 full_path_without_directory = rel_path + "/" + pid_doc
-                self._delete(entity, full_path_without_directory)
+                self._delete("metadata", full_path_without_directory)
                 info_string = (
                     "FileHashStore - delete_metadata: Successfully deleted metadata for pid:"
                     + f" {pid} for format_id: {format_id}"
@@ -1496,9 +1495,8 @@ class FileHashStore(HashStore):
         )
 
         # Objects are stored with their content identifier based on the store algorithm
-        entity = "objects"
         object_cid = hex_digests.get(self.algorithm)
-        abs_file_path = self._build_path(entity, object_cid, extension)
+        abs_file_path = self._build_path("objects", object_cid, extension)
 
         # Only move file if it doesn't exist. We do not check before we create the tmp
         # file and calculate the hex digests because the given checksum could be incorrect.
@@ -1508,7 +1506,7 @@ class FileHashStore(HashStore):
                 pid,
                 checksum,
                 checksum_algorithm,
-                entity,
+                "objects",
                 hex_digests,
                 tmp_file_name,
                 tmp_file_size,
@@ -1554,21 +1552,23 @@ class FileHashStore(HashStore):
                             + " not be created and/or tagged.",
                         )
                         logging.debug(debug_msg)
-                        self._delete(entity, abs_file_path)
+                        self._delete("objects", abs_file_path)
                         raise err
-
-                logging.debug(
-                    "FileHashStore - _move_and_get_checksums: Deleting temporary file: %s",
-                    tmp_file_name,
-                )
-                self._delete(entity, tmp_file_name)
-                err_msg = (
-                    f"Object has not been stored for pid: {pid} - an unexpected error has occurred"
-                    + f" when moving tmp file to: {object_cid}. Reference files will not be"
-                    + f" created and/or tagged. Error: {err}"
-                )
-                logging.warning("FileHashStore - _move_and_get_checksums: %s", err_msg)
-                raise
+                else:
+                    logging.debug(
+                        "FileHashStore - _move_and_get_checksums: Deleting temporary file: %s",
+                        tmp_file_name,
+                    )
+                    self._delete("tmp", tmp_file_name)
+                    err_msg = (
+                        f"Object has not been stored for pid: {pid} - an unexpected error has "
+                        f"occurred when moving tmp file to: {object_cid}. Reference files will "
+                        f"not be created and/or tagged. Error: {err}"
+                    )
+                    logging.warning(
+                        "FileHashStore - _move_and_get_checksums: %s", err_msg
+                    )
+                    raise
         else:
             # If the data object already exists, do not move the file but attempt to verify it
             try:
@@ -1576,7 +1576,7 @@ class FileHashStore(HashStore):
                     pid,
                     checksum,
                     checksum_algorithm,
-                    entity,
+                    "objects",
                     hex_digests,
                     tmp_file_name,
                     tmp_file_size,
@@ -1601,9 +1601,10 @@ class FileHashStore(HashStore):
                 logging.debug(exception_string)
                 raise NonMatchingChecksum(exception_string) from nmce
             finally:
-                # Delete the temporary file, the data object already exists, so it is redundant
-                # No exception is thrown so 'store_object' can proceed to tag object
-                self._delete(entity, tmp_file_name)
+                # Ensure that the tmp file has been removed, the data object already exists, so it
+                # is redundant. No exception is thrown so 'store_object' can proceed to tag object
+                if os.path.exists(tmp_file_name):
+                    self._delete("tmp", tmp_file_name)
 
         return object_cid, tmp_file_size, hex_digests
 
@@ -2335,10 +2336,12 @@ class FileHashStore(HashStore):
         :rtype: bool
         """
         if entity == "objects":
-            return bool(self._get_hashstore_data_object_path(file))
-        else:
-            file_exists = bool(self._resolve_path(entity, file))
-        return file_exists
+            try:
+                return bool(self._get_hashstore_data_object_path(file))
+            except FileNotFoundError:
+                return False
+        if entity == "metadata":
+            return bool(self._get_hashstore_metadata_path(file))
 
     def _open(self, entity, file, mode="rb"):
         """Return open buffer object from given id or path. Caller is responsible
@@ -2351,12 +2354,13 @@ class FileHashStore(HashStore):
         :return: An `io` stream dependent on the `mode`.
         :rtype: io.BufferedReader
         """
+        realpath = None
         if entity == "objects":
-            return bool(self._get_hashstore_data_object_path(file))
-        else:
-            realpath = self._resolve_path(entity, file)
-            if realpath is None:
-                raise IOError(f"Could not locate file: {file}")
+            realpath = self._get_hashstore_data_object_path(file)
+        if entity == "metadata":
+            realpath = self._get_hashstore_metadata_path(file)
+        if realpath is None:
+            raise IOError(f"Could not locate file: {file}")
 
         # pylint: disable=W1514
         # mode defaults to "rb"
@@ -2370,21 +2374,27 @@ class FileHashStore(HashStore):
         :param str entity: Desired entity type (ex. "objects", "metadata").
         :param str file: Address ID or path of file.
         """
-        if entity == "objects":
-            return bool(self._get_hashstore_data_object_path(file))
+        if entity == "tmp":
+            realpath = file
+        elif entity == "objects":
+            realpath = self._get_hashstore_data_object_path(file)
+        elif entity == "metadata":
+            realpath = self._get_hashstore_metadata_path(file)
+        elif os.path.exists(file):
+            # Check if the given path is an absolute path
+            realpath = file
         else:
-            realpath = self._resolve_path(entity, file)
-            if realpath is None:
-                return None
+            raise IOError(f"FileHashStore - delete(): Could not locate file: {file}")
 
-        try:
-            os.remove(realpath)
-        except OSError as err:
-            exception_string = (
-                f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
-            )
-            logging.error(exception_string)
-            raise err
+        if realpath is not None:
+            try:
+                os.remove(realpath)
+            except OSError as err:
+                exception_string = (
+                    f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
+                )
+                logging.error(exception_string)
+                raise err
 
     @staticmethod
     def _rename_path_for_deletion(path):
@@ -2433,38 +2443,10 @@ class FileHashStore(HashStore):
         absolute_path = os.path.join(root_dir, *paths) + extension
         return absolute_path
 
-    def _resolve_path(self, entity, file):
-        """Attempt to determine the absolute path of a file ID or path through
-        successive checking of candidate paths - first by checking whether the 'file'
-        exists, followed by checking the entity type with respect to the file.
-
-        :param str entity: Desired entity type ("objects", "metadata", "cid", "pid"),
-            where "cid" & "pid" represents resolving the path to the refs files.
-        :param str file: Name of the file.
-
-        :return: Path to file
-        :rtype: str
-        """
-        # Check for relative path.
-        if entity == "metadata":
-            if os.path.isfile(file):
-                return file
-            rel_root = self.metadata
-            relpath = os.path.join(rel_root, file)
-            if os.path.isfile(relpath):
-                return relpath
-        else:
-            exception_string = (
-                "FileHashStore - _resolve_path: entity must be"
-                + " 'objects', 'metadata', 'cid' or 'pid'. Supplied: "
-                + entity
-            )
-            raise ValueError(exception_string)
-
     def _get_hashstore_data_object_path(self, cid_or_path):
         """Return the expected path to a hashstore data object that exists.
 
-        :param str cid_or_path: Content identifier
+        :param str cid_or_path: Content identifier or path to check
 
         :return: Path to the data object referenced by the pid
         :rtype: Path
@@ -2484,13 +2466,13 @@ class FileHashStore(HashStore):
             else:
                 raise FileNotFoundError(
                     "FileHashStore - hashstore data object does not exist for cid: "
-                    "" + cid_or_path
+                    + cid_or_path
                 )
 
     def _get_hashstore_metadata_path(self, metacat_cid_or_path):
         """Return the expected metadata path to a hashstore metadata object that exists.
 
-        :param str cid: Metadata content identifier or path to check
+        :param str metacat_cid_or_path: Metadata content identifier or path to check
 
         :return: Path to the data object referenced by the pid
         :rtype: Path
@@ -2590,6 +2572,8 @@ class FileHashStore(HashStore):
             directory_to_count = self.pids
         elif entity == "cid":
             directory_to_count = self.cids
+        elif entity == "tmp":
+            directory_to_count = self.objects + "tmp"
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"

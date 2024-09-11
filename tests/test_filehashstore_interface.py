@@ -440,6 +440,8 @@ def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, stor
             pid, path, checksum="nonmatchingchecksum", checksum_algorithm="sha256"
         )
     assert store._count(entity) == 1
+    # Confirm tmp files created during this process was handled
+    assert store._count("tmp") == 0
     assert store._exists(entity, pids[pid][store.algorithm])
 
 
@@ -866,7 +868,7 @@ def test_store_metadata_metadata_path(pids, store):
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath, format_id)
-        metadata_path = store._resolve_path("metadata", metadata_cid)
+        metadata_path = store._get_hashstore_metadata_path(metadata_cid)
         assert metadata_cid == metadata_path
 
 

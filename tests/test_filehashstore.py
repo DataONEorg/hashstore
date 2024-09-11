@@ -873,8 +873,8 @@ def test_find_object_cid_refs_does_not_contain_pid(pids, store):
         object_metadata = store.store_object(pid, path)
 
         # Remove the pid from the cid refs file
-        cid_ref_abs_path = store._resolve_path(
-            "cid", object_metadata.hex_digests.get("sha256")
+        cid_ref_abs_path = store._get_hashstore_cid_refs_path(
+            object_metadata.hex_digests.get("sha256")
         )
         store._update_refs_file(cid_ref_abs_path, pid, "remove")
 
@@ -1211,7 +1211,7 @@ def test_get_hashstore_pid_refs_path(pids, store):
         assert resolved_pid_ref_abs_path == calculated_pid_ref_path
 
 
-def test_resolve_path_refs_cid(pids, store):
+def test_get_hashstore_cid_refs_path(pids, store):
     """Confirm resolve path returns correct object pid refs path"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -1219,7 +1219,7 @@ def test_resolve_path_refs_cid(pids, store):
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.cid
 
-        resolved_cid_ref_abs_path = store._resolve_path("cid", cid)
+        resolved_cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
         calculated_cid_ref_path = store.cids + "/" + "/".join(store._shard(cid))
 
         assert resolved_cid_ref_abs_path == calculated_cid_ref_path

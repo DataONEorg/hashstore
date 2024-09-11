@@ -418,7 +418,7 @@ def test_store_object_duplicate_object_references_file_content(pids, store):
     pid_three = "dou.test.2"
     store.store_object(pid_three, path)
     # Confirm the content of the cid refence files
-    cid_ref_abs_path = store._resolve_path("cid", pids[pid][store.algorithm])
+    cid_ref_abs_path = store._get_hashstore_cid_refs_path(pids[pid][store.algorithm])
     with open(cid_ref_abs_path, "r", encoding="utf8") as f:
         for _, line in enumerate(f, start=1):
             value = line.strip()
@@ -555,8 +555,8 @@ def test_store_object_threads_multiple_pids_one_cid_content(pids, store):
     assert store._count(entity) == 1
     assert store._exists(entity, pids["jtao.1700.1"][store.algorithm])
 
-    cid_refs_path = store._resolve_path(
-        "cid", "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
+    cid_refs_path = store._get_hashstore_cid_refs_path(
+        "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
     )
     number_of_pids_reffed = 0
     with open(cid_refs_path, "r", encoding="utf8") as ref_file:
@@ -1065,7 +1065,7 @@ def test_delete_object_cid_refs_file_deleted(pids, store):
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         cid = object_metadata.cid
         store.delete_object(pid)
-        cid_refs_file_path = store._resolve_path("cid", cid)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
         assert not os.path.exists(cid_refs_file_path)
 
 
@@ -1076,11 +1076,11 @@ def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.cid
-        cid_refs_abs_path = store._resolve_path("cid", cid)
+        cid_refs_abs_path = store._get_hashstore_cid_refs_path(cid)
         # pylint: disable=W0212
         store._update_refs_file(cid_refs_abs_path, "dou.test.1", "add")
         store.delete_object(pid)
-        cid_refs_file_path = store._resolve_path("cid", cid)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
         assert os.path.exists(cid_refs_file_path)
 
 

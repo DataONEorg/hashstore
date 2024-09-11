@@ -651,7 +651,7 @@ class FileHashStore(HashStore):
             # Prepare files and paths
             tmp_root_path = self._get_store_path("refs") / "tmp"
             pid_refs_path = self._get_hashstore_pid_refs_path(pid)
-            cid_refs_path = self._resolve_path("cid", cid)
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
             # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
             self._create_path(Path(os.path.dirname(pid_refs_path)))
             self._create_path(Path(os.path.dirname(cid_refs_path)))
@@ -702,7 +702,9 @@ class FileHashStore(HashStore):
                     return True
                 else:
                     # Check if the retrieved cid refs file exists and pid is referenced
-                    retrieved_cid_refs_path = self._resolve_path("cid", pid_refs_cid)
+                    retrieved_cid_refs_path = self._get_hashstore_cid_refs_path(
+                        pid_refs_cid
+                    )
                     if os.path.exists(
                         retrieved_cid_refs_path
                     ) and self._is_string_in_refs_file(pid, retrieved_cid_refs_path):
@@ -1057,10 +1059,10 @@ class FileHashStore(HashStore):
                 with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
                     # Retrieve the cid
                     pid_refs_cid = pid_ref_file.read()
-                cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
+                cid_ref_abs_str = str(self._get_hashstore_cid_refs_path(pid_refs_cid))
                 # Remove if the pid refs is found
-                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
-                    self._update_refs_file(cid_ref_abs_path, pid, "remove")
+                if self._is_string_in_refs_file(pid, cid_ref_abs_str):
+                    self._update_refs_file(cid_ref_abs_str, pid, "remove")
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
                 # Remove all files confirmed for deletion
@@ -1337,10 +1339,10 @@ class FileHashStore(HashStore):
                 pid_refs_cid = pid_ref_file.read()
 
             # Confirm that the cid reference file exists
-            cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
+            cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
             if os.path.exists(cid_ref_abs_path):
                 # Check that the pid is actually found in the cid reference file
-                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
+                if self._is_string_in_refs_file(pid, str(cid_ref_abs_path)):
                     # Object must also exist in order to return the cid retrieved
                     if not self._exists("objects", pid_refs_cid):
                         err_msg = (
@@ -2008,7 +2010,7 @@ class FileHashStore(HashStore):
                     else:
                         # Delete the object
                         cid = hex_digests[self.algorithm]
-                        cid_abs_path = self._resolve_path("cid", cid)
+                        cid_abs_path = self._get_hashstore_cid_refs_path(cid)
                         self._delete(entity, cid_abs_path)
                         logging.debug(exception_string)
                         raise NonMatchingChecksum(exception_string)
@@ -2038,7 +2040,7 @@ class FileHashStore(HashStore):
         if pid_refs_path is None:
             pid_refs_path = self._get_hashstore_pid_refs_path(pid)
         if cid_refs_path is None:
-            cid_refs_path = self._resolve_path("cid", cid)
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
 
         # Check that reference files were created
         if not os.path.exists(pid_refs_path):
@@ -2086,7 +2088,7 @@ class FileHashStore(HashStore):
 
         :param str cid: Content identifier
         """
-        cid_refs_abs_path = self._resolve_path("cid", cid)
+        cid_refs_abs_path = self._get_hashstore_cid_refs_path(cid)
         # If the refs file still exists, do not delete the object
         if not os.path.exists(cid_refs_abs_path):
             sync_begin_debug_msg = (
@@ -2451,11 +2453,6 @@ class FileHashStore(HashStore):
             relpath = os.path.join(rel_root, file)
             if os.path.isfile(relpath):
                 return relpath
-        # Check for sharded path.
-        elif entity == "cid":
-            # Note, we skip checking whether the file exists for refs
-            cid_ref_file_abs_path = self._build_path(entity, file)
-            return cid_ref_file_abs_path
         else:
             exception_string = (
                 "FileHashStore - _resolve_path: entity must be"
@@ -2477,8 +2474,21 @@ class FileHashStore(HashStore):
         pid_ref_file_abs_path = os.path.join(root_dir, *directories_and_path)
         return pid_ref_file_abs_path
 
+    def _get_hashstore_cid_refs_path(self, cid):
+        """Return the expected path to a cid reference file. The path may or may not exist.
+
+        :param str cid: Content identifier
+
+        :return: Path to cid reference file
+        :rtype: Path
+        """
+        root_dir = self._get_store_path("cid")
+        directories_and_path = self._shard(cid)
+        cid_ref_file_abs_path = os.path.join(root_dir, *directories_and_path)
+        return cid_ref_file_abs_path
+
     def _get_store_path(self, entity):
-        """Return a path object of the root directory of the store.
+        """Return a path object to the root directory of the requested hashstore directory type
 
         :param str entity: Desired entity type: "objects", "metadata", "refs", "cid" and "pid".
         Note, "cid" and "pid" are refs specific directories.

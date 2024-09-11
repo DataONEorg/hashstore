@@ -48,7 +48,7 @@ def test_tag_object_cid_refs_file_exists(pids, store):
         object_metadata = store.store_object(None, path)
         cid = object_metadata.cid
         store.tag_object(pid, object_metadata.cid)
-        cid_refs_file_path = store._resolve_path("cid", cid)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
         assert os.path.exists(cid_refs_file_path)
 
 
@@ -72,7 +72,7 @@ def test_tag_object_cid_refs_file_content(pids, store):
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(None, path)
         store.tag_object(pid, object_metadata.cid)
-        cid_refs_file_path = store._resolve_path("cid", object_metadata.cid)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(object_metadata.cid)
         with open(cid_refs_file_path, "r", encoding="utf8") as f:
             pid_refs_cid = f.read().strip()
         assert pid_refs_cid == pid
@@ -91,7 +91,7 @@ def test_tag_object_pid_refs_found_cid_refs_found(pids, store):
         with pytest.raises(HashStoreRefsAlreadyExists):
             store.tag_object(pid, cid)
 
-        cid_refs_file_path = store._resolve_path("cid", object_metadata.cid)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(object_metadata.cid)
         line_count = 0
         with open(cid_refs_file_path, "r", encoding="utf8") as ref_file:
             for _line in ref_file:
@@ -109,7 +109,7 @@ def test_tag_object_pid_refs_found_cid_refs_not_found(store):
     cid = object_metadata.cid
 
     # Manually delete the cid refs file, creating an orphaned pid
-    cid_ref_abs_path = store._resolve_path("cid", cid)
+    cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
     os.remove(cid_ref_abs_path)
     assert store._count("cid") == 0
 
@@ -146,7 +146,7 @@ def test_tag_object_pid_refs_not_found_cid_refs_found(store):
 
     # Read cid file to confirm cid refs file contains the additional pid
     line_count = 0
-    cid_ref_abs_path = store._resolve_path("cid", cid)
+    cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
     with open(cid_ref_abs_path, "r", encoding="utf8") as f:
         for _, line in enumerate(f, start=1):
             value = line.strip()
@@ -215,7 +215,7 @@ def test_verify_object_exception_incorrect_size(pids, store):
 
         cid = object_metadata.cid
         cid = object_metadata.hex_digests[store.algorithm]
-        cid_abs_path = store._resolve_path("cid", cid)
+        cid_abs_path = store._get_hashstore_cid_refs_path(cid)
         assert not os.path.exists(cid_abs_path)
 
 
@@ -237,7 +237,7 @@ def test_verify_object_exception_incorrect_checksum(pids, store):
 
         cid = object_metadata.cid
         cid = object_metadata.hex_digests[store.algorithm]
-        cid_abs_path = store._resolve_path("cid", cid)
+        cid_abs_path = store._get_hashstore_cid_refs_path(cid)
         assert not os.path.exists(cid_abs_path)
 
 
@@ -338,7 +338,7 @@ def test_update_refs_file_content_cid_refs_does_not_exist(pids, store):
     """Test that _update_refs_file throws exception if refs file doesn't exist."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
-        cid_ref_abs_path = store._resolve_path("cid", cid)
+        cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
         with pytest.raises(FileNotFoundError):
             store._update_refs_file(cid_ref_abs_path, pid, "add")
 
@@ -407,7 +407,7 @@ def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
         # Write the cid refs file and move it where it needs to be
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
-        cid_ref_abs_path = store._resolve_path("cid", cid)
+        cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
         print(cid_ref_abs_path)
         store._create_path(os.path.dirname(cid_ref_abs_path))
         shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
@@ -445,7 +445,7 @@ def test_verify_hashstore_references_cid_refs_file_missing_pid(pids, store):
         # Get a tmp cid refs file and write the wrong pid into it
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, "bad pid", "cid")
-        cid_ref_abs_path = store._resolve_path("cid", cid)
+        cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
         store._create_path(os.path.dirname(cid_ref_abs_path))
         shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
         # Now write the pid refs file, both cid and pid refs must be present
@@ -469,7 +469,7 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
         # Write the wrong pid into a cid refs file and move it where it needs to be
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, "bad pid", "cid")
-        cid_ref_abs_path = store._resolve_path("cid", cid)
+        cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
         store._create_path(os.path.dirname(cid_ref_abs_path))
         shutil.move(tmp_cid_refs_file, cid_ref_abs_path)
         # Now write the pid refs with expected values

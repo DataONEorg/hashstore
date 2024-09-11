@@ -854,7 +854,7 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid")
 
-        object_info_dict = self.find_object(pid)
+        object_info_dict = self._find_object(pid)
         object_cid = object_info_dict.get("cid")
         entity = "objects"
 
@@ -946,7 +946,7 @@ class FileHashStore(HashStore):
             # `find_object` which will throw custom exceptions if there is an issue with
             # the reference files, which help us determine the path to proceed with.
             try:
-                object_info_dict = self.find_object(pid)
+                object_info_dict = self._find_object(pid)
                 cid = object_info_dict.get("cid")
 
                 # Proceed with next steps - cid has been retrieved without any issues
@@ -1248,7 +1248,7 @@ class FileHashStore(HashStore):
 
         entity = "objects"
         algorithm = self._clean_algorithm(algorithm)
-        object_cid = self.find_object(pid).get("cid")
+        object_cid = self._find_object(pid).get("cid")
         if not self._exists(entity, object_cid):
             exception_string = (
                 f"FileHashStore - get_hex_digest: No object found for pid: {pid}"
@@ -1319,7 +1319,7 @@ class FileHashStore(HashStore):
         )
         return object_metadata
 
-    def find_object(self, pid):
+    def _find_object(self, pid):
         """Check if an object referenced by a pid exists and retrieve its content identifier.
         The `find_object` method validates the existence of an object based on the provided
         pid and returns the associated content identifier.

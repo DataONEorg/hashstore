@@ -826,7 +826,7 @@ def test_find_object(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        obj_info_dict = store.find_object(pid)
+        obj_info_dict = store._find_object(pid)
         assert obj_info_dict.get("cid") == object_metadata.hex_digests.get("sha256")
 
 
@@ -837,12 +837,12 @@ def test_find_object_refs_exist_but_obj_not_found(pids, store):
         path = test_dir + pid.replace("/", "_")
         store.store_object(pid, path)
 
-        cid = store.find_object(pid).get("cid")
+        cid = store._find_object(pid).get("cid")
         obj_path = store._get_hashstore_data_object_path(cid)
         os.remove(obj_path)
 
         with pytest.raises(RefsFileExistsButCidObjMissing):
-            store.find_object(pid)
+            store._find_object(pid)
 
 
 def test_find_object_cid_refs_not_found(pids, store):
@@ -861,7 +861,7 @@ def test_find_object_cid_refs_not_found(pids, store):
             pid_ref_file.truncate()
 
         with pytest.raises(CidRefsDoesNotExist):
-            store.find_object(pid)
+            store._find_object(pid)
 
 
 def test_find_object_cid_refs_does_not_contain_pid(pids, store):
@@ -879,25 +879,25 @@ def test_find_object_cid_refs_does_not_contain_pid(pids, store):
         store._update_refs_file(cid_ref_abs_path, pid, "remove")
 
         with pytest.raises(PidNotFoundInCidRefsFile):
-            store.find_object(pid)
+            store._find_object(pid)
 
 
 def test_find_object_pid_refs_not_found(store):
     """Test find object throws exception when object doesn't exist."""
     with pytest.raises(PidRefsDoesNotExist):
-        store.find_object("dou.test.1")
+        store._find_object("dou.test.1")
 
 
 def test_find_object_pid_none(store):
     """Test find object throws exception when pid is None."""
     with pytest.raises(ValueError):
-        store.find_object(None)
+        store._find_object(None)
 
 
 def test_find_object_pid_empty(store):
     """Test find object throws exception when pid is empty."""
     with pytest.raises(ValueError):
-        store.find_object("")
+        store._find_object("")
 
 
 def test_clean_algorithm(store):

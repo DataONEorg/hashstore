@@ -1206,7 +1206,6 @@ class FileHashStore(HashStore):
                 full_path_without_directory = (
                     self.metadata + "/" + rel_path + "/" + pid_doc
                 )
-                print("DOU full_path_without_directory: " + full_path_without_directory)
                 self._delete("metadata", full_path_without_directory)
                 info_string = (
                     "FileHashStore - delete_metadata: Successfully deleted metadata for pid:"
@@ -1264,7 +1263,6 @@ class FileHashStore(HashStore):
         self,
         pid,
         file,
-        extension=None,
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
@@ -1275,7 +1273,6 @@ class FileHashStore(HashStore):
 
         :param str pid: Authority-based identifier.
         :param mixed file: Readable object or path to file.
-        :param str extension: Optional extension to append to file when saving.
         :param str additional_algorithm: Optional algorithm value to include when returning
             hex digests.
         :param str checksum: Optional checksum to validate object against hex digest before moving
@@ -1299,7 +1296,6 @@ class FileHashStore(HashStore):
             ) = self._move_and_get_checksums(
                 pid,
                 stream,
-                extension,
                 additional_algorithm,
                 checksum,
                 checksum_algorithm,
@@ -1349,7 +1345,7 @@ class FileHashStore(HashStore):
                     if not self._exists("objects", pid_refs_cid):
                         err_msg = (
                             f"FileHashStore - find_object: Refs file found for pid ({pid}) at"
-                            + pid_ref_abs_path
+                            + str(pid_ref_abs_path)
                             + f", but object referenced does not exist, cid: {pid_refs_cid}"
                         )
                         logging.error(err_msg)
@@ -1396,7 +1392,7 @@ class FileHashStore(HashStore):
         else:
             err_msg = (
                 f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
-                + pid_ref_abs_path
+                + str(pid_ref_abs_path)
             )
             logging.error(err_msg)
             raise PidRefsDoesNotExist(err_msg)
@@ -1453,7 +1449,6 @@ class FileHashStore(HashStore):
         self,
         pid,
         stream,
-        extension=None,
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
@@ -1469,7 +1464,6 @@ class FileHashStore(HashStore):
 
         :param str pid: Authority-based identifier.
         :param Stream stream: Object stream.
-        :param str extension: Optional extension to append to the file
             when saving.
         :param str additional_algorithm: Optional algorithm value to include
             when returning hex digests.
@@ -2015,7 +2009,7 @@ class FileHashStore(HashStore):
                         # Delete the object
                         cid = hex_digests[self.algorithm]
                         cid_abs_path = self._get_hashstore_cid_refs_path(cid)
-                        self._delete(entity, cid_abs_path)
+                        self._delete(entity, str(cid_abs_path))
                         logging.debug(exception_string)
                         raise NonMatchingChecksum(exception_string)
 
@@ -2303,28 +2297,39 @@ class FileHashStore(HashStore):
         hex_digest = hashobj.hexdigest()
         return hex_digest
 
-    def _shard(self, digest):
-        """Generates a list given a digest of `self.depth` number of tokens with width
-        `self.width` from the first part of the digest plus the remainder.
+    def _shard(self, checksum):
+        """Splits the given checksum into a list of tokens of length `self.width`, followed by
+        the remainder.
+
+        This method divides the checksum into `self.depth` number of tokens, each with a fixed
+        width of `self.width`, taken from the beginning of the checksum. Any leftover characters
+        are added as the final element in the list.
 
         Example:
+            For a checksum of '0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e',
+            the result may be:
             ['0d', '55', '5e', 'd77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e']
 
-        :param str digest: The string to be divided into tokens.
+        :param str checksum: The checksum string to be split into tokens.
 
-        :return: A list containing the tokens of fixed width.
+        :return: A list where each element is a token of fixed width, with any leftover characters as the last element.
         :rtype: list
         """
 
         def compact(items):
             """Return only truthy elements of `items`."""
+            # truthy_items = []
+            # for item in items:
+            #     if item:
+            #         truthy_items.append(item)
+            # return truthy_items
             return [item for item in items if item]
 
         # This creates a list of `depth` number of tokens with width
         # `width` from the first part of the id plus the remainder.
         hierarchical_list = compact(
-            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
-            + [digest[self.depth * self.width :]]
+            [checksum[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
+            + [checksum[self.depth * self.width :]]
         )
 
         return hierarchical_list

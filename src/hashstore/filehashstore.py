@@ -615,11 +615,11 @@ class FileHashStore(HashStore):
                     file_size_to_validate=expected_file_size,
                 )
             except NonMatchingObjSize as nmose:
-                self.delete_object_only(object_metadata.cid)
+                self._delete_object_only(object_metadata.cid)
                 logging.error(nmose)
                 raise nmose
             except NonMatchingChecksum as mmce:
-                self.delete_object_only(object_metadata.cid)
+                self._delete_object_only(object_metadata.cid)
                 raise mmce
             logging.info(
                 "FileHashStore - verify_object: object has been validated for cid: %s",
@@ -2084,7 +2084,7 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise CidRefsContentError(exception_string)
 
-    def delete_object_only(self, cid):
+    def _delete_object_only(self, cid):
         """Attempt to delete an object based on the given content identifier (cid). If the object
         has any pids references and/or a cid refs file exists, the object will not be deleted.
 

@@ -2461,15 +2461,15 @@ class FileHashStore(HashStore):
             )
             raise ValueError(exception_string)
 
-    def _get_hashstore_data_object_path(self, cid):
+    def _get_hashstore_data_object_path(self, cid_or_path):
         """Return the expected path to a hashstore data object that exists.
 
-        :param str cid: Content identifier
+        :param str cid_or_path: Content identifier
 
         :return: Path to the data object referenced by the pid
         :rtype: Path
         """
-        paths = self._shard(cid)
+        paths = self._shard(cid_or_path)
         root_dir = self._get_store_path("objects")
         absolute_path = os.path.join(root_dir, *paths)
 
@@ -2478,14 +2478,29 @@ class FileHashStore(HashStore):
         else:
             # Check the relative path, for usage convenience
             rel_root = self.objects
-            relpath = os.path.join(rel_root, cid)
+            relpath = os.path.join(rel_root, cid_or_path)
             if os.path.isfile(relpath):
                 return relpath
             else:
                 raise FileNotFoundError(
                     "FileHashStore - hashstore data object does not exist for cid: "
-                    "" + cid
+                    "" + cid_or_path
                 )
+
+    def _get_hashstore_metadata_path(self, metacat_cid_or_path):
+        """Return the expected metadata path to a hashstore metadata object that exists.
+
+        :param str cid: Metadata content identifier or path to check
+
+        :return: Path to the data object referenced by the pid
+        :rtype: Path
+        """
+        if os.path.isfile(metacat_cid_or_path):
+            return metacat_cid_or_path
+        rel_root = self.metadata
+        relpath = os.path.join(rel_root, metacat_cid_or_path)
+        if os.path.isfile(relpath):
+            return relpath
 
     def _get_hashstore_pid_refs_path(self, pid):
         """Return the expected path to a pid reference file. The path may or may not exist.

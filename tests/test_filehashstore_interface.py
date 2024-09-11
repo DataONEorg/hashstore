@@ -731,7 +731,7 @@ def test_store_metadata(pids, store):
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
-        assert metadata_cid == full_path
+        assert metadata_cid == str(full_path)
     assert store._count(entity) == 3
 
 
@@ -756,9 +756,9 @@ def test_store_metadata_one_pid_multiple_docs_correct_location(store):
     full_path = store._get_store_path("metadata") / rel_path / metadata_document_name
     full_path3 = store._get_store_path("metadata") / rel_path / metadata_document_name3
     full_path4 = store._get_store_path("metadata") / rel_path / metadata_document_name4
-    assert metadata_cid == full_path
-    assert metadata_cid3 == full_path3
-    assert metadata_cid4 == full_path4
+    assert metadata_cid == str(full_path)
+    assert metadata_cid3 == str(full_path3)
+    assert metadata_cid4 == str(full_path4)
     assert store._count(entity) == 3
 
 
@@ -777,7 +777,7 @@ def test_store_metadata_default_format_id(pids, store):
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
-        assert metadata_cid == full_path
+        assert metadata_cid == str(full_path)
 
 
 def test_store_metadata_files_string(pids, store):

@@ -821,7 +821,7 @@ class FileHashStore(HashStore):
                 + f" pid: {pid} with format_id: {checked_format_id}"
             )
             logging.info(info_msg)
-            return metadata_cid
+            return str(metadata_cid)
         finally:
             # Release pid
             end_sync_debug_msg = (
@@ -1203,7 +1203,10 @@ class FileHashStore(HashStore):
                     logging.debug(sync_begin_debug_msg)
                     self.metadata_locked_docs.append(pid_doc)
             try:
-                full_path_without_directory = rel_path + "/" + pid_doc
+                full_path_without_directory = (
+                    self.metadata + "/" + rel_path + "/" + pid_doc
+                )
+                print("DOU full_path_without_directory: " + full_path_without_directory)
                 self._delete("metadata", full_path_without_directory)
                 info_string = (
                     "FileHashStore - delete_metadata: Successfully deleted metadata for pid:"
@@ -1846,7 +1849,7 @@ class FileHashStore(HashStore):
         :param str metadata_doc_name: Metadata document name
 
         :return: Address of the metadata document.
-        :rtype: str
+        :rtype: Path
         """
         logging.debug(
             "FileHashStore - _put_metadata: Request to put metadata for pid: %s", pid
@@ -2370,7 +2373,10 @@ class FileHashStore(HashStore):
             except FileNotFoundError:
                 return False
         if entity == "metadata":
-            return bool(self._get_hashstore_metadata_path(file))
+            try:
+                return bool(self._get_hashstore_metadata_path(file))
+            except FileNotFoundError:
+                return False
 
     def _open(self, entity, file, mode="rb"):
         """Return open buffer object from given id or path. Caller is responsible
@@ -2403,27 +2409,32 @@ class FileHashStore(HashStore):
         :param str entity: Desired entity type (ex. "objects", "metadata").
         :param str file: Address ID or path of file.
         """
-        if entity == "tmp":
-            realpath = file
-        elif entity == "objects":
-            realpath = self._get_hashstore_data_object_path(file)
-        elif entity == "metadata":
-            realpath = self._get_hashstore_metadata_path(file)
-        elif os.path.exists(file):
-            # Check if the given path is an absolute path
-            realpath = file
-        else:
-            raise IOError(f"FileHashStore - delete(): Could not locate file: {file}")
-
-        if realpath is not None:
-            try:
-                os.remove(realpath)
-            except OSError as err:
-                exception_string = (
-                    f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
+        try:
+            if entity == "tmp":
+                realpath = file
+            elif entity == "objects":
+                realpath = self._get_hashstore_data_object_path(file)
+            elif entity == "metadata":
+                realpath = self._get_hashstore_metadata_path(file)
+            elif os.path.exists(file):
+                # Check if the given path is an absolute path
+                realpath = file
+            else:
+                raise IOError(
+                    f"FileHashStore - delete(): Could not locate file: {file}"
                 )
-                logging.error(exception_string)
-                raise err
+        except FileNotFoundError:
+            realpath = None
+
+        try:
+            if realpath is not None:
+                os.remove(realpath)
+        except OSError as err:
+            exception_string = (
+                f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
+            )
+            logging.error(exception_string)
+            raise err
 
     @staticmethod
     def _rename_path_for_deletion(path):
@@ -2464,44 +2475,57 @@ class FileHashStore(HashStore):
         absolute_path = os.path.join(root_dir, *paths)
         return absolute_path
 
-    def _get_hashstore_data_object_path(self, cid_or_path):
-        """Return the expected path to a hashstore data object that exists.
+    def _get_hashstore_data_object_path(self, cid_or_relative_path):
+        """Get the expected path to a hashstore data object that exists using a content identifier.
 
-        :param str cid_or_path: Content identifier or path to check
+        :param str cid_or_relative_path: Content identifier
 
         :return: Path to the data object referenced by the pid
         :rtype: Path
         """
-        expected_abs_path = self._build_hashstore_data_object_path(cid_or_path)
-
-        if os.path.isfile(expected_abs_path):
-            return expected_abs_path
+        expected_abs_data_obj_path = self._build_hashstore_data_object_path(
+            cid_or_relative_path
+        )
+        if os.path.isfile(expected_abs_data_obj_path):
+            return expected_abs_data_obj_path
         else:
-            # Check the relative path, for usage convenience
-            rel_root = self.objects
-            relpath = os.path.join(rel_root, cid_or_path)
-            if os.path.isfile(relpath):
-                return relpath
+            if os.path.isfile(cid_or_relative_path):
+                # Check whether the supplied arg is an abs path that exists or not for convenience
+                return cid_or_relative_path
             else:
-                raise FileNotFoundError(
-                    "FileHashStore - hashstore data object does not exist for cid: "
-                    + cid_or_path
-                )
+                # Check the relative path
+                relpath = os.path.join(self.objects, cid_or_relative_path)
+                if os.path.isfile(relpath):
+                    return relpath
+                else:
+                    raise FileNotFoundError(
+                        "FileHashStore - _get_hashstore_data_object_path: could not locate a"
+                        + "data object in '/objects' for the supplied cid_or_relative_path: "
+                        + cid_or_relative_path
+                    )
 
-    def _get_hashstore_metadata_path(self, metacat_cid_or_path):
+    def _get_hashstore_metadata_path(self, metadata_relative_path):
         """Return the expected metadata path to a hashstore metadata object that exists.
 
-        :param str metacat_cid_or_path: Metadata content identifier or path to check
+        :param str metadata_relative_path: Metadata path to check
 
         :return: Path to the data object referenced by the pid
         :rtype: Path
         """
-        if os.path.isfile(metacat_cid_or_path):
-            return metacat_cid_or_path
-        rel_root = self.metadata
-        relpath = os.path.join(rel_root, metacat_cid_or_path)
-        if os.path.isfile(relpath):
-            return relpath
+        # Form the absolute path to the metadata file
+        expected_abs_metadata_path = os.path.join(self.metadata, metadata_relative_path)
+        if os.path.isfile(expected_abs_metadata_path):
+            return expected_abs_metadata_path
+        else:
+            if os.path.isfile(metadata_relative_path):
+                # Check whether the supplied arg is an abs path that exists or not for convenience
+                return metadata_relative_path
+            else:
+                raise FileNotFoundError(
+                    "FileHashStore - _get_hashstore_metadata_path: could not locate a"
+                    + "metadata object in '/metadata' for the supplied metadata_relative_path: "
+                    + metadata_relative_path
+                )
 
     def _get_hashstore_pid_refs_path(self, pid):
         """Return the expected path to a pid reference file. The path may or may not exist.
@@ -2511,6 +2535,7 @@ class FileHashStore(HashStore):
         :return: Path to pid reference file
         :rtype: Path
         """
+        # The pid refs file is named after the hash of the pid using the store's algorithm
         hash_id = self._computehash(pid, self.algorithm)
         root_dir = self._get_store_path("pid")
         directories_and_path = self._shard(hash_id)
@@ -2526,6 +2551,7 @@ class FileHashStore(HashStore):
         :rtype: Path
         """
         root_dir = self._get_store_path("cid")
+        # The content identifier is to be split into directories as is supplied
         directories_and_path = self._shard(cid)
         cid_ref_file_abs_path = os.path.join(root_dir, *directories_and_path)
         return cid_ref_file_abs_path

@@ -1075,17 +1075,14 @@ def test_create_path(pids, store):
 
 def test_get_real_path_file_does_not_exist(store):
     """Test get_real_path returns None when object does not exist."""
-    entity = "objects"
     test_path = "tests/testdata/helloworld.txt"
     with pytest.raises(FileNotFoundError):
-        real_path_exists = store._get_hashstore_data_object_path(test_path)
-    # assert real_path_exists is None
+        store._get_hashstore_data_object_path(test_path)
 
 
 def test_get_real_path_with_object_id(store, pids):
     """Test get_real_path returns absolute path given an object id."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
@@ -1096,7 +1093,6 @@ def test_get_real_path_with_object_id(store, pids):
 def test_get_real_path_with_object_id_sharded(pids, store):
     """Test exists method with a sharded path (relative path)."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
@@ -1108,7 +1104,6 @@ def test_get_real_path_with_object_id_sharded(pids, store):
 
 def test_get_real_path_with_metadata_id(store, pids):
     """Test get_real_path returns absolute path given a metadata id."""
-    entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
@@ -1122,7 +1117,6 @@ def test_get_real_path_with_metadata_id(store, pids):
 def test_build_hashstore_data_object_path(store, pids):
     """Test _build_hashstore_data_object_path builds the hashstore data object file path."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         _ = store._store_and_validate_data(pid, path)

@@ -8,12 +8,9 @@ from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
     HashStoreRefsAlreadyExists,
-    NonMatchingChecksum,
-    NonMatchingObjSize,
     PidAlreadyExistsError,
     PidRefsContentError,
     PidRefsFileNotFound,
-    UnsupportedAlgorithm,
 )
 
 # pylint: disable=W0212
@@ -79,7 +76,7 @@ def test_tag_object_cid_refs_file_content(pids, store):
 
 
 def test_tag_object_pid_refs_found_cid_refs_found(pids, store):
-    """Test tag_object does not throws exception when the refs files already exist
+    """Test tag_object does not throw an exception when any refs file already exists
     and verifies the content, and does not double tag the cid refs file."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():

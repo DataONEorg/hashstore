@@ -30,6 +30,7 @@ from hashstore.filehashstore_exceptions import (
     PidRefsFileNotFound,
     RefsFileExistsButCidObjMissing,
     UnsupportedAlgorithm,
+    StoreObjectForPidAlreadyInProgress,
 )
 
 
@@ -510,23 +511,24 @@ class FileHashStore(HashStore):
             sync_begin_debug_msg = (
                 f"FileHashStore - store_object: Adding pid ({pid}) to locked list."
             )
-            sync_wait_msg = (
-                f"FileHashStore - store_object: Pid ({pid}) is locked. Waiting."
+            err_msg = (
+                f"FileHashStore - store_object: Duplicate object request encountered for pid: "
+                f"{pid}" + ". Already in progress."
             )
             if self.use_multiprocessing:
                 with self.object_condition_mp:
                     # Wait for the pid to release if it's in use
-                    while pid in self.object_locked_pids_mp:
-                        logging.debug(sync_wait_msg)
-                        self.object_condition_mp.wait()
+                    if pid in self.object_locked_pids_mp:
+                        logging.error(err_msg)
+                        raise StoreObjectForPidAlreadyInProgress(err_msg)
                     # Modify object_locked_pids consecutively
                     logging.debug(sync_begin_debug_msg)
                     self.object_locked_pids_mp.append(pid)
             else:
                 with self.object_condition:
-                    while pid in self.object_locked_pids:
-                        logging.debug(sync_wait_msg)
-                        self.object_condition.wait()
+                    if pid in self.object_locked_pids:
+                        logging.error(err_msg)
+                        raise StoreObjectForPidAlreadyInProgress(err_msg)
                     logging.debug(sync_begin_debug_msg)
                     self.object_locked_pids.append(pid)
             try:
@@ -566,17 +568,8 @@ class FileHashStore(HashStore):
                     f"FileHashStore - store_object: Releasing pid ({pid})"
                     + " from locked list"
                 )
-                if self.use_multiprocessing:
-                    with self.object_condition_mp:
-                        logging.debug(end_sync_debug_msg)
-                        self.object_locked_pids_mp.remove(pid)
-                        self.object_condition_mp.notify()
-                else:
-                    # Release pid
-                    with self.object_condition:
-                        logging.debug(end_sync_debug_msg)
-                        self.object_locked_pids.remove(pid)
-                        self.object_condition.notify()
+                self.release_object_locked_pids(pid)
+                logging.debug(end_sync_debug_msg)
 
         return object_metadata
 
@@ -2593,6 +2586,24 @@ class FileHashStore(HashStore):
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
             )
+
+    # Synchronization Methods
+
+    def release_object_locked_pids(self, pid):
+        """Remove the given persistent identifier from 'object_locked_pids' and notify other
+        waiting threads or processes.
+
+        :param str pid: Persistent or authority-based identifier
+        """
+        if self.use_multiprocessing:
+            with self.object_condition_mp:
+                self.object_locked_pids_mp.remove(pid)
+                self.object_condition_mp.notify()
+        else:
+            # Release pid
+            with self.object_condition:
+                self.object_locked_pids.remove(pid)
+                self.object_condition.notify()
 
     @staticmethod
     def _get_file_paths(directory):

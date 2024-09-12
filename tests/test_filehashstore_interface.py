@@ -501,7 +501,10 @@ def test_store_object_duplicates_threads(pids, store):
             store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
         # pylint: disable=W0718
         except Exception as e:
-            assert type(e).__name__ == "HashStoreRefsAlreadyExists"
+            assert (
+                type(e).__name__ == "HashStoreRefsAlreadyExists"
+                or type(e).__name__ == "StoreObjectForPidAlreadyInProgress"
+            )
 
     thread1 = Thread(target=store_object_wrapper, args=(pid, path))
     thread2 = Thread(target=store_object_wrapper, args=(pid, path))

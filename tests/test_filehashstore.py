@@ -227,29 +227,27 @@ def test_set_default_algorithms_missing_yaml(store, pids):
 
 
 def test_store_and_validate_data_files_path(pids, store):
-    """Test _store_and_validate_data with path object for the path arg."""
+    """Test _store_and_validate_data accepts path object for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
         path = Path(test_dir) / pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
-        object_metadata_id = object_metadata.cid
-        assert store._exists(entity, object_metadata_id)
+        assert store._exists(entity, object_metadata.cid)
 
 
 def test_store_and_validate_data_files_string(pids, store):
-    """Test _store_and_validate_data with string for the path arg."""
+    """Test _store_and_validate_data accepts string for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
-        object_metadata_id = object_metadata.cid
-        assert store._exists(entity, object_metadata_id)
+        assert store._exists(entity, object_metadata.cid)
 
 
 def test_store_and_validate_data_files_stream(pids, store):
-    """Test _store_and_validate_data with stream for the path arg."""
+    """Test _store_and_validate_data accepts stream for the path arg."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -257,19 +255,17 @@ def test_store_and_validate_data_files_stream(pids, store):
         input_stream = io.open(path, "rb")
         object_metadata = store._store_and_validate_data(pid, input_stream)
         input_stream.close()
-        object_metadata_id = object_metadata.cid
-        assert store._exists(entity, object_metadata_id)
+        assert store._exists(entity, object_metadata.cid)
     assert store._count(entity) == 3
 
 
 def test_store_and_validate_data_cid(pids, store):
-    """Check _store_and_validate_data returns correct id."""
+    """Check _store_and_validate_data returns the expected content identifier"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
-        object_metadata_id = object_metadata.cid
-        assert object_metadata_id == pids[pid][store.algorithm]
+        assert object_metadata.cid == pids[pid][store.algorithm]
 
 
 def test_store_and_validate_data_file_size(pids, store):
@@ -278,8 +274,7 @@ def test_store_and_validate_data_file_size(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
-        object_size = object_metadata.obj_size
-        assert object_size == pids[pid]["file_size_bytes"]
+        assert object_metadata.obj_size == pids[pid]["file_size_bytes"]
 
 
 def test_store_and_validate_data_hex_digests(pids, store):
@@ -288,17 +283,16 @@ def test_store_and_validate_data_hex_digests(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
-        object_metadata_hex_digests = object_metadata.hex_digests
-        assert object_metadata_hex_digests.get("md5") == pids[pid]["md5"]
-        assert object_metadata_hex_digests.get("sha1") == pids[pid]["sha1"]
-        assert object_metadata_hex_digests.get("sha256") == pids[pid]["sha256"]
-        assert object_metadata_hex_digests.get("sha384") == pids[pid]["sha384"]
-        assert object_metadata_hex_digests.get("sha512") == pids[pid]["sha512"]
+        assert object_metadata.hex_digests.get("md5") == pids[pid]["md5"]
+        assert object_metadata.hex_digests.get("sha1") == pids[pid]["sha1"]
+        assert object_metadata.hex_digests.get("sha256") == pids[pid]["sha256"]
+        assert object_metadata.hex_digests.get("sha384") == pids[pid]["sha384"]
+        assert object_metadata.hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
 def test_store_and_validate_data_additional_algorithm(pids, store):
-    """Check _store_and_validate_data returns additional algorithm in hex digests
-    when provided an additional algo value."""
+    """Check _store_and_validate_data returns an additional algorithm in hex digests
+    when provided with an additional algo value."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -306,13 +300,13 @@ def test_store_and_validate_data_additional_algorithm(pids, store):
         object_metadata = store._store_and_validate_data(
             pid, path, additional_algorithm=algo
         )
-        hex_digests = object_metadata.hex_digests
-        sha224_hash = hex_digests.get(algo)
+        sha224_hash = object_metadata.hex_digests.get(algo)
         assert sha224_hash == pids[pid][algo]
 
 
 def test_store_and_validate_data_with_correct_checksums(pids, store):
-    """Check _store_and_validate_data with valid checksum and checksum algorithm supplied."""
+    """Check _store_and_validate_data stores a data object when a valid checksum and checksum
+    algorithm is supplied."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         algo = "sha224"
@@ -325,7 +319,7 @@ def test_store_and_validate_data_with_correct_checksums(pids, store):
 
 
 def test_store_and_validate_data_with_incorrect_checksum(pids, store):
-    """Check _store_and_validate_data fails when a bad checksum supplied."""
+    """Check _store_and_validate_data does not store data objects when a bad checksum supplied."""
     test_dir = "tests/testdata/"
     entity = "objects"
     for pid in pids.keys():
@@ -345,8 +339,7 @@ def test_store_data_only_cid(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_data_only(path)
-        object_metadata_id = object_metadata.cid
-        assert object_metadata_id == pids[pid][store.algorithm]
+        assert object_metadata.cid == pids[pid][store.algorithm]
 
 
 def test_store_data_only_file_size(pids, store):
@@ -355,8 +348,7 @@ def test_store_data_only_file_size(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_data_only(path)
-        object_size = object_metadata.obj_size
-        assert object_size == pids[pid]["file_size_bytes"]
+        assert object_metadata.obj_size == pids[pid]["file_size_bytes"]
 
 
 def test_store_data_only_hex_digests(pids, store):
@@ -365,12 +357,11 @@ def test_store_data_only_hex_digests(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_data_only(path)
-        object_metadata_hex_digests = object_metadata.hex_digests
-        assert object_metadata_hex_digests.get("md5") == pids[pid]["md5"]
-        assert object_metadata_hex_digests.get("sha1") == pids[pid]["sha1"]
-        assert object_metadata_hex_digests.get("sha256") == pids[pid]["sha256"]
-        assert object_metadata_hex_digests.get("sha384") == pids[pid]["sha384"]
-        assert object_metadata_hex_digests.get("sha512") == pids[pid]["sha512"]
+        assert object_metadata.hex_digests.get("md5") == pids[pid]["md5"]
+        assert object_metadata.hex_digests.get("sha1") == pids[pid]["sha1"]
+        assert object_metadata.hex_digests.get("sha256") == pids[pid]["sha256"]
+        assert object_metadata.hex_digests.get("sha384") == pids[pid]["sha384"]
+        assert object_metadata.hex_digests.get("sha512") == pids[pid]["sha512"]
 
 
 def test_move_and_get_checksums_id(pids, store):
@@ -821,17 +812,30 @@ def test_verify_object_information_missing_key_in_hex_digests_supported_algo(
 
 
 def test_find_object(pids, store):
-    """Test find_object returns the correct content identifier (cid)."""
+    """Test _find_object returns the correct content."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
         obj_info_dict = store._find_object(pid)
-        assert obj_info_dict.get("cid") == object_metadata.hex_digests.get("sha256")
+        retrieved_cid = obj_info_dict["cid"]
+
+        assert retrieved_cid == object_metadata.hex_digests.get("sha256")
+
+        data_object_path = store._get_hashstore_data_object_path(retrieved_cid)
+        assert data_object_path == obj_info_dict["cid_object_path"]
+
+        cid_refs_path = store._get_hashstore_cid_refs_path(retrieved_cid)
+        assert cid_refs_path == obj_info_dict["cid_refs_path"]
+
+        pid_refs_path = store._get_hashstore_pid_refs_path(pid)
+        assert pid_refs_path == obj_info_dict["pid_refs_path"]
+
+        assert obj_info_dict["sysmeta_path"] == "Does not exist."
 
 
 def test_find_object_refs_exist_but_obj_not_found(pids, store):
-    """Test find_object throws exception when refs file exist but the object does not."""
+    """Test _find_object throws exception when refs file exist but the object does not."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -846,8 +850,8 @@ def test_find_object_refs_exist_but_obj_not_found(pids, store):
 
 
 def test_find_object_cid_refs_not_found(pids, store):
-    """Test find_object throws exception when pid refs file is found with a cid
-    but the cid does not exist."""
+    """Test _find_object throws exception when pid refs file is found (and contains a cid)
+    but the cid refs file does not exist."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -865,7 +869,7 @@ def test_find_object_cid_refs_not_found(pids, store):
 
 
 def test_find_object_cid_refs_does_not_contain_pid(pids, store):
-    """Test find_object throws exception when pid refs file is found with a cid
+    """Test _find_object throws exception when pid refs file is found (and contains a cid)
     but the cid refs file does not contain the pid."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -883,19 +887,19 @@ def test_find_object_cid_refs_does_not_contain_pid(pids, store):
 
 
 def test_find_object_pid_refs_not_found(store):
-    """Test find object throws exception when object doesn't exist."""
+    """Test _find_object throws exception when a pid refs file does not exist."""
     with pytest.raises(PidRefsDoesNotExist):
         store._find_object("dou.test.1")
 
 
 def test_find_object_pid_none(store):
-    """Test find object throws exception when pid is None."""
+    """Test _find_object throws exception when pid is None."""
     with pytest.raises(ValueError):
         store._find_object(None)
 
 
 def test_find_object_pid_empty(store):
-    """Test find object throws exception when pid is empty."""
+    """Test _find_object throws exception when pid is empty."""
     with pytest.raises(ValueError):
         store._find_object("")
 

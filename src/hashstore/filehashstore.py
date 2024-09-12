@@ -1385,8 +1385,8 @@ class FileHashStore(HashStore):
                     # If not, it is an orphan pid refs file
                     err_msg = (
                         "FileHashStore - find_object: pid refs file exists with cid: "
-                        + f"{pid_refs_cid} for pid: {pid}"
-                        + f", but is missing from cid refs file: {cid_ref_abs_path}"
+                        + f"{pid_refs_cid} for pid: {pid} but is missing from cid refs file:"
+                        + str(cid_ref_abs_path)
                     )
                     logging.error(err_msg)
                     raise PidNotFoundInCidRefsFile(err_msg)
@@ -1406,9 +1406,10 @@ class FileHashStore(HashStore):
             raise PidRefsDoesNotExist(err_msg)
 
     def _store_data_only(self, data):
-        """Store an object to HashStore and return the ID and a hex digest
-        dictionary of the default algorithms. This method does not validate the
-        object and writes directly to `/objects` after the hex digests are calculated.
+        """Store an object to HashStore and return the a metadata object containing the content
+        identifier, object file size and hex digests dictionary of the default algorithms. This
+        method does not validate the object and writes directly to `/objects` after the hex
+        digests are calculated.
 
         :param mixed data: String or path to object.
 
@@ -1429,13 +1430,16 @@ class FileHashStore(HashStore):
             # Get the hex digest dictionary
             with closing(stream):
                 (
-                    object_ref_pid_location,
+                    object_cid,
                     obj_file_size,
                     hex_digest_dict,
                 ) = self._move_and_get_checksums(None, stream)
 
             object_metadata = ObjectMetadata(
-                None, object_ref_pid_location, obj_file_size, hex_digest_dict
+                "HashStoreNoPid",
+                object_cid,
+                obj_file_size,
+                hex_digest_dict,
             )
             # The permanent address of the data stored is based on the data's checksum
             cid = hex_digest_dict.get(self.algorithm)

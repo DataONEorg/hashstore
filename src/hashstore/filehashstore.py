@@ -636,27 +636,9 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid")
         self._check_string(cid, "cid")
 
-        sync_begin_debug_msg = (
-            f"FileHashStore - tag_object: Adding cid ({pid}) to locked list."
-        )
-        sync_wait_msg = f"FileHashStore - tag_object: Cid ({cid}) is locked. Waiting."
         # TODO: The pid should also be locked to ensure thread safety
-        if self.use_multiprocessing:
-            with self.object_cid_condition_mp:
-                # Wait for the cid to release if it's being tagged
-                while cid in self.object_locked_cids_mp:
-                    logging.debug(sync_wait_msg)
-                    self.object_cid_condition_mp.wait()
-                # Modify reference_locked_cids consecutively
-                logging.debug(sync_begin_debug_msg)
-                self.object_locked_cids_mp.append(cid)
-        else:
-            with self.object_cid_condition_th:
-                while cid in self.object_locked_cids_th:
-                    logging.debug(sync_wait_msg)
-                    self.object_cid_condition_th.wait()
-                logging.debug(sync_begin_debug_msg)
-                self.object_locked_cids_th.append(cid)
+        self.synchronize_referenced_locked_cids(cid)
+
         try:
             # Prepare files and paths
             tmp_root_path = self._get_store_path("refs") / "tmp"
@@ -2580,6 +2562,37 @@ class FileHashStore(HashStore):
             with self.object_pid_condition_th:
                 self.object_locked_pids_th.remove(pid)
                 self.object_pid_condition_th.notify()
+
+    def synchronize_referenced_locked_cids(self, cid):
+        """Multiple threads may access a data object via its 'cid' or the respective 'cid
+        reference  file' (which contains a list of 'pid's that reference a 'cid') and this needs
+        to be coordinated."""
+        if self.use_multiprocessing:
+            with self.object_cid_condition_mp:
+                # Wait for the cid to release if it's being tagged
+                while cid in self.object_locked_cids_mp:
+                    logging.debug(
+                        f"synchronize_referenced_locked_cids: Cid ({cid}) is locked. Waiting."
+                    )
+                    self.object_cid_condition_mp.wait()
+                # Modify reference_locked_cids consecutively
+                self.object_locked_cids_mp.append(cid)
+                logging.debug(
+                    f"synchronize_referenced_locked_cids: Synchronizing object_locked_cids_mp for"
+                    + f" cid: {cid}"
+                )
+        else:
+            with self.object_cid_condition_th:
+                while cid in self.object_locked_cids_th:
+                    logging.debug(
+                        f"synchronize_referenced_locked_cids: Cid ({cid}) is locked. Waiting."
+                    )
+                    self.object_cid_condition_th.wait()
+                self.object_locked_cids_th.append(cid)
+                logging.debug(
+                    f"synchronize_referenced_locked_cids: Synchronizing object_locked_cids_th for"
+                    + f" cid: {cid}"
+                )
 
     @staticmethod
     def _get_file_paths(directory):

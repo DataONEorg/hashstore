@@ -8,7 +8,7 @@ from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
     HashStoreRefsAlreadyExists,
-    PidAlreadyExistsError,
+    PidRefsAlreadyExistsError,
     PidRefsContentError,
     PidRefsFileNotFound,
 )
@@ -97,25 +97,6 @@ def test_tag_object_pid_refs_found_cid_refs_found(pids, store):
 
 
 def test_tag_object_pid_refs_found_cid_refs_not_found(store):
-    """Test that tag_object creates a missing cid refs file when called to tag a cid
-    with a pid whose associated pid refs file contains the given cid."""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid.replace("/", "_")
-    object_metadata = store.store_object(pid, path)
-    cid = object_metadata.cid
-
-    # Manually delete the cid refs file, creating an orphaned pid
-    cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
-    os.remove(cid_ref_abs_path)
-    assert store._count("cid") == 0
-
-    store.tag_object(pid, cid)
-    assert store._count("pid") == 1
-    assert store._count("cid") == 1
-
-
-def test_tag_object_pid_refs_found_cid_refs_not_found_different_cid_retrieved(store):
     """Test that tag_object throws an exception when pid refs file exists, contains a
     different cid, and is correctly referenced in the associated cid refs file"""
     test_dir = "tests/testdata/"
@@ -123,7 +104,7 @@ def test_tag_object_pid_refs_found_cid_refs_not_found_different_cid_retrieved(st
     path = test_dir + pid.replace("/", "_")
     _object_metadata = store.store_object(pid, path)
 
-    with pytest.raises(PidAlreadyExistsError):
+    with pytest.raises(PidRefsAlreadyExistsError):
         store.tag_object(pid, "another_cid_value_that_is_not_found")
 
 

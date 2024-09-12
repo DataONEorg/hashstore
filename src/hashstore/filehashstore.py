@@ -23,7 +23,7 @@ from hashstore.filehashstore_exceptions import (
     HashStoreRefsAlreadyExists,
     NonMatchingChecksum,
     NonMatchingObjSize,
-    PidAlreadyExistsError,
+    PidRefsAlreadyExistsError,
     PidNotFoundInCidRefsFile,
     PidRefsContentError,
     PidRefsDoesNotExist,
@@ -681,56 +681,15 @@ class FileHashStore(HashStore):
                     raise HashStoreRefsAlreadyExists(err_msg)
 
             elif os.path.exists(pid_refs_path) and not os.path.exists(cid_refs_path):
-                debug_msg = (
-                    f"FileHashStore - tag_object: pid refs file exists ({pid_refs_path})"
-                    + f" for pid: {pid}, but cid refs file doesn't at: {cid_refs_path}"
-                    + f" for cid: {cid}"
+                # If pid refs exists, the pid has already been claimed and cannot be tagged we
+                # throw an exception immediately
+                error_msg = (
+                    f"FileHashStore - tag_object: Pid refs file already exists for pid: {pid}."
+                    + " A pid can only reference one cid. "
                 )
-                logging.debug(debug_msg)
-                # A pid reference file can only contain and reference one cid
-                # First, confirm that the expected cid refs file exists by getting the cid
-                with open(pid_refs_path, "r", encoding="utf8") as pid_ref_file:
-                    pid_refs_cid = pid_ref_file.read()
+                logging.error(error_msg)
+                raise PidRefsAlreadyExistsError(error_msg)
 
-                if self._is_string_in_refs_file(cid, pid_refs_path):
-                    # The pid correctly references the given cid, but the cid refs file is missing
-                    cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
-                    shutil.move(cid_tmp_file_path, cid_refs_path)
-                    self._verify_hashstore_references(
-                        pid,
-                        cid,
-                        pid_refs_path,
-                        cid_refs_path,
-                        "Created missing cid refs file",
-                    )
-                    info_msg = (
-                        f"FileHashStore - tag_object: pid refs file exists for pid: {pid}"
-                        + f", with the expected cid: {cid} - but cid refs file is missing."
-                        + " Cid refs file created, tagged and verified."
-                    )
-                    logging.info(info_msg)
-                    return True
-                else:
-                    # Check if the retrieved cid refs file exists and pid is referenced
-                    retrieved_cid_refs_path = self._get_hashstore_cid_refs_path(
-                        pid_refs_cid
-                    )
-                    if os.path.exists(
-                        retrieved_cid_refs_path
-                    ) and self._is_string_in_refs_file(pid, retrieved_cid_refs_path):
-                        # Throw exception, this pid is accounted for
-                        error_msg = (
-                            "FileHashStore - tag_object: Pid refs file exists with valid pid"
-                            + f" and cid reference files for pid: {pid} with cid: {cid}."
-                        )
-                        logging.error(error_msg)
-                        raise PidAlreadyExistsError(error_msg)
-                    else:
-                        debug_msg = (
-                            f"FileHashStore - tag_object: Orphan pid refs file found for {pid}."
-                            + f" Cid ({cid}) reference file does not contain the pid. Proceeding."
-                        )
-                        logging.debug(debug_msg)
             elif not os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
                 debug_msg = (
                     f"FileHashStore - tag_object: pid refs file does not exist for pid {pid}"

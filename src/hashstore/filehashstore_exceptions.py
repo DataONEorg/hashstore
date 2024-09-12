@@ -55,7 +55,7 @@ class PidRefsFileNotFound(Exception):
         self.errors = errors
 
 
-class PidAlreadyExistsError(Exception):
+class PidRefsAlreadyExistsError(Exception):
     """Custom exception thrown when a client calls 'tag_object' and the pid
     that is being tagged is already accounted for (has a pid refs file and
     is found in the cid refs file)."""

@@ -78,20 +78,6 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def verify_object(
-        self, object_metadata, checksum, checksum_algorithm, expected_file_size
-    ):
-        """Confirm equality of content in an ObjectMetadata. The `verify_object` method verifies
-        that the content in the provided `object_metadata` matches the specified values.
-
-        :param ObjectMetadata object_metadata: ObjectMetadata object.
-        :param str checksum: Value of the checksum.
-        :param str checksum_algorithm: Algorithm of the checksum.
-        :param int expected_file_size: Size of the temporary file.
-        """
-        raise NotImplementedError()
-
-    @abstractmethod
     def store_metadata(self, pid, metadata, format_id):
         """Add or update metadata, such as `sysmeta`, to disk using the given path/stream. The
         `store_metadata` method uses a persistent identifier `pid` and a metadata `format_id`
@@ -139,15 +125,27 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_object(self, ab_id, id_type):
+    def delete_object(self, pid):
         """Deletes an object and its related data permanently from HashStore using a given
-        persistent identifier. If the `id_type` is 'pid', the object associated with the pid will
-        be deleted if it is not referenced by any other pids, along with its reference files and
-        all metadata documents found in its respective metadata directory. If the `id_type` is
-        'cid', only the object will be deleted if it is not referenced by other pids.
+        persistent identifier. The object associated with the pid will be deleted if it is not
+        referenced by any other pids, along with its reference files and all metadata documents
+        found in its respective metadata directory.
 
-        :param str ab_id: Authority-based identifier.
-        :param str id_type: "pid" or "cid"
+        :param str pid: Persistent or Authority-based identifier.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def delete_invalid_object(
+        self, object_metadata, checksum, checksum_algorithm, expected_file_size
+    ):
+        """Confirm equality of content in an ObjectMetadata. The `delete_invalid_object` method
+        will delete a data object if the object_metadata does not match the specified values.
+
+        :param ObjectMetadata object_metadata: ObjectMetadata object.
+        :param str checksum: Value of the checksum.
+        :param str checksum_algorithm: Algorithm of the checksum.
+        :param int expected_file_size: Size of the temporary file.
         """
         raise NotImplementedError()
 

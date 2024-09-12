@@ -418,7 +418,7 @@ def test_store_object_duplicate_object_references_file_content(pids, store):
     pid_three = "dou.test.2"
     store.store_object(pid_three, path)
     # Confirm the content of the cid refence files
-    cid_ref_abs_path = store._resolve_path("cid", pids[pid][store.algorithm])
+    cid_ref_abs_path = store._get_hashstore_cid_refs_path(pids[pid][store.algorithm])
     with open(cid_ref_abs_path, "r", encoding="utf8") as f:
         for _, line in enumerate(f, start=1):
             value = line.strip()
@@ -440,6 +440,8 @@ def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, stor
             pid, path, checksum="nonmatchingchecksum", checksum_algorithm="sha256"
         )
     assert store._count(entity) == 1
+    # Confirm tmp files created during this process was handled
+    assert store._count("tmp") == 0
     assert store._exists(entity, pids[pid][store.algorithm])
 
 
@@ -555,8 +557,8 @@ def test_store_object_threads_multiple_pids_one_cid_content(pids, store):
     assert store._count(entity) == 1
     assert store._exists(entity, pids["jtao.1700.1"][store.algorithm])
 
-    cid_refs_path = store._resolve_path(
-        "cid", "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
+    cid_refs_path = store._get_hashstore_cid_refs_path(
+        "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
     )
     number_of_pids_reffed = 0
     with open(cid_refs_path, "r", encoding="utf8") as ref_file:
@@ -729,7 +731,7 @@ def test_store_metadata(pids, store):
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
-        assert metadata_cid == full_path
+        assert metadata_cid == str(full_path)
     assert store._count(entity) == 3
 
 
@@ -754,9 +756,9 @@ def test_store_metadata_one_pid_multiple_docs_correct_location(store):
     full_path = store._get_store_path("metadata") / rel_path / metadata_document_name
     full_path3 = store._get_store_path("metadata") / rel_path / metadata_document_name3
     full_path4 = store._get_store_path("metadata") / rel_path / metadata_document_name4
-    assert metadata_cid == full_path
-    assert metadata_cid3 == full_path3
-    assert metadata_cid4 == full_path4
+    assert metadata_cid == str(full_path)
+    assert metadata_cid3 == str(full_path3)
+    assert metadata_cid4 == str(full_path4)
     assert store._count(entity) == 3
 
 
@@ -775,7 +777,7 @@ def test_store_metadata_default_format_id(pids, store):
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
-        assert metadata_cid == full_path
+        assert metadata_cid == str(full_path)
 
 
 def test_store_metadata_files_string(pids, store):
@@ -866,7 +868,7 @@ def test_store_metadata_metadata_path(pids, store):
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
         metadata_cid = store.store_metadata(pid, syspath, format_id)
-        metadata_path = store._resolve_path("metadata", metadata_cid)
+        metadata_path = store._get_hashstore_metadata_path(metadata_cid)
         assert metadata_cid == metadata_path
 
 
@@ -1049,7 +1051,7 @@ def test_delete_object_pid_refs_file_deleted(pids, store):
         _object_metadata = store.store_object(pid, path)
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
-        pid_refs_file_path = store._resolve_path("pid", pid)
+        pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
         assert not os.path.exists(pid_refs_file_path)
 
 
@@ -1065,7 +1067,7 @@ def test_delete_object_cid_refs_file_deleted(pids, store):
         _metadata_cid = store.store_metadata(pid, syspath, format_id)
         cid = object_metadata.cid
         store.delete_object(pid)
-        cid_refs_file_path = store._resolve_path("cid", cid)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
         assert not os.path.exists(cid_refs_file_path)
 
 
@@ -1076,40 +1078,12 @@ def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.cid
-        cid_refs_abs_path = store._resolve_path("cid", cid)
+        cid_refs_abs_path = store._get_hashstore_cid_refs_path(cid)
         # pylint: disable=W0212
         store._update_refs_file(cid_refs_abs_path, "dou.test.1", "add")
         store.delete_object(pid)
-        cid_refs_file_path = store._resolve_path("cid", cid)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
         assert os.path.exists(cid_refs_file_path)
-
-
-def test_delete_object_idtype_cid(pids, store):
-    """Test delete_object successfully deletes only object."""
-    test_dir = "tests/testdata/"
-    entity = "objects"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid=None, data=path)
-        store.delete_object(object_metadata.cid, "cid")
-    assert store._count(entity) == 0
-
-
-def test_delete_object_idtype_cid_refs_file_exists(pids, store):
-    """Test delete_object does not delete object if a cid refs file still exists."""
-    test_dir = "tests/testdata/"
-    entity = "objects"
-    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
-        store.delete_object(object_metadata.cid, "cid")
-    assert store._count(entity) == 3
-    assert store._count("pid") == 3
-    assert store._count("cid") == 3
 
 
 def test_delete_object_pid_empty(store):
@@ -1124,6 +1098,143 @@ def test_delete_object_pid_none(store):
     pid = None
     with pytest.raises(ValueError):
         store.delete_object(pid)
+
+
+def test_delete_invalid_object(pids, store):
+    """Test delete_invalid_object does not throw exception given good arguments."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+        store.delete_invalid_object(
+            object_metadata, checksum, checksum_algorithm, expected_file_size
+        )
+        assert store._exists("objects", object_metadata.cid)
+
+
+def test_delete_invalid_object_supported_other_algo_not_in_default(pids, store):
+    """Test delete_invalid_object does not throw exception when supported add algo is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        supported_algo = "sha224"
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = pids[pid][supported_algo]
+        expected_file_size = object_metadata.obj_size
+        store.delete_invalid_object(
+            object_metadata, checksum, supported_algo, expected_file_size
+        )
+        assert store._exists("objects", object_metadata.cid)
+
+
+def test_delete_invalid_object_exception_incorrect_object_metadata_type(pids, store):
+    """Test delete_invalid_object throws exception when incorrect class type is given to
+    object_metadata arg."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(ValueError):
+            store.delete_invalid_object(
+                "not_object_metadata", checksum, checksum_algorithm, expected_file_size
+            )
+
+
+def test_delete_invalid_object_exception_incorrect_size(pids, store):
+    """Test delete_invalid_object throws exception when incorrect size is supplied and that data
+    object is deleted as we are storing without a pid."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+
+        with pytest.raises(NonMatchingObjSize):
+            store.delete_invalid_object(
+                object_metadata, checksum, checksum_algorithm, 1000
+            )
+
+        assert not store._exists("objects", object_metadata.cid)
+
+
+def test_delete_invalid_object_exception_incorrect_size_object_exists(pids, store):
+    """Test delete_invalid_object throws exception when incorrect size is supplied and that data
+    object is not deleted since it already exists (a cid refs file is present)."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        store.store_object(pid, data=path)
+    # Store again without pid and wrong object size
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+
+        with pytest.raises(NonMatchingObjSize):
+            store.delete_invalid_object(
+                object_metadata, checksum, checksum_algorithm, 1000
+            )
+
+        assert store._exists("objects", object_metadata.cid)
+        assert store._count("tmp") == 0
+
+
+def test_delete_invalid_object_exception_incorrect_checksum(pids, store):
+    """Test delete_invalid_object throws exception when incorrect checksum is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+
+        with pytest.raises(NonMatchingChecksum):
+            store.delete_invalid_object(
+                object_metadata, "abc123", checksum_algorithm, expected_file_size
+            )
+
+        assert not store._exists("objects", object_metadata.cid)
+
+
+def test_delete_invalid_object_exception_incorrect_checksum_algo(pids, store):
+    """Test delete_invalid_object throws exception when unsupported algorithm is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(UnsupportedAlgorithm):
+            store.delete_invalid_object(
+                object_metadata, checksum, "md2", expected_file_size
+            )
+
+        assert store._exists("objects", object_metadata.cid)
+        assert store._count("tmp") == 0
+
+
+def test_delete_invalid_object_exception_supported_other_algo_bad_checksum(pids, store):
+    """Test delete_invalid_object throws exception when incorrect checksum is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(NonMatchingChecksum):
+            store.delete_invalid_object(
+                object_metadata, checksum, "sha224", expected_file_size
+            )
+
+        assert not store._exists("objects", object_metadata.cid)
 
 
 def test_delete_metadata(pids, store):

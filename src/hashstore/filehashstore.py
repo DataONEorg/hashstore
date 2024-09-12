@@ -420,9 +420,9 @@ class FileHashStore(HashStore):
                     checked_properties[key] = int(value)
                 except Exception as err:
                     exception_string = (
-                            "FileHashStore - _validate_properties: Unexpected exception when"
-                            " attempting to ensure store depth and width are integers. Details: "
-                            + str(err)
+                        "FileHashStore - _validate_properties: Unexpected exception when"
+                        " attempting to ensure store depth and width are integers. Details: "
+                        + str(err)
                     )
                     logging.debug(exception_string)
                     raise ValueError(exception_string)
@@ -580,7 +580,7 @@ class FileHashStore(HashStore):
 
         return object_metadata
 
-    def verify_object(
+    def delete_invalid_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
         self._check_string(checksum, "checksum")
@@ -603,16 +603,24 @@ class FileHashStore(HashStore):
             checksum_algorithm_checked = self._clean_algorithm(checksum_algorithm)
 
             # Throws exceptions if there's an issue
-            self._verify_object_information(
-                pid=None,
-                checksum=checksum,
-                checksum_algorithm=checksum_algorithm_checked,
-                entity="objects",
-                hex_digests=object_metadata_hex_digests,
-                tmp_file_name=None,
-                tmp_file_size=object_metadata_file_size,
-                file_size_to_validate=expected_file_size,
-            )
+            try:
+                self._verify_object_information(
+                    pid=None,
+                    checksum=checksum,
+                    checksum_algorithm=checksum_algorithm_checked,
+                    entity="objects",
+                    hex_digests=object_metadata_hex_digests,
+                    tmp_file_name=None,
+                    tmp_file_size=object_metadata_file_size,
+                    file_size_to_validate=expected_file_size,
+                )
+            except NonMatchingObjSize as nmose:
+                self._delete_object_only(object_metadata.cid)
+                logging.error(nmose)
+                raise nmose
+            except NonMatchingChecksum as mmce:
+                self._delete_object_only(object_metadata.cid)
+                raise mmce
             logging.info(
                 "FileHashStore - verify_object: object has been validated for cid: %s",
                 object_metadata.cid,
@@ -650,8 +658,8 @@ class FileHashStore(HashStore):
         try:
             # Prepare files and paths
             tmp_root_path = self._get_store_path("refs") / "tmp"
-            pid_refs_path = self._resolve_path("pid", pid)
-            cid_refs_path = self._resolve_path("cid", cid)
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
             # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
             self._create_path(Path(os.path.dirname(pid_refs_path)))
             self._create_path(Path(os.path.dirname(cid_refs_path)))
@@ -702,7 +710,9 @@ class FileHashStore(HashStore):
                     return True
                 else:
                     # Check if the retrieved cid refs file exists and pid is referenced
-                    retrieved_cid_refs_path = self._resolve_path("cid", pid_refs_cid)
+                    retrieved_cid_refs_path = self._get_hashstore_cid_refs_path(
+                        pid_refs_cid
+                    )
                     if os.path.exists(
                         retrieved_cid_refs_path
                     ) and self._is_string_in_refs_file(pid, retrieved_cid_refs_path):
@@ -819,7 +829,7 @@ class FileHashStore(HashStore):
                 + f" pid: {pid} with format_id: {checked_format_id}"
             )
             logging.info(info_msg)
-            return metadata_cid
+            return str(metadata_cid)
         finally:
             # Release pid
             end_sync_debug_msg = (
@@ -844,7 +854,7 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid")
 
-        object_info_dict = self.find_object(pid)
+        object_info_dict = self._find_object(pid)
         object_cid = object_info_dict.get("cid")
         entity = "objects"
 
@@ -897,22 +907,57 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise ValueError(exception_string)
 
-    def delete_object(self, ab_id, id_type=None):
+    def delete_object(self, pid):
         logging.debug(
-            "FileHashStore - delete_object: Request to delete object for id: %s", ab_id
+            "FileHashStore - delete_object: Request to delete object for id: %s", pid
         )
-        self._check_string(ab_id, "ab_id")
+        self._check_string(pid, "pid")
 
-        if id_type == "cid":
-            cid_refs_abs_path = self._resolve_path("cid", ab_id)
-            # If the refs file still exists, do not delete the object
-            if not os.path.exists(cid_refs_abs_path):
-                cid = ab_id
+        objects_to_delete = []
+
+        # Storing and deleting objects are synchronized together
+        # Duplicate store object requests for a pid are rejected, but deleting an object
+        # will wait for a pid to be released if it's found to be in use before proceeding.
+        sync_begin_debug_msg = (
+            f"FileHashStore - delete_object: Pid ({pid}) to locked list."
+        )
+        sync_wait_msg = (
+            f"FileHashStore - delete_object: Pid ({pid}) is locked. Waiting."
+        )
+        if self.use_multiprocessing:
+            with self.object_condition_mp:
+                # Wait for the pid to release if it's in use
+                while pid in self.object_locked_pids_mp:
+                    logging.debug(sync_wait_msg)
+                    self.object_condition_mp.wait()
+                # Modify object_locked_pids consecutively
+                logging.debug(sync_begin_debug_msg)
+                self.object_locked_pids_mp.append(pid)
+        else:
+            with self.object_condition:
+                while pid in self.object_locked_pids:
+                    logging.debug(sync_wait_msg)
+                    self.object_condition.wait()
+                logging.debug(sync_begin_debug_msg)
+                self.object_locked_pids.append(pid)
+
+        try:
+            # Before we begin deletion process, we look for the `cid` by calling
+            # `find_object` which will throw custom exceptions if there is an issue with
+            # the reference files, which help us determine the path to proceed with.
+            try:
+                object_info_dict = self._find_object(pid)
+                cid = object_info_dict.get("cid")
+
+                # Proceed with next steps - cid has been retrieved without any issues
+                # We must synchronize here based on the `cid` because multiple threads may
+                # try to access the `cid_reference_file`
                 sync_begin_debug_msg = (
                     f"FileHashStore - delete_object: Cid ({cid}) to locked list."
                 )
                 sync_wait_msg = (
-                    f"FileHashStore - delete_object: Cid ({cid}) is locked. Waiting."
+                    f"FileHashStore - delete_object: Cid ({cid}) is locked."
+                    + " Waiting."
                 )
                 if self.use_multiprocessing:
                     with self.reference_condition_mp:
@@ -932,7 +977,42 @@ class FileHashStore(HashStore):
                         self.reference_locked_cids.append(cid)
 
                 try:
-                    self._delete("objects", cid)
+                    cid_ref_abs_path = object_info_dict.get("cid_refs_path")
+                    pid_ref_abs_path = object_info_dict.get("pid_refs_path")
+                    # Add pid refs file to be permanently deleted
+                    objects_to_delete.append(
+                        self._rename_path_for_deletion(pid_ref_abs_path)
+                    )
+                    # Remove pid from cid reference file
+                    self._update_refs_file(cid_ref_abs_path, pid, "remove")
+                    # Delete cid reference file and object only if the cid refs file is empty
+                    if os.path.getsize(cid_ref_abs_path) == 0:
+                        debug_msg = (
+                            "FileHashStore - delete_object: cid_refs_file is empty (size == 0):"
+                            + f" {cid_ref_abs_path} - deleting cid refs file and data object."
+                        )
+                        logging.debug(debug_msg)
+                        objects_to_delete.append(
+                            self._rename_path_for_deletion(cid_ref_abs_path)
+                        )
+                        obj_real_path = object_info_dict.get("cid_object_path")
+                        objects_to_delete.append(
+                            self._rename_path_for_deletion(obj_real_path)
+                        )
+                    # Remove all files confirmed for deletion
+                    for obj in objects_to_delete:
+                        os.remove(obj)
+
+                    # Remove metadata files if they exist
+                    self.delete_metadata(pid)
+
+                    info_string = (
+                        "FileHashStore - delete_object: Successfully deleted references,"
+                        + f" metadata and object associated with pid: {pid}"
+                    )
+                    logging.info(info_string)
+                    return
+
                 finally:
                     # Release cid
                     end_sync_debug_msg = (
@@ -949,201 +1029,83 @@ class FileHashStore(HashStore):
                             logging.debug(end_sync_debug_msg)
                             self.reference_locked_cids.remove(cid)
                             self.reference_condition.notify()
-        else:
-            # id_type is "pid"
-            pid = ab_id
-            objects_to_delete = []
 
-            # Storing and deleting objects are synchronized together
-            # Duplicate store object requests for a pid are rejected, but deleting an object
-            # will wait for a pid to be released if it's found to be in use before proceeding.
-            sync_begin_debug_msg = (
-                f"FileHashStore - delete_object: Pid ({pid}) to locked list."
-            )
-            sync_wait_msg = (
-                f"FileHashStore - delete_object: Pid ({pid}) is locked. Waiting."
+            except PidRefsDoesNotExist:
+                warn_msg = (
+                    "FileHashStore - delete_object: pid refs file does not exist for pid: "
+                    + pid
+                    + ". Skipping object deletion. Deleting pid metadata documents."
+                )
+                logging.warning(warn_msg)
+
+                # Remove metadata files if they exist
+                self.delete_metadata(pid)
+
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
+            except CidRefsDoesNotExist:
+                # Delete pid refs file
+                pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(pid_ref_abs_path)
+                )
+                # Remove metadata files if they exist
+                self.delete_metadata(pid)
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
+            except RefsFileExistsButCidObjMissing:
+                # Add pid refs file to be permanently deleted
+                pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(pid_ref_abs_path)
+                )
+                # Remove pid from cid refs file
+                with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
+                    # Retrieve the cid
+                    pid_refs_cid = pid_ref_file.read()
+                cid_ref_abs_str = str(self._get_hashstore_cid_refs_path(pid_refs_cid))
+                # Remove if the pid refs is found
+                if self._is_string_in_refs_file(pid, cid_ref_abs_str):
+                    self._update_refs_file(cid_ref_abs_str, pid, "remove")
+                # Remove metadata files if they exist
+                self.delete_metadata(pid)
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
+            except PidNotFoundInCidRefsFile:
+                # Add pid refs file to be permanently deleted
+                pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
+                objects_to_delete.append(
+                    self._rename_path_for_deletion(pid_ref_abs_path)
+                )
+                # Remove metadata files if they exist
+                self.delete_metadata(pid)
+                # Remove all files confirmed for deletion
+                for obj in objects_to_delete:
+                    os.remove(obj)
+                return
+        finally:
+            # Release pid
+            end_sync_debug_msg = (
+                f"FileHashStore - delete_object: Releasing pid ({pid})"
+                + " from locked list"
             )
             if self.use_multiprocessing:
                 with self.object_condition_mp:
-                    # Wait for the pid to release if it's in use
-                    while pid in self.object_locked_pids_mp:
-                        logging.debug(sync_wait_msg)
-                        self.object_condition_mp.wait()
-                    # Modify object_locked_pids consecutively
-                    logging.debug(sync_begin_debug_msg)
-                    self.object_locked_pids_mp.append(pid)
+                    logging.debug(end_sync_debug_msg)
+                    self.object_locked_pids_mp.remove(pid)
+                    self.object_condition_mp.notify()
             else:
-                with self.object_condition:
-                    while pid in self.object_locked_pids:
-                        logging.debug(sync_wait_msg)
-                        self.object_condition.wait()
-                    logging.debug(sync_begin_debug_msg)
-                    self.object_locked_pids.append(pid)
-
-            try:
-                # Before we begin deletion process, we look for the `cid` by calling
-                # `find_object` which will throw custom exceptions if there is an issue with
-                # the reference files, which help us determine the path to proceed with.
-                try:
-                    object_info_dict = self.find_object(pid)
-                    cid = object_info_dict.get("cid")
-
-                    # Proceed with next steps - cid has been retrieved without any issues
-                    # We must synchronize here based on the `cid` because multiple threads may
-                    # try to access the `cid_reference_file`
-                    sync_begin_debug_msg = (
-                        f"FileHashStore - delete_object: Cid ({cid}) to locked list."
-                    )
-                    sync_wait_msg = (
-                        f"FileHashStore - delete_object: Cid ({cid}) is locked."
-                        + " Waiting."
-                    )
-                    if self.use_multiprocessing:
-                        with self.reference_condition_mp:
-                            # Wait for the cid to release if it's in use
-                            while cid in self.reference_locked_cids_mp:
-                                logging.debug(sync_wait_msg)
-                                self.reference_condition_mp.wait()
-                            # Modify reference_locked_cids consecutively
-                            logging.debug(sync_begin_debug_msg)
-                            self.reference_locked_cids_mp.append(cid)
-                    else:
-                        with self.reference_condition:
-                            while cid in self.reference_locked_cids:
-                                logging.debug(sync_wait_msg)
-                                self.reference_condition.wait()
-                            logging.debug(sync_begin_debug_msg)
-                            self.reference_locked_cids.append(cid)
-
-                    try:
-                        cid_ref_abs_path = object_info_dict.get("cid_refs_path")
-                        pid_ref_abs_path = object_info_dict.get("pid_refs_path")
-                        # Add pid refs file to be permanently deleted
-                        objects_to_delete.append(
-                            self._rename_path_for_deletion(pid_ref_abs_path)
-                        )
-                        # Remove pid from cid reference file
-                        self._update_refs_file(cid_ref_abs_path, pid, "remove")
-                        # Delete cid reference file and object only if the cid refs file is empty
-                        if os.path.getsize(cid_ref_abs_path) == 0:
-                            debug_msg = (
-                                "FileHashStore - delete_object: cid_refs_file is empty (size == 0):"
-                                + f" {cid_ref_abs_path} - deleting cid refs file and data object."
-                            )
-                            logging.debug(debug_msg)
-                            objects_to_delete.append(
-                                self._rename_path_for_deletion(cid_ref_abs_path)
-                            )
-                            obj_real_path = object_info_dict.get("cid_object_path")
-                            objects_to_delete.append(
-                                self._rename_path_for_deletion(obj_real_path)
-                            )
-                        # Remove all files confirmed for deletion
-                        for obj in objects_to_delete:
-                            os.remove(obj)
-
-                        # Remove metadata files if they exist
-                        self.delete_metadata(pid)
-
-                        info_string = (
-                            "FileHashStore - delete_object: Successfully deleted references,"
-                            + f" metadata and object associated with pid: {pid}"
-                        )
-                        logging.info(info_string)
-                        return
-
-                    finally:
-                        # Release cid
-                        end_sync_debug_msg = (
-                            f"FileHashStore - delete_object: Releasing cid ({cid})"
-                            + " from locked list"
-                        )
-                        if self.use_multiprocessing:
-                            with self.reference_condition_mp:
-                                logging.debug(end_sync_debug_msg)
-                                self.reference_locked_cids_mp.remove(cid)
-                                self.reference_condition_mp.notify()
-                        else:
-                            with self.reference_condition:
-                                logging.debug(end_sync_debug_msg)
-                                self.reference_locked_cids.remove(cid)
-                                self.reference_condition.notify()
-
-                except PidRefsDoesNotExist:
-                    warn_msg = (
-                        "FileHashStore - delete_object: pid refs file does not exist for pid: "
-                        + ab_id
-                        + ". Skipping object deletion. Deleting pid metadata documents."
-                    )
-                    logging.warning(warn_msg)
-
-                    # Remove metadata files if they exist
-                    self.delete_metadata(pid)
-
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
-                except CidRefsDoesNotExist:
-                    # Delete pid refs file
-                    objects_to_delete.append(
-                        self._rename_path_for_deletion(self._resolve_path("pid", pid))
-                    )
-                    # Remove metadata files if they exist
-                    self.delete_metadata(pid)
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
-                except RefsFileExistsButCidObjMissing:
-                    # Add pid refs file to be permanently deleted
-                    pid_ref_abs_path = self._resolve_path("pid", pid)
-                    objects_to_delete.append(
-                        self._rename_path_for_deletion(pid_ref_abs_path)
-                    )
-                    # Remove pid from cid refs file
-                    with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
-                        # Retrieve the cid
-                        pid_refs_cid = pid_ref_file.read()
-                    cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
-                    # Remove if the pid refs is found
-                    if self._is_string_in_refs_file(pid, cid_ref_abs_path):
-                        self._update_refs_file(cid_ref_abs_path, pid, "remove")
-                    # Remove metadata files if they exist
-                    self.delete_metadata(pid)
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
-                except PidNotFoundInCidRefsFile:
-                    # Add pid refs file to be permanently deleted
-                    pid_ref_abs_path = self._resolve_path("pid", pid)
-                    objects_to_delete.append(
-                        self._rename_path_for_deletion(pid_ref_abs_path)
-                    )
-                    # Remove metadata files if they exist
-                    self.delete_metadata(pid)
-                    # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
-                    return
-            finally:
                 # Release pid
-                end_sync_debug_msg = (
-                    f"FileHashStore - delete_object: Releasing pid ({pid})"
-                    + " from locked list"
-                )
-                if self.use_multiprocessing:
-                    with self.object_condition_mp:
-                        logging.debug(end_sync_debug_msg)
-                        self.object_locked_pids_mp.remove(pid)
-                        self.object_condition_mp.notify()
-                else:
-                    # Release pid
-                    with self.object_condition:
-                        logging.debug(end_sync_debug_msg)
-                        self.object_locked_pids.remove(pid)
-                        self.object_condition.notify()
+                with self.object_condition:
+                    logging.debug(end_sync_debug_msg)
+                    self.object_locked_pids.remove(pid)
+                    self.object_condition.notify()
 
     def delete_metadata(self, pid, format_id=None):
         logging.debug(
@@ -1222,7 +1184,6 @@ class FileHashStore(HashStore):
                 logging.info(info_string)
         else:
             # Delete a specific metadata file
-            entity = "metadata"
             pid_doc = self._computehash(pid + checked_format_id)
             # Wait for the pid to release if it's in use
             sync_begin_debug_msg = (
@@ -1250,8 +1211,10 @@ class FileHashStore(HashStore):
                     logging.debug(sync_begin_debug_msg)
                     self.metadata_locked_docs.append(pid_doc)
             try:
-                full_path_without_directory = rel_path + "/" + pid_doc
-                self._delete(entity, full_path_without_directory)
+                full_path_without_directory = (
+                    self.metadata + "/" + rel_path + "/" + pid_doc
+                )
+                self._delete("metadata", full_path_without_directory)
                 info_string = (
                     "FileHashStore - delete_metadata: Successfully deleted metadata for pid:"
                     + f" {pid} for format_id: {format_id}"
@@ -1285,7 +1248,7 @@ class FileHashStore(HashStore):
 
         entity = "objects"
         algorithm = self._clean_algorithm(algorithm)
-        object_cid = self.find_object(pid).get("cid")
+        object_cid = self._find_object(pid).get("cid")
         if not self._exists(entity, object_cid):
             exception_string = (
                 f"FileHashStore - get_hex_digest: No object found for pid: {pid}"
@@ -1308,7 +1271,6 @@ class FileHashStore(HashStore):
         self,
         pid,
         file,
-        extension=None,
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
@@ -1319,7 +1281,6 @@ class FileHashStore(HashStore):
 
         :param str pid: Authority-based identifier.
         :param mixed file: Readable object or path to file.
-        :param str extension: Optional extension to append to file when saving.
         :param str additional_algorithm: Optional algorithm value to include when returning
             hex digests.
         :param str checksum: Optional checksum to validate object against hex digest before moving
@@ -1343,7 +1304,6 @@ class FileHashStore(HashStore):
             ) = self._move_and_get_checksums(
                 pid,
                 stream,
-                extension,
                 additional_algorithm,
                 checksum,
                 checksum_algorithm,
@@ -1359,7 +1319,7 @@ class FileHashStore(HashStore):
         )
         return object_metadata
 
-    def find_object(self, pid):
+    def _find_object(self, pid):
         """Check if an object referenced by a pid exists and retrieve its content identifier.
         The `find_object` method validates the existence of an object based on the provided
         pid and returns the associated content identifier.
@@ -1378,23 +1338,23 @@ class FileHashStore(HashStore):
         )
         self._check_string(pid, "pid")
 
-        pid_ref_abs_path = self._resolve_path("pid", pid)
+        pid_ref_abs_path = self._get_hashstore_pid_refs_path(pid)
         if os.path.exists(pid_ref_abs_path):
             # Read the file to get the cid from the pid reference
             with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
                 pid_refs_cid = pid_ref_file.read()
 
             # Confirm that the cid reference file exists
-            cid_ref_abs_path = self._resolve_path("cid", pid_refs_cid)
+            cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
             if os.path.exists(cid_ref_abs_path):
                 # Check that the pid is actually found in the cid reference file
-                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
+                if self._is_string_in_refs_file(pid, str(cid_ref_abs_path)):
                     # Object must also exist in order to return the cid retrieved
                     if not self._exists("objects", pid_refs_cid):
                         err_msg = (
-                                f"FileHashStore - find_object: Refs file found for pid ({pid}) at"
-                                + pid_ref_abs_path
-                                + f", but object referenced does not exist, cid: {pid_refs_cid}"
+                            f"FileHashStore - find_object: Refs file found for pid ({pid}) at"
+                            + str(pid_ref_abs_path)
+                            + f", but object referenced does not exist, cid: {pid_refs_cid}"
                         )
                         logging.error(err_msg)
                         raise RefsFileExistsButCidObjMissing(err_msg)
@@ -1403,14 +1363,14 @@ class FileHashStore(HashStore):
                         metadata_directory = self._computehash(pid)
                         metadata_rel_path = "/".join(self._shard(metadata_directory))
                         sysmeta_full_path = (
-                                self._get_store_path("metadata")
-                                / metadata_rel_path
-                                / sysmeta_doc_name
+                            self._get_store_path("metadata")
+                            / metadata_rel_path
+                            / sysmeta_doc_name
                         )
                         obj_info_dict = {
                             "cid": pid_refs_cid,
-                            "cid_object_path": self._resolve_path(
-                                "objects", pid_refs_cid
+                            "cid_object_path": self._get_hashstore_data_object_path(
+                                pid_refs_cid
                             ),
                             "cid_refs_path": cid_ref_abs_path,
                             "pid_refs_path": pid_ref_abs_path,
@@ -1424,31 +1384,32 @@ class FileHashStore(HashStore):
                 else:
                     # If not, it is an orphan pid refs file
                     err_msg = (
-                            "FileHashStore - find_object: pid refs file exists with cid: "
-                            + f"{pid_refs_cid} for pid: {pid}"
-                            + f", but is missing from cid refs file: {cid_ref_abs_path}"
+                        "FileHashStore - find_object: pid refs file exists with cid: "
+                        + f"{pid_refs_cid} for pid: {pid} but is missing from cid refs file:"
+                        + str(cid_ref_abs_path)
                     )
                     logging.error(err_msg)
                     raise PidNotFoundInCidRefsFile(err_msg)
             else:
                 err_msg = (
-                        f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
-                        + f", but cid refs file not found: {cid_ref_abs_path} for pid: {pid}"
+                    f"FileHashStore - find_object: pid refs file exists with cid: {pid_refs_cid}"
+                    + f", but cid refs file not found: {cid_ref_abs_path} for pid: {pid}"
                 )
                 logging.error(err_msg)
                 raise CidRefsDoesNotExist(err_msg)
         else:
             err_msg = (
-                    f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
-                    + pid_ref_abs_path
+                f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
+                + str(pid_ref_abs_path)
             )
             logging.error(err_msg)
             raise PidRefsDoesNotExist(err_msg)
 
     def _store_data_only(self, data):
-        """Store an object to HashStore and return the ID and a hex digest
-        dictionary of the default algorithms. This method does not validate the
-        object and writes directly to `/objects` after the hex digests are calculated.
+        """Store an object to HashStore and return the a metadata object containing the content
+        identifier, object file size and hex digests dictionary of the default algorithms. This
+        method does not validate the object and writes directly to `/objects` after the hex
+        digests are calculated.
 
         :param mixed data: String or path to object.
 
@@ -1469,13 +1430,16 @@ class FileHashStore(HashStore):
             # Get the hex digest dictionary
             with closing(stream):
                 (
-                    object_ref_pid_location,
+                    object_cid,
                     obj_file_size,
                     hex_digest_dict,
                 ) = self._move_and_get_checksums(None, stream)
 
             object_metadata = ObjectMetadata(
-                None, object_ref_pid_location, obj_file_size, hex_digest_dict
+                "HashStoreNoPid",
+                object_cid,
+                obj_file_size,
+                hex_digest_dict,
             )
             # The permanent address of the data stored is based on the data's checksum
             cid = hex_digest_dict.get(self.algorithm)
@@ -1497,7 +1461,6 @@ class FileHashStore(HashStore):
         self,
         pid,
         stream,
-        extension=None,
         additional_algorithm=None,
         checksum=None,
         checksum_algorithm=None,
@@ -1513,7 +1476,6 @@ class FileHashStore(HashStore):
 
         :param str pid: Authority-based identifier.
         :param Stream stream: Object stream.
-        :param str extension: Optional extension to append to the file
             when saving.
         :param str additional_algorithm: Optional algorithm value to include
             when returning hex digests.
@@ -1542,9 +1504,8 @@ class FileHashStore(HashStore):
         )
 
         # Objects are stored with their content identifier based on the store algorithm
-        entity = "objects"
         object_cid = hex_digests.get(self.algorithm)
-        abs_file_path = self._build_path(entity, object_cid, extension)
+        abs_file_path = self._build_hashstore_data_object_path(object_cid)
 
         # Only move file if it doesn't exist. We do not check before we create the tmp
         # file and calculate the hex digests because the given checksum could be incorrect.
@@ -1554,7 +1515,7 @@ class FileHashStore(HashStore):
                 pid,
                 checksum,
                 checksum_algorithm,
-                entity,
+                "objects",
                 hex_digests,
                 tmp_file_name,
                 tmp_file_size,
@@ -1600,21 +1561,23 @@ class FileHashStore(HashStore):
                             + " not be created and/or tagged.",
                         )
                         logging.debug(debug_msg)
-                        self._delete(entity, abs_file_path)
+                        self._delete("objects", abs_file_path)
                         raise err
-
-                logging.debug(
-                    "FileHashStore - _move_and_get_checksums: Deleting temporary file: %s",
-                    tmp_file_name,
-                )
-                self._delete(entity, tmp_file_name)
-                err_msg = (
-                    f"Object has not been stored for pid: {pid} - an unexpected error has occurred"
-                    + f" when moving tmp file to: {object_cid}. Reference files will not be"
-                    + f" created and/or tagged. Error: {err}"
-                )
-                logging.warning("FileHashStore - _move_and_get_checksums: %s", err_msg)
-                raise
+                else:
+                    logging.debug(
+                        "FileHashStore - _move_and_get_checksums: Deleting temporary file: %s",
+                        tmp_file_name,
+                    )
+                    self._delete("tmp", tmp_file_name)
+                    err_msg = (
+                        f"Object has not been stored for pid: {pid} - an unexpected error has "
+                        f"occurred when moving tmp file to: {object_cid}. Reference files will "
+                        f"not be created and/or tagged. Error: {err}"
+                    )
+                    logging.warning(
+                        "FileHashStore - _move_and_get_checksums: %s", err_msg
+                    )
+                    raise
         else:
             # If the data object already exists, do not move the file but attempt to verify it
             try:
@@ -1622,7 +1585,7 @@ class FileHashStore(HashStore):
                     pid,
                     checksum,
                     checksum_algorithm,
-                    entity,
+                    "objects",
                     hex_digests,
                     tmp_file_name,
                     tmp_file_size,
@@ -1647,9 +1610,10 @@ class FileHashStore(HashStore):
                 logging.debug(exception_string)
                 raise NonMatchingChecksum(exception_string) from nmce
             finally:
-                # Delete the temporary file, the data object already exists, so it is redundant
-                # No exception is thrown so 'store_object' can proceed to tag object
-                self._delete(entity, tmp_file_name)
+                # Ensure that the tmp file has been removed, the data object already exists, so it
+                # is redundant. No exception is thrown so 'store_object' can proceed to tag object
+                if os.path.exists(tmp_file_name):
+                    self._delete("tmp", tmp_file_name)
 
         return object_cid, tmp_file_size, hex_digests
 
@@ -1812,7 +1776,7 @@ class FileHashStore(HashStore):
     def _update_refs_file(self, refs_file_path, ref_id, update_type):
         """Add or remove an existing ref from a refs file.
 
-        :param str refs_file_path: Absolute path to the refs file.
+        :param path refs_file_path: Absolute path to the refs file.
         :param str ref_id: Authority-based or persistent identifier of the object.
         :param str update_type: 'add' or 'remove'
         """
@@ -1869,7 +1833,7 @@ class FileHashStore(HashStore):
         """Check a reference file for a ref_id (`cid` or `pid`).
 
         :param str ref_id: Authority-based, persistent identifier or content identifier
-        :param str refs_file_path: Path to the refs file
+        :param path refs_file_path: Path to the refs file
 
         :return: pid_found
         :rtype: boolean
@@ -1891,7 +1855,7 @@ class FileHashStore(HashStore):
         :param str metadata_doc_name: Metadata document name
 
         :return: Address of the metadata document.
-        :rtype: str
+        :rtype: Path
         """
         logging.debug(
             "FileHashStore - _put_metadata: Request to put metadata for pid: %s", pid
@@ -2054,10 +2018,6 @@ class FileHashStore(HashStore):
                         logging.debug(exception_string_for_pid)
                         raise NonMatchingChecksum(exception_string_for_pid)
                     else:
-                        # Delete the object
-                        cid = hex_digests[self.algorithm]
-                        cid_abs_path = self._resolve_path("cid", cid)
-                        self._delete(entity, cid_abs_path)
                         logging.debug(exception_string)
                         raise NonMatchingChecksum(exception_string)
 
@@ -2074,8 +2034,8 @@ class FileHashStore(HashStore):
 
         :param str pid: Authority-based or persistent identifier.
         :param str cid: Content identifier.
-        :param str pid_refs_path: Path to pid refs file
-        :param str cid_refs_path: Path to cid refs file
+        :param path pid_refs_path: Path to pid refs file
+        :param path cid_refs_path: Path to cid refs file
         :param str additional_log_string: String to append to exception statement
         """
         debug_msg = (
@@ -2084,9 +2044,9 @@ class FileHashStore(HashStore):
         )
         logging.debug(debug_msg)
         if pid_refs_path is None:
-            pid_refs_path = self._resolve_path("pid", pid)
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
         if cid_refs_path is None:
-            cid_refs_path = self._resolve_path("cid", cid)
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
 
         # Check that reference files were created
         if not os.path.exists(pid_refs_path):
@@ -2127,6 +2087,57 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise CidRefsContentError(exception_string)
+
+    def _delete_object_only(self, cid):
+        """Attempt to delete an object based on the given content identifier (cid). If the object
+        has any pids references and/or a cid refs file exists, the object will not be deleted.
+
+        :param str cid: Content identifier
+        """
+        cid_refs_abs_path = self._get_hashstore_cid_refs_path(cid)
+        # If the refs file still exists, do not delete the object
+        if not os.path.exists(cid_refs_abs_path):
+            sync_begin_debug_msg = (
+                f"FileHashStore - delete_object: Cid ({cid}) to locked list."
+            )
+            sync_wait_msg = (
+                f"FileHashStore - delete_object: Cid ({cid}) is locked. Waiting."
+            )
+            if self.use_multiprocessing:
+                with self.reference_condition_mp:
+                    # Wait for the cid to release if it's in use
+                    while cid in self.reference_locked_cids_mp:
+                        logging.debug(sync_wait_msg)
+                        self.reference_condition_mp.wait()
+                    # Modify reference_locked_cids consecutively
+                    logging.debug(sync_begin_debug_msg)
+                    self.reference_locked_cids_mp.append(cid)
+            else:
+                with self.reference_condition:
+                    while cid in self.reference_locked_cids:
+                        logging.debug(sync_wait_msg)
+                        self.reference_condition.wait()
+                    logging.debug(sync_begin_debug_msg)
+                    self.reference_locked_cids.append(cid)
+
+            try:
+                self._delete("objects", cid)
+            finally:
+                # Release cid
+                end_sync_debug_msg = (
+                    f"FileHashStore - delete_object: Releasing cid ({cid})"
+                    + " from locked list"
+                )
+                if self.use_multiprocessing:
+                    with self.reference_condition_mp:
+                        logging.debug(end_sync_debug_msg)
+                        self.reference_locked_cids_mp.remove(cid)
+                        self.reference_condition_mp.notify()
+                else:
+                    with self.reference_condition:
+                        logging.debug(end_sync_debug_msg)
+                        self.reference_locked_cids.remove(cid)
+                        self.reference_condition.notify()
 
     @staticmethod
     def _check_arg_data(data):
@@ -2294,6 +2305,73 @@ class FileHashStore(HashStore):
         hex_digest = hashobj.hexdigest()
         return hex_digest
 
+    def _shard(self, checksum):
+        """Splits the given checksum into a list of tokens of length `self.width`, followed by
+        the remainder.
+
+        This method divides the checksum into `self.depth` number of tokens, each with a fixed
+        width of `self.width`, taken from the beginning of the checksum. Any leftover characters
+        are added as the final element in the list.
+
+        Example:
+            For a checksum of '0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e',
+            the result may be:
+            ['0d', '55', '5e', 'd77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e']
+
+        :param str checksum: The checksum string to be split into tokens.
+
+        :return: A list where each element is a token of fixed width, with any leftover
+        characters as the last element.
+        :rtype: list
+        """
+
+        def compact(items):
+            """Return only truthy elements of `items`."""
+            # truthy_items = []
+            # for item in items:
+            #     if item:
+            #         truthy_items.append(item)
+            # return truthy_items
+            return [item for item in items if item]
+
+        # This creates a list of `depth` number of tokens with width
+        # `width` from the first part of the id plus the remainder.
+        hierarchical_list = compact(
+            [checksum[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
+            + [checksum[self.depth * self.width :]]
+        )
+
+        return hierarchical_list
+
+    def _count(self, entity):
+        """Return the count of the number of files in the `root` directory.
+
+        :param str entity: Desired entity type (ex. "objects", "metadata").
+
+        :return: Number of files in the directory.
+        :rtype: int
+        """
+        count = 0
+        if entity == "objects":
+            directory_to_count = self.objects
+        elif entity == "metadata":
+            directory_to_count = self.metadata
+        elif entity == "pid":
+            directory_to_count = self.pids
+        elif entity == "cid":
+            directory_to_count = self.cids
+        elif entity == "tmp":
+            directory_to_count = self.objects + "tmp"
+        else:
+            raise ValueError(
+                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
+            )
+
+        for _, _, files in os.walk(directory_to_count):
+            for _ in files:
+                count += 1
+        return count
+
     def _exists(self, entity, file):
         """Check whether a given file id or path exists on disk.
 
@@ -2303,34 +2381,16 @@ class FileHashStore(HashStore):
         :return: True if the file exists.
         :rtype: bool
         """
-        file_exists = bool(self._resolve_path(entity, file))
-        return file_exists
-
-    def _shard(self, digest):
-        """Generates a list given a digest of `self.depth` number of tokens with width
-        `self.width` from the first part of the digest plus the remainder.
-
-        Example:
-            ['0d', '55', '5e', 'd77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e']
-
-        :param str digest: The string to be divided into tokens.
-
-        :return: A list containing the tokens of fixed width.
-        :rtype: list
-        """
-
-        def compact(items):
-            """Return only truthy elements of `items`."""
-            return [item for item in items if item]
-
-        # This creates a list of `depth` number of tokens with width
-        # `width` from the first part of the id plus the remainder.
-        hierarchical_list = compact(
-            [digest[i * self.width : self.width * (i + 1)] for i in range(self.depth)]
-            + [digest[self.depth * self.width :]]
-        )
-
-        return hierarchical_list
+        if entity == "objects":
+            try:
+                return bool(self._get_hashstore_data_object_path(file))
+            except FileNotFoundError:
+                return False
+        if entity == "metadata":
+            try:
+                return bool(self._get_hashstore_metadata_path(file))
+            except FileNotFoundError:
+                return False
 
     def _open(self, entity, file, mode="rb"):
         """Return open buffer object from given id or path. Caller is responsible
@@ -2343,7 +2403,11 @@ class FileHashStore(HashStore):
         :return: An `io` stream dependent on the `mode`.
         :rtype: io.BufferedReader
         """
-        realpath = self._resolve_path(entity, file)
+        realpath = None
+        if entity == "objects":
+            realpath = self._get_hashstore_data_object_path(file)
+        if entity == "metadata":
+            realpath = self._get_hashstore_metadata_path(file)
         if realpath is None:
             raise IOError(f"Could not locate file: {file}")
 
@@ -2359,12 +2423,26 @@ class FileHashStore(HashStore):
         :param str entity: Desired entity type (ex. "objects", "metadata").
         :param str file: Address ID or path of file.
         """
-        realpath = self._resolve_path(entity, file)
-        if realpath is None:
-            return None
+        try:
+            if entity == "tmp":
+                realpath = file
+            elif entity == "objects":
+                realpath = self._get_hashstore_data_object_path(file)
+            elif entity == "metadata":
+                realpath = self._get_hashstore_metadata_path(file)
+            elif os.path.exists(file):
+                # Check if the given path is an absolute path
+                realpath = file
+            else:
+                raise IOError(
+                    f"FileHashStore - delete(): Could not locate file: {file}"
+                )
+        except FileNotFoundError:
+            realpath = None
 
         try:
-            os.remove(realpath)
+            if realpath is not None:
+                os.remove(realpath)
         except OSError as err:
             exception_string = (
                 f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
@@ -2398,77 +2476,105 @@ class FileHashStore(HashStore):
         except FileExistsError:
             assert os.path.isdir(path), f"expected {path} to be a directory"
 
-    def _build_path(self, entity, hash_id, extension=""):
-        """Build the absolute file path for a given hash ID with an optional file extension.
+    def _build_hashstore_data_object_path(self, hash_id):
+        """Build the absolute file path for a given content identifier
 
-        :param str entity: Desired entity type (ex. "objects", "metadata").
         :param str hash_id: A hash ID to build a file path for.
-        :param str extension: An optional file extension to append to the file path.
 
         :return: An absolute file path for the specified hash ID.
         :rtype: str
         """
         paths = self._shard(hash_id)
-        root_dir = self._get_store_path(entity)
-
-        if extension and not extension.startswith(os.extsep):
-            extension = os.extsep + extension
-        elif not extension:
-            extension = ""
-
-        absolute_path = os.path.join(root_dir, *paths) + extension
+        root_dir = self._get_store_path("objects")
+        absolute_path = os.path.join(root_dir, *paths)
         return absolute_path
 
-    def _resolve_path(self, entity, file):
-        """Attempt to determine the absolute path of a file ID or path through
-        successive checking of candidate paths - first by checking whether the 'file'
-        exists, followed by checking the entity type with respect to the file.
+    def _get_hashstore_data_object_path(self, cid_or_relative_path):
+        """Get the expected path to a hashstore data object that exists using a content identifier.
 
-        :param str entity: Desired entity type ("objects", "metadata", "cid", "pid"),
-            where "cid" & "pid" represents resolving the path to the refs files.
-        :param str file: Name of the file.
+        :param str cid_or_relative_path: Content identifier
 
-        :return: Path to file
-        :rtype: str
+        :return: Path to the data object referenced by the pid
+        :rtype: Path
         """
-        # Check for relative path.
-        if entity == "objects":
-            rel_root = self.objects
-            relpath = os.path.join(rel_root, file)
-            if os.path.isfile(relpath):
-                return relpath
-            else:
-                abspath = self._build_path(entity, file)
-                if os.path.isfile(abspath):
-                    return abspath
-        elif entity == "metadata":
-            if os.path.isfile(file):
-                return file
-            rel_root = self.metadata
-            relpath = os.path.join(rel_root, file)
-            if os.path.isfile(relpath):
-                return relpath
-        # Check for sharded path.
-        elif entity == "cid":
-            # Note, we skip checking whether the file exists for refs
-            cid_ref_file_abs_path = self._build_path(entity, file)
-            return cid_ref_file_abs_path
-        elif entity == "pid":
-            # Note, we skip checking whether the file exists for refs
-            hash_id = self._computehash(file, self.algorithm)
-            pid_ref_file_abs_path = self._build_path(entity, hash_id)
-            return pid_ref_file_abs_path
+        expected_abs_data_obj_path = self._build_hashstore_data_object_path(
+            cid_or_relative_path
+        )
+        if os.path.isfile(expected_abs_data_obj_path):
+            return expected_abs_data_obj_path
         else:
-            exception_string = (
-                "FileHashStore - _resolve_path: entity must be"
-                + " 'objects', 'metadata', 'cid' or 'pid"
-            )
-            raise ValueError(exception_string)
+            if os.path.isfile(cid_or_relative_path):
+                # Check whether the supplied arg is an abs path that exists or not for convenience
+                return cid_or_relative_path
+            else:
+                # Check the relative path
+                relpath = os.path.join(self.objects, cid_or_relative_path)
+                if os.path.isfile(relpath):
+                    return relpath
+                else:
+                    raise FileNotFoundError(
+                        "FileHashStore - _get_hashstore_data_object_path: could not locate a"
+                        + "data object in '/objects' for the supplied cid_or_relative_path: "
+                        + cid_or_relative_path
+                    )
+
+    def _get_hashstore_metadata_path(self, metadata_relative_path):
+        """Return the expected metadata path to a hashstore metadata object that exists.
+
+        :param str metadata_relative_path: Metadata path to check
+
+        :return: Path to the data object referenced by the pid
+        :rtype: Path
+        """
+        # Form the absolute path to the metadata file
+        expected_abs_metadata_path = os.path.join(self.metadata, metadata_relative_path)
+        if os.path.isfile(expected_abs_metadata_path):
+            return expected_abs_metadata_path
+        else:
+            if os.path.isfile(metadata_relative_path):
+                # Check whether the supplied arg is an abs path that exists or not for convenience
+                return metadata_relative_path
+            else:
+                raise FileNotFoundError(
+                    "FileHashStore - _get_hashstore_metadata_path: could not locate a"
+                    + "metadata object in '/metadata' for the supplied metadata_relative_path: "
+                    + metadata_relative_path
+                )
+
+    def _get_hashstore_pid_refs_path(self, pid):
+        """Return the expected path to a pid reference file. The path may or may not exist.
+
+        :param str pid: Persistent or authority-based identifier
+
+        :return: Path to pid reference file
+        :rtype: Path
+        """
+        # The pid refs file is named after the hash of the pid using the store's algorithm
+        hash_id = self._computehash(pid, self.algorithm)
+        root_dir = self._get_store_path("pid")
+        directories_and_path = self._shard(hash_id)
+        pid_ref_file_abs_path = os.path.join(root_dir, *directories_and_path)
+        return pid_ref_file_abs_path
+
+    def _get_hashstore_cid_refs_path(self, cid):
+        """Return the expected path to a cid reference file. The path may or may not exist.
+
+        :param str cid: Content identifier
+
+        :return: Path to cid reference file
+        :rtype: Path
+        """
+        root_dir = self._get_store_path("cid")
+        # The content identifier is to be split into directories as is supplied
+        directories_and_path = self._shard(cid)
+        cid_ref_file_abs_path = os.path.join(root_dir, *directories_and_path)
+        return cid_ref_file_abs_path
 
     def _get_store_path(self, entity):
-        """Return a path object of the root directory of the store.
+        """Return a path object to the root directory of the requested hashstore directory type
 
-        :param str entity: Desired entity type: "objects" or "metadata"
+        :param str entity: Desired entity type: "objects", "metadata", "refs", "cid" and "pid".
+        Note, "cid" and "pid" are refs specific directories.
 
         :return: Path to requested store entity type
         :rtype: Path
@@ -2507,33 +2613,6 @@ class FileHashStore(HashStore):
             return file_paths
         else:
             return None
-
-    def _count(self, entity):
-        """Return the count of the number of files in the `root` directory.
-
-        :param str entity: Desired entity type (ex. "objects", "metadata").
-
-        :return: Number of files in the directory.
-        :rtype: int
-        """
-        count = 0
-        if entity == "objects":
-            directory_to_count = self.objects
-        elif entity == "metadata":
-            directory_to_count = self.metadata
-        elif entity == "pid":
-            directory_to_count = self.pids
-        elif entity == "cid":
-            directory_to_count = self.cids
-        else:
-            raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
-            )
-
-        for _, _, files in os.walk(directory_to_count):
-            for _ in files:
-                count += 1
-        return count
 
     # Other Static Methods
 

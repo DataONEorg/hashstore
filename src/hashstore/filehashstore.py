@@ -658,19 +658,28 @@ class FileHashStore(HashStore):
             self._create_path(Path(os.path.dirname(cid_refs_path)))
 
             if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
-                self._verify_hashstore_references(
-                    pid,
-                    cid,
-                    pid_refs_path,
-                    cid_refs_path,
-                    "Refs file already exists, verifying.",
-                )
-                error_msg = (
+                # If both reference files exist, we confirm that reference files are where they
+                # are expected to be and throw an exception to inform the client that everything
+                # is in place - and include other issues for context
+                err_msg = (
                     f"FileHashStore - tag_object: Object with cid: {cid}"
-                    + f" already exists and is tagged with pid: {pid}"
+                    + f" already exists and is tagged with pid: {pid}."
                 )
-                logging.error(error_msg)
-                raise HashStoreRefsAlreadyExists(error_msg)
+                try:
+                    self._verify_hashstore_references(
+                        pid,
+                        cid,
+                        pid_refs_path,
+                        cid_refs_path,
+                        "Refs file already exists, verifying.",
+                    )
+                    logging.error(err_msg)
+                    raise HashStoreRefsAlreadyExists(err_msg)
+                except Exception as e:
+                    rev_msg = err_msg + " " + str(e)
+                    logging.error(rev_msg)
+                    raise HashStoreRefsAlreadyExists(err_msg)
+
             elif os.path.exists(pid_refs_path) and not os.path.exists(cid_refs_path):
                 debug_msg = (
                     f"FileHashStore - tag_object: pid refs file exists ({pid_refs_path})"

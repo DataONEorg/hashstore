@@ -83,30 +83,38 @@ class FileHashStore(HashStore):
         self.use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
         if self.use_multiprocessing == "True":
             # Create multiprocessing synchronization variables
-            self.object_lock_mp = multiprocessing.Lock()
-            self.object_condition_mp = multiprocessing.Condition(self.object_lock_mp)
+            # Synchronization values for object locked pids
+            self.object_pid_lock_mp = multiprocessing.Lock()
+            self.object_pid_condition_mp = multiprocessing.Condition(
+                self.object_pid_lock_mp
+            )
             self.object_locked_pids_mp = multiprocessing.Manager().list()
+            # Synchronization values for object locked cids
+            self.object_cid_lock_mp = multiprocessing.Lock()
+            self.object_cid_condition_mp = multiprocessing.Condition(
+                self.object_cid_lock_mp
+            )
+            self.object_locked_cids_mp = multiprocessing.Manager().list()
+            # Synchronization values for metadata locked documents
             self.metadata_lock_mp = multiprocessing.Lock()
             self.metadata_condition_mp = multiprocessing.Condition(
                 self.metadata_lock_mp
             )
             self.metadata_locked_docs_mp = multiprocessing.Manager().list()
-            self.reference_lock_mp = multiprocessing.Lock()
-            self.reference_condition_mp = multiprocessing.Condition(
-                self.reference_lock_mp
-            )
-            self.reference_locked_cids_mp = multiprocessing.Manager().list()
         else:
             # Create threading synchronization variables
-            self.object_lock = threading.Lock()
-            self.object_condition = threading.Condition(self.object_lock)
-            self.object_locked_pids = []
-            self.metadata_lock = threading.Lock()
-            self.metadata_condition = threading.Condition(self.metadata_lock)
-            self.metadata_locked_docs = []
-            self.reference_lock = threading.Lock()
-            self.reference_condition = threading.Condition(self.reference_lock)
-            self.reference_locked_cids = []
+            # Synchronization values for object locked pids
+            self.object_pid_lock_th = threading.Lock()
+            self.object_pid_condition_th = threading.Condition(self.object_pid_lock_th)
+            self.object_locked_pids_th = []
+            # Synchronization values for object locked cids
+            self.object_cid_lock_th = threading.Lock()
+            self.object_cid_condition_th = threading.Condition(self.object_cid_lock_th)
+            self.object_locked_cids_th = []
+            # Synchronization values for metadata locked documents
+            self.metadata_lock_th = threading.Lock()
+            self.metadata_condition_th = threading.Condition(self.metadata_lock_th)
+            self.metadata_locked_docs_th = []
         # Now check properties
         if properties:
             # Validate properties against existing configuration if present
@@ -516,7 +524,7 @@ class FileHashStore(HashStore):
                 f"{pid}" + ". Already in progress."
             )
             if self.use_multiprocessing:
-                with self.object_condition_mp:
+                with self.object_pid_condition_mp:
                     # Wait for the pid to release if it's in use
                     if pid in self.object_locked_pids_mp:
                         logging.error(err_msg)
@@ -525,12 +533,12 @@ class FileHashStore(HashStore):
                     logging.debug(sync_begin_debug_msg)
                     self.object_locked_pids_mp.append(pid)
             else:
-                with self.object_condition:
-                    if pid in self.object_locked_pids:
+                with self.object_pid_condition_th:
+                    if pid in self.object_locked_pids_th:
                         logging.error(err_msg)
                         raise StoreObjectForPidAlreadyInProgress(err_msg)
                     logging.debug(sync_begin_debug_msg)
-                    self.object_locked_pids.append(pid)
+                    self.object_locked_pids_th.append(pid)
             try:
                 logging.debug(
                     "FileHashStore - store_object: Attempting to store object for pid: %s",
@@ -632,22 +640,23 @@ class FileHashStore(HashStore):
             f"FileHashStore - tag_object: Adding cid ({pid}) to locked list."
         )
         sync_wait_msg = f"FileHashStore - tag_object: Cid ({cid}) is locked. Waiting."
+        # TODO: The pid should also be locked to ensure thread safety
         if self.use_multiprocessing:
-            with self.reference_condition_mp:
+            with self.object_cid_condition_mp:
                 # Wait for the cid to release if it's being tagged
-                while cid in self.reference_locked_cids_mp:
+                while cid in self.object_locked_cids_mp:
                     logging.debug(sync_wait_msg)
-                    self.reference_condition_mp.wait()
+                    self.object_cid_condition_mp.wait()
                 # Modify reference_locked_cids consecutively
                 logging.debug(sync_begin_debug_msg)
-                self.reference_locked_cids_mp.append(cid)
+                self.object_locked_cids_mp.append(cid)
         else:
-            with self.reference_condition:
-                while cid in self.reference_locked_cids:
+            with self.object_cid_condition_th:
+                while cid in self.object_locked_cids_th:
                     logging.debug(sync_wait_msg)
-                    self.reference_condition.wait()
+                    self.object_cid_condition_th.wait()
                 logging.debug(sync_begin_debug_msg)
-                self.reference_locked_cids.append(cid)
+                self.object_locked_cids_th.append(cid)
         try:
             # Prepare files and paths
             tmp_root_path = self._get_store_path("refs") / "tmp"
@@ -737,15 +746,15 @@ class FileHashStore(HashStore):
                 + " reference_locked_cids."
             )
             if self.use_multiprocessing:
-                with self.reference_condition_mp:
+                with self.object_cid_condition_mp:
                     logging.debug(end_sync_debug_msg)
-                    self.reference_locked_cids_mp.remove(cid)
-                    self.reference_condition_mp.notify()
+                    self.object_locked_cids_mp.remove(cid)
+                    self.object_cid_condition_mp.notify()
             else:
-                with self.reference_condition:
+                with self.object_cid_condition_th:
                     logging.debug(end_sync_debug_msg)
-                    self.reference_locked_cids.remove(cid)
-                    self.reference_condition.notify()
+                    self.object_locked_cids_th.remove(cid)
+                    self.object_cid_condition_th.notify()
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
@@ -775,12 +784,12 @@ class FileHashStore(HashStore):
                 logging.debug(sync_begin_debug_msg)
                 self.metadata_locked_docs_mp.append(pid_doc)
         else:
-            with self.metadata_condition:
-                while pid_doc in self.metadata_locked_docs:
+            with self.metadata_condition_th:
+                while pid_doc in self.metadata_locked_docs_th:
                     logging.debug(sync_wait_msg)
-                    self.metadata_condition.wait()
+                    self.metadata_condition_th.wait()
                 logging.debug(sync_begin_debug_msg)
-                self.metadata_locked_docs.append(pid_doc)
+                self.metadata_locked_docs_th.append(pid_doc)
 
         try:
             metadata_cid = self._put_metadata(metadata, pid, pid_doc)
@@ -802,10 +811,10 @@ class FileHashStore(HashStore):
                     self.metadata_locked_docs_mp.remove(pid_doc)
                     self.metadata_condition_mp.notify()
             else:
-                with self.metadata_condition:
+                with self.metadata_condition_th:
                     logging.debug(end_sync_debug_msg)
-                    self.metadata_locked_docs.remove(pid_doc)
-                    self.metadata_condition.notify()
+                    self.metadata_locked_docs_th.remove(pid_doc)
+                    self.metadata_condition_th.notify()
 
     def retrieve_object(self, pid):
         logging.debug(
@@ -885,21 +894,21 @@ class FileHashStore(HashStore):
             f"FileHashStore - delete_object: Pid ({pid}) is locked. Waiting."
         )
         if self.use_multiprocessing:
-            with self.object_condition_mp:
+            with self.object_pid_condition_mp:
                 # Wait for the pid to release if it's in use
                 while pid in self.object_locked_pids_mp:
                     logging.debug(sync_wait_msg)
-                    self.object_condition_mp.wait()
+                    self.object_pid_condition_mp.wait()
                 # Modify object_locked_pids consecutively
                 logging.debug(sync_begin_debug_msg)
                 self.object_locked_pids_mp.append(pid)
         else:
-            with self.object_condition:
-                while pid in self.object_locked_pids:
+            with self.object_pid_condition_th:
+                while pid in self.object_locked_pids_th:
                     logging.debug(sync_wait_msg)
-                    self.object_condition.wait()
+                    self.object_pid_condition_th.wait()
                 logging.debug(sync_begin_debug_msg)
-                self.object_locked_pids.append(pid)
+                self.object_locked_pids_th.append(pid)
 
         try:
             # Before we begin deletion process, we look for the `cid` by calling
@@ -920,21 +929,21 @@ class FileHashStore(HashStore):
                     + " Waiting."
                 )
                 if self.use_multiprocessing:
-                    with self.reference_condition_mp:
+                    with self.object_cid_condition_mp:
                         # Wait for the cid to release if it's in use
-                        while cid in self.reference_locked_cids_mp:
+                        while cid in self.object_locked_cids_mp:
                             logging.debug(sync_wait_msg)
-                            self.reference_condition_mp.wait()
+                            self.object_cid_condition_mp.wait()
                         # Modify reference_locked_cids consecutively
                         logging.debug(sync_begin_debug_msg)
-                        self.reference_locked_cids_mp.append(cid)
+                        self.object_locked_cids_mp.append(cid)
                 else:
-                    with self.reference_condition:
-                        while cid in self.reference_locked_cids:
+                    with self.object_cid_condition_th:
+                        while cid in self.object_locked_cids_th:
                             logging.debug(sync_wait_msg)
-                            self.reference_condition.wait()
+                            self.object_cid_condition_th.wait()
                         logging.debug(sync_begin_debug_msg)
-                        self.reference_locked_cids.append(cid)
+                        self.object_locked_cids_th.append(cid)
 
                 try:
                     cid_ref_abs_path = object_info_dict.get("cid_refs_path")
@@ -980,15 +989,15 @@ class FileHashStore(HashStore):
                         + " from locked list"
                     )
                     if self.use_multiprocessing:
-                        with self.reference_condition_mp:
+                        with self.object_cid_condition_mp:
                             logging.debug(end_sync_debug_msg)
-                            self.reference_locked_cids_mp.remove(cid)
-                            self.reference_condition_mp.notify()
+                            self.object_locked_cids_mp.remove(cid)
+                            self.object_cid_condition_mp.notify()
                     else:
-                        with self.reference_condition:
+                        with self.object_cid_condition_th:
                             logging.debug(end_sync_debug_msg)
-                            self.reference_locked_cids.remove(cid)
-                            self.reference_condition.notify()
+                            self.object_locked_cids_th.remove(cid)
+                            self.object_cid_condition_th.notify()
 
             except PidRefsDoesNotExist:
                 warn_msg = (
@@ -1056,16 +1065,16 @@ class FileHashStore(HashStore):
                 + " from locked list"
             )
             if self.use_multiprocessing:
-                with self.object_condition_mp:
+                with self.object_pid_condition_mp:
                     logging.debug(end_sync_debug_msg)
                     self.object_locked_pids_mp.remove(pid)
-                    self.object_condition_mp.notify()
+                    self.object_pid_condition_mp.notify()
             else:
                 # Release pid
-                with self.object_condition:
+                with self.object_pid_condition_th:
                     logging.debug(end_sync_debug_msg)
-                    self.object_locked_pids.remove(pid)
-                    self.object_condition.notify()
+                    self.object_locked_pids_th.remove(pid)
+                    self.object_pid_condition_th.notify()
 
     def delete_metadata(self, pid, format_id=None):
         logging.debug(
@@ -1107,12 +1116,12 @@ class FileHashStore(HashStore):
                             logging.debug(sync_begin_debug_msg)
                             self.metadata_locked_docs_mp.append(pid_doc)
                     else:
-                        with self.metadata_condition:
-                            while pid in self.metadata_locked_docs:
+                        with self.metadata_condition_th:
+                            while pid in self.metadata_locked_docs_th:
                                 logging.debug(sync_wait_msg)
-                                self.metadata_condition.wait()
+                                self.metadata_condition_th.wait()
                             logging.debug(sync_begin_debug_msg)
-                            self.metadata_locked_docs.append(pid_doc)
+                            self.metadata_locked_docs_th.append(pid_doc)
                     try:
                         # Mark metadata doc for deletion
                         objects_to_delete.append(self._rename_path_for_deletion(path))
@@ -1129,10 +1138,10 @@ class FileHashStore(HashStore):
                                 self.metadata_locked_docs_mp.remove(pid_doc)
                                 self.metadata_condition_mp.notify()
                         else:
-                            with self.metadata_condition:
+                            with self.metadata_condition_th:
                                 logging.debug(end_sync_debug_msg)
-                                self.metadata_locked_docs.remove(pid_doc)
-                                self.metadata_condition.notify()
+                                self.metadata_locked_docs_th.remove(pid_doc)
+                                self.metadata_condition_th.notify()
 
                 # Delete metadata objects
                 for obj in objects_to_delete:
@@ -1164,12 +1173,12 @@ class FileHashStore(HashStore):
                     logging.debug(sync_begin_debug_msg)
                     self.metadata_locked_docs_mp.append(pid_doc)
             else:
-                with self.metadata_condition:
-                    while pid in self.metadata_locked_docs:
+                with self.metadata_condition_th:
+                    while pid in self.metadata_locked_docs_th:
                         logging.debug(sync_wait_msg)
-                        self.metadata_condition.wait()
+                        self.metadata_condition_th.wait()
                     logging.debug(sync_begin_debug_msg)
-                    self.metadata_locked_docs.append(pid_doc)
+                    self.metadata_locked_docs_th.append(pid_doc)
             try:
                 full_path_without_directory = (
                     self.metadata + "/" + rel_path + "/" + pid_doc
@@ -1193,10 +1202,10 @@ class FileHashStore(HashStore):
                         self.metadata_locked_docs_mp.remove(pid_doc)
                         self.metadata_condition_mp.notify()
                 else:
-                    with self.metadata_condition:
+                    with self.metadata_condition_th:
                         logging.debug(end_sync_debug_msg)
-                        self.metadata_locked_docs.remove(pid_doc)
-                        self.metadata_condition.notify()
+                        self.metadata_locked_docs_th.remove(pid_doc)
+                        self.metadata_condition_th.notify()
 
     def get_hex_digest(self, pid, algorithm):
         logging.debug(
@@ -2064,21 +2073,21 @@ class FileHashStore(HashStore):
                 f"FileHashStore - delete_object: Cid ({cid}) is locked. Waiting."
             )
             if self.use_multiprocessing:
-                with self.reference_condition_mp:
+                with self.object_cid_condition_mp:
                     # Wait for the cid to release if it's in use
-                    while cid in self.reference_locked_cids_mp:
+                    while cid in self.object_locked_cids_mp:
                         logging.debug(sync_wait_msg)
-                        self.reference_condition_mp.wait()
+                        self.object_cid_condition_mp.wait()
                     # Modify reference_locked_cids consecutively
                     logging.debug(sync_begin_debug_msg)
-                    self.reference_locked_cids_mp.append(cid)
+                    self.object_locked_cids_mp.append(cid)
             else:
-                with self.reference_condition:
-                    while cid in self.reference_locked_cids:
+                with self.object_cid_condition_th:
+                    while cid in self.object_locked_cids_th:
                         logging.debug(sync_wait_msg)
-                        self.reference_condition.wait()
+                        self.object_cid_condition_th.wait()
                     logging.debug(sync_begin_debug_msg)
-                    self.reference_locked_cids.append(cid)
+                    self.object_locked_cids_th.append(cid)
 
             try:
                 self._delete("objects", cid)
@@ -2089,15 +2098,15 @@ class FileHashStore(HashStore):
                     + " from locked list"
                 )
                 if self.use_multiprocessing:
-                    with self.reference_condition_mp:
+                    with self.object_cid_condition_mp:
                         logging.debug(end_sync_debug_msg)
-                        self.reference_locked_cids_mp.remove(cid)
-                        self.reference_condition_mp.notify()
+                        self.object_locked_cids_mp.remove(cid)
+                        self.object_cid_condition_mp.notify()
                 else:
-                    with self.reference_condition:
+                    with self.object_cid_condition_th:
                         logging.debug(end_sync_debug_msg)
-                        self.reference_locked_cids.remove(cid)
-                        self.reference_condition.notify()
+                        self.object_locked_cids_th.remove(cid)
+                        self.object_cid_condition_th.notify()
 
     @staticmethod
     def _check_arg_data(data):
@@ -2563,14 +2572,14 @@ class FileHashStore(HashStore):
         :param str pid: Persistent or authority-based identifier
         """
         if self.use_multiprocessing:
-            with self.object_condition_mp:
+            with self.object_pid_condition_mp:
                 self.object_locked_pids_mp.remove(pid)
-                self.object_condition_mp.notify()
+                self.object_pid_condition_mp.notify()
         else:
             # Release pid
-            with self.object_condition:
-                self.object_locked_pids.remove(pid)
-                self.object_condition.notify()
+            with self.object_pid_condition_th:
+                self.object_locked_pids_th.remove(pid)
+                self.object_pid_condition_th.notify()
 
     @staticmethod
     def _get_file_paths(directory):

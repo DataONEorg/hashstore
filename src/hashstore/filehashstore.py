@@ -714,7 +714,7 @@ class FileHashStore(HashStore):
                     cid,
                     pid,
                 )
-                return True
+                return
 
             # Move both files after checking the existing status of refs files
             pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
@@ -730,7 +730,6 @@ class FileHashStore(HashStore):
                 cid,
                 pid,
             )
-            return True
         finally:
             # Release cid
             end_sync_debug_msg = (

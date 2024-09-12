@@ -72,8 +72,6 @@ class HashStore(ABC):
 
         :param str pid: Authority-based or persistent identifier of the object.
         :param str cid: Content identifier of the object.
-
-        :return: bool - `True` upon successful tagging.
         """
         raise NotImplementedError()
 

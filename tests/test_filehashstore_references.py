@@ -17,13 +17,14 @@ from hashstore.filehashstore_exceptions import (
 
 
 def test_tag_object(pids, store):
-    """Test tag_object returns true boolean when successful."""
+    """Test tag_object does not throw exception when successful."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(None, path)
-        object_tagged = store.tag_object(pid, object_metadata.cid)
-        assert object_tagged
+        store.tag_object(pid, object_metadata.cid)
+    assert store._count("pid") == 3
+    assert store._count("cid") == 3
 
 
 def test_tag_object_pid_refs_file_exists(pids, store):

@@ -646,8 +646,8 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid")
         self._check_string(cid, "cid")
 
-        # TODO: The pid should also be locked to ensure thread safety
-        self._synchronize_referenced_locked_cids(cid)
+        self._synchronize_referenced_locked_pids(pid)
+        self._synchronize_object_locked_cids(cid)
 
         try:
             # Prepare files and paths
@@ -737,6 +737,7 @@ class FileHashStore(HashStore):
                 f"FileHashStore - tag_object: Releasing cid ({cid}) from"
                 + " reference_locked_cids."
             )
+            self._release_reference_locked_pids(pid)
             if self.use_multiprocessing:
                 with self.object_cid_condition_mp:
                     logging.debug(end_sync_debug_msg)
@@ -2573,7 +2574,7 @@ class FileHashStore(HashStore):
                 self.object_locked_pids_th.remove(pid)
                 self.object_pid_condition_th.notify()
 
-    def _synchronize_referenced_locked_cids(self, cid):
+    def _synchronize_object_locked_cids(self, cid):
         """Multiple threads may access a data object via its 'cid' or the respective 'cid
         reference file' (which contains a list of 'pid's that reference a 'cid') and this needs
         to be coordinated.

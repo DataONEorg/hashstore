@@ -106,7 +106,7 @@ class FileHashStore(HashStore):
             self.reference_pid_condition_mp = multiprocessing.Condition(
                 self.reference_pid_lock_mp
             )
-            self.reference_locked_docs_mp = multiprocessing.Manager().list()
+            self.reference_locked_pids_mp = multiprocessing.Manager().list()
         else:
             # Create threading synchronization variables
             # Synchronization values for object locked pids
@@ -124,7 +124,7 @@ class FileHashStore(HashStore):
             # Synchronization values for reference locked pids
             self.reference_pid_lock_th = threading.Lock()
             self.reference_pid_condition_th = threading.Condition(self.metadata_lock_th)
-            self.reference_locked_docs_th = []
+            self.reference_locked_pids_th = []
         # Now check properties
         if properties:
             # Validate properties against existing configuration if present
@@ -2575,8 +2575,11 @@ class FileHashStore(HashStore):
 
     def _synchronize_referenced_locked_cids(self, cid):
         """Multiple threads may access a data object via its 'cid' or the respective 'cid
-        reference  file' (which contains a list of 'pid's that reference a 'cid') and this needs
-        to be coordinated."""
+        reference file' (which contains a list of 'pid's that reference a 'cid') and this needs
+        to be coordinated.
+
+        :param str cid: Content identifier
+        """
         if self.use_multiprocessing:
             with self.object_cid_condition_mp:
                 # Wait for the cid to release if it's being tagged
@@ -2603,6 +2606,55 @@ class FileHashStore(HashStore):
                     f"synchronize_referenced_locked_cids: Synchronizing object_locked_cids_th for"
                     + f" cid: {cid}"
                 )
+
+    def _synchronize_referenced_locked_pids(self, pid):
+        """Multiple threads may interact with a pid (to tag, untag, delete) and these actions
+        must be coordinated to prevent unexpected behaviour/race conditions that cause chaos.
+
+        :param str pid: Persistent or authority-based identifier
+        """
+        if self.use_multiprocessing:
+            with self.reference_pid_condition_mp:
+                # Wait for the pid to release if it's in use
+                while pid in self.reference_locked_pids_mp:
+                    logging.debug(
+                        f"_synchronize_referenced_locked_pids: Pid ({pid}) is locked. Waiting."
+                    )
+                    self.reference_pid_condition_mp.wait()
+                # Modify reference_locked_pids consecutively
+                self.reference_locked_pids_mp.append(pid)
+                logging.debug(
+                    f"_synchronize_referenced_locked_pids: Synchronizing reference_locked_pids_mp"
+                    + f" for pid: {pid}"
+                )
+        else:
+            with self.reference_pid_condition_th:
+                while pid in self.reference_locked_pids_th:
+                    logging.debug(
+                        f"_synchronize_referenced_locked_pids: Pid ({pid}) is locked. Waiting."
+                    )
+                    self.reference_pid_condition_th.wait()
+                self.reference_locked_pids_th.append(pid)
+                logging.debug(
+                    f"_synchronize_referenced_locked_pids: Synchronizing reference_locked_pids_th"
+                    + f" for pid: {pid}"
+                )
+
+    def _release_reference_locked_pids(self, pid):
+        """Remove the given persistent identifier from 'reference_locked_pids_' and notify other
+        waiting threads or processes.
+
+        :param str pid: Persistent or authority-based identifier
+        """
+        if self.use_multiprocessing:
+            with self.reference_pid_condition_mp:
+                self.reference_locked_pids_mp.remove(pid)
+                self.reference_pid_condition_mp.notify()
+        else:
+            # Release pid
+            with self.reference_pid_condition_th:
+                self.reference_locked_pids_th.remove(pid)
+                self.reference_pid_condition_th.notify()
 
     @staticmethod
     def _get_file_paths(directory):

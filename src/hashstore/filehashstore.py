@@ -101,6 +101,12 @@ class FileHashStore(HashStore):
                 self.metadata_lock_mp
             )
             self.metadata_locked_docs_mp = multiprocessing.Manager().list()
+            # Synchronization values for reference locked pids
+            self.reference_pid_lock_mp = multiprocessing.Lock()
+            self.reference_pid_condition_mp = multiprocessing.Condition(
+                self.reference_pid_lock_mp
+            )
+            self.reference_locked_docs_mp = multiprocessing.Manager().list()
         else:
             # Create threading synchronization variables
             # Synchronization values for object locked pids
@@ -115,6 +121,10 @@ class FileHashStore(HashStore):
             self.metadata_lock_th = threading.Lock()
             self.metadata_condition_th = threading.Condition(self.metadata_lock_th)
             self.metadata_locked_docs_th = []
+            # Synchronization values for reference locked pids
+            self.reference_pid_lock_th = threading.Lock()
+            self.reference_pid_condition_th = threading.Condition(self.metadata_lock_th)
+            self.reference_locked_docs_th = []
         # Now check properties
         if properties:
             # Validate properties against existing configuration if present
@@ -576,7 +586,7 @@ class FileHashStore(HashStore):
                     f"FileHashStore - store_object: Releasing pid ({pid})"
                     + " from locked list"
                 )
-                self.release_object_locked_pids(pid)
+                self._release_object_locked_pids(pid)
                 logging.debug(end_sync_debug_msg)
 
         return object_metadata
@@ -637,7 +647,7 @@ class FileHashStore(HashStore):
         self._check_string(cid, "cid")
 
         # TODO: The pid should also be locked to ensure thread safety
-        self.synchronize_referenced_locked_cids(cid)
+        self._synchronize_referenced_locked_cids(cid)
 
         try:
             # Prepare files and paths
@@ -2547,7 +2557,7 @@ class FileHashStore(HashStore):
 
     # Synchronization Methods
 
-    def release_object_locked_pids(self, pid):
+    def _release_object_locked_pids(self, pid):
         """Remove the given persistent identifier from 'object_locked_pids' and notify other
         waiting threads or processes.
 
@@ -2563,7 +2573,7 @@ class FileHashStore(HashStore):
                 self.object_locked_pids_th.remove(pid)
                 self.object_pid_condition_th.notify()
 
-    def synchronize_referenced_locked_cids(self, cid):
+    def _synchronize_referenced_locked_cids(self, cid):
         """Multiple threads may access a data object via its 'cid' or the respective 'cid
         reference  file' (which contains a list of 'pid's that reference a 'cid') and this needs
         to be coordinated."""

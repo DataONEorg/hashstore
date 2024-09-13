@@ -737,17 +737,9 @@ class FileHashStore(HashStore):
                 f"FileHashStore - tag_object: Releasing cid ({cid}) from"
                 + " reference_locked_cids."
             )
+            logging.debug(end_sync_debug_msg)
+            self._release_object_locked_cids(cid)
             self._release_reference_locked_pids(pid)
-            if self.use_multiprocessing:
-                with self.object_cid_condition_mp:
-                    logging.debug(end_sync_debug_msg)
-                    self.object_locked_cids_mp.remove(cid)
-                    self.object_cid_condition_mp.notify()
-            else:
-                with self.object_cid_condition_th:
-                    logging.debug(end_sync_debug_msg)
-                    self.object_locked_cids_th.remove(cid)
-                    self.object_cid_condition_th.notify()
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
@@ -2608,6 +2600,21 @@ class FileHashStore(HashStore):
                     + f" cid: {cid}"
                 )
 
+    def _release_object_locked_cids(self, cid):
+        """Remove the given content identifier from 'object_locked_cids' and notify other
+        waiting threads or processes.
+
+        :param str cid: Content identifier
+        """
+        if self.use_multiprocessing:
+            with self.object_cid_condition_mp:
+                self.object_locked_cids_mp.remove(cid)
+                self.object_cid_condition_mp.notify()
+        else:
+            with self.object_cid_condition_th:
+                self.object_locked_cids_th.remove(cid)
+                self.object_cid_condition_th.notify()
+
     def _synchronize_referenced_locked_pids(self, pid):
         """Multiple threads may interact with a pid (to tag, untag, delete) and these actions
         must be coordinated to prevent unexpected behaviour/race conditions that cause chaos.
@@ -2642,7 +2649,7 @@ class FileHashStore(HashStore):
                 )
 
     def _release_reference_locked_pids(self, pid):
-        """Remove the given persistent identifier from 'reference_locked_pids_' and notify other
+        """Remove the given persistent identifier from 'reference_locked_pids' and notify other
         waiting threads or processes.
 
         :param str pid: Persistent or authority-based identifier

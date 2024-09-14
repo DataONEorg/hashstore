@@ -15,6 +15,8 @@ from hashstore.filehashstore_exceptions import (
 
 # pylint: disable=W0212
 
+# TODO: Review 'tag_object' tests and split them into relevant 'store_hashstore_refs_files' tests
+
 
 def test_tag_object(pids, store):
     """Test tag_object does not throw exception when successful."""

@@ -1275,7 +1275,7 @@ class FileHashStore(HashStore):
             raise PidRefsDoesNotExist(err_msg)
 
     def _store_data_only(self, data):
-        """Store an object to HashStore and return the a metadata object containing the content
+        """Store an object to HashStore and return a metadata object containing the content
         identifier, object file size and hex digests dictionary of the default algorithms. This
         method does not validate the object and writes directly to `/objects` after the hex
         digests are calculated.
@@ -1617,87 +1617,100 @@ class FileHashStore(HashStore):
             self._synchronize_referenced_locked_pids(pid)
             self._synchronize_object_locked_cids(cid)
 
-            # Prepare files and paths
-            tmp_root_path = self._get_store_path("refs") / "tmp"
-            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
-            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
-            # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
-            self._create_path(Path(os.path.dirname(pid_refs_path)))
-            self._create_path(Path(os.path.dirname(cid_refs_path)))
+            try:
+                # Prepare files and paths
+                tmp_root_path = self._get_store_path("refs") / "tmp"
+                pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+                cid_refs_path = self._get_hashstore_cid_refs_path(cid)
+                # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
+                self._create_path(Path(os.path.dirname(pid_refs_path)))
+                self._create_path(Path(os.path.dirname(cid_refs_path)))
 
-            if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
-                # If both reference files exist, we confirm that reference files are where they
-                # are expected to be and throw an exception to inform the client that everything
-                # is in place - and include other issues for context
-                err_msg = (
-                    f"FileHashStore - store_hashstore_refs_files: Object with cid: {cid}"
-                    f" already exists and is tagged with pid: {pid}."
-                )
-                try:
+                if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
+                    # If both reference files exist, we confirm that reference files are where they
+                    # are expected to be and throw an exception to inform the client that everything
+                    # is in place - and include other issues for context
+                    err_msg = (
+                        f"FileHashStore - store_hashstore_refs_files: Object with cid: {cid}"
+                        f" already exists and is tagged with pid: {pid}."
+                    )
+                    try:
+                        self._verify_hashstore_references(
+                            pid,
+                            cid,
+                            pid_refs_path,
+                            cid_refs_path,
+                            "Refs file already exists, verifying.",
+                        )
+                        logging.error(err_msg)
+                        raise HashStoreRefsAlreadyExists(err_msg)
+                    except Exception as e:
+                        rev_msg = err_msg + " " + str(e)
+                        logging.error(rev_msg)
+                        raise HashStoreRefsAlreadyExists(err_msg)
+
+                elif os.path.exists(pid_refs_path) and not os.path.exists(
+                    cid_refs_path
+                ):
+                    # If pid refs exists, the pid has already been claimed and cannot be tagged we
+                    # throw an exception immediately
+                    error_msg = (
+                        f"FileHashStore - store_hashstore_refs_files: Pid refs file already exists"
+                        f" for pid: {pid}."
+                    )
+                    logging.error(error_msg)
+                    raise PidRefsAlreadyExistsError(error_msg)
+
+                elif not os.path.exists(pid_refs_path) and os.path.exists(
+                    cid_refs_path
+                ):
+                    debug_msg = (
+                        f"FileHashStore - store_hashstore_refs_files: pid refs file does not exist"
+                        f" for pid {pid} but cid refs file found at: {cid_refs_path} for cid: {cid}"
+                    )
+                    logging.debug(debug_msg)
+                    # Move the pid refs file
+                    pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
+                    shutil.move(pid_tmp_file_path, pid_refs_path)
+                    # Update cid ref files as it already exists
+                    if not self._is_string_in_refs_file(pid, cid_refs_path):
+                        self._update_refs_file(cid_refs_path, pid, "add")
                     self._verify_hashstore_references(
                         pid,
                         cid,
                         pid_refs_path,
                         cid_refs_path,
-                        "Refs file already exists, verifying.",
+                        f"Updated existing cid refs file: {cid_refs_path} with pid: {pid}",
                     )
-                    logging.error(err_msg)
-                    raise HashStoreRefsAlreadyExists(err_msg)
-                except Exception as e:
-                    rev_msg = err_msg + " " + str(e)
-                    logging.error(rev_msg)
-                    raise HashStoreRefsAlreadyExists(err_msg)
+                    info_msg = (
+                        "FileHashStore - store_hashstore_refs_files: Successfully updated "
+                        f"cid: {cid} with pid: {pid}"
+                    )
+                    logging.info(info_msg)
+                    return
 
-            elif os.path.exists(pid_refs_path) and not os.path.exists(cid_refs_path):
-                # If pid refs exists, the pid has already been claimed and cannot be tagged we
-                # throw an exception immediately
-                error_msg = (
-                    f"FileHashStore - store_hashstore_refs_files: Pid refs file already exists"
-                    f" for pid: {pid}."
-                )
-                logging.error(error_msg)
-                raise PidRefsAlreadyExistsError(error_msg)
-
-            elif not os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
-                debug_msg = (
-                    f"FileHashStore - store_hashstore_refs_files: pid refs file does not exist"
-                    f" for pid {pid} but cid refs file found at: {cid_refs_path} for cid: {cid}"
-                )
-                logging.debug(debug_msg)
-                # Move the pid refs file
+                # Move both files after checking the existing status of refs files
                 pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
+                cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
                 shutil.move(pid_tmp_file_path, pid_refs_path)
-                # Update cid ref files as it already exists
-                if not self._is_string_in_refs_file(pid, cid_refs_path):
-                    self._update_refs_file(cid_refs_path, pid, "add")
+                shutil.move(cid_tmp_file_path, cid_refs_path)
+                log_msg = "Refs files have been moved to their permanent location. Verifying refs."
                 self._verify_hashstore_references(
-                    pid,
-                    cid,
-                    pid_refs_path,
-                    cid_refs_path,
-                    f"Updated existing cid refs file: {cid_refs_path} with pid: {pid}",
+                    pid, cid, pid_refs_path, cid_refs_path, log_msg
                 )
                 info_msg = (
                     "FileHashStore - store_hashstore_refs_files: Successfully updated "
                     f"cid: {cid} with pid: {pid}"
                 )
                 logging.info(info_msg)
-                return
 
-            # Move both files after checking the existing status of refs files
-            pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
-            cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
-            shutil.move(pid_tmp_file_path, pid_refs_path)
-            shutil.move(cid_tmp_file_path, cid_refs_path)
-            log_msg = "Reference files have been moved to their permanent location. Verifying refs."
-            self._verify_hashstore_references(
-                pid, cid, pid_refs_path, cid_refs_path, log_msg
-            )
-            info_msg = (
-                "FileHashStore - store_hashstore_refs_files: Successfully updated "
-                f"cid: {cid} with pid: {pid}"
-            )
-            logging.info(info_msg)
+            except HashStoreRefsAlreadyExists or PidRefsAlreadyExistsError as expected_exceptions:
+                raise expected_exceptions
+
+            except Exception as unexpected_exception:
+                # TODO: Untagobject
+                raise unexpected_exception
+
         finally:
             # Release cid
             self._release_object_locked_cids(cid)

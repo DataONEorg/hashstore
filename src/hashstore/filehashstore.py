@@ -641,10 +641,10 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid")
         self._check_string(cid, "cid")
 
-        self._synchronize_referenced_locked_pids(pid)
-        self._synchronize_object_locked_cids(cid)
-
         try:
+            self._synchronize_referenced_locked_pids(pid)
+            self._synchronize_object_locked_cids(cid)
+
             # Prepare files and paths
             tmp_root_path = self._get_store_path("refs") / "tmp"
             pid_refs_path = self._get_hashstore_pid_refs_path(pid)

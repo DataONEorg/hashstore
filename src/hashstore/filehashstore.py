@@ -582,12 +582,7 @@ class FileHashStore(HashStore):
                 raise err
             finally:
                 # Release pid
-                end_sync_debug_msg = (
-                    f"FileHashStore - store_object: Releasing pid ({pid})"
-                    + " from locked list"
-                )
                 self._release_object_locked_pids(pid)
-                logging.debug(end_sync_debug_msg)
 
         return object_metadata
 
@@ -733,11 +728,6 @@ class FileHashStore(HashStore):
             )
         finally:
             # Release cid
-            end_sync_debug_msg = (
-                f"FileHashStore - tag_object: Releasing cid ({cid}) from"
-                + " reference_locked_cids."
-            )
-            logging.debug(end_sync_debug_msg)
             self._release_object_locked_cids(cid)
             self._release_reference_locked_pids(pid)
 
@@ -2610,10 +2600,20 @@ class FileHashStore(HashStore):
             with self.object_cid_condition_mp:
                 self.object_locked_cids_mp.remove(cid)
                 self.object_cid_condition_mp.notify()
+                end_sync_debug_msg = (
+                    f"FileHashStore - _release_object_locked_cids: Releasing cid ({cid}) from"
+                    + " object_cid_condition_mp."
+                )
+                logging.debug(end_sync_debug_msg)
         else:
             with self.object_cid_condition_th:
                 self.object_locked_cids_th.remove(cid)
                 self.object_cid_condition_th.notify()
+                end_sync_debug_msg = (
+                    f"FileHashStore - _release_object_locked_cids: Releasing cid ({cid}) from"
+                    + " object_cid_condition_th."
+                )
+                logging.debug(end_sync_debug_msg)
 
     def _synchronize_referenced_locked_pids(self, pid):
         """Multiple threads may interact with a pid (to tag, untag, delete) and these actions
@@ -2658,11 +2658,21 @@ class FileHashStore(HashStore):
             with self.reference_pid_condition_mp:
                 self.reference_locked_pids_mp.remove(pid)
                 self.reference_pid_condition_mp.notify()
+                end_sync_debug_msg = (
+                    f"FileHashStore - _release_reference_locked_pids: Releasing pid ({pid}) from"
+                    + " reference_locked_pids_mp."
+                )
+                logging.debug(end_sync_debug_msg)
         else:
             # Release pid
             with self.reference_pid_condition_th:
                 self.reference_locked_pids_th.remove(pid)
                 self.reference_pid_condition_th.notify()
+                end_sync_debug_msg = (
+                    f"FileHashStore - _release_reference_locked_pids: Releasing pid ({pid}) from"
+                    + " reference_locked_pids_th."
+                )
+                logging.debug(end_sync_debug_msg)
 
     @staticmethod
     def _get_file_paths(directory):

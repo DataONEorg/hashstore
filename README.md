@@ -164,7 +164,7 @@ store and tag an object simultaneously if the relevant data is available. In the
 identifier (ex. persistent identifier (pid)), `store_object` can be called to solely store an
 object. The client is then expected to call `verify_object` when the relevant metadata is available
 to confirm that the object has been stored as expected. The client is then expected to call
-`delete_invalid_object` when the relevant metadata is available to confirm that the object is
+`delete_if_invalid_object` when the relevant metadata is available to confirm that the object is
 what is expected. And to finalize the process (to make the object discoverable), the client
 calls `tagObject``. In summary, there are two expected paths to store an object:
 
@@ -204,7 +204,7 @@ obj_info_allinone = hashstore.store_object(input_stream, pid, additional_algo, c
 # Store object
 obj_info_manual = hashstore.store_object(input_stream)
 # Validate object with expected values when available
-hashstore.delete_invalid_object(obj_info_manual, checksum, checksum_algo, obj_size)
+hashstore.delete_if_invalid_object(obj_info_manual, checksum, checksum_algo, obj_size)
 # Tag object, makes the object discoverable (find, retrieve, delete)
 hashstore.tag_object(pid, obj_info_manual.cid)
 ```

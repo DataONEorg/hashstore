@@ -1112,7 +1112,7 @@ def test_delete_invalid_object(pids, store):
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
-        store.delete_invalid_object(
+        store.delete_if_invalid_object(
             object_metadata, checksum, checksum_algorithm, expected_file_size
         )
         assert store._exists("objects", object_metadata.cid)
@@ -1127,7 +1127,7 @@ def test_delete_invalid_object_supported_other_algo_not_in_default(pids, store):
         object_metadata = store.store_object(data=path)
         checksum = pids[pid][supported_algo]
         expected_file_size = object_metadata.obj_size
-        store.delete_invalid_object(
+        store.delete_if_invalid_object(
             object_metadata, checksum, supported_algo, expected_file_size
         )
         assert store._exists("objects", object_metadata.cid)
@@ -1144,7 +1144,7 @@ def test_delete_invalid_object_exception_incorrect_object_metadata_type(pids, st
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
         with pytest.raises(ValueError):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 "not_object_metadata", checksum, checksum_algorithm, expected_file_size
             )
 
@@ -1160,7 +1160,7 @@ def test_delete_invalid_object_exception_incorrect_size(pids, store):
         checksum_algorithm = store.algorithm
 
         with pytest.raises(NonMatchingObjSize):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, checksum, checksum_algorithm, 1000
             )
 
@@ -1182,7 +1182,7 @@ def test_delete_invalid_object_exception_incorrect_size_object_exists(pids, stor
         checksum_algorithm = store.algorithm
 
         with pytest.raises(NonMatchingObjSize):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, checksum, checksum_algorithm, 1000
             )
 
@@ -1200,7 +1200,7 @@ def test_delete_invalid_object_exception_incorrect_checksum(pids, store):
         expected_file_size = object_metadata.obj_size
 
         with pytest.raises(NonMatchingChecksum):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, "abc123", checksum_algorithm, expected_file_size
             )
 
@@ -1216,7 +1216,7 @@ def test_delete_invalid_object_exception_incorrect_checksum_algo(pids, store):
         checksum = object_metadata.hex_digests.get(store.algorithm)
         expected_file_size = object_metadata.obj_size
         with pytest.raises(UnsupportedAlgorithm):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, checksum, "md2", expected_file_size
             )
 
@@ -1233,7 +1233,7 @@ def test_delete_invalid_object_exception_supported_other_algo_bad_checksum(pids,
         checksum = object_metadata.hex_digests.get(store.algorithm)
         expected_file_size = object_metadata.obj_size
         with pytest.raises(NonMatchingChecksum):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, checksum, "sha224", expected_file_size
             )
 

@@ -586,7 +586,7 @@ class FileHashStore(HashStore):
 
         return object_metadata
 
-    def delete_invalid_object(
+    def delete_if_invalid_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
         self._check_string(checksum, "checksum")

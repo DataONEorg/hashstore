@@ -21,6 +21,7 @@ from hashstore.filehashstore_exceptions import (
     CidRefsFileNotFound,
     PidRefsContentError,
     PidRefsFileNotFound,
+    IdentifierNotLocked,
 )
 
 
@@ -732,6 +733,25 @@ def test_store_hashstore_refs_files_refs_not_found_cid_refs_found(store):
     assert line_count == 2
     assert store._count("pid") == 2
     assert store._count("cid") == 1
+
+
+def test_validate_and_check_cid_lock_non_matching_cid(store):
+    """Test that _validate_and_check_cid_lock throws exception when cid is different"""
+    pid = "dou.test.1"
+    cid = "thegoodcid"
+    cid_to_check = "thebadcid"
+
+    with pytest.raises(ValueError):
+        store._validate_and_check_cid_lock(pid, cid, cid_to_check)
+
+
+def test_validate_and_check_cid_lock_identifier_not_locked(store):
+    """Test that _validate_and_check_cid_lock throws exception when cid is not locked"""
+    pid = "dou.test.1"
+    cid = "thegoodcid"
+
+    with pytest.raises(IdentifierNotLocked):
+        store._validate_and_check_cid_lock(pid, cid, cid)
 
 
 def test_write_refs_file_ref_type_cid(store):

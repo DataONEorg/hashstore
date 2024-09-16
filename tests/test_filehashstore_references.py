@@ -7,15 +7,11 @@ import pytest
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
-    HashStoreRefsAlreadyExists,
-    PidRefsAlreadyExistsError,
     PidRefsContentError,
     PidRefsFileNotFound,
 )
 
 # pylint: disable=W0212
-
-# TODO: Review 'tag_object' tests and split them into relevant 'store_hashstore_refs_files' tests
 
 
 def test_tag_object(pids, store):
@@ -27,88 +23,6 @@ def test_tag_object(pids, store):
         store.tag_object(pid, object_metadata.cid)
     assert store._count("pid") == 3
     assert store._count("cid") == 3
-
-
-def test_tag_object_pid_refs_file_exists(pids, store):
-    """Test tag_object creates the expected pid reference file."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(None, path)
-        store.tag_object(pid, object_metadata.cid)
-        pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
-        assert os.path.exists(pid_refs_file_path)
-
-
-def test_tag_object_cid_refs_file_exists(pids, store):
-    """Test tag_object creates the cid reference file."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(None, path)
-        cid = object_metadata.cid
-        store.tag_object(pid, object_metadata.cid)
-        cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
-        assert os.path.exists(cid_refs_file_path)
-
-
-def test_tag_object_pid_refs_file_content(pids, store):
-    """Test tag_object created the pid reference file with the expected cid."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(None, path)
-        store.tag_object(pid, object_metadata.cid)
-        pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
-        with open(pid_refs_file_path, "r", encoding="utf8") as f:
-            pid_refs_cid = f.read()
-        assert pid_refs_cid == object_metadata.cid
-
-
-def test_tag_object_cid_refs_file_content(pids, store):
-    """Test tag_object creates the cid reference file successfully with pid tagged."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(None, path)
-        store.tag_object(pid, object_metadata.cid)
-        cid_refs_file_path = store._get_hashstore_cid_refs_path(object_metadata.cid)
-        with open(cid_refs_file_path, "r", encoding="utf8") as f:
-            pid_refs_cid = f.read().strip()
-        assert pid_refs_cid == pid
-
-
-def test_tag_object_pid_refs_found_cid_refs_found(pids, store):
-    """Test tag_object does not throw an exception when any refs file already exists
-    and verifies the content, and does not double tag the cid refs file."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(None, path)
-        cid = object_metadata.cid
-        store.tag_object(pid, cid)
-
-        with pytest.raises(HashStoreRefsAlreadyExists):
-            store.tag_object(pid, cid)
-
-        cid_refs_file_path = store._get_hashstore_cid_refs_path(object_metadata.cid)
-        line_count = 0
-        with open(cid_refs_file_path, "r", encoding="utf8") as ref_file:
-            for _line in ref_file:
-                line_count += 1
-        assert line_count == 1
-
-
-def test_tag_object_pid_refs_found_cid_refs_not_found(store):
-    """Test that tag_object throws an exception when pid refs file exists, contains a
-    different cid, and is correctly referenced in the associated cid refs file"""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid.replace("/", "_")
-    _object_metadata = store.store_object(pid, path)
-
-    with pytest.raises(PidRefsAlreadyExistsError):
-        store.tag_object(pid, "another_cid_value_that_is_not_found")
 
 
 def test_tag_object_pid_refs_not_found_cid_refs_found(store):
@@ -136,6 +50,10 @@ def test_tag_object_pid_refs_not_found_cid_refs_found(store):
     assert line_count == 2
     assert store._count("pid") == 2
     assert store._count("cid") == 1
+
+
+# TODO: Add tag_ojbect test for HashStoreRefsAlreadyExists
+# TODO: Add tag_ojbect test for PidRefsAlreadyExistsError
 
 
 def test_write_refs_file_ref_type_cid(store):

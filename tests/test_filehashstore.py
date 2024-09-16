@@ -13,6 +13,8 @@ from hashstore.filehashstore_exceptions import (
     PidRefsDoesNotExist,
     RefsFileExistsButCidObjMissing,
     UnsupportedAlgorithm,
+    HashStoreRefsAlreadyExists,
+    PidRefsAlreadyExistsError,
 )
 
 
@@ -620,6 +622,110 @@ def test_mktmpfile(store):
     # pylint: disable=W0212
     tmp = store._mktmpfile(path)
     assert os.path.exists(tmp.name)
+
+
+def test_store_hashstore_refs_files_(pids, store):
+    """Test _store_hashstore_refs_files does not throw exception when successful."""
+    for pid in pids.keys():
+        cid = pids[pid][store.algorithm]
+        store._store_hashstore_refs_files(pid, cid)
+    assert store._count("pid") == 3
+    assert store._count("cid") == 3
+
+
+def test_store_hashstore_refs_files_pid_refs_file_exists(pids, store):
+    """Test _store_hashstore_refs_file creates the expected pid reference file."""
+    for pid in pids.keys():
+        cid = pids[pid][store.algorithm]
+        store._store_hashstore_refs_files(pid, cid)
+        pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
+        assert os.path.exists(pid_refs_file_path)
+
+
+def test_store_hashstore_refs_file_cid_refs_file_exists(pids, store):
+    """Test _store_hashstore_refs_file creates the cid reference file."""
+    for pid in pids.keys():
+        cid = pids[pid][store.algorithm]
+        store._store_hashstore_refs_files(pid, cid)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
+        assert os.path.exists(cid_refs_file_path)
+
+
+def test_store_hashstore_refs_file_pid_refs_file_content(pids, store):
+    """Test _store_hashstore_refs_file created the pid reference file with the expected cid."""
+    for pid in pids.keys():
+        cid = pids[pid][store.algorithm]
+        store._store_hashstore_refs_files(pid, cid)
+        pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
+        with open(pid_refs_file_path, "r", encoding="utf8") as f:
+            pid_refs_cid = f.read()
+        assert pid_refs_cid == cid
+
+
+def test_store_hashstore_refs_file_cid_refs_file_content(pids, store):
+    """Test _store_hashstore_refs_file creates the cid reference file successfully with pid
+    tagged."""
+    for pid in pids.keys():
+        cid = pids[pid][store.algorithm]
+        store._store_hashstore_refs_files(pid, cid)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
+        with open(cid_refs_file_path, "r", encoding="utf8") as f:
+            pid_refs_cid = f.read().strip()
+        assert pid_refs_cid == pid
+
+
+def test_store_hashstore_refs_file_pid_refs_found_cid_refs_found(pids, store):
+    """Test _store_hashstore_refs_file does not throw an exception when any refs file already exists
+    and verifies the content, and does not double tag the cid refs file."""
+    for pid in pids.keys():
+        cid = pids[pid][store.algorithm]
+        store._store_hashstore_refs_files(pid, cid)
+
+        with pytest.raises(HashStoreRefsAlreadyExists):
+            store.tag_object(pid, cid)
+
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
+        line_count = 0
+        with open(cid_refs_file_path, "r", encoding="utf8") as ref_file:
+            for _line in ref_file:
+                line_count += 1
+        assert line_count == 1
+
+
+def test_store_hashstore_refs_files_pid_refs_found_cid_refs_not_found(store, pids):
+    """Test that _store_hashstore_refs_files throws an exception when pid refs file exists,
+    contains a different cid, and is correctly referenced in the associated cid refs file"""
+    for pid in pids.keys():
+        cid = pids[pid][store.algorithm]
+        store._store_hashstore_refs_files(pid, cid)
+
+        with pytest.raises(PidRefsAlreadyExistsError):
+            store._store_hashstore_refs_files(
+                pid, "another_cid_value_that_is_not_found"
+            )
+
+
+def test_store_hashstore_refs_files_refs_not_found_cid_refs_found(store):
+    """Test _store_hashstore_refs_files updates a cid reference file that already exists."""
+    pid = "jtao.1700.1"
+    cid = "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
+    # Tag object
+    store._store_hashstore_refs_files(pid, cid)
+    # Tag the cid with another pid
+    additional_pid = "dou.test.1"
+    store._store_hashstore_refs_files(additional_pid, cid)
+
+    # Read cid file to confirm cid refs file contains the additional pid
+    line_count = 0
+    cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
+    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+        for _, line in enumerate(f, start=1):
+            value = line.strip()
+            line_count += 1
+            assert value == pid or value == additional_pid
+    assert line_count == 2
+    assert store._count("pid") == 2
+    assert store._count("cid") == 1
 
 
 def test_put_metadata_with_path(pids, store):

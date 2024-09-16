@@ -643,7 +643,7 @@ class FileHashStore(HashStore):
         self._check_string(cid, "cid")
 
         try:
-            self._store_hashstore_refs_files(cid, pid)
+            self._store_hashstore_refs_files(pid, cid)
         except HashStoreRefsAlreadyExists as hrae:
             err_msg = (
                 f"FileHashStore - tag_object: reference files for pid: {pid} and {cid} "
@@ -1606,12 +1606,12 @@ class FileHashStore(HashStore):
                 os.umask(oldmask)
         return tmp
 
-    def _store_hashstore_refs_files(self, cid, pid):
+    def _store_hashstore_refs_files(self, pid, cid):
         """Create the pid refs file and create/update cid refs files in HashStore to establish
         the relationship between a 'pid' and a 'cid'.
 
-        :param str cid: Content identifier
         :param str pid: Persistent or authority-based identifier.
+        :param str cid: Content identifier
         """
         try:
             self._synchronize_referenced_locked_pids(pid)

@@ -38,7 +38,7 @@ class CidRefsFileNotFound(Exception):
         self.errors = errors
 
 
-class CidRefsDoesNotExist(Exception):
+class OrphanPidRefsFileFound(Exception):
     """Custom exception thrown when a cid refs file does not exist."""
 
     def __init__(self, message, errors=None):

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from hashstore.filehashstore import FileHashStore, ObjectMetadata
 from hashstore.filehashstore_exceptions import (
-    CidRefsDoesNotExist,
+    OrphanPidRefsFileFound,
     NonMatchingChecksum,
     NonMatchingObjSize,
     PidNotFoundInCidRefsFile,
@@ -864,7 +864,7 @@ def test_find_object_cid_refs_not_found(pids, store):
             pid_ref_file.write("intentionally.wrong.pid")
             pid_ref_file.truncate()
 
-        with pytest.raises(CidRefsDoesNotExist):
+        with pytest.raises(OrphanPidRefsFileFound):
             store._find_object(pid)
 
 

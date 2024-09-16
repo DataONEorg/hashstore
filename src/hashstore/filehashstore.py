@@ -18,7 +18,7 @@ from tempfile import NamedTemporaryFile
 from hashstore import HashStore
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
-    CidRefsDoesNotExist,
+    OrphanPidRefsFileFound,
     CidRefsFileNotFound,
     HashStoreRefsAlreadyExists,
     NonMatchingChecksum,
@@ -915,7 +915,7 @@ class FileHashStore(HashStore):
                 for obj in objects_to_delete:
                     os.remove(obj)
                 return
-            except CidRefsDoesNotExist:
+            except OrphanPidRefsFileFound:
                 # Delete pid refs file
                 pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
                 objects_to_delete.append(
@@ -1266,7 +1266,7 @@ class FileHashStore(HashStore):
                     + f", but cid refs file not found: {cid_ref_abs_path} for pid: {pid}"
                 )
                 logging.error(err_msg)
-                raise CidRefsDoesNotExist(err_msg)
+                raise OrphanPidRefsFileFound(err_msg)
         else:
             err_msg = (
                 f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
@@ -1735,6 +1735,30 @@ class FileHashStore(HashStore):
         # To untag a pid, the pid must be found and currently locked
         # The pid will not be released until this process is over
         self._check_reference_locked_pids(pid)
+
+        # Before we begin the untagging process, we look for the `cid` by calling `find_object`
+        # which will throw custom exceptions if there is an issue with the reference files,
+        # which help us determine the path to proceed with.
+        try:
+            # TODO: find_object
+            # Check and validate cid
+            # Remove pid refs
+            # Remove pid from cid refs
+            # delete files
+            return
+        except OrphanPidRefsFileFound as oprff:
+            # TODO: Handle orphan pid refs
+            return
+        except RefsFileExistsButCidObjMissing as rfebcom:
+            # TODO: Handle refs existing but data obj missing
+            return
+        except PidNotFoundInCidRefsFile as pnficrf:
+            # TODO: Handle refs exist but pid is not found in cid refs
+            return
+        except PidRefsDoesNotExist as prdne:
+            # TODO: Handle cid refs to ensure pid not found in it
+            return
+
 
     def _write_refs_file(self, path, ref_id, ref_type):
         """Write a reference file in the supplied path into a temporary file.

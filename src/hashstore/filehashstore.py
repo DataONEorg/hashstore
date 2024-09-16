@@ -643,7 +643,7 @@ class FileHashStore(HashStore):
         self._check_string(cid, "cid")
 
         try:
-            self.store_hashstore_refs_files(cid, pid)
+            self._store_hashstore_refs_files(cid, pid)
         except HashStoreRefsAlreadyExists as hrae:
             err_msg = (
                 f"FileHashStore - tag_object: reference files for pid: {pid} and {cid} "
@@ -1606,7 +1606,7 @@ class FileHashStore(HashStore):
                 os.umask(oldmask)
         return tmp
 
-    def store_hashstore_refs_files(self, cid, pid):
+    def _store_hashstore_refs_files(self, cid, pid):
         """Create the pid refs file and create/update cid refs files in HashStore to establish
         the relationship between a 'pid' and a 'cid'.
 
@@ -1730,7 +1730,7 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid")
         self._check_string(cid, "cid")
 
-        delete_list = []
+        untag_obj_delete_list = []
 
         # To untag a pid, the pid must be found and currently locked
         # The pid will not be released until this process is over
@@ -1740,13 +1740,19 @@ class FileHashStore(HashStore):
         # which will throw custom exceptions if there is an issue with the reference files,
         # which help us determine the path to proceed with.
         try:
-            # TODO: find_object
             obj_info_dict = self._find_object(pid)
             cid_to_check = obj_info_dict["cid"]
             self._validate_and_check_cid_lock(pid, cid, cid_to_check)
             # Remove pid refs
+            pid_refs_path_str = obj_info_dict.get("pid_refs_path")
+            untag_obj_delete_list.append(
+                self._rename_path_for_deletion(pid_refs_path_str)
+            )
             # Remove pid from cid refs
-            # delete files
+            # TODO
+            # Remove all files confirmed for deletion
+            for obj in untag_obj_delete_list:
+                os.remove(obj)
             return
         except OrphanPidRefsFileFound as oprff:
             # TODO: Handle orphan pid refs

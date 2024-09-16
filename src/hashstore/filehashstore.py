@@ -1780,6 +1780,7 @@ class FileHashStore(HashStore):
         """
         try:
             delete_list.append(self._rename_path_for_deletion(pid_refs_path))
+
         except Exception as e:
             err_msg = (
                 f"Unable to delete pid refs file: {pid_refs_path} for pid: {pid}. "
@@ -1801,14 +1802,13 @@ class FileHashStore(HashStore):
             # Delete cid reference file and object only if the cid refs file is empty
             if os.path.getsize(cid_refs_path) == 0:
                 delete_list.append(self._rename_path_for_deletion(cid_refs_path))
-            return
+
         except Exception as e:
             err_msg = (
                 f"Unable to delete remove pid from cid refs file: {cid_refs_path} for pid:"
                 f" {pid}. " + str(e)
             )
             logging.error(err_msg)
-            return
 
     def _validate_and_check_cid_lock(self, pid, cid, cid_to_check):
         """Confirm that the two content identifiers provided are equal and is locked to ensure

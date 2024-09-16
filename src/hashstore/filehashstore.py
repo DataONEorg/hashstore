@@ -1741,7 +1741,9 @@ class FileHashStore(HashStore):
         # which help us determine the path to proceed with.
         try:
             # TODO: find_object
-            # Check and validate cid
+            obj_info_dict = self._find_object(pid)
+            cid_to_check = obj_info_dict["cid"]
+            self._validate_and_check_cid_lock(pid, cid, cid_to_check)
             # Remove pid refs
             # Remove pid from cid refs
             # delete files
@@ -1759,6 +1761,24 @@ class FileHashStore(HashStore):
             # TODO: Handle cid refs to ensure pid not found in it
             return
 
+    def _validate_and_check_cid_lock(self, pid, cid, cid_to_check):
+        """Confirm that the two content identifiers provided are equal and is locked to ensure
+        thread safety.
+
+        :param str pid: Persistent identifier
+        :param str cid: Content identifier
+        :param str cid_to_check: Cid that was retrieved or read
+        """
+        self._check_string(cid, "cid")
+        self._check_string(cid_to_check, "cid_to_check")
+
+        if cid is not cid_to_check:
+            err_msg = (
+                f"_validate_and_check_cid_lock: cid provided: {cid_to_check} does not "
+                f"match untag request for cid: {cid} and pid: {pid}"
+            )
+            raise ValueError(err_msg)
+        self._check_object_locked_cids(cid)
 
     def _write_refs_file(self, path, ref_id, ref_type):
         """Write a reference file in the supplied path into a temporary file.
@@ -2669,6 +2689,23 @@ class FileHashStore(HashStore):
                     + f" cid: {cid}"
                 )
 
+    def _check_object_locked_cids(self, cid):
+        """Check that a given content identifier is currently locked (found in the
+        'object_locked_cids' array). If it is not, an exception will be thrown.
+
+        :param str cid: Content identifier
+        """
+        if self.use_multiprocessing:
+            if cid not in self.object_locked_cids_mp:
+                err_msg = f"_check_object_locked_cids: cid {cid} is not locked."
+                logging.error(err_msg)
+                raise IdentifierNotLocked(err_msg)
+        else:
+            if cid not in self.object_locked_cids_th:
+                err_msg = f"_check_object_locked_cids: cid {cid} is not locked."
+                logging.error(err_msg)
+                raise IdentifierNotLocked(err_msg)
+
     def _release_object_locked_cids(self, cid):
         """Remove the given content identifier from 'object_locked_cids' and notify other
         waiting threads or processes.
@@ -2728,7 +2765,7 @@ class FileHashStore(HashStore):
                 )
 
     def _check_reference_locked_pids(self, pid):
-        """Check that a given persistent identifier is currently locked (found in
+        """Check that a given persistent identifier is currently locked (found in the
         'reference_locked_pids' array). If it is not, an exception will be thrown.
 
         :param str pid: Persistent or authority-based identifier

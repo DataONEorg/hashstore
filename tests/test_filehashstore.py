@@ -1067,6 +1067,11 @@ def test_delete_with_object_metadata_id(pids, store):
     assert store._count(entity) == 0
 
 
+# TODO: Add untag pytest for pid and cid successfully untagged
+# TODO: Add untag pytest for exception thrown when pid is not locked
+# TODO: Add untag pytest for exception thrown when cid is not locked
+
+
 def test_create_path(pids, store):
     """Test makepath creates folder successfully."""
     for pid in pids:

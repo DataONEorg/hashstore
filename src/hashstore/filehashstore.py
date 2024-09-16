@@ -1708,9 +1708,9 @@ class FileHashStore(HashStore):
                 raise expected_exceptions
 
             except Exception as unexpected_exception:
-                # TODO: Untagobject
                 # For all other unexpected exceptions, we are to revert the tagging process as
                 # much as possible. No exceptions from the reverting process will be thrown.
+                self._untag_object(pid, cid)
                 raise unexpected_exception
 
         finally:

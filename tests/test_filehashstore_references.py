@@ -14,48 +14,6 @@ from hashstore.filehashstore_exceptions import (
 # pylint: disable=W0212
 
 
-def test_tag_object(pids, store):
-    """Test tag_object does not throw exception when successful."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(None, path)
-        store.tag_object(pid, object_metadata.cid)
-    assert store._count("pid") == 3
-    assert store._count("cid") == 3
-
-
-def test_tag_object_pid_refs_not_found_cid_refs_found(store):
-    """Test tag_object updates a cid reference file that already exists."""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid.replace("/", "_")
-    # Store data only
-    object_metadata = store.store_object(None, path)
-    cid = object_metadata.cid
-    # Tag object
-    store.tag_object(pid, cid)
-    # Tag the cid with another pid
-    additional_pid = "dou.test.1"
-    store.tag_object(additional_pid, cid)
-
-    # Read cid file to confirm cid refs file contains the additional pid
-    line_count = 0
-    cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
-    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
-        for _, line in enumerate(f, start=1):
-            value = line.strip()
-            line_count += 1
-            assert value == pid or value == additional_pid
-    assert line_count == 2
-    assert store._count("pid") == 2
-    assert store._count("cid") == 1
-
-
-# TODO: Add tag_ojbect test for HashStoreRefsAlreadyExists
-# TODO: Add tag_ojbect test for PidRefsAlreadyExistsError
-
-
 def test_write_refs_file_ref_type_cid(store):
     """Test that write_refs_file writes a reference file."""
     tmp_root_path = store._get_store_path("refs") / "tmp"

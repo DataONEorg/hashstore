@@ -1487,7 +1487,7 @@ def test_cast_to_bytes(store):
     assert isinstance(string_bytes, bytes)
 
 
-def test_resolve_path_objects(pids, store):
+def test_get_hashstore_data_object_path(pids, store):
     """Confirm resolve path returns correct object path"""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
@@ -1501,7 +1501,7 @@ def test_resolve_path_objects(pids, store):
         assert calculated_obj_path == obj_resolved_path
 
 
-def test_resolve_path_metadata(pids, store):
+def test_get_hashstore_metadata_path_metadata(pids, store):
     """Confirm resolve path returns correct metadata path."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"

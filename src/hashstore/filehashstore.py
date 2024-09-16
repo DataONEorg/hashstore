@@ -2541,7 +2541,7 @@ class FileHashStore(HashStore):
     def _get_hashstore_data_object_path(self, cid_or_relative_path):
         """Get the expected path to a hashstore data object that exists using a content identifier.
 
-        :param str cid_or_relative_path: Content identifier
+        :param str cid_or_relative_path: Content identifier or relative path in '/objects' to check
 
         :return: Path to the data object referenced by the pid
         :rtype: Path
@@ -2570,7 +2570,8 @@ class FileHashStore(HashStore):
     def _get_hashstore_metadata_path(self, metadata_relative_path):
         """Return the expected metadata path to a hashstore metadata object that exists.
 
-        :param str metadata_relative_path: Metadata path to check
+        :param str metadata_relative_path: Metadata path to check or relative path in
+        '/metadata' to check
 
         :return: Path to the data object referenced by the pid
         :rtype: Path

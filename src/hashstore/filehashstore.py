@@ -1708,12 +1708,24 @@ class FileHashStore(HashStore):
 
             except Exception as unexpected_exception:
                 # TODO: Untagobject
+                # For all other unexpected exceptions, we are to revert the tagging process as
+                # much as possible. No exceptions from the reverting process will be thrown.
                 raise unexpected_exception
 
         finally:
             # Release cid
             self._release_object_locked_cids(cid)
             self._release_reference_locked_pids(pid)
+
+    def _untag_object(self, pid, cid):
+        """Untags a data object in HashStore by deleting the 'pid reference file' and removing
+        the 'pid' from the 'cid reference file'. This method will never delete a data
+        object. _untag_object will attempt to proceed with as much of the untagging process as
+        possible and swallow relevant exceptions.
+
+        :param str cid: Content identifier
+        :param str pid: Persistent or authority-based identifier.
+        """
 
     def _write_refs_file(self, path, ref_id, ref_type):
         """Write a reference file in the supplied path into a temporary file.

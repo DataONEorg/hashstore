@@ -750,6 +750,41 @@ def test_mark_pid_refs_file_for_deletion(store):
     assert "_delete" in str(list_to_check[0])
 
 
+def test_remove_pid_and_handle_cid_refs_deletion_multiple_cid_refs_contains_multi_pids(
+    store,
+):
+    """Test _remove_pid_and_handle_cid_refs_deletion removes a pid from the cid refs file."""
+    pid = "dou.test.1"
+    pid_two = "dou.test.2"
+    cid = "agoodcid"
+    list_to_check = []
+    store._store_hashstore_refs_files(pid, cid)
+    store._store_hashstore_refs_files(pid_two, cid)
+
+    cid_refs_path = store._get_hashstore_cid_refs_path(cid)
+    store._remove_pid_and_handle_cid_refs_deletion(pid, list_to_check, cid_refs_path)
+
+    assert store._is_string_in_refs_file(pid, cid_refs_path) is False
+    assert store._count("cid") == 1
+    assert len(list_to_check) == 0
+
+
+def test_remove_pid_and_handle_cid_refs_deletion_cid_refs_empty(store):
+    """Test _remove_pid_and_handle_cid_refs_deletion removes a pid from the cid refs file and
+    deletes it when it is empty after removal."""
+    pid = "dou.test.1"
+    cid = "agoodcid"
+    list_to_check = []
+    store._store_hashstore_refs_files(pid, cid)
+
+    cid_refs_path = store._get_hashstore_cid_refs_path(cid)
+    store._remove_pid_and_handle_cid_refs_deletion(pid, list_to_check, cid_refs_path)
+
+    assert not os.path.exists(cid_refs_path)
+    assert os.path.exists(cid_refs_path + "_delete")
+    assert len(list_to_check) == 1
+
+
 def test_validate_and_check_cid_lock_non_matching_cid(store):
     """Test that _validate_and_check_cid_lock throws exception when cid is different"""
     pid = "dou.test.1"

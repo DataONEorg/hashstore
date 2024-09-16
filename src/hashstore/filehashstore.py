@@ -1745,11 +1745,15 @@ class FileHashStore(HashStore):
             self._validate_and_check_cid_lock(pid, cid, cid_to_check)
 
             # Remove pid refs
-            pid_refs_path_str = obj_info_dict.get("pid_refs_path")
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
             self._mark_pid_refs_file_for_deletion(
-                pid, untag_obj_delete_list, pid_refs_path_str
+                pid, untag_obj_delete_list, pid_refs_path
             )
             # Remove pid from cid refs
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
+            self._remove_pid_and_handle_cid_refs_deletion(
+                pid, untag_obj_delete_list, cid_refs_path
+            )
             # Remove all files confirmed for deletion
             for obj in untag_obj_delete_list:
                 os.remove(obj)
@@ -1772,7 +1776,7 @@ class FileHashStore(HashStore):
 
         :param str pid: Persistent or authority-based identifier.
         :param list delete_list: List to add the renamed pid refs file marked for deletion to
-        :param str pid_refs_path: Path to the pid reference file
+        :param path pid_refs_path: Path to the pid reference file
         """
         try:
             delete_list.append(self._rename_path_for_deletion(pid_refs_path))
@@ -1782,6 +1786,29 @@ class FileHashStore(HashStore):
                 + str(e)
             )
             logging.error(err_msg)
+
+    def _remove_pid_and_handle_cid_refs_deletion(self, pid, delete_list, cid_refs_path):
+        """Attempt to remove a pid from a 'cid refs file' and add the 'cid refs file' to the
+        delete list if it is empty.
+
+        :param str pid: Persistent or authority-based identifier.
+        :param list delete_list: List to add the renamed pid refs file marked for deletion to
+        :param path cid_refs_path: Path to the pid reference file
+        """
+        try:
+            # Remove pid from cid reference file
+            self._update_refs_file(cid_refs_path, pid, "remove")
+            # Delete cid reference file and object only if the cid refs file is empty
+            if os.path.getsize(cid_refs_path) == 0:
+                delete_list.append(self._rename_path_for_deletion(cid_refs_path))
+            return
+        except Exception as e:
+            err_msg = (
+                f"Unable to delete remove pid from cid refs file: {cid_refs_path} for pid:"
+                f" {pid}. " + str(e)
+            )
+            logging.error(err_msg)
+            return
 
     def _validate_and_check_cid_lock(self, pid, cid, cid_to_check):
         """Confirm that the two content identifiers provided are equal and is locked to ensure

@@ -1743,13 +1743,13 @@ class FileHashStore(HashStore):
             obj_info_dict = self._find_object(pid)
             cid_to_check = obj_info_dict["cid"]
             self._validate_and_check_cid_lock(pid, cid, cid_to_check)
+
             # Remove pid refs
             pid_refs_path_str = obj_info_dict.get("pid_refs_path")
-            untag_obj_delete_list.append(
-                self._rename_path_for_deletion(pid_refs_path_str)
+            self._mark_pid_refs_file_for_deletion(
+                pid, untag_obj_delete_list, pid_refs_path_str
             )
             # Remove pid from cid refs
-            # TODO
             # Remove all files confirmed for deletion
             for obj in untag_obj_delete_list:
                 os.remove(obj)
@@ -1766,6 +1766,22 @@ class FileHashStore(HashStore):
         except PidRefsDoesNotExist as prdne:
             # TODO: Handle cid refs to ensure pid not found in it
             return
+
+    def _mark_pid_refs_file_for_deletion(self, pid, delete_list, pid_refs_path):
+        """Attempt to rename a pid refs file and add the renamed file to a provided list.
+
+        :param str pid: Persistent or authority-based identifier.
+        :param list delete_list: List to add the renamed pid refs file marked for deletion to
+        :param str pid_refs_path: Path to the pid reference file
+        """
+        try:
+            delete_list.append(self._rename_path_for_deletion(pid_refs_path))
+        except Exception as e:
+            err_msg = (
+                f"Unable to delete pid refs file: {pid_refs_path} for pid: {pid}. "
+                + str(e)
+            )
+            logging.error(err_msg)
 
     def _validate_and_check_cid_lock(self, pid, cid, cid_to_check):
         """Confirm that the two content identifiers provided are equal and is locked to ensure

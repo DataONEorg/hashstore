@@ -735,6 +735,21 @@ def test_store_hashstore_refs_files_refs_not_found_cid_refs_found(store):
     assert store._count("cid") == 1
 
 
+def test_mark_pid_refs_file_for_deletion(store):
+    """Test _mark_pid_refs_file_for_deletion renames a given path for deletion (adds '_delete' to
+    the path name) and adds it to the given list."""
+    pid = "dou.test.1"
+    cid = "agoodcid"
+    list_to_check = []
+    store._store_hashstore_refs_files(pid, cid)
+    pid_refs_path = store._get_hashstore_pid_refs_path(pid)
+
+    store._mark_pid_refs_file_for_deletion(pid, list_to_check, pid_refs_path)
+
+    assert len(list_to_check) == 1
+    assert "_delete" in str(list_to_check[0])
+
+
 def test_validate_and_check_cid_lock_non_matching_cid(store):
     """Test that _validate_and_check_cid_lock throws exception when cid is different"""
     pid = "dou.test.1"

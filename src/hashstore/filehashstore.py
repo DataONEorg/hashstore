@@ -1343,13 +1343,12 @@ class FileHashStore(HashStore):
         validate the object (and delete the tmpFile if the hex digest stored does
         not match what is provided).
 
-        :param str pid: Authority-based identifier.
-        :param Stream stream: Object stream.
-            when saving.
-        :param str additional_algorithm: Optional algorithm value to include
-            when returning hex digests.
-        :param str checksum: Optional checksum to validate the object
-            against hex digest before moving to the permanent location.
+        :param Optional[str] pid: Authority-based identifier.
+        :param Stream stream: Object stream when saving.
+        :param str additional_algorithm: Optional algorithm value to include when returning hex
+            digests.
+        :param str checksum: Optional checksum to validate the object against hex digest before
+            moving to the permanent location.
         :param str checksum_algorithm: Algorithm value of the given checksum.
         :param int file_size_to_validate: Expected size of the object.
 

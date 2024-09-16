@@ -31,6 +31,7 @@ from hashstore.filehashstore_exceptions import (
     RefsFileExistsButCidObjMissing,
     UnsupportedAlgorithm,
     StoreObjectForPidAlreadyInProgress,
+    IdentifierNotLocked,
 )
 
 
@@ -1726,6 +1727,14 @@ class FileHashStore(HashStore):
         :param str cid: Content identifier
         :param str pid: Persistent or authority-based identifier.
         """
+        self._check_string(pid, "pid")
+        self._check_string(cid, "cid")
+
+        delete_list = []
+
+        # To untag a pid, the pid must be found and currently locked
+        # The pid will not be released until this process is over
+        self._check_reference_locked_pids(pid)
 
     def _write_refs_file(self, path, ref_id, ref_type):
         """Write a reference file in the supplied path into a temporary file.
@@ -2693,6 +2702,23 @@ class FileHashStore(HashStore):
                     f"_synchronize_referenced_locked_pids: Synchronizing reference_locked_pids_th"
                     + f" for pid: {pid}"
                 )
+
+    def _check_reference_locked_pids(self, pid):
+        """Check that a given persistent identifier is currently locked (found in
+        'reference_locked_pids' array). If it is not, an exception will be thrown.
+
+        :param str pid: Persistent or authority-based identifier
+        """
+        if self.use_multiprocessing:
+            if pid not in self.reference_locked_pids_mp:
+                err_msg = f"_check_reference_locked_pids: pid {pid} is not locked."
+                logging.error(err_msg)
+                raise IdentifierNotLocked(err_msg)
+        else:
+            if pid not in self.reference_locked_pids_th:
+                err_msg = f"_check_reference_locked_pids: pid {pid} is not locked."
+                logging.error(err_msg)
+                raise IdentifierNotLocked(err_msg)
 
     def _release_reference_locked_pids(self, pid):
         """Remove the given persistent identifier from 'reference_locked_pids' and notify other

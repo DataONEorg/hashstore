@@ -11,6 +11,15 @@ class StoreObjectForPidAlreadyInProgress(Exception):
         self.errors = errors
 
 
+class IdentifierNotLocked(Exception):
+    """Custom exception thrown when an identifier (ex. 'pid' or 'cid') is not locked, which is
+    required to ensure thread safety."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
 class CidRefsContentError(Exception):
     """Custom exception thrown when verifying reference files and a cid refs
     file does not have a pid that is expected to be found."""

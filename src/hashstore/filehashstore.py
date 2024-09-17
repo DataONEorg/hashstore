@@ -1800,8 +1800,25 @@ class FileHashStore(HashStore):
             logging.warning(warn_msg)
 
         except PidNotFoundInCidRefsFile as pnficrf:
-            # TODO: Handle refs exist but pid is not found in cid refs
-            return
+            # `find_object` throws this exception when both the pid and cid refs file exists
+            # but the pid is not found in the cid refs file
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+            cid_read = self._read_small_file_content(pid_refs_path)
+            self._validate_and_check_cid_lock(pid, cid, cid_read)
+
+            # Remove pid refs
+            self._mark_pid_refs_file_for_deletion(
+                pid, untag_obj_delete_list, pid_refs_path
+            )
+            self._delete_marked_files(untag_obj_delete_list)
+
+            warn_msg = (
+                f"_untag_object: pid not found in expected cid refs file for pid: {pid}. "
+                + "Deleted orphan pid refs file. Additional info: "
+                + str(pnficrf)
+            )
+            logging.warning(warn_msg)
+
         except PidRefsDoesNotExist as prdne:
             # TODO: Handle cid refs to ensure pid not found in it
             return

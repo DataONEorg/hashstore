@@ -1603,6 +1603,37 @@ def test_untag_object_orphan_refs_exist_but_data_object_not_found(pids, store):
     assert store._count("cid") == 0
 
 
+def test_untag_object_refs_found_but_pid_not_in_cid_refs(pids, store):
+    """Test _untag_object removes pid refs file whose pid is not found in the cid refs file."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    pid_two = pid + ".dou"
+    path = test_dir + pid
+    object_metadata = store.store_object(pid, path)
+    _object_metadata_two = store.store_object(pid_two, path)
+    cid = object_metadata.cid
+
+    assert store._count("pid") == 2
+    assert store._count("cid") == 1
+
+    # Remove pid from cid refs
+    cid_refs_file = store._get_hashstore_cid_refs_path(cid)
+    # First remove the pid
+    store._update_refs_file(cid_refs_file, pid, "remove")
+
+    with pytest.raises(PidNotFoundInCidRefsFile):
+        store._find_object(pid)
+
+    store._synchronize_referenced_locked_pids(pid)
+    store._synchronize_object_locked_cids(cid)
+    store._untag_object(pid, cid)
+    store._release_reference_locked_pids(pid)
+    store._release_object_locked_cids(cid)
+
+    assert store._count("pid") == 1
+    assert store._count("cid") == 1
+
+
 def test_create_path(pids, store):
     """Test makepath creates folder successfully."""
     for pid in pids:

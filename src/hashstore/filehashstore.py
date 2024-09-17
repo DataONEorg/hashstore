@@ -931,9 +931,7 @@ class FileHashStore(HashStore):
                     self._rename_path_for_deletion(pid_ref_abs_path)
                 )
                 # Remove pid from cid refs file
-                with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
-                    # Retrieve the cid
-                    pid_refs_cid = pid_ref_file.read()
+                pid_refs_cid = self._read_small_file_content(pid_ref_abs_path)
                 cid_ref_abs_str = str(self._get_hashstore_cid_refs_path(pid_refs_cid))
                 # Remove if the pid refs is found
                 if self._is_string_in_refs_file(pid, cid_ref_abs_str):
@@ -1205,8 +1203,7 @@ class FileHashStore(HashStore):
         pid_ref_abs_path = self._get_hashstore_pid_refs_path(pid)
         if os.path.exists(pid_ref_abs_path):
             # Read the file to get the cid from the pid reference
-            with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
-                pid_refs_cid = pid_ref_file.read()
+            pid_refs_cid = self._read_small_file_content(pid_ref_abs_path)
 
             # Confirm that the cid reference file exists
             cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
@@ -2168,8 +2165,7 @@ class FileHashStore(HashStore):
             raise CidRefsFileNotFound(exception_string)
         # Check the content of the reference files
         # Start with the cid
-        with open(pid_refs_path, "r", encoding="utf8") as f:
-            retrieved_cid = f.read()
+        retrieved_cid = self._read_small_file_content(pid_refs_path)
         if retrieved_cid != cid:
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file exists"
@@ -2821,6 +2817,19 @@ class FileHashStore(HashStore):
                 logging.debug(end_sync_debug_msg)
 
     # Other Static Methods
+    @staticmethod
+    def _read_small_file_content(path_to_file):
+        """Read the contents of a file with the given path. This method is not optimized for
+        large files - so it should only be used for small files (like reference files).
+
+        :param path path_to_file: Path to the file to read
+
+        :return: Content of the given file
+        :rtype: str
+        """
+        with open(path_to_file, "r", encoding="utf8") as opened_path:
+            content = opened_path.read()
+            return content
 
     @staticmethod
     def _rename_path_for_deletion(path):

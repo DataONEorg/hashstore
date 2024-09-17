@@ -1695,7 +1695,10 @@ class FileHashStore(HashStore):
                 )
                 logging.info(info_msg)
 
-            except HashStoreRefsAlreadyExists or PidRefsAlreadyExistsError as expected_exceptions:
+            except (
+                HashStoreRefsAlreadyExists,
+                PidRefsAlreadyExistsError,
+            ) as expected_exceptions:
                 raise expected_exceptions
 
             except Exception as unexpected_exception:
@@ -1757,6 +1760,7 @@ class FileHashStore(HashStore):
             cid_read = self._read_small_file_content(pid_refs_path)
             self._validate_and_check_cid_lock(pid, cid, cid_read)
 
+            # Remove pid refs
             self._mark_pid_refs_file_for_deletion(
                 pid, untag_obj_delete_list, pid_refs_path
             )
@@ -1770,8 +1774,31 @@ class FileHashStore(HashStore):
             logging.warning(warn_msg)
 
         except RefsFileExistsButCidObjMissing as rfebcom:
-            # TODO: Handle refs existing but data obj missing
-            return
+            # `find_object` throws this exception when both pid/cid refs files exist but the
+            # actual data object does not.
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+            cid_read = self._read_small_file_content(pid_refs_path)
+            self._validate_and_check_cid_lock(pid, cid, cid_read)
+
+            # Remove pid refs
+            self._mark_pid_refs_file_for_deletion(
+                pid, untag_obj_delete_list, pid_refs_path
+            )
+            # Remove pid from cid refs
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
+            self._remove_pid_and_handle_cid_refs_deletion(
+                pid, untag_obj_delete_list, cid_refs_path
+            )
+            # Remove all files confirmed for deletion
+            self._delete_marked_files(untag_obj_delete_list)
+
+            warn_msg = (
+                f"_untag_object: data object for cid: {cid_read}. does not exist, but pid and cid "
+                f"references files found for pid: {pid}, Deleted pid and cid refs files. "
+                f"Additional info: " + str(rfebcom)
+            )
+            logging.warning(warn_msg)
+
         except PidNotFoundInCidRefsFile as pnficrf:
             # TODO: Handle refs exist but pid is not found in cid refs
             return

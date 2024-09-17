@@ -1506,7 +1506,6 @@ def test_delete_with_object_metadata_id(pids, store):
     assert store._count(entity) == 0
 
 
-# TODO: Add untag pytest for pid and cid successfully untagged
 def test_untag_object(pids, store):
     """Test _untag_object untags successfully."""
     test_dir = "tests/testdata/"
@@ -1574,6 +1573,34 @@ def test_untag_object_orphan_pid_refs_file_found(pids, store):
     store._release_object_locked_cids(cid)
 
     assert store._count("pid") == 0
+
+
+def test_untag_object_orphan_refs_exist_but_data_object_not_found(pids, store):
+    """Test _untag_object removes orphaned pid and cid refs files"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    object_metadata = store.store_object(pid, path)
+    cid = object_metadata.cid
+
+    assert store._count("pid") == 1
+    assert store._count("cid") == 1
+
+    # Remove cid refs file
+    data_obj_path = store._get_hashstore_data_object_path(cid)
+    os.remove(data_obj_path)
+
+    with pytest.raises(RefsFileExistsButCidObjMissing):
+        store._find_object(pid)
+
+    store._synchronize_referenced_locked_pids(pid)
+    store._synchronize_object_locked_cids(cid)
+    store._untag_object(pid, cid)
+    store._release_reference_locked_pids(pid)
+    store._release_object_locked_cids(cid)
+
+    assert store._count("pid") == 0
+    assert store._count("cid") == 0
 
 
 def test_create_path(pids, store):

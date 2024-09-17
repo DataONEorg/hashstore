@@ -870,8 +870,7 @@ class FileHashStore(HashStore):
                             self._rename_path_for_deletion(obj_real_path)
                         )
                     # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
+                    self._delete_marked_files(objects_to_delete)
 
                     # Remove metadata files if they exist
                     self.delete_metadata(pid)
@@ -912,8 +911,7 @@ class FileHashStore(HashStore):
                 self.delete_metadata(pid)
 
                 # Remove all files confirmed for deletion
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 return
             except OrphanPidRefsFileFound:
                 # Delete pid refs file
@@ -924,8 +922,7 @@ class FileHashStore(HashStore):
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
                 # Remove all files confirmed for deletion
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 return
             except RefsFileExistsButCidObjMissing:
                 # Add pid refs file to be permanently deleted
@@ -944,8 +941,7 @@ class FileHashStore(HashStore):
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
                 # Remove all files confirmed for deletion
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 return
             except PidNotFoundInCidRefsFile:
                 # Add pid refs file to be permanently deleted
@@ -956,8 +952,7 @@ class FileHashStore(HashStore):
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
                 # Remove all files confirmed for deletion
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 return
         finally:
             # Release pid
@@ -1045,8 +1040,7 @@ class FileHashStore(HashStore):
                                 self.metadata_condition_th.notify()
 
                 # Delete metadata objects
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 info_string = (
                     "FileHashStore - delete_metadata: Successfully deleted all metadata"
                     + f"for pid: {pid}",
@@ -1721,7 +1715,7 @@ class FileHashStore(HashStore):
     def _untag_object(self, pid, cid):
         """Untags a data object in HashStore by deleting the 'pid reference file' and removing
         the 'pid' from the 'cid reference file'. This method will never delete a data
-        object. _untag_object will attempt to proceed with as much of the untagging process as
+        object. `_untag_object` will attempt to proceed with as much of the untagging process as
         possible and swallow relevant exceptions.
 
         :param str cid: Content identifier
@@ -1755,9 +1749,8 @@ class FileHashStore(HashStore):
                 pid, untag_obj_delete_list, cid_refs_path
             )
             # Remove all files confirmed for deletion
-            for obj in untag_obj_delete_list:
-                os.remove(obj)
-            return
+            self._delete_marked_files(untag_obj_delete_list)
+
         except OrphanPidRefsFileFound as oprff:
             # TODO: Handle orphan pid refs
             return
@@ -1770,6 +1763,22 @@ class FileHashStore(HashStore):
         except PidRefsDoesNotExist as prdne:
             # TODO: Handle cid refs to ensure pid not found in it
             return
+
+    @staticmethod
+    def _delete_marked_files(delete_list):
+        """Delete all the file paths in a given delete list.
+
+        :param list delete_list: Persistent or authority-based identifier.
+        """
+        if delete_list is not None:
+            for obj in delete_list:
+                try:
+                    os.remove(obj)
+                except Exception as e:
+                    warn_msg = f"Unable to remove {obj} in given delete_list. " + str(e)
+                    logging.warning(warn_msg)
+        else:
+            raise ValueError("delete_marked_files: list cannot be None")
 
     def _mark_pid_refs_file_for_deletion(self, pid, delete_list, pid_refs_path):
         """Attempt to rename a pid refs file and add the renamed file to a provided list.

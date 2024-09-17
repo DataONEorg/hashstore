@@ -735,6 +735,40 @@ def test_store_hashstore_refs_files_refs_not_found_cid_refs_found(store):
     assert store._count("cid") == 1
 
 
+def test_delete_marked_files(store):
+    """Test that _delete_marked_files removes all items from a given list"""
+    pid = "jtao.1700.1"
+    cid = "94f9b6c88f1f458e410c30c351c6384ea42ac1b5ee1f8430d3e365e43b78a38a"
+    # Tag object
+    store._store_hashstore_refs_files(pid, cid)
+    # Tag the cid with another pid
+    additional_pid = "dou.test.1"
+    store._store_hashstore_refs_files(additional_pid, cid)
+
+    list_to_check = []
+    pid_refs_path = store._get_hashstore_pid_refs_path(pid)
+    store._mark_pid_refs_file_for_deletion(pid, list_to_check, pid_refs_path)
+    pid_refs_path_two = store._get_hashstore_pid_refs_path(additional_pid)
+    store._mark_pid_refs_file_for_deletion(pid, list_to_check, pid_refs_path_two)
+
+    assert len(list_to_check) == 2
+
+    store._delete_marked_files(list_to_check)
+
+    assert not os.path.exists(list_to_check[0])
+    assert not os.path.exists(list_to_check[1])
+
+
+def test_delete_marked_files_empty_list_or_none(store):
+    """Test that _delete_marked_files throws exception when supplied 'None' value - and does not
+    throw any exception when provided with an empty list."""
+    list_to_check = []
+    store._delete_marked_files(list_to_check)
+
+    with pytest.raises(ValueError):
+        store._delete_marked_files(None)
+
+
 def test_mark_pid_refs_file_for_deletion(store):
     """Test _mark_pid_refs_file_for_deletion renames a given path for deletion (adds '_delete' to
     the path name) and adds it to the given list."""

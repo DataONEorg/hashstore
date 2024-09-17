@@ -1820,8 +1820,23 @@ class FileHashStore(HashStore):
             logging.warning(warn_msg)
 
         except PidRefsDoesNotExist as prdne:
-            # TODO: Handle cid refs to ensure pid not found in it
-            return
+            # `find_object` throws this exception if the pid refs file is not found
+            # Check to see if pid is in the 'cid refs file' and attempt to remove it
+            self._check_object_locked_cids(cid)
+
+            # Remove pid from cid refs
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
+            self._remove_pid_and_handle_cid_refs_deletion(
+                pid, untag_obj_delete_list, cid_refs_path
+            )
+            # Remove all files confirmed for deletion
+            self._delete_marked_files(untag_obj_delete_list)
+
+            warn_msg = (
+                f"Pid refs file not found, removed pid from cid refs file for cid: {cid}"
+                + str(prdne)
+            )
+            logging.warning(warn_msg)
 
     def _put_metadata(self, metadata, pid, metadata_doc_name):
         """Store contents of metadata to `[self.root]/metadata` using the hash of the

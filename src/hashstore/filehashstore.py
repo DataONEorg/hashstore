@@ -1747,10 +1747,28 @@ class FileHashStore(HashStore):
             )
             # Remove all files confirmed for deletion
             self._delete_marked_files(untag_obj_delete_list)
+            info_msg = f"_untag_object: Untagged pid: {pid} with cid: {cid}"
+            logging.info(info_msg)
 
         except OrphanPidRefsFileFound as oprff:
-            # TODO: Handle orphan pid refs
-            return
+            # `find_object` throws this exception when the cid refs file doesn't exist,
+            # so we only need to delete the pid refs file (pid is already locked)
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+            cid_read = self._read_small_file_content(pid_refs_path)
+            self._validate_and_check_cid_lock(pid, cid, cid_read)
+
+            self._mark_pid_refs_file_for_deletion(
+                pid, untag_obj_delete_list, pid_refs_path
+            )
+            self._delete_marked_files(untag_obj_delete_list)
+
+            warn_msg = (
+                f"_untag_object: Cid refs file does not exist for pid: {pid}."
+                + " Deleted orphan pid refs file. Additional info: "
+                + str(oprff)
+            )
+            logging.warning(warn_msg)
+
         except RefsFileExistsButCidObjMissing as rfebcom:
             # TODO: Handle refs existing but data obj missing
             return
@@ -1914,7 +1932,7 @@ class FileHashStore(HashStore):
         self._check_string(cid, "cid")
         self._check_string(cid_to_check, "cid_to_check")
 
-        if cid is not cid_to_check:
+        if cid != cid_to_check:
             err_msg = (
                 f"_validate_and_check_cid_lock: cid provided: {cid_to_check} does not "
                 f"match untag request for cid: {cid} and pid: {pid}"

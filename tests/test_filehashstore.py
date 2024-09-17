@@ -1507,8 +1507,73 @@ def test_delete_with_object_metadata_id(pids, store):
 
 
 # TODO: Add untag pytest for pid and cid successfully untagged
-# TODO: Add untag pytest for exception thrown when pid is not locked
-# TODO: Add untag pytest for exception thrown when cid is not locked
+def test_untag_object(pids, store):
+    """Test _untag_object untags successfully."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        store._synchronize_referenced_locked_pids(pid)
+        store._synchronize_object_locked_cids(cid)
+        store._untag_object(pid, cid)
+        store._release_reference_locked_pids(pid)
+        store._release_object_locked_cids(cid)
+
+        assert store._count("pid") == 0
+        assert store._count("cid") == 0
+    assert store._count("objects") == 3
+
+
+def test_untag_object_pid_not_locked(pids, store):
+    """Test _untag_object throws exception when pid is not locked"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        with pytest.raises(IdentifierNotLocked):
+            store._untag_object(pid, cid)
+
+
+def test_untag_object_cid_not_locked(pids, store):
+    """Test _untag_object throws exception with cid is not locked"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        with pytest.raises(IdentifierNotLocked):
+            store._synchronize_referenced_locked_pids(pid)
+            store._untag_object(pid, cid)
+            store._release_reference_locked_pids(pid)
+
+
+def test_untag_object_orphan_pid_refs_file_found(pids, store):
+    """Test _untag_object removes an orphan pid refs file"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    object_metadata = store.store_object(pid, path)
+    cid = object_metadata.cid
+
+    # Remove cid refs file
+    cid_refs_abs_path = store._get_hashstore_cid_refs_path(cid)
+    os.remove(cid_refs_abs_path)
+
+    with pytest.raises(OrphanPidRefsFileFound):
+        store._find_object(pid)
+
+    store._synchronize_referenced_locked_pids(pid)
+    store._synchronize_object_locked_cids(cid)
+    store._untag_object(pid, cid)
+    store._release_reference_locked_pids(pid)
+    store._release_object_locked_cids(cid)
+
+    assert store._count("pid") == 0
 
 
 def test_create_path(pids, store):

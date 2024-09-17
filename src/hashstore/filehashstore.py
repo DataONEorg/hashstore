@@ -1764,6 +1764,93 @@ class FileHashStore(HashStore):
             # TODO: Handle cid refs to ensure pid not found in it
             return
 
+    def _put_metadata(self, metadata, pid, metadata_doc_name):
+        """Store contents of metadata to `[self.root]/metadata` using the hash of the
+        given PID and format ID as the permanent address.
+
+        :param mixed metadata: String or path to metadata document.
+        :param str pid: Authority-based identifier.
+        :param str metadata_doc_name: Metadata document name
+
+        :return: Address of the metadata document.
+        :rtype: Path
+        """
+        logging.debug(
+            "FileHashStore - _put_metadata: Request to put metadata for pid: %s", pid
+        )
+        # Create metadata tmp file and write to it
+        metadata_stream = Stream(metadata)
+        with closing(metadata_stream):
+            metadata_tmp = self._mktmpmetadata(metadata_stream)
+
+        # Get target and related paths (permanent location)
+        metadata_directory = self._computehash(pid)
+        metadata_document_name = metadata_doc_name
+        rel_path = "/".join(self._shard(metadata_directory))
+        full_path = self._get_store_path("metadata") / rel_path / metadata_document_name
+
+        # Move metadata to target path
+        if os.path.exists(metadata_tmp):
+            try:
+                parent = full_path.parent
+                parent.mkdir(parents=True, exist_ok=True)
+                # Metadata will be replaced if it exists
+                shutil.move(metadata_tmp, full_path)
+                logging.debug(
+                    "FileHashStore - _put_metadata: Successfully put metadata for pid: %s",
+                    pid,
+                )
+                return full_path
+            except Exception as err:
+                exception_string = (
+                    f"FileHashStore - _put_metadata: Unexpected {err=}, {type(err)=}"
+                )
+                logging.error(exception_string)
+                if os.path.exists(metadata_tmp):
+                    # Remove tmp metadata, calling app must re-upload
+                    logging.debug(
+                        "FileHashStore - _put_metadata: Deleting metadata for pid: %s",
+                        pid,
+                    )
+                    self.metadata.delete(metadata_tmp)
+                raise
+        else:
+            exception_string = (
+                f"FileHashStore - _put_metadata: Attempt to move metadata for pid: {pid}"
+                + f", but metadata temp file not found: {metadata_tmp}"
+            )
+            logging.error(exception_string)
+            raise FileNotFoundError(exception_string)
+
+    def _mktmpmetadata(self, stream):
+        """Create a named temporary file with `stream` (metadata).
+
+        :param Stream stream: Metadata stream.
+
+        :return: Path/name of temporary file created and written into.
+        :rtype: str
+        """
+        # Create temporary file in .../{store_path}/tmp
+        tmp_root_path = self._get_store_path("metadata") / "tmp"
+        tmp = self._mktmpfile(tmp_root_path)
+
+        # tmp is a file-like object that is already opened for writing by default
+        logging.debug(
+            "FileHashStore - _mktmpmetadata: Writing stream to tmp metadata file: %s",
+            tmp.name,
+        )
+        with tmp as tmp_file:
+            for data in stream:
+                tmp_file.write(self._cast_to_bytes(data))
+
+        logging.debug(
+            "FileHashStore - _mktmpmetadata: Successfully written to tmp metadata file: %s",
+            tmp.name,
+        )
+        return tmp.name
+
+    # FileHashStore Utility & Supporting Methods
+
     @staticmethod
     def _delete_marked_files(delete_list):
         """Delete all the file paths in a given delete list.
@@ -1946,93 +2033,6 @@ class FileHashStore(HashStore):
                 if ref_id == value:
                     return True
         return False
-
-    def _put_metadata(self, metadata, pid, metadata_doc_name):
-        """Store contents of metadata to `[self.root]/metadata` using the hash of the
-        given PID and format ID as the permanent address.
-
-        :param mixed metadata: String or path to metadata document.
-        :param str pid: Authority-based identifier.
-        :param str metadata_doc_name: Metadata document name
-
-        :return: Address of the metadata document.
-        :rtype: Path
-        """
-        logging.debug(
-            "FileHashStore - _put_metadata: Request to put metadata for pid: %s", pid
-        )
-        # Create metadata tmp file and write to it
-        metadata_stream = Stream(metadata)
-        with closing(metadata_stream):
-            metadata_tmp = self._mktmpmetadata(metadata_stream)
-
-        # Get target and related paths (permanent location)
-        metadata_directory = self._computehash(pid)
-        metadata_document_name = metadata_doc_name
-        rel_path = "/".join(self._shard(metadata_directory))
-        full_path = self._get_store_path("metadata") / rel_path / metadata_document_name
-
-        # Move metadata to target path
-        if os.path.exists(metadata_tmp):
-            try:
-                parent = full_path.parent
-                parent.mkdir(parents=True, exist_ok=True)
-                # Metadata will be replaced if it exists
-                shutil.move(metadata_tmp, full_path)
-                logging.debug(
-                    "FileHashStore - _put_metadata: Successfully put metadata for pid: %s",
-                    pid,
-                )
-                return full_path
-            except Exception as err:
-                exception_string = (
-                    f"FileHashStore - _put_metadata: Unexpected {err=}, {type(err)=}"
-                )
-                logging.error(exception_string)
-                if os.path.exists(metadata_tmp):
-                    # Remove tmp metadata, calling app must re-upload
-                    logging.debug(
-                        "FileHashStore - _put_metadata: Deleting metadata for pid: %s",
-                        pid,
-                    )
-                    self.metadata.delete(metadata_tmp)
-                raise
-        else:
-            exception_string = (
-                f"FileHashStore - _put_metadata: Attempt to move metadata for pid: {pid}"
-                + f", but metadata temp file not found: {metadata_tmp}"
-            )
-            logging.error(exception_string)
-            raise FileNotFoundError(exception_string)
-
-    def _mktmpmetadata(self, stream):
-        """Create a named temporary file with `stream` (metadata).
-
-        :param Stream stream: Metadata stream.
-
-        :return: Path/name of temporary file created and written into.
-        :rtype: str
-        """
-        # Create temporary file in .../{store_path}/tmp
-        tmp_root_path = self._get_store_path("metadata") / "tmp"
-        tmp = self._mktmpfile(tmp_root_path)
-
-        # tmp is a file-like object that is already opened for writing by default
-        logging.debug(
-            "FileHashStore - _mktmpmetadata: Writing stream to tmp metadata file: %s",
-            tmp.name,
-        )
-        with tmp as tmp_file:
-            for data in stream:
-                tmp_file.write(self._cast_to_bytes(data))
-
-        logging.debug(
-            "FileHashStore - _mktmpmetadata: Successfully written to tmp metadata file: %s",
-            tmp.name,
-        )
-        return tmp.name
-
-    # FileHashStore Utility & Supporting Methods
 
     def _verify_object_information(
         self,
@@ -2239,37 +2239,6 @@ class FileHashStore(HashStore):
                         logging.debug(end_sync_debug_msg)
                         self.object_locked_cids_th.remove(cid)
                         self.object_cid_condition_th.notify()
-
-    @staticmethod
-    def _check_arg_data(data):
-        """Checks a data argument to ensure that it is either a string, path, or stream
-        object.
-
-        :param data: Object to validate (string, path, or stream).
-        :type data: str, os.PathLike, io.BufferedReader
-
-        :return: True if valid.
-        :rtype: bool
-        """
-        if (
-            not isinstance(data, str)
-            and not isinstance(data, Path)
-            and not isinstance(data, io.BufferedIOBase)
-        ):
-            exception_string = (
-                "FileHashStore - _validate_arg_data: Data must be a path, string or buffered"
-                + f" stream type. Data type supplied: {type(data)}"
-            )
-            logging.error(exception_string)
-            raise TypeError(exception_string)
-        if isinstance(data, str):
-            if data.strip() == "":
-                exception_string = (
-                    "FileHashStore - _validate_arg_data: Data string cannot be empty."
-                )
-                logging.error(exception_string)
-                raise TypeError(exception_string)
-        return True
 
     def _check_arg_algorithms_and_checksum(
         self, additional_algorithm, checksum, checksum_algorithm
@@ -2550,21 +2519,6 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise err
-
-    @staticmethod
-    def _rename_path_for_deletion(path):
-        """Rename a given path by appending '_delete' and move it to the renamed path.
-
-        :param string path: Path to file to rename
-
-        :return: Path to the renamed file
-        :rtype: str
-        """
-        if isinstance(path, str):
-            path = Path(path)
-        delete_path = path.with_name(path.stem + "_delete" + path.suffix)
-        shutil.move(path, delete_path)
-        return delete_path
 
     def _create_path(self, path):
         """Physically create the folder path (and all intermediate ones) on disk.
@@ -2866,6 +2820,23 @@ class FileHashStore(HashStore):
                 )
                 logging.debug(end_sync_debug_msg)
 
+    # Other Static Methods
+
+    @staticmethod
+    def _rename_path_for_deletion(path):
+        """Rename a given path by appending '_delete' and move it to the renamed path.
+
+        :param string path: Path to file to rename
+
+        :return: Path to the renamed file
+        :rtype: str
+        """
+        if isinstance(path, str):
+            path = Path(path)
+        delete_path = path.with_name(path.stem + "_delete" + path.suffix)
+        shutil.move(path, delete_path)
+        return delete_path
+
     @staticmethod
     def _get_file_paths(directory):
         """Get the file paths of a given directory if it exists
@@ -2886,7 +2857,36 @@ class FileHashStore(HashStore):
         else:
             return None
 
-    # Other Static Methods
+    @staticmethod
+    def _check_arg_data(data):
+        """Checks a data argument to ensure that it is either a string, path, or stream
+        object.
+
+        :param data: Object to validate (string, path, or stream).
+        :type data: str, os.PathLike, io.BufferedReader
+
+        :return: True if valid.
+        :rtype: bool
+        """
+        if (
+            not isinstance(data, str)
+            and not isinstance(data, Path)
+            and not isinstance(data, io.BufferedIOBase)
+        ):
+            exception_string = (
+                "FileHashStore - _validate_arg_data: Data must be a path, string or buffered"
+                + f" stream type. Data type supplied: {type(data)}"
+            )
+            logging.error(exception_string)
+            raise TypeError(exception_string)
+        if isinstance(data, str):
+            if data.strip() == "":
+                exception_string = (
+                    "FileHashStore - _validate_arg_data: Data string cannot be empty."
+                )
+                logging.error(exception_string)
+                raise TypeError(exception_string)
+        return True
 
     @staticmethod
     def _check_integer(file_size):

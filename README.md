@@ -85,8 +85,8 @@ hashstore = hashstore_factory.get_hashstore(module_name, class_name, properties)
 
 # Store objects (.../[hashstore_path]/objects/)
 pid = "j.tao.1700.1"
-object = "/path/to/your/object.data"
-object_metadata = hashstore.store_object(pid, object)
+object_path = "/path/to/your/object.data"
+object_metadata = hashstore.store_object(pid, object_path)
 object_cid = object_metadata.cid
 
 # Store metadata (.../[hashstore_path]/metadata/)
@@ -95,11 +95,11 @@ pid = "j.tao.1700.1"
 sysmeta = "/path/to/your/sysmeta/document.xml"
 metadata_cid = hashstore.store_metadata(pid, sysmeta)
 
-# If you want to store other types of metadata, add an additional `format_id`.
+# If you want to store other types of metadata, include a `format_id`.
 pid = "j.tao.1700.1"
 metadata = "/path/to/your/metadata/document.json"
 format_id = "http://custom.metadata.com/json/type/v1.0"
-metadata_cid = hashstore.store_metadata(pid, metadata, format_id)
+metadata_cid_two = hashstore.store_metadata(pid, metadata, format_id)
 
 # ...
 ```

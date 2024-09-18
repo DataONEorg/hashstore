@@ -1,6 +1,25 @@
 """FileHashStore custom exception module."""
 
 
+class StoreObjectForPidAlreadyInProgress(Exception):
+    """Custom exception thrown when called to store a data object for a pid that is already
+    progress. A pid can only ever reference one data object/content identifier so duplicate
+    requests are rejected immediately."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
+class IdentifierNotLocked(Exception):
+    """Custom exception thrown when an identifier (ex. 'pid' or 'cid') is not locked, which is
+    required to ensure thread safety."""
+
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
 class CidRefsContentError(Exception):
     """Custom exception thrown when verifying reference files and a cid refs
     file does not have a pid that is expected to be found."""
@@ -19,7 +38,7 @@ class CidRefsFileNotFound(Exception):
         self.errors = errors
 
 
-class CidRefsDoesNotExist(Exception):
+class OrphanPidRefsFileFound(Exception):
     """Custom exception thrown when a cid refs file does not exist."""
 
     def __init__(self, message, errors=None):
@@ -45,7 +64,7 @@ class PidRefsFileNotFound(Exception):
         self.errors = errors
 
 
-class PidAlreadyExistsError(Exception):
+class PidRefsAlreadyExistsError(Exception):
     """Custom exception thrown when a client calls 'tag_object' and the pid
     that is being tagged is already accounted for (has a pid refs file and
     is found in the cid refs file)."""

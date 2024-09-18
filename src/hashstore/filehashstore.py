@@ -18,18 +18,20 @@ from tempfile import NamedTemporaryFile
 from hashstore import HashStore
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
-    CidRefsDoesNotExist,
+    OrphanPidRefsFileFound,
     CidRefsFileNotFound,
     HashStoreRefsAlreadyExists,
     NonMatchingChecksum,
     NonMatchingObjSize,
-    PidAlreadyExistsError,
+    PidRefsAlreadyExistsError,
     PidNotFoundInCidRefsFile,
     PidRefsContentError,
     PidRefsDoesNotExist,
     PidRefsFileNotFound,
     RefsFileExistsButCidObjMissing,
     UnsupportedAlgorithm,
+    StoreObjectForPidAlreadyInProgress,
+    IdentifierNotLocked,
 )
 
 
@@ -82,30 +84,48 @@ class FileHashStore(HashStore):
         self.use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
         if self.use_multiprocessing == "True":
             # Create multiprocessing synchronization variables
-            self.object_lock_mp = multiprocessing.Lock()
-            self.object_condition_mp = multiprocessing.Condition(self.object_lock_mp)
+            # Synchronization values for object locked pids
+            self.object_pid_lock_mp = multiprocessing.Lock()
+            self.object_pid_condition_mp = multiprocessing.Condition(
+                self.object_pid_lock_mp
+            )
             self.object_locked_pids_mp = multiprocessing.Manager().list()
+            # Synchronization values for object locked cids
+            self.object_cid_lock_mp = multiprocessing.Lock()
+            self.object_cid_condition_mp = multiprocessing.Condition(
+                self.object_cid_lock_mp
+            )
+            self.object_locked_cids_mp = multiprocessing.Manager().list()
+            # Synchronization values for metadata locked documents
             self.metadata_lock_mp = multiprocessing.Lock()
             self.metadata_condition_mp = multiprocessing.Condition(
                 self.metadata_lock_mp
             )
             self.metadata_locked_docs_mp = multiprocessing.Manager().list()
-            self.reference_lock_mp = multiprocessing.Lock()
-            self.reference_condition_mp = multiprocessing.Condition(
-                self.reference_lock_mp
+            # Synchronization values for reference locked pids
+            self.reference_pid_lock_mp = multiprocessing.Lock()
+            self.reference_pid_condition_mp = multiprocessing.Condition(
+                self.reference_pid_lock_mp
             )
-            self.reference_locked_cids_mp = multiprocessing.Manager().list()
+            self.reference_locked_pids_mp = multiprocessing.Manager().list()
         else:
             # Create threading synchronization variables
-            self.object_lock = threading.Lock()
-            self.object_condition = threading.Condition(self.object_lock)
-            self.object_locked_pids = []
-            self.metadata_lock = threading.Lock()
-            self.metadata_condition = threading.Condition(self.metadata_lock)
-            self.metadata_locked_docs = []
-            self.reference_lock = threading.Lock()
-            self.reference_condition = threading.Condition(self.reference_lock)
-            self.reference_locked_cids = []
+            # Synchronization values for object locked pids
+            self.object_pid_lock_th = threading.Lock()
+            self.object_pid_condition_th = threading.Condition(self.object_pid_lock_th)
+            self.object_locked_pids_th = []
+            # Synchronization values for object locked cids
+            self.object_cid_lock_th = threading.Lock()
+            self.object_cid_condition_th = threading.Condition(self.object_cid_lock_th)
+            self.object_locked_cids_th = []
+            # Synchronization values for metadata locked documents
+            self.metadata_lock_th = threading.Lock()
+            self.metadata_condition_th = threading.Condition(self.metadata_lock_th)
+            self.metadata_locked_docs_th = []
+            # Synchronization values for reference locked pids
+            self.reference_pid_lock_th = threading.Lock()
+            self.reference_pid_condition_th = threading.Condition(self.metadata_lock_th)
+            self.reference_locked_pids_th = []
         # Now check properties
         if properties:
             # Validate properties against existing configuration if present
@@ -510,25 +530,26 @@ class FileHashStore(HashStore):
             sync_begin_debug_msg = (
                 f"FileHashStore - store_object: Adding pid ({pid}) to locked list."
             )
-            sync_wait_msg = (
-                f"FileHashStore - store_object: Pid ({pid}) is locked. Waiting."
+            err_msg = (
+                f"FileHashStore - store_object: Duplicate object request encountered for pid: "
+                f"{pid}" + ". Already in progress."
             )
             if self.use_multiprocessing:
-                with self.object_condition_mp:
+                with self.object_pid_condition_mp:
                     # Wait for the pid to release if it's in use
-                    while pid in self.object_locked_pids_mp:
-                        logging.debug(sync_wait_msg)
-                        self.object_condition_mp.wait()
+                    if pid in self.object_locked_pids_mp:
+                        logging.error(err_msg)
+                        raise StoreObjectForPidAlreadyInProgress(err_msg)
                     # Modify object_locked_pids consecutively
                     logging.debug(sync_begin_debug_msg)
                     self.object_locked_pids_mp.append(pid)
             else:
-                with self.object_condition:
-                    while pid in self.object_locked_pids:
-                        logging.debug(sync_wait_msg)
-                        self.object_condition.wait()
+                with self.object_pid_condition_th:
+                    if pid in self.object_locked_pids_th:
+                        logging.error(err_msg)
+                        raise StoreObjectForPidAlreadyInProgress(err_msg)
                     logging.debug(sync_begin_debug_msg)
-                    self.object_locked_pids.append(pid)
+                    self.object_locked_pids_th.append(pid)
             try:
                 logging.debug(
                     "FileHashStore - store_object: Attempting to store object for pid: %s",
@@ -562,25 +583,11 @@ class FileHashStore(HashStore):
                 raise err
             finally:
                 # Release pid
-                end_sync_debug_msg = (
-                    f"FileHashStore - store_object: Releasing pid ({pid})"
-                    + " from locked list"
-                )
-                if self.use_multiprocessing:
-                    with self.object_condition_mp:
-                        logging.debug(end_sync_debug_msg)
-                        self.object_locked_pids_mp.remove(pid)
-                        self.object_condition_mp.notify()
-                else:
-                    # Release pid
-                    with self.object_condition:
-                        logging.debug(end_sync_debug_msg)
-                        self.object_locked_pids.remove(pid)
-                        self.object_condition.notify()
+                self._release_object_locked_pids(pid)
 
         return object_metadata
 
-    def delete_invalid_object(
+    def delete_if_invalid_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
         self._check_string(checksum, "checksum")
@@ -635,157 +642,20 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid")
         self._check_string(cid, "cid")
 
-        sync_begin_debug_msg = (
-            f"FileHashStore - tag_object: Adding cid ({pid}) to locked list."
-        )
-        sync_wait_msg = f"FileHashStore - tag_object: Cid ({cid}) is locked. Waiting."
-        if self.use_multiprocessing:
-            with self.reference_condition_mp:
-                # Wait for the cid to release if it's being tagged
-                while cid in self.reference_locked_cids_mp:
-                    logging.debug(sync_wait_msg)
-                    self.reference_condition_mp.wait()
-                # Modify reference_locked_cids consecutively
-                logging.debug(sync_begin_debug_msg)
-                self.reference_locked_cids_mp.append(cid)
-        else:
-            with self.reference_condition:
-                while cid in self.reference_locked_cids:
-                    logging.debug(sync_wait_msg)
-                    self.reference_condition.wait()
-                logging.debug(sync_begin_debug_msg)
-                self.reference_locked_cids.append(cid)
         try:
-            # Prepare files and paths
-            tmp_root_path = self._get_store_path("refs") / "tmp"
-            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
-            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
-            # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
-            self._create_path(Path(os.path.dirname(pid_refs_path)))
-            self._create_path(Path(os.path.dirname(cid_refs_path)))
-
-            if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
-                self._verify_hashstore_references(
-                    pid,
-                    cid,
-                    pid_refs_path,
-                    cid_refs_path,
-                    "Refs file already exists, verifying.",
-                )
-                error_msg = (
-                    f"FileHashStore - tag_object: Object with cid: {cid}"
-                    + f" already exists and is tagged with pid: {pid}"
-                )
-                logging.error(error_msg)
-                raise HashStoreRefsAlreadyExists(error_msg)
-            elif os.path.exists(pid_refs_path) and not os.path.exists(cid_refs_path):
-                debug_msg = (
-                    f"FileHashStore - tag_object: pid refs file exists ({pid_refs_path})"
-                    + f" for pid: {pid}, but cid refs file doesn't at: {cid_refs_path}"
-                    + f" for cid: {cid}"
-                )
-                logging.debug(debug_msg)
-                # A pid reference file can only contain and reference one cid
-                # First, confirm that the expected cid refs file exists by getting the cid
-                with open(pid_refs_path, "r", encoding="utf8") as pid_ref_file:
-                    pid_refs_cid = pid_ref_file.read()
-
-                if self._is_string_in_refs_file(cid, pid_refs_path):
-                    # The pid correctly references the given cid, but the cid refs file is missing
-                    cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
-                    shutil.move(cid_tmp_file_path, cid_refs_path)
-                    self._verify_hashstore_references(
-                        pid,
-                        cid,
-                        pid_refs_path,
-                        cid_refs_path,
-                        "Created missing cid refs file",
-                    )
-                    info_msg = (
-                        f"FileHashStore - tag_object: pid refs file exists for pid: {pid}"
-                        + f", with the expected cid: {cid} - but cid refs file is missing."
-                        + " Cid refs file created, tagged and verified."
-                    )
-                    logging.info(info_msg)
-                    return True
-                else:
-                    # Check if the retrieved cid refs file exists and pid is referenced
-                    retrieved_cid_refs_path = self._get_hashstore_cid_refs_path(
-                        pid_refs_cid
-                    )
-                    if os.path.exists(
-                        retrieved_cid_refs_path
-                    ) and self._is_string_in_refs_file(pid, retrieved_cid_refs_path):
-                        # Throw exception, this pid is accounted for
-                        error_msg = (
-                            "FileHashStore - tag_object: Pid refs file exists with valid pid"
-                            + f" and cid reference files for pid: {pid} with cid: {cid}."
-                        )
-                        logging.error(error_msg)
-                        raise PidAlreadyExistsError(error_msg)
-                    else:
-                        debug_msg = (
-                            f"FileHashStore - tag_object: Orphan pid refs file found for {pid}."
-                            + f" Cid ({cid}) reference file does not contain the pid. Proceeding."
-                        )
-                        logging.debug(debug_msg)
-            elif not os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
-                debug_msg = (
-                    f"FileHashStore - tag_object: pid refs file does not exist for pid {pid}"
-                    + f" but cid refs file found at: {cid_refs_path} for cid: {cid}"
-                )
-                logging.debug(debug_msg)
-                # Move the pid refs file
-                pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
-                shutil.move(pid_tmp_file_path, pid_refs_path)
-                # Update cid ref files as it already exists
-                if not self._is_string_in_refs_file(pid, cid_refs_path):
-                    self._update_refs_file(cid_refs_path, pid, "add")
-                self._verify_hashstore_references(
-                    pid,
-                    cid,
-                    pid_refs_path,
-                    cid_refs_path,
-                    f"Updated existing cid refs file: {cid_refs_path} with pid: {pid}",
-                )
-                logging.info(
-                    "FileHashStore - tag_object: Successfully updated cid: %s with pid: %s",
-                    cid,
-                    pid,
-                )
-                return True
-
-            # Move both files after checking the existing status of refs files
-            pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
-            cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
-            shutil.move(pid_tmp_file_path, pid_refs_path)
-            shutil.move(cid_tmp_file_path, cid_refs_path)
-            log_msg = "Reference files have been moved to their permanent location. Verifying refs."
-            self._verify_hashstore_references(
-                pid, cid, pid_refs_path, cid_refs_path, log_msg
+            self._store_hashstore_refs_files(pid, cid)
+        except HashStoreRefsAlreadyExists as hrae:
+            err_msg = (
+                f"FileHashStore - tag_object: reference files for pid: {pid} and {cid} "
+                "already exist. " + str(hrae)
             )
-            logging.info(
-                "FileHashStore - tag_object: Successfully tagged cid: %s with pid %s",
-                cid,
-                pid,
+            raise HashStoreRefsAlreadyExists(err_msg)
+        except PidRefsAlreadyExistsError as praee:
+            err_msg = (
+                f"FileHashStore - tag_object: A pid can only reference one cid. "
+                + str(praee)
             )
-            return True
-        finally:
-            # Release cid
-            end_sync_debug_msg = (
-                f"FileHashStore - tag_object: Releasing cid ({cid}) from"
-                + " reference_locked_cids."
-            )
-            if self.use_multiprocessing:
-                with self.reference_condition_mp:
-                    logging.debug(end_sync_debug_msg)
-                    self.reference_locked_cids_mp.remove(cid)
-                    self.reference_condition_mp.notify()
-            else:
-                with self.reference_condition:
-                    logging.debug(end_sync_debug_msg)
-                    self.reference_locked_cids.remove(cid)
-                    self.reference_condition.notify()
+            raise PidRefsAlreadyExistsError(err_msg)
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(
@@ -815,12 +685,12 @@ class FileHashStore(HashStore):
                 logging.debug(sync_begin_debug_msg)
                 self.metadata_locked_docs_mp.append(pid_doc)
         else:
-            with self.metadata_condition:
-                while pid_doc in self.metadata_locked_docs:
+            with self.metadata_condition_th:
+                while pid_doc in self.metadata_locked_docs_th:
                     logging.debug(sync_wait_msg)
-                    self.metadata_condition.wait()
+                    self.metadata_condition_th.wait()
                 logging.debug(sync_begin_debug_msg)
-                self.metadata_locked_docs.append(pid_doc)
+                self.metadata_locked_docs_th.append(pid_doc)
 
         try:
             metadata_cid = self._put_metadata(metadata, pid, pid_doc)
@@ -842,10 +712,10 @@ class FileHashStore(HashStore):
                     self.metadata_locked_docs_mp.remove(pid_doc)
                     self.metadata_condition_mp.notify()
             else:
-                with self.metadata_condition:
+                with self.metadata_condition_th:
                     logging.debug(end_sync_debug_msg)
-                    self.metadata_locked_docs.remove(pid_doc)
-                    self.metadata_condition.notify()
+                    self.metadata_locked_docs_th.remove(pid_doc)
+                    self.metadata_condition_th.notify()
 
     def retrieve_object(self, pid):
         logging.debug(
@@ -925,21 +795,21 @@ class FileHashStore(HashStore):
             f"FileHashStore - delete_object: Pid ({pid}) is locked. Waiting."
         )
         if self.use_multiprocessing:
-            with self.object_condition_mp:
+            with self.object_pid_condition_mp:
                 # Wait for the pid to release if it's in use
                 while pid in self.object_locked_pids_mp:
                     logging.debug(sync_wait_msg)
-                    self.object_condition_mp.wait()
+                    self.object_pid_condition_mp.wait()
                 # Modify object_locked_pids consecutively
                 logging.debug(sync_begin_debug_msg)
                 self.object_locked_pids_mp.append(pid)
         else:
-            with self.object_condition:
-                while pid in self.object_locked_pids:
+            with self.object_pid_condition_th:
+                while pid in self.object_locked_pids_th:
                     logging.debug(sync_wait_msg)
-                    self.object_condition.wait()
+                    self.object_pid_condition_th.wait()
                 logging.debug(sync_begin_debug_msg)
-                self.object_locked_pids.append(pid)
+                self.object_locked_pids_th.append(pid)
 
         try:
             # Before we begin deletion process, we look for the `cid` by calling
@@ -960,21 +830,21 @@ class FileHashStore(HashStore):
                     + " Waiting."
                 )
                 if self.use_multiprocessing:
-                    with self.reference_condition_mp:
+                    with self.object_cid_condition_mp:
                         # Wait for the cid to release if it's in use
-                        while cid in self.reference_locked_cids_mp:
+                        while cid in self.object_locked_cids_mp:
                             logging.debug(sync_wait_msg)
-                            self.reference_condition_mp.wait()
+                            self.object_cid_condition_mp.wait()
                         # Modify reference_locked_cids consecutively
                         logging.debug(sync_begin_debug_msg)
-                        self.reference_locked_cids_mp.append(cid)
+                        self.object_locked_cids_mp.append(cid)
                 else:
-                    with self.reference_condition:
-                        while cid in self.reference_locked_cids:
+                    with self.object_cid_condition_th:
+                        while cid in self.object_locked_cids_th:
                             logging.debug(sync_wait_msg)
-                            self.reference_condition.wait()
+                            self.object_cid_condition_th.wait()
                         logging.debug(sync_begin_debug_msg)
-                        self.reference_locked_cids.append(cid)
+                        self.object_locked_cids_th.append(cid)
 
                 try:
                     cid_ref_abs_path = object_info_dict.get("cid_refs_path")
@@ -1000,8 +870,7 @@ class FileHashStore(HashStore):
                             self._rename_path_for_deletion(obj_real_path)
                         )
                     # Remove all files confirmed for deletion
-                    for obj in objects_to_delete:
-                        os.remove(obj)
+                    self._delete_marked_files(objects_to_delete)
 
                     # Remove metadata files if they exist
                     self.delete_metadata(pid)
@@ -1020,15 +889,15 @@ class FileHashStore(HashStore):
                         + " from locked list"
                     )
                     if self.use_multiprocessing:
-                        with self.reference_condition_mp:
+                        with self.object_cid_condition_mp:
                             logging.debug(end_sync_debug_msg)
-                            self.reference_locked_cids_mp.remove(cid)
-                            self.reference_condition_mp.notify()
+                            self.object_locked_cids_mp.remove(cid)
+                            self.object_cid_condition_mp.notify()
                     else:
-                        with self.reference_condition:
+                        with self.object_cid_condition_th:
                             logging.debug(end_sync_debug_msg)
-                            self.reference_locked_cids.remove(cid)
-                            self.reference_condition.notify()
+                            self.object_locked_cids_th.remove(cid)
+                            self.object_cid_condition_th.notify()
 
             except PidRefsDoesNotExist:
                 warn_msg = (
@@ -1042,10 +911,9 @@ class FileHashStore(HashStore):
                 self.delete_metadata(pid)
 
                 # Remove all files confirmed for deletion
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 return
-            except CidRefsDoesNotExist:
+            except OrphanPidRefsFileFound:
                 # Delete pid refs file
                 pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
                 objects_to_delete.append(
@@ -1054,8 +922,7 @@ class FileHashStore(HashStore):
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
                 # Remove all files confirmed for deletion
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 return
             except RefsFileExistsButCidObjMissing:
                 # Add pid refs file to be permanently deleted
@@ -1064,9 +931,7 @@ class FileHashStore(HashStore):
                     self._rename_path_for_deletion(pid_ref_abs_path)
                 )
                 # Remove pid from cid refs file
-                with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
-                    # Retrieve the cid
-                    pid_refs_cid = pid_ref_file.read()
+                pid_refs_cid = self._read_small_file_content(pid_ref_abs_path)
                 cid_ref_abs_str = str(self._get_hashstore_cid_refs_path(pid_refs_cid))
                 # Remove if the pid refs is found
                 if self._is_string_in_refs_file(pid, cid_ref_abs_str):
@@ -1074,8 +939,7 @@ class FileHashStore(HashStore):
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
                 # Remove all files confirmed for deletion
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 return
             except PidNotFoundInCidRefsFile:
                 # Add pid refs file to be permanently deleted
@@ -1086,8 +950,7 @@ class FileHashStore(HashStore):
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
                 # Remove all files confirmed for deletion
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 return
         finally:
             # Release pid
@@ -1096,16 +959,16 @@ class FileHashStore(HashStore):
                 + " from locked list"
             )
             if self.use_multiprocessing:
-                with self.object_condition_mp:
+                with self.object_pid_condition_mp:
                     logging.debug(end_sync_debug_msg)
                     self.object_locked_pids_mp.remove(pid)
-                    self.object_condition_mp.notify()
+                    self.object_pid_condition_mp.notify()
             else:
                 # Release pid
-                with self.object_condition:
+                with self.object_pid_condition_th:
                     logging.debug(end_sync_debug_msg)
-                    self.object_locked_pids.remove(pid)
-                    self.object_condition.notify()
+                    self.object_locked_pids_th.remove(pid)
+                    self.object_pid_condition_th.notify()
 
     def delete_metadata(self, pid, format_id=None):
         logging.debug(
@@ -1147,12 +1010,12 @@ class FileHashStore(HashStore):
                             logging.debug(sync_begin_debug_msg)
                             self.metadata_locked_docs_mp.append(pid_doc)
                     else:
-                        with self.metadata_condition:
-                            while pid in self.metadata_locked_docs:
+                        with self.metadata_condition_th:
+                            while pid in self.metadata_locked_docs_th:
                                 logging.debug(sync_wait_msg)
-                                self.metadata_condition.wait()
+                                self.metadata_condition_th.wait()
                             logging.debug(sync_begin_debug_msg)
-                            self.metadata_locked_docs.append(pid_doc)
+                            self.metadata_locked_docs_th.append(pid_doc)
                     try:
                         # Mark metadata doc for deletion
                         objects_to_delete.append(self._rename_path_for_deletion(path))
@@ -1169,14 +1032,13 @@ class FileHashStore(HashStore):
                                 self.metadata_locked_docs_mp.remove(pid_doc)
                                 self.metadata_condition_mp.notify()
                         else:
-                            with self.metadata_condition:
+                            with self.metadata_condition_th:
                                 logging.debug(end_sync_debug_msg)
-                                self.metadata_locked_docs.remove(pid_doc)
-                                self.metadata_condition.notify()
+                                self.metadata_locked_docs_th.remove(pid_doc)
+                                self.metadata_condition_th.notify()
 
                 # Delete metadata objects
-                for obj in objects_to_delete:
-                    os.remove(obj)
+                self._delete_marked_files(objects_to_delete)
                 info_string = (
                     "FileHashStore - delete_metadata: Successfully deleted all metadata"
                     + f"for pid: {pid}",
@@ -1204,12 +1066,12 @@ class FileHashStore(HashStore):
                     logging.debug(sync_begin_debug_msg)
                     self.metadata_locked_docs_mp.append(pid_doc)
             else:
-                with self.metadata_condition:
-                    while pid in self.metadata_locked_docs:
+                with self.metadata_condition_th:
+                    while pid in self.metadata_locked_docs_th:
                         logging.debug(sync_wait_msg)
-                        self.metadata_condition.wait()
+                        self.metadata_condition_th.wait()
                     logging.debug(sync_begin_debug_msg)
-                    self.metadata_locked_docs.append(pid_doc)
+                    self.metadata_locked_docs_th.append(pid_doc)
             try:
                 full_path_without_directory = (
                     self.metadata + "/" + rel_path + "/" + pid_doc
@@ -1233,10 +1095,10 @@ class FileHashStore(HashStore):
                         self.metadata_locked_docs_mp.remove(pid_doc)
                         self.metadata_condition_mp.notify()
                 else:
-                    with self.metadata_condition:
+                    with self.metadata_condition_th:
                         logging.debug(end_sync_debug_msg)
-                        self.metadata_locked_docs.remove(pid_doc)
-                        self.metadata_condition.notify()
+                        self.metadata_locked_docs_th.remove(pid_doc)
+                        self.metadata_condition_th.notify()
 
     def get_hex_digest(self, pid, algorithm):
         logging.debug(
@@ -1341,8 +1203,7 @@ class FileHashStore(HashStore):
         pid_ref_abs_path = self._get_hashstore_pid_refs_path(pid)
         if os.path.exists(pid_ref_abs_path):
             # Read the file to get the cid from the pid reference
-            with open(pid_ref_abs_path, "r", encoding="utf8") as pid_ref_file:
-                pid_refs_cid = pid_ref_file.read()
+            pid_refs_cid = self._read_small_file_content(pid_ref_abs_path)
 
             # Confirm that the cid reference file exists
             cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
@@ -1396,7 +1257,7 @@ class FileHashStore(HashStore):
                     + f", but cid refs file not found: {cid_ref_abs_path} for pid: {pid}"
                 )
                 logging.error(err_msg)
-                raise CidRefsDoesNotExist(err_msg)
+                raise OrphanPidRefsFileFound(err_msg)
         else:
             err_msg = (
                 f"FileHashStore - find_object: pid refs file not found for pid ({pid}): "
@@ -1406,7 +1267,7 @@ class FileHashStore(HashStore):
             raise PidRefsDoesNotExist(err_msg)
 
     def _store_data_only(self, data):
-        """Store an object to HashStore and return the a metadata object containing the content
+        """Store an object to HashStore and return a metadata object containing the content
         identifier, object file size and hex digests dictionary of the default algorithms. This
         method does not validate the object and writes directly to `/objects` after the hex
         digests are calculated.
@@ -1474,13 +1335,12 @@ class FileHashStore(HashStore):
         validate the object (and delete the tmpFile if the hex digest stored does
         not match what is provided).
 
-        :param str pid: Authority-based identifier.
-        :param Stream stream: Object stream.
-            when saving.
-        :param str additional_algorithm: Optional algorithm value to include
-            when returning hex digests.
-        :param str checksum: Optional checksum to validate the object
-            against hex digest before moving to the permanent location.
+        :param Optional[str] pid: Authority-based identifier.
+        :param Stream stream: Object stream when saving.
+        :param str additional_algorithm: Optional algorithm value to include when returning hex
+            digests.
+        :param str checksum: Optional checksum to validate the object against hex digest before
+            moving to the permanent location.
         :param str checksum_algorithm: Algorithm value of the given checksum.
         :param int file_size_to_validate: Expected size of the object.
 
@@ -1737,6 +1597,408 @@ class FileHashStore(HashStore):
                 os.umask(oldmask)
         return tmp
 
+    def _store_hashstore_refs_files(self, pid, cid):
+        """Create the pid refs file and create/update cid refs files in HashStore to establish
+        the relationship between a 'pid' and a 'cid'.
+
+        :param str pid: Persistent or authority-based identifier.
+        :param str cid: Content identifier
+        """
+        try:
+            self._synchronize_referenced_locked_pids(pid)
+            self._synchronize_object_locked_cids(cid)
+
+            try:
+                # Prepare files and paths
+                tmp_root_path = self._get_store_path("refs") / "tmp"
+                pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+                cid_refs_path = self._get_hashstore_cid_refs_path(cid)
+                # Create paths for pid ref file in '.../refs/pid' and cid ref file in '.../refs/cid'
+                self._create_path(Path(os.path.dirname(pid_refs_path)))
+                self._create_path(Path(os.path.dirname(cid_refs_path)))
+
+                if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
+                    # If both reference files exist, we confirm that reference files are where they
+                    # are expected to be and throw an exception to inform the client that everything
+                    # is in place - and include other issues for context
+                    err_msg = (
+                        f"FileHashStore - store_hashstore_refs_files: Object with cid: {cid}"
+                        f" already exists and is tagged with pid: {pid}."
+                    )
+                    try:
+                        self._verify_hashstore_references(
+                            pid,
+                            cid,
+                            pid_refs_path,
+                            cid_refs_path,
+                            "Refs file already exists, verifying.",
+                        )
+                        logging.error(err_msg)
+                        raise HashStoreRefsAlreadyExists(err_msg)
+                    except Exception as e:
+                        rev_msg = err_msg + " " + str(e)
+                        logging.error(rev_msg)
+                        raise HashStoreRefsAlreadyExists(err_msg)
+
+                elif os.path.exists(pid_refs_path) and not os.path.exists(
+                    cid_refs_path
+                ):
+                    # If pid refs exists, the pid has already been claimed and cannot be tagged we
+                    # throw an exception immediately
+                    error_msg = (
+                        f"FileHashStore - store_hashstore_refs_files: Pid refs file already exists"
+                        f" for pid: {pid}."
+                    )
+                    logging.error(error_msg)
+                    raise PidRefsAlreadyExistsError(error_msg)
+
+                elif not os.path.exists(pid_refs_path) and os.path.exists(
+                    cid_refs_path
+                ):
+                    debug_msg = (
+                        f"FileHashStore - store_hashstore_refs_files: pid refs file does not exist"
+                        f" for pid {pid} but cid refs file found at: {cid_refs_path} for cid: {cid}"
+                    )
+                    logging.debug(debug_msg)
+                    # Move the pid refs file
+                    pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
+                    shutil.move(pid_tmp_file_path, pid_refs_path)
+                    # Update cid ref files as it already exists
+                    if not self._is_string_in_refs_file(pid, cid_refs_path):
+                        self._update_refs_file(cid_refs_path, pid, "add")
+                    self._verify_hashstore_references(
+                        pid,
+                        cid,
+                        pid_refs_path,
+                        cid_refs_path,
+                        f"Updated existing cid refs file: {cid_refs_path} with pid: {pid}",
+                    )
+                    info_msg = (
+                        "FileHashStore - store_hashstore_refs_files: Successfully updated "
+                        f"cid: {cid} with pid: {pid}"
+                    )
+                    logging.info(info_msg)
+                    return
+
+                # Move both files after checking the existing status of refs files
+                pid_tmp_file_path = self._write_refs_file(tmp_root_path, cid, "pid")
+                cid_tmp_file_path = self._write_refs_file(tmp_root_path, pid, "cid")
+                shutil.move(pid_tmp_file_path, pid_refs_path)
+                shutil.move(cid_tmp_file_path, cid_refs_path)
+                log_msg = "Refs files have been moved to their permanent location. Verifying refs."
+                self._verify_hashstore_references(
+                    pid, cid, pid_refs_path, cid_refs_path, log_msg
+                )
+                info_msg = (
+                    "FileHashStore - store_hashstore_refs_files: Successfully updated "
+                    f"cid: {cid} with pid: {pid}"
+                )
+                logging.info(info_msg)
+
+            except (
+                HashStoreRefsAlreadyExists,
+                PidRefsAlreadyExistsError,
+            ) as expected_exceptions:
+                raise expected_exceptions
+
+            except Exception as unexpected_exception:
+                # For all other unexpected exceptions, we are to revert the tagging process as
+                # much as possible. No exceptions from the reverting process will be thrown.
+                self._untag_object(pid, cid)
+                raise unexpected_exception
+
+        finally:
+            # Release cid
+            self._release_object_locked_cids(cid)
+            self._release_reference_locked_pids(pid)
+
+    def _untag_object(self, pid, cid):
+        """Untags a data object in HashStore by deleting the 'pid reference file' and removing
+        the 'pid' from the 'cid reference file'. This method will never delete a data
+        object. `_untag_object` will attempt to proceed with as much of the untagging process as
+        possible and swallow relevant exceptions.
+
+        :param str cid: Content identifier
+        :param str pid: Persistent or authority-based identifier.
+        """
+        self._check_string(pid, "pid")
+        self._check_string(cid, "cid")
+
+        untag_obj_delete_list = []
+
+        # To untag a pid, the pid must be found and currently locked
+        # The pid will not be released until this process is over
+        self._check_reference_locked_pids(pid)
+
+        # Before we begin the untagging process, we look for the `cid` by calling `find_object`
+        # which will throw custom exceptions if there is an issue with the reference files,
+        # which help us determine the path to proceed with.
+        try:
+            obj_info_dict = self._find_object(pid)
+            cid_to_check = obj_info_dict["cid"]
+            self._validate_and_check_cid_lock(pid, cid, cid_to_check)
+
+            # Remove pid refs
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+            self._mark_pid_refs_file_for_deletion(
+                pid, untag_obj_delete_list, pid_refs_path
+            )
+            # Remove pid from cid refs
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
+            self._remove_pid_and_handle_cid_refs_deletion(
+                pid, untag_obj_delete_list, cid_refs_path
+            )
+            # Remove all files confirmed for deletion
+            self._delete_marked_files(untag_obj_delete_list)
+            info_msg = f"_untag_object: Untagged pid: {pid} with cid: {cid}"
+            logging.info(info_msg)
+
+        except OrphanPidRefsFileFound as oprff:
+            # `find_object` throws this exception when the cid refs file doesn't exist,
+            # so we only need to delete the pid refs file (pid is already locked)
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+            cid_read = self._read_small_file_content(pid_refs_path)
+            self._validate_and_check_cid_lock(pid, cid, cid_read)
+
+            # Remove pid refs
+            self._mark_pid_refs_file_for_deletion(
+                pid, untag_obj_delete_list, pid_refs_path
+            )
+            self._delete_marked_files(untag_obj_delete_list)
+
+            warn_msg = (
+                f"_untag_object: Cid refs file does not exist for pid: {pid}."
+                + " Deleted orphan pid refs file. Additional info: "
+                + str(oprff)
+            )
+            logging.warning(warn_msg)
+
+        except RefsFileExistsButCidObjMissing as rfebcom:
+            # `find_object` throws this exception when both pid/cid refs files exist but the
+            # actual data object does not.
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+            cid_read = self._read_small_file_content(pid_refs_path)
+            self._validate_and_check_cid_lock(pid, cid, cid_read)
+
+            # Remove pid refs
+            self._mark_pid_refs_file_for_deletion(
+                pid, untag_obj_delete_list, pid_refs_path
+            )
+            # Remove pid from cid refs
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
+            self._remove_pid_and_handle_cid_refs_deletion(
+                pid, untag_obj_delete_list, cid_refs_path
+            )
+            # Remove all files confirmed for deletion
+            self._delete_marked_files(untag_obj_delete_list)
+
+            warn_msg = (
+                f"_untag_object: data object for cid: {cid_read}. does not exist, but pid and cid "
+                f"references files found for pid: {pid}, Deleted pid and cid refs files. "
+                f"Additional info: " + str(rfebcom)
+            )
+            logging.warning(warn_msg)
+
+        except PidNotFoundInCidRefsFile as pnficrf:
+            # `find_object` throws this exception when both the pid and cid refs file exists
+            # but the pid is not found in the cid refs file
+            pid_refs_path = self._get_hashstore_pid_refs_path(pid)
+            cid_read = self._read_small_file_content(pid_refs_path)
+            self._validate_and_check_cid_lock(pid, cid, cid_read)
+
+            # Remove pid refs
+            self._mark_pid_refs_file_for_deletion(
+                pid, untag_obj_delete_list, pid_refs_path
+            )
+            self._delete_marked_files(untag_obj_delete_list)
+
+            warn_msg = (
+                f"_untag_object: pid not found in expected cid refs file for pid: {pid}. "
+                + "Deleted orphan pid refs file. Additional info: "
+                + str(pnficrf)
+            )
+            logging.warning(warn_msg)
+
+        except PidRefsDoesNotExist as prdne:
+            # `find_object` throws this exception if the pid refs file is not found
+            # Check to see if pid is in the 'cid refs file' and attempt to remove it
+            self._check_object_locked_cids(cid)
+
+            # Remove pid from cid refs
+            cid_refs_path = self._get_hashstore_cid_refs_path(cid)
+            self._remove_pid_and_handle_cid_refs_deletion(
+                pid, untag_obj_delete_list, cid_refs_path
+            )
+            # Remove all files confirmed for deletion
+            self._delete_marked_files(untag_obj_delete_list)
+
+            warn_msg = (
+                f"Pid refs file not found, removed pid from cid refs file for cid: {cid}"
+                + str(prdne)
+            )
+            logging.warning(warn_msg)
+
+    def _put_metadata(self, metadata, pid, metadata_doc_name):
+        """Store contents of metadata to `[self.root]/metadata` using the hash of the
+        given PID and format ID as the permanent address.
+
+        :param mixed metadata: String or path to metadata document.
+        :param str pid: Authority-based identifier.
+        :param str metadata_doc_name: Metadata document name
+
+        :return: Address of the metadata document.
+        :rtype: Path
+        """
+        logging.debug(
+            "FileHashStore - _put_metadata: Request to put metadata for pid: %s", pid
+        )
+        # Create metadata tmp file and write to it
+        metadata_stream = Stream(metadata)
+        with closing(metadata_stream):
+            metadata_tmp = self._mktmpmetadata(metadata_stream)
+
+        # Get target and related paths (permanent location)
+        metadata_directory = self._computehash(pid)
+        metadata_document_name = metadata_doc_name
+        rel_path = "/".join(self._shard(metadata_directory))
+        full_path = self._get_store_path("metadata") / rel_path / metadata_document_name
+
+        # Move metadata to target path
+        if os.path.exists(metadata_tmp):
+            try:
+                parent = full_path.parent
+                parent.mkdir(parents=True, exist_ok=True)
+                # Metadata will be replaced if it exists
+                shutil.move(metadata_tmp, full_path)
+                logging.debug(
+                    "FileHashStore - _put_metadata: Successfully put metadata for pid: %s",
+                    pid,
+                )
+                return full_path
+            except Exception as err:
+                exception_string = (
+                    f"FileHashStore - _put_metadata: Unexpected {err=}, {type(err)=}"
+                )
+                logging.error(exception_string)
+                if os.path.exists(metadata_tmp):
+                    # Remove tmp metadata, calling app must re-upload
+                    logging.debug(
+                        "FileHashStore - _put_metadata: Deleting metadata for pid: %s",
+                        pid,
+                    )
+                    self.metadata.delete(metadata_tmp)
+                raise
+        else:
+            exception_string = (
+                f"FileHashStore - _put_metadata: Attempt to move metadata for pid: {pid}"
+                + f", but metadata temp file not found: {metadata_tmp}"
+            )
+            logging.error(exception_string)
+            raise FileNotFoundError(exception_string)
+
+    def _mktmpmetadata(self, stream):
+        """Create a named temporary file with `stream` (metadata).
+
+        :param Stream stream: Metadata stream.
+
+        :return: Path/name of temporary file created and written into.
+        :rtype: str
+        """
+        # Create temporary file in .../{store_path}/tmp
+        tmp_root_path = self._get_store_path("metadata") / "tmp"
+        tmp = self._mktmpfile(tmp_root_path)
+
+        # tmp is a file-like object that is already opened for writing by default
+        logging.debug(
+            "FileHashStore - _mktmpmetadata: Writing stream to tmp metadata file: %s",
+            tmp.name,
+        )
+        with tmp as tmp_file:
+            for data in stream:
+                tmp_file.write(self._cast_to_bytes(data))
+
+        logging.debug(
+            "FileHashStore - _mktmpmetadata: Successfully written to tmp metadata file: %s",
+            tmp.name,
+        )
+        return tmp.name
+
+    # FileHashStore Utility & Supporting Methods
+
+    @staticmethod
+    def _delete_marked_files(delete_list):
+        """Delete all the file paths in a given delete list.
+
+        :param list delete_list: Persistent or authority-based identifier.
+        """
+        if delete_list is not None:
+            for obj in delete_list:
+                try:
+                    os.remove(obj)
+                except Exception as e:
+                    warn_msg = f"Unable to remove {obj} in given delete_list. " + str(e)
+                    logging.warning(warn_msg)
+        else:
+            raise ValueError("delete_marked_files: list cannot be None")
+
+    def _mark_pid_refs_file_for_deletion(self, pid, delete_list, pid_refs_path):
+        """Attempt to rename a pid refs file and add the renamed file to a provided list.
+
+        :param str pid: Persistent or authority-based identifier.
+        :param list delete_list: List to add the renamed pid refs file marked for deletion to
+        :param path pid_refs_path: Path to the pid reference file
+        """
+        try:
+            delete_list.append(self._rename_path_for_deletion(pid_refs_path))
+
+        except Exception as e:
+            err_msg = (
+                f"Unable to delete pid refs file: {pid_refs_path} for pid: {pid}. "
+                + str(e)
+            )
+            logging.error(err_msg)
+
+    def _remove_pid_and_handle_cid_refs_deletion(self, pid, delete_list, cid_refs_path):
+        """Attempt to remove a pid from a 'cid refs file' and add the 'cid refs file' to the
+        delete list if it is empty.
+
+        :param str pid: Persistent or authority-based identifier.
+        :param list delete_list: List to add the renamed pid refs file marked for deletion to
+        :param path cid_refs_path: Path to the pid reference file
+        """
+        try:
+            # Remove pid from cid reference file
+            self._update_refs_file(cid_refs_path, pid, "remove")
+            # Delete cid reference file and object only if the cid refs file is empty
+            if os.path.getsize(cid_refs_path) == 0:
+                delete_list.append(self._rename_path_for_deletion(cid_refs_path))
+
+        except Exception as e:
+            err_msg = (
+                f"Unable to delete remove pid from cid refs file: {cid_refs_path} for pid:"
+                f" {pid}. " + str(e)
+            )
+            logging.error(err_msg)
+
+    def _validate_and_check_cid_lock(self, pid, cid, cid_to_check):
+        """Confirm that the two content identifiers provided are equal and is locked to ensure
+        thread safety.
+
+        :param str pid: Persistent identifier
+        :param str cid: Content identifier
+        :param str cid_to_check: Cid that was retrieved or read
+        """
+        self._check_string(cid, "cid")
+        self._check_string(cid_to_check, "cid_to_check")
+
+        if cid != cid_to_check:
+            err_msg = (
+                f"_validate_and_check_cid_lock: cid provided: {cid_to_check} does not "
+                f"match untag request for cid: {cid} and pid: {pid}"
+            )
+            raise ValueError(err_msg)
+        self._check_object_locked_cids(cid)
+
     def _write_refs_file(self, path, ref_id, ref_type):
         """Write a reference file in the supplied path into a temporary file.
         All `pid` or `cid` reference files begin with a single identifier, with the
@@ -1845,93 +2107,6 @@ class FileHashStore(HashStore):
                 if ref_id == value:
                     return True
         return False
-
-    def _put_metadata(self, metadata, pid, metadata_doc_name):
-        """Store contents of metadata to `[self.root]/metadata` using the hash of the
-        given PID and format ID as the permanent address.
-
-        :param mixed metadata: String or path to metadata document.
-        :param str pid: Authority-based identifier.
-        :param str metadata_doc_name: Metadata document name
-
-        :return: Address of the metadata document.
-        :rtype: Path
-        """
-        logging.debug(
-            "FileHashStore - _put_metadata: Request to put metadata for pid: %s", pid
-        )
-        # Create metadata tmp file and write to it
-        metadata_stream = Stream(metadata)
-        with closing(metadata_stream):
-            metadata_tmp = self._mktmpmetadata(metadata_stream)
-
-        # Get target and related paths (permanent location)
-        metadata_directory = self._computehash(pid)
-        metadata_document_name = metadata_doc_name
-        rel_path = "/".join(self._shard(metadata_directory))
-        full_path = self._get_store_path("metadata") / rel_path / metadata_document_name
-
-        # Move metadata to target path
-        if os.path.exists(metadata_tmp):
-            try:
-                parent = full_path.parent
-                parent.mkdir(parents=True, exist_ok=True)
-                # Metadata will be replaced if it exists
-                shutil.move(metadata_tmp, full_path)
-                logging.debug(
-                    "FileHashStore - _put_metadata: Successfully put metadata for pid: %s",
-                    pid,
-                )
-                return full_path
-            except Exception as err:
-                exception_string = (
-                    f"FileHashStore - _put_metadata: Unexpected {err=}, {type(err)=}"
-                )
-                logging.error(exception_string)
-                if os.path.exists(metadata_tmp):
-                    # Remove tmp metadata, calling app must re-upload
-                    logging.debug(
-                        "FileHashStore - _put_metadata: Deleting metadata for pid: %s",
-                        pid,
-                    )
-                    self.metadata.delete(metadata_tmp)
-                raise
-        else:
-            exception_string = (
-                f"FileHashStore - _put_metadata: Attempt to move metadata for pid: {pid}"
-                + f", but metadata temp file not found: {metadata_tmp}"
-            )
-            logging.error(exception_string)
-            raise FileNotFoundError(exception_string)
-
-    def _mktmpmetadata(self, stream):
-        """Create a named temporary file with `stream` (metadata).
-
-        :param Stream stream: Metadata stream.
-
-        :return: Path/name of temporary file created and written into.
-        :rtype: str
-        """
-        # Create temporary file in .../{store_path}/tmp
-        tmp_root_path = self._get_store_path("metadata") / "tmp"
-        tmp = self._mktmpfile(tmp_root_path)
-
-        # tmp is a file-like object that is already opened for writing by default
-        logging.debug(
-            "FileHashStore - _mktmpmetadata: Writing stream to tmp metadata file: %s",
-            tmp.name,
-        )
-        with tmp as tmp_file:
-            for data in stream:
-                tmp_file.write(self._cast_to_bytes(data))
-
-        logging.debug(
-            "FileHashStore - _mktmpmetadata: Successfully written to tmp metadata file: %s",
-            tmp.name,
-        )
-        return tmp.name
-
-    # FileHashStore Utility & Supporting Methods
 
     def _verify_object_information(
         self,
@@ -2067,8 +2242,7 @@ class FileHashStore(HashStore):
             raise CidRefsFileNotFound(exception_string)
         # Check the content of the reference files
         # Start with the cid
-        with open(pid_refs_path, "r", encoding="utf8") as f:
-            retrieved_cid = f.read()
+        retrieved_cid = self._read_small_file_content(pid_refs_path)
         if retrieved_cid != cid:
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file exists"
@@ -2104,21 +2278,21 @@ class FileHashStore(HashStore):
                 f"FileHashStore - delete_object: Cid ({cid}) is locked. Waiting."
             )
             if self.use_multiprocessing:
-                with self.reference_condition_mp:
+                with self.object_cid_condition_mp:
                     # Wait for the cid to release if it's in use
-                    while cid in self.reference_locked_cids_mp:
+                    while cid in self.object_locked_cids_mp:
                         logging.debug(sync_wait_msg)
-                        self.reference_condition_mp.wait()
+                        self.object_cid_condition_mp.wait()
                     # Modify reference_locked_cids consecutively
                     logging.debug(sync_begin_debug_msg)
-                    self.reference_locked_cids_mp.append(cid)
+                    self.object_locked_cids_mp.append(cid)
             else:
-                with self.reference_condition:
-                    while cid in self.reference_locked_cids:
+                with self.object_cid_condition_th:
+                    while cid in self.object_locked_cids_th:
                         logging.debug(sync_wait_msg)
-                        self.reference_condition.wait()
+                        self.object_cid_condition_th.wait()
                     logging.debug(sync_begin_debug_msg)
-                    self.reference_locked_cids.append(cid)
+                    self.object_locked_cids_th.append(cid)
 
             try:
                 self._delete("objects", cid)
@@ -2129,46 +2303,15 @@ class FileHashStore(HashStore):
                     + " from locked list"
                 )
                 if self.use_multiprocessing:
-                    with self.reference_condition_mp:
+                    with self.object_cid_condition_mp:
                         logging.debug(end_sync_debug_msg)
-                        self.reference_locked_cids_mp.remove(cid)
-                        self.reference_condition_mp.notify()
+                        self.object_locked_cids_mp.remove(cid)
+                        self.object_cid_condition_mp.notify()
                 else:
-                    with self.reference_condition:
+                    with self.object_cid_condition_th:
                         logging.debug(end_sync_debug_msg)
-                        self.reference_locked_cids.remove(cid)
-                        self.reference_condition.notify()
-
-    @staticmethod
-    def _check_arg_data(data):
-        """Checks a data argument to ensure that it is either a string, path, or stream
-        object.
-
-        :param data: Object to validate (string, path, or stream).
-        :type data: str, os.PathLike, io.BufferedReader
-
-        :return: True if valid.
-        :rtype: bool
-        """
-        if (
-            not isinstance(data, str)
-            and not isinstance(data, Path)
-            and not isinstance(data, io.BufferedIOBase)
-        ):
-            exception_string = (
-                "FileHashStore - _validate_arg_data: Data must be a path, string or buffered"
-                + f" stream type. Data type supplied: {type(data)}"
-            )
-            logging.error(exception_string)
-            raise TypeError(exception_string)
-        if isinstance(data, str):
-            if data.strip() == "":
-                exception_string = (
-                    "FileHashStore - _validate_arg_data: Data string cannot be empty."
-                )
-                logging.error(exception_string)
-                raise TypeError(exception_string)
-        return True
+                        self.object_locked_cids_th.remove(cid)
+                        self.object_cid_condition_th.notify()
 
     def _check_arg_algorithms_and_checksum(
         self, additional_algorithm, checksum, checksum_algorithm
@@ -2450,21 +2593,6 @@ class FileHashStore(HashStore):
             logging.error(exception_string)
             raise err
 
-    @staticmethod
-    def _rename_path_for_deletion(path):
-        """Rename a given path by appending '_delete' and move it to the renamed path.
-
-        :param string path: Path to file to rename
-
-        :return: Path to the renamed file
-        :rtype: str
-        """
-        if isinstance(path, str):
-            path = Path(path)
-        delete_path = path.with_name(path.stem + "_delete" + path.suffix)
-        shutil.move(path, delete_path)
-        return delete_path
-
     def _create_path(self, path):
         """Physically create the folder path (and all intermediate ones) on disk.
 
@@ -2492,7 +2620,7 @@ class FileHashStore(HashStore):
     def _get_hashstore_data_object_path(self, cid_or_relative_path):
         """Get the expected path to a hashstore data object that exists using a content identifier.
 
-        :param str cid_or_relative_path: Content identifier
+        :param str cid_or_relative_path: Content identifier or relative path in '/objects' to check
 
         :return: Path to the data object referenced by the pid
         :rtype: Path
@@ -2521,7 +2649,8 @@ class FileHashStore(HashStore):
     def _get_hashstore_metadata_path(self, metadata_relative_path):
         """Return the expected metadata path to a hashstore metadata object that exists.
 
-        :param str metadata_relative_path: Metadata path to check
+        :param str metadata_relative_path: Metadata path to check or relative path in
+        '/metadata' to check
 
         :return: Path to the data object referenced by the pid
         :rtype: Path
@@ -2594,6 +2723,206 @@ class FileHashStore(HashStore):
                 f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
             )
 
+    # Synchronization Methods
+
+    def _release_object_locked_pids(self, pid):
+        """Remove the given persistent identifier from 'object_locked_pids' and notify other
+        waiting threads or processes.
+
+        :param str pid: Persistent or authority-based identifier
+        """
+        if self.use_multiprocessing:
+            with self.object_pid_condition_mp:
+                self.object_locked_pids_mp.remove(pid)
+                self.object_pid_condition_mp.notify()
+        else:
+            # Release pid
+            with self.object_pid_condition_th:
+                self.object_locked_pids_th.remove(pid)
+                self.object_pid_condition_th.notify()
+
+    def _synchronize_object_locked_cids(self, cid):
+        """Multiple threads may access a data object via its 'cid' or the respective 'cid
+        reference file' (which contains a list of 'pid's that reference a 'cid') and this needs
+        to be coordinated.
+
+        :param str cid: Content identifier
+        """
+        if self.use_multiprocessing:
+            with self.object_cid_condition_mp:
+                # Wait for the cid to release if it's being tagged
+                while cid in self.object_locked_cids_mp:
+                    logging.debug(
+                        f"synchronize_referenced_locked_cids: Cid ({cid}) is locked. Waiting."
+                    )
+                    self.object_cid_condition_mp.wait()
+                # Modify reference_locked_cids consecutively
+                self.object_locked_cids_mp.append(cid)
+                logging.debug(
+                    f"synchronize_referenced_locked_cids: Synchronizing object_locked_cids_mp for"
+                    + f" cid: {cid}"
+                )
+        else:
+            with self.object_cid_condition_th:
+                while cid in self.object_locked_cids_th:
+                    logging.debug(
+                        f"synchronize_referenced_locked_cids: Cid ({cid}) is locked. Waiting."
+                    )
+                    self.object_cid_condition_th.wait()
+                self.object_locked_cids_th.append(cid)
+                logging.debug(
+                    f"synchronize_referenced_locked_cids: Synchronizing object_locked_cids_th for"
+                    + f" cid: {cid}"
+                )
+
+    def _check_object_locked_cids(self, cid):
+        """Check that a given content identifier is currently locked (found in the
+        'object_locked_cids' array). If it is not, an exception will be thrown.
+
+        :param str cid: Content identifier
+        """
+        if self.use_multiprocessing:
+            if cid not in self.object_locked_cids_mp:
+                err_msg = f"_check_object_locked_cids: cid {cid} is not locked."
+                logging.error(err_msg)
+                raise IdentifierNotLocked(err_msg)
+        else:
+            if cid not in self.object_locked_cids_th:
+                err_msg = f"_check_object_locked_cids: cid {cid} is not locked."
+                logging.error(err_msg)
+                raise IdentifierNotLocked(err_msg)
+
+    def _release_object_locked_cids(self, cid):
+        """Remove the given content identifier from 'object_locked_cids' and notify other
+        waiting threads or processes.
+
+        :param str cid: Content identifier
+        """
+        if self.use_multiprocessing:
+            with self.object_cid_condition_mp:
+                self.object_locked_cids_mp.remove(cid)
+                self.object_cid_condition_mp.notify()
+                end_sync_debug_msg = (
+                    f"FileHashStore - _release_object_locked_cids: Releasing cid ({cid}) from"
+                    + " object_cid_condition_mp."
+                )
+                logging.debug(end_sync_debug_msg)
+        else:
+            with self.object_cid_condition_th:
+                self.object_locked_cids_th.remove(cid)
+                self.object_cid_condition_th.notify()
+                end_sync_debug_msg = (
+                    f"FileHashStore - _release_object_locked_cids: Releasing cid ({cid}) from"
+                    + " object_cid_condition_th."
+                )
+                logging.debug(end_sync_debug_msg)
+
+    def _synchronize_referenced_locked_pids(self, pid):
+        """Multiple threads may interact with a pid (to tag, untag, delete) and these actions
+        must be coordinated to prevent unexpected behaviour/race conditions that cause chaos.
+
+        :param str pid: Persistent or authority-based identifier
+        """
+        if self.use_multiprocessing:
+            with self.reference_pid_condition_mp:
+                # Wait for the pid to release if it's in use
+                while pid in self.reference_locked_pids_mp:
+                    logging.debug(
+                        f"_synchronize_referenced_locked_pids: Pid ({pid}) is locked. Waiting."
+                    )
+                    self.reference_pid_condition_mp.wait()
+                # Modify reference_locked_pids consecutively
+                self.reference_locked_pids_mp.append(pid)
+                logging.debug(
+                    f"_synchronize_referenced_locked_pids: Synchronizing reference_locked_pids_mp"
+                    + f" for pid: {pid}"
+                )
+        else:
+            with self.reference_pid_condition_th:
+                while pid in self.reference_locked_pids_th:
+                    logging.debug(
+                        f"_synchronize_referenced_locked_pids: Pid ({pid}) is locked. Waiting."
+                    )
+                    self.reference_pid_condition_th.wait()
+                self.reference_locked_pids_th.append(pid)
+                logging.debug(
+                    f"_synchronize_referenced_locked_pids: Synchronizing reference_locked_pids_th"
+                    + f" for pid: {pid}"
+                )
+
+    def _check_reference_locked_pids(self, pid):
+        """Check that a given persistent identifier is currently locked (found in the
+        'reference_locked_pids' array). If it is not, an exception will be thrown.
+
+        :param str pid: Persistent or authority-based identifier
+        """
+        if self.use_multiprocessing:
+            if pid not in self.reference_locked_pids_mp:
+                err_msg = f"_check_reference_locked_pids: pid {pid} is not locked."
+                logging.error(err_msg)
+                raise IdentifierNotLocked(err_msg)
+        else:
+            if pid not in self.reference_locked_pids_th:
+                err_msg = f"_check_reference_locked_pids: pid {pid} is not locked."
+                logging.error(err_msg)
+                raise IdentifierNotLocked(err_msg)
+
+    def _release_reference_locked_pids(self, pid):
+        """Remove the given persistent identifier from 'reference_locked_pids' and notify other
+        waiting threads or processes.
+
+        :param str pid: Persistent or authority-based identifier
+        """
+        if self.use_multiprocessing:
+            with self.reference_pid_condition_mp:
+                self.reference_locked_pids_mp.remove(pid)
+                self.reference_pid_condition_mp.notify()
+                end_sync_debug_msg = (
+                    f"FileHashStore - _release_reference_locked_pids: Releasing pid ({pid}) from"
+                    + " reference_locked_pids_mp."
+                )
+                logging.debug(end_sync_debug_msg)
+        else:
+            # Release pid
+            with self.reference_pid_condition_th:
+                self.reference_locked_pids_th.remove(pid)
+                self.reference_pid_condition_th.notify()
+                end_sync_debug_msg = (
+                    f"FileHashStore - _release_reference_locked_pids: Releasing pid ({pid}) from"
+                    + " reference_locked_pids_th."
+                )
+                logging.debug(end_sync_debug_msg)
+
+    # Other Static Methods
+    @staticmethod
+    def _read_small_file_content(path_to_file):
+        """Read the contents of a file with the given path. This method is not optimized for
+        large files - so it should only be used for small files (like reference files).
+
+        :param path path_to_file: Path to the file to read
+
+        :return: Content of the given file
+        :rtype: str
+        """
+        with open(path_to_file, "r", encoding="utf8") as opened_path:
+            content = opened_path.read()
+            return content
+
+    @staticmethod
+    def _rename_path_for_deletion(path):
+        """Rename a given path by appending '_delete' and move it to the renamed path.
+
+        :param string path: Path to file to rename
+
+        :return: Path to the renamed file
+        :rtype: str
+        """
+        if isinstance(path, str):
+            path = Path(path)
+        delete_path = path.with_name(path.stem + "_delete" + path.suffix)
+        shutil.move(path, delete_path)
+        return delete_path
+
     @staticmethod
     def _get_file_paths(directory):
         """Get the file paths of a given directory if it exists
@@ -2614,7 +2943,36 @@ class FileHashStore(HashStore):
         else:
             return None
 
-    # Other Static Methods
+    @staticmethod
+    def _check_arg_data(data):
+        """Checks a data argument to ensure that it is either a string, path, or stream
+        object.
+
+        :param data: Object to validate (string, path, or stream).
+        :type data: str, os.PathLike, io.BufferedReader
+
+        :return: True if valid.
+        :rtype: bool
+        """
+        if (
+            not isinstance(data, str)
+            and not isinstance(data, Path)
+            and not isinstance(data, io.BufferedIOBase)
+        ):
+            exception_string = (
+                "FileHashStore - _validate_arg_data: Data must be a path, string or buffered"
+                + f" stream type. Data type supplied: {type(data)}"
+            )
+            logging.error(exception_string)
+            raise TypeError(exception_string)
+        if isinstance(data, str):
+            if data.strip() == "":
+                exception_string = (
+                    "FileHashStore - _validate_arg_data: Data string cannot be empty."
+                )
+                logging.error(exception_string)
+                raise TypeError(exception_string)
+        return True
 
     @staticmethod
     def _check_integer(file_size):

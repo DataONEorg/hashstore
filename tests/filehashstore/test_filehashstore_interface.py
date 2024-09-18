@@ -501,7 +501,10 @@ def test_store_object_duplicates_threads(pids, store):
             store.store_object(obj_pid, obj_path)  # Call store_object inside the thread
         # pylint: disable=W0718
         except Exception as e:
-            assert type(e).__name__ == "HashStoreRefsAlreadyExists"
+            assert (
+                type(e).__name__ == "HashStoreRefsAlreadyExists"
+                or type(e).__name__ == "StoreObjectForPidAlreadyInProgress"
+            )
 
     thread1 = Thread(target=store_object_wrapper, args=(pid, path))
     thread2 = Thread(target=store_object_wrapper, args=(pid, path))
@@ -713,6 +716,48 @@ def test_store_object_sparse_large_file(store):
     object_metadata = store.store_object(pid, file_path)
     object_metadata_id = object_metadata.cid
     assert object_metadata_id == object_metadata.hex_digests.get("sha256")
+
+
+def test_tag_object(pids, store):
+    """Test tag_object does not throw exception when successful."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(None, path)
+        store.tag_object(pid, object_metadata.cid)
+    assert store._count("pid") == 3
+    assert store._count("cid") == 3
+
+
+def test_tag_object_pid_refs_not_found_cid_refs_found(store):
+    """Test tag_object updates a cid reference file that already exists."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid.replace("/", "_")
+    # Store data only
+    object_metadata = store.store_object(None, path)
+    cid = object_metadata.cid
+    # Tag object
+    store.tag_object(pid, cid)
+    # Tag the cid with another pid
+    additional_pid = "dou.test.1"
+    store.tag_object(additional_pid, cid)
+
+    # Read cid file to confirm cid refs file contains the additional pid
+    line_count = 0
+    cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
+    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+        for _, line in enumerate(f, start=1):
+            value = line.strip()
+            line_count += 1
+            assert value == pid or value == additional_pid
+    assert line_count == 2
+    assert store._count("pid") == 2
+    assert store._count("cid") == 1
+
+
+# TODO: Add tag_ojbect test for HashStoreRefsAlreadyExists
+# TODO: Add tag_ojbect test for PidRefsAlreadyExistsError
 
 
 def test_store_metadata(pids, store):
@@ -1109,7 +1154,7 @@ def test_delete_invalid_object(pids, store):
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
-        store.delete_invalid_object(
+        store.delete_if_invalid_object(
             object_metadata, checksum, checksum_algorithm, expected_file_size
         )
         assert store._exists("objects", object_metadata.cid)
@@ -1124,7 +1169,7 @@ def test_delete_invalid_object_supported_other_algo_not_in_default(pids, store):
         object_metadata = store.store_object(data=path)
         checksum = pids[pid][supported_algo]
         expected_file_size = object_metadata.obj_size
-        store.delete_invalid_object(
+        store.delete_if_invalid_object(
             object_metadata, checksum, supported_algo, expected_file_size
         )
         assert store._exists("objects", object_metadata.cid)
@@ -1141,7 +1186,7 @@ def test_delete_invalid_object_exception_incorrect_object_metadata_type(pids, st
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
         with pytest.raises(ValueError):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 "not_object_metadata", checksum, checksum_algorithm, expected_file_size
             )
 
@@ -1157,7 +1202,7 @@ def test_delete_invalid_object_exception_incorrect_size(pids, store):
         checksum_algorithm = store.algorithm
 
         with pytest.raises(NonMatchingObjSize):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, checksum, checksum_algorithm, 1000
             )
 
@@ -1179,7 +1224,7 @@ def test_delete_invalid_object_exception_incorrect_size_object_exists(pids, stor
         checksum_algorithm = store.algorithm
 
         with pytest.raises(NonMatchingObjSize):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, checksum, checksum_algorithm, 1000
             )
 
@@ -1197,7 +1242,7 @@ def test_delete_invalid_object_exception_incorrect_checksum(pids, store):
         expected_file_size = object_metadata.obj_size
 
         with pytest.raises(NonMatchingChecksum):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, "abc123", checksum_algorithm, expected_file_size
             )
 
@@ -1213,7 +1258,7 @@ def test_delete_invalid_object_exception_incorrect_checksum_algo(pids, store):
         checksum = object_metadata.hex_digests.get(store.algorithm)
         expected_file_size = object_metadata.obj_size
         with pytest.raises(UnsupportedAlgorithm):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, checksum, "md2", expected_file_size
             )
 
@@ -1230,7 +1275,7 @@ def test_delete_invalid_object_exception_supported_other_algo_bad_checksum(pids,
         checksum = object_metadata.hex_digests.get(store.algorithm)
         expected_file_size = object_metadata.obj_size
         with pytest.raises(NonMatchingChecksum):
-            store.delete_invalid_object(
+            store.delete_if_invalid_object(
                 object_metadata, checksum, "sha224", expected_file_size
             )
 

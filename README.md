@@ -85,8 +85,8 @@ hashstore = hashstore_factory.get_hashstore(module_name, class_name, properties)
 
 # Store objects (.../[hashstore_path]/objects/)
 pid = "j.tao.1700.1"
-object = "/path/to/your/object.data"
-object_metadata = hashstore.store_object(pid, object)
+object_path = "/path/to/your/object.data"
+object_metadata = hashstore.store_object(pid, object_path)
 object_cid = object_metadata.cid
 
 # Store metadata (.../[hashstore_path]/metadata/)
@@ -95,11 +95,11 @@ pid = "j.tao.1700.1"
 sysmeta = "/path/to/your/sysmeta/document.xml"
 metadata_cid = hashstore.store_metadata(pid, sysmeta)
 
-# If you want to store other types of metadata, add an additional `format_id`.
+# If you want to store other types of metadata, include a `format_id`.
 pid = "j.tao.1700.1"
 metadata = "/path/to/your/metadata/document.json"
 format_id = "http://custom.metadata.com/json/type/v1.0"
-metadata_cid = hashstore.store_metadata(pid, metadata, format_id)
+metadata_cid_two = hashstore.store_metadata(pid, metadata, format_id)
 
 # ...
 ```
@@ -164,7 +164,7 @@ store and tag an object simultaneously if the relevant data is available. In the
 identifier (ex. persistent identifier (pid)), `store_object` can be called to solely store an
 object. The client is then expected to call `verify_object` when the relevant metadata is available
 to confirm that the object has been stored as expected. The client is then expected to call
-`delete_invalid_object` when the relevant metadata is available to confirm that the object is
+`delete_if_invalid_object` when the relevant metadata is available to confirm that the object is
 what is expected. And to finalize the process (to make the object discoverable), the client
 calls `tagObject``. In summary, there are two expected paths to store an object:
 
@@ -204,7 +204,7 @@ obj_info_allinone = hashstore.store_object(input_stream, pid, additional_algo, c
 # Store object
 obj_info_manual = hashstore.store_object(input_stream)
 # Validate object with expected values when available
-hashstore.delete_invalid_object(obj_info_manual, checksum, checksum_algo, obj_size)
+hashstore.delete_if_invalid_object(obj_info_manual, checksum, checksum_algo, obj_size)
 # Tag object, makes the object discoverable (find, retrieve, delete)
 hashstore.tag_object(pid, obj_info_manual.cid)
 ```

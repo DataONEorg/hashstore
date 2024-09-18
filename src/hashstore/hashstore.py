@@ -72,8 +72,6 @@ class HashStore(ABC):
 
         :param str pid: Authority-based or persistent identifier of the object.
         :param str cid: Content identifier of the object.
-
-        :return: bool - `True` upon successful tagging.
         """
         raise NotImplementedError()
 
@@ -136,7 +134,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_invalid_object(
+    def delete_if_invalid_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
         """Confirm equality of content in an ObjectMetadata. The `delete_invalid_object` method

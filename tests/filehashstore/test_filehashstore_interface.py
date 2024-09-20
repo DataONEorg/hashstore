@@ -950,13 +950,13 @@ def test_delete_if_invalid_object_exception_supported_other_algo_bad_checksum(
 
 
 def test_store_metadata(pids, store):
-    """Test store metadata."""
+    """Test store_metadata."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
+        stored_metadata_path = store.store_metadata(pid, syspath, format_id)
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)
@@ -964,12 +964,12 @@ def test_store_metadata(pids, store):
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
-        assert metadata_cid == str(full_path)
+        assert stored_metadata_path == str(full_path)
     assert store._count("metadata") == 3
 
 
 def test_store_metadata_one_pid_multiple_docs_correct_location(store):
-    """Test store metadata for a pid with multiple metadata documents."""
+    """Test store_metadata for a pid with multiple metadata documents."""
     test_dir = "tests/testdata/"
     entity = "metadata"
     pid = "jtao.1700.1"
@@ -980,29 +980,31 @@ def test_store_metadata_one_pid_multiple_docs_correct_location(store):
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     format_id3 = "http://ns.dataone.org/service/types/v3.0"
     format_id4 = "http://ns.dataone.org/service/types/v4.0"
-    metadata_cid = store.store_metadata(pid, syspath, format_id)
-    metadata_cid3 = store.store_metadata(pid, syspath, format_id3)
-    metadata_cid4 = store.store_metadata(pid, syspath, format_id4)
+    stored_metadata_path = store.store_metadata(pid, syspath, format_id)
+    stored_metadata_path3 = store.store_metadata(pid, syspath, format_id3)
+    stored_metadata_path4 = store.store_metadata(pid, syspath, format_id4)
+
     metadata_document_name = store._computehash(pid + format_id)
     metadata_document_name3 = store._computehash(pid + format_id3)
     metadata_document_name4 = store._computehash(pid + format_id4)
     full_path = store._get_store_path("metadata") / rel_path / metadata_document_name
     full_path3 = store._get_store_path("metadata") / rel_path / metadata_document_name3
     full_path4 = store._get_store_path("metadata") / rel_path / metadata_document_name4
-    assert metadata_cid == str(full_path)
-    assert metadata_cid3 == str(full_path3)
-    assert metadata_cid4 == str(full_path4)
+
+    assert stored_metadata_path == str(full_path)
+    assert stored_metadata_path3 == str(full_path3)
+    assert stored_metadata_path4 == str(full_path4)
     assert store._count(entity) == 3
 
 
 def test_store_metadata_default_format_id(pids, store):
-    """Test store metadata returns expected id when storing with default format_id."""
+    """Test store_metadata returns expected id when storing with default format_id."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, syspath)
+        stored_metadata_path = store.store_metadata(pid, syspath)
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)
@@ -1010,24 +1012,24 @@ def test_store_metadata_default_format_id(pids, store):
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
-        assert metadata_cid == str(full_path)
+        assert stored_metadata_path == str(full_path)
 
 
 def test_store_metadata_files_string(pids, store):
-    """Test store metadata with a string object to the metadata."""
+    """Test store_metadata with a string object to the metadata."""
     test_dir = "tests/testdata/"
     entity = "metadata"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
-        metadata_cid = store.store_metadata(pid, syspath_string, format_id)
-        assert store._exists(entity, metadata_cid)
+        stored_metadata_path = store.store_metadata(pid, syspath_string, format_id)
+        assert store._exists(entity, stored_metadata_path)
     assert store._count(entity) == 3
 
 
 def test_store_metadata_files_input_stream(pids, store):
-    """Test store metadata with an input stream to metadata."""
+    """Test store_metadata with a stream to  the metadata."""
     test_dir = "tests/testdata/"
     entity = "metadata"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
@@ -1035,13 +1037,13 @@ def test_store_metadata_files_input_stream(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath_string = str(Path(test_dir) / filename)
         syspath_stream = io.open(syspath_string, "rb")
-        _metadata_cid = store.store_metadata(pid, syspath_stream, format_id)
+        _stored_metadata_path = store.store_metadata(pid, syspath_stream, format_id)
         syspath_stream.close()
     assert store._count(entity) == 3
 
 
 def test_store_metadata_pid_empty(store):
-    """Test store metadata raises error with an empty string as the pid."""
+    """Test store_metadata raises error with an empty string as the pid."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = ""
@@ -1052,7 +1054,7 @@ def test_store_metadata_pid_empty(store):
 
 
 def test_store_metadata_pid_empty_spaces(store):
-    """Test store metadata raises error with empty spaces as the pid."""
+    """Test store_metadata raises error with empty spaces as the pid."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "   "
@@ -1063,7 +1065,7 @@ def test_store_metadata_pid_empty_spaces(store):
 
 
 def test_store_metadata_pid_format_id_spaces(store):
-    """Test store metadata raises error with empty spaces as the format_id."""
+    """Test store_metadata raises error with empty spaces as the format_id."""
     test_dir = "tests/testdata/"
     format_id = "       "
     pid = "jtao.1700.1"
@@ -1074,7 +1076,7 @@ def test_store_metadata_pid_format_id_spaces(store):
 
 
 def test_store_metadata_metadata_empty(store):
-    """Test store metadata raises error with empty spaces as the metadata path."""
+    """Test store_metadata raises error with empty spaces as the metadata path."""
     pid = "jtao.1700.1"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     syspath_string = "   "
@@ -1083,7 +1085,7 @@ def test_store_metadata_metadata_empty(store):
 
 
 def test_store_metadata_metadata_none(store):
-    """Test store metadata raises error with empty None metadata path."""
+    """Test store_metadata raises error with empty None metadata path."""
     pid = "jtao.1700.1"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     syspath_string = None
@@ -1092,7 +1094,7 @@ def test_store_metadata_metadata_none(store):
 
 
 def test_store_metadata_metadata_path(pids, store):
-    """Test store metadata returns expected path to metadata document."""
+    """Test store_metadata returns expected path to metadata document."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
@@ -1100,13 +1102,13 @@ def test_store_metadata_metadata_path(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
-        metadata_path = store._get_hashstore_metadata_path(metadata_cid)
-        assert metadata_cid == metadata_path
+        stored_metadata_path = store.store_metadata(pid, syspath, format_id)
+        metadata_path = store._get_hashstore_metadata_path(stored_metadata_path)
+        assert stored_metadata_path == metadata_path
 
 
 def test_store_metadata_thread_lock(store):
-    """Test store metadata thread lock."""
+    """Test store_metadata thread lock."""
     test_dir = "tests/testdata/"
     entity = "metadata"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
@@ -1172,7 +1174,7 @@ def test_retrieve_metadata(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     _object_metadata = store.store_object(pid, path)
-    _metadata_cid = store.store_metadata(pid, syspath, format_id)
+    _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
     metadata_stream = store.retrieve_metadata(pid, format_id)
     metadata_content = metadata_stream.read().decode("utf-8")
     metadata_stream.close()
@@ -1188,7 +1190,7 @@ def test_retrieve_metadata_default_format_id(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     _object_metadata = store.store_object(pid, path)
-    _metadata_cid = store.store_metadata(pid, syspath)
+    _stored_metadata_path = store.store_metadata(pid, syspath)
     metadata_stream = store.retrieve_metadata(pid)
     metadata_content = metadata_stream.read().decode("utf-8")
     metadata_stream.close()
@@ -1222,7 +1224,7 @@ def test_retrieve_metadata_format_id_empty(store):
 
 
 def test_retrieve_metadata_format_id_empty_spaces(store):
-    """Test retrieve_metadata raises error when supplied with empty spaces asthe format_id."""
+    """Test retrieve_metadata raises error when supplied with empty spaces as the format_id."""
     format_id = "    "
     pid = "jtao.1700.1"
     with pytest.raises(ValueError):
@@ -1238,7 +1240,7 @@ def test_delete_object_object_deleted(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
     assert store._count("objects") == 0
 
@@ -1253,7 +1255,7 @@ def test_delete_object_metadata_deleted(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
     assert store._count("metadata") == 0
 
@@ -1267,7 +1269,7 @@ def test_delete_object_all_refs_files_deleted(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
     assert store._count("pid") == 0
     assert store._count("cid") == 0
@@ -1282,7 +1284,7 @@ def test_delete_object_pid_refs_file_deleted(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
         store.delete_object(pid)
         pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
         assert not os.path.exists(pid_refs_file_path)
@@ -1297,7 +1299,7 @@ def test_delete_object_cid_refs_file_deleted(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
         cid = object_metadata.cid
         store.delete_object(pid)
         cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
@@ -1343,7 +1345,7 @@ def test_delete_metadata(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
         store.delete_metadata(pid, format_id)
     assert store._count(entity) == 0
 
@@ -1359,9 +1361,9 @@ def test_delete_metadata_one_pid_multiple_metadata_documents(store):
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     format_id3 = "http://ns.dataone.org/service/types/v3.0"
     format_id4 = "http://ns.dataone.org/service/types/v4.0"
-    _metadata_cid = store.store_metadata(pid, syspath, format_id)
-    _metadata_cid3 = store.store_metadata(pid, syspath, format_id3)
-    _metadata_cid4 = store.store_metadata(pid, syspath, format_id4)
+    _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
+    _stored_metadata_path3 = store.store_metadata(pid, syspath, format_id3)
+    _stored_metadata_path4 = store.store_metadata(pid, syspath, format_id4)
     store.delete_metadata(pid)
     assert store._count(entity) == 0
 
@@ -1377,9 +1379,9 @@ def test_delete_metadata_specific_pid_multiple_metadata_documents(store):
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     format_id3 = "http://ns.dataone.org/service/types/v3.0"
     format_id4 = "http://ns.dataone.org/service/types/v4.0"
-    _metadata_cid = store.store_metadata(pid, syspath, format_id)
-    _metadata_cid3 = store.store_metadata(pid, syspath, format_id3)
-    _metadata_cid4 = store.store_metadata(pid, syspath, format_id4)
+    _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
+    _stored_metadata_path3 = store.store_metadata(pid, syspath, format_id3)
+    _stored_metadata_path4 = store.store_metadata(pid, syspath, format_id4)
     store.delete_metadata(pid, format_id4)
     assert store._count(entity) == 2
 
@@ -1401,7 +1403,7 @@ def test_delete_metadata_default_format_id(store, pids):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath)
+        _stored_metadata_path = store.store_metadata(pid, syspath)
         store.delete_metadata(pid)
     assert store._count(entity) == 0
 
@@ -1439,7 +1441,7 @@ def test_get_hex_digest(store):
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
     _object_metadata = store.store_object(pid, path)
-    _metadata_cid = store.store_metadata(pid, syspath, format_id)
+    _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
     sha3_256_hex_digest = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )

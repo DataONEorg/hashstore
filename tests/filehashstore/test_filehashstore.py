@@ -42,8 +42,9 @@ def test_init_directories_created(store):
 
 
 def test_init_existing_store_incorrect_algorithm_format(store):
-    """Confirm that exception is thrown when store_algorithm is not a DataONE
-    controlled value."""
+    """Confirm that exception is thrown when store_algorithm is not a DataONE controlled value (
+    the string must exactly match the expected format). DataONE uses the library of congress
+    vocabulary to standardize algorithm types."""
     properties = {
         "store_path": store.root + "/incorrect_algo_format",
         "store_depth": 3,
@@ -180,7 +181,6 @@ def test_validate_properties(store):
         "store_algorithm": "SHA-256",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    # pylint: disable=W0212
     assert store._validate_properties(properties)
 
 
@@ -193,7 +193,6 @@ def test_validate_properties_missing_key(store):
         "store_algorithm": "SHA-256",
     }
     with pytest.raises(KeyError):
-        # pylint: disable=W0212
         store._validate_properties(properties)
 
 
@@ -207,7 +206,6 @@ def test_validate_properties_key_value_is_none(store):
         "store_metadata_namespace": None,
     }
     with pytest.raises(ValueError):
-        # pylint: disable=W0212
         store._validate_properties(properties)
 
 
@@ -215,7 +213,6 @@ def test_validate_properties_incorrect_type(store):
     """Confirm exception raised when a bad properties value is given."""
     properties = "etc/filehashstore/hashstore.yaml"
     with pytest.raises(ValueError):
-        # pylint: disable=W0212
         store._validate_properties(properties)
 
 
@@ -228,7 +225,6 @@ def test_set_default_algorithms_missing_yaml(store, pids):
         store._store_and_validate_data(pid, path)
     os.remove(store.hashstore_configuration_yaml)
     with pytest.raises(FileNotFoundError):
-        # pylint: disable=W0212
         store._set_default_algorithms()
 
 
@@ -238,11 +234,10 @@ def test_set_default_algorithms_missing_yaml(store, pids):
 def test_store_and_validate_data_files_path(pids, store):
     """Test _store_and_validate_data accepts path object for the path arg."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = Path(test_dir) / pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
-        assert store._exists(entity, object_metadata.cid)
+        assert store._exists("objects", object_metadata.cid)
 
 
 def test_store_and_validate_data_files_string(pids, store):
@@ -252,20 +247,19 @@ def test_store_and_validate_data_files_string(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
-        assert store._exists(entity, object_metadata.cid)
+        assert store._exists("objects", object_metadata.cid)
 
 
 def test_store_and_validate_data_files_stream(pids, store):
     """Test _store_and_validate_data accepts stream for the path arg."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         object_metadata = store._store_and_validate_data(pid, input_stream)
         input_stream.close()
-        assert store._exists(entity, object_metadata.cid)
-    assert store._count(entity) == 3
+        assert store._exists("objects", object_metadata.cid)
+    assert store._count("objects") == 3
 
 
 def test_store_and_validate_data_cid(pids, store):
@@ -371,6 +365,127 @@ def test_store_data_only_hex_digests(pids, store):
         assert object_metadata.hex_digests.get("sha256") == pids[pid]["sha256"]
         assert object_metadata.hex_digests.get("sha384") == pids[pid]["sha384"]
         assert object_metadata.hex_digests.get("sha512") == pids[pid]["sha512"]
+
+
+def test_find_object_no_sysmeta(pids, store):
+    """Test _find_object returns the correct content and expected value for non-existent sysmeta."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+        obj_info_dict = store._find_object(pid)
+        retrieved_cid = obj_info_dict["cid"]
+
+        assert retrieved_cid == object_metadata.hex_digests.get("sha256")
+
+        data_object_path = store._get_hashstore_data_object_path(retrieved_cid)
+        assert data_object_path == obj_info_dict["cid_object_path"]
+
+        cid_refs_path = store._get_hashstore_cid_refs_path(retrieved_cid)
+        assert cid_refs_path == obj_info_dict["cid_refs_path"]
+
+        pid_refs_path = store._get_hashstore_pid_refs_path(pid)
+        assert pid_refs_path == obj_info_dict["pid_refs_path"]
+
+        assert obj_info_dict["sysmeta_path"] == "Does not exist."
+
+
+def test_find_object_sysmeta(pids, store):
+    """Test _find_object returns the correct content along with the sysmeta path"""
+    test_dir = "tests/testdata/"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        object_metadata = store.store_object(pid, path)
+        stored_metadata_path = store.store_metadata(pid, syspath, format_id)
+
+        obj_info_dict = store._find_object(pid)
+        retrieved_cid = obj_info_dict["cid"]
+
+        assert retrieved_cid == object_metadata.hex_digests.get("sha256")
+
+        data_object_path = store._get_hashstore_data_object_path(retrieved_cid)
+        assert data_object_path == obj_info_dict["cid_object_path"]
+
+        cid_refs_path = store._get_hashstore_cid_refs_path(retrieved_cid)
+        assert cid_refs_path == obj_info_dict["cid_refs_path"]
+
+        pid_refs_path = store._get_hashstore_pid_refs_path(pid)
+        assert pid_refs_path == obj_info_dict["pid_refs_path"]
+
+        assert str(obj_info_dict["sysmeta_path"]) == stored_metadata_path
+
+
+def test_find_object_refs_exist_but_obj_not_found(pids, store):
+    """Test _find_object throws exception when refs file exist but the object does not."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        store.store_object(pid, path)
+
+        cid = store._find_object(pid).get("cid")
+        obj_path = store._get_hashstore_data_object_path(cid)
+        os.remove(obj_path)
+
+        with pytest.raises(RefsFileExistsButCidObjMissing):
+            store._find_object(pid)
+
+
+def test_find_object_cid_refs_not_found(pids, store):
+    """Test _find_object throws exception when pid refs file is found (and contains a cid)
+    but the cid refs file does not exist."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        _object_metadata = store.store_object(pid, path)
+
+        # Place the wrong cid into the pid refs file that has already been created
+        pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
+        with open(pid_ref_abs_path, "w", encoding="utf8") as pid_ref_file:
+            pid_ref_file.seek(0)
+            pid_ref_file.write("intentionally.wrong.pid")
+            pid_ref_file.truncate()
+
+        with pytest.raises(OrphanPidRefsFileFound):
+            store._find_object(pid)
+
+
+def test_find_object_cid_refs_does_not_contain_pid(pids, store):
+    """Test _find_object throws exception when pid refs file is found (and contains a cid)
+    but the cid refs file does not contain the pid."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+
+        # Remove the pid from the cid refs file
+        cid_ref_abs_path = store._get_hashstore_cid_refs_path(
+            object_metadata.hex_digests.get("sha256")
+        )
+        store._update_refs_file(cid_ref_abs_path, pid, "remove")
+
+        with pytest.raises(PidNotFoundInCidRefsFile):
+            store._find_object(pid)
+
+
+def test_find_object_pid_refs_not_found(store):
+    """Test _find_object throws exception when a pid refs file does not exist."""
+    with pytest.raises(PidRefsDoesNotExist):
+        store._find_object("dou.test.1")
+
+
+def test_find_object_pid_none(store):
+    """Test _find_object throws exception when pid is None."""
+    with pytest.raises(ValueError):
+        store._find_object(None)
+
+
+def test_find_object_pid_empty(store):
+    """Test _find_object throws exception when pid is empty."""
+    with pytest.raises(ValueError):
+        store._find_object("")
 
 
 def test_move_and_get_checksums_id(pids, store):
@@ -1248,99 +1363,6 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
 
         with pytest.raises(CidRefsContentError):
             store._verify_hashstore_references(pid, cid)
-
-
-def test_find_object(pids, store):
-    """Test _find_object returns the correct content."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-        obj_info_dict = store._find_object(pid)
-        retrieved_cid = obj_info_dict["cid"]
-
-        assert retrieved_cid == object_metadata.hex_digests.get("sha256")
-
-        data_object_path = store._get_hashstore_data_object_path(retrieved_cid)
-        assert data_object_path == obj_info_dict["cid_object_path"]
-
-        cid_refs_path = store._get_hashstore_cid_refs_path(retrieved_cid)
-        assert cid_refs_path == obj_info_dict["cid_refs_path"]
-
-        pid_refs_path = store._get_hashstore_pid_refs_path(pid)
-        assert pid_refs_path == obj_info_dict["pid_refs_path"]
-
-        assert obj_info_dict["sysmeta_path"] == "Does not exist."
-
-
-def test_find_object_refs_exist_but_obj_not_found(pids, store):
-    """Test _find_object throws exception when refs file exist but the object does not."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        store.store_object(pid, path)
-
-        cid = store._find_object(pid).get("cid")
-        obj_path = store._get_hashstore_data_object_path(cid)
-        os.remove(obj_path)
-
-        with pytest.raises(RefsFileExistsButCidObjMissing):
-            store._find_object(pid)
-
-
-def test_find_object_cid_refs_not_found(pids, store):
-    """Test _find_object throws exception when pid refs file is found (and contains a cid)
-    but the cid refs file does not exist."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        _object_metadata = store.store_object(pid, path)
-
-        # Place the wrong cid into the pid refs file that has already been created
-        pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
-        with open(pid_ref_abs_path, "w", encoding="utf8") as pid_ref_file:
-            pid_ref_file.seek(0)
-            pid_ref_file.write("intentionally.wrong.pid")
-            pid_ref_file.truncate()
-
-        with pytest.raises(OrphanPidRefsFileFound):
-            store._find_object(pid)
-
-
-def test_find_object_cid_refs_does_not_contain_pid(pids, store):
-    """Test _find_object throws exception when pid refs file is found (and contains a cid)
-    but the cid refs file does not contain the pid."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid, path)
-
-        # Remove the pid from the cid refs file
-        cid_ref_abs_path = store._get_hashstore_cid_refs_path(
-            object_metadata.hex_digests.get("sha256")
-        )
-        store._update_refs_file(cid_ref_abs_path, pid, "remove")
-
-        with pytest.raises(PidNotFoundInCidRefsFile):
-            store._find_object(pid)
-
-
-def test_find_object_pid_refs_not_found(store):
-    """Test _find_object throws exception when a pid refs file does not exist."""
-    with pytest.raises(PidRefsDoesNotExist):
-        store._find_object("dou.test.1")
-
-
-def test_find_object_pid_none(store):
-    """Test _find_object throws exception when pid is None."""
-    with pytest.raises(ValueError):
-        store._find_object(None)
-
-
-def test_find_object_pid_empty(store):
-    """Test _find_object throws exception when pid is empty."""
-    with pytest.raises(ValueError):
-        store._find_object("")
 
 
 def test_clean_algorithm(store):

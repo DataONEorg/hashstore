@@ -1237,7 +1237,7 @@ class FileHashStore(HashStore):
                             "pid_refs_path": pid_ref_abs_path,
                             "sysmeta_path": (
                                 sysmeta_full_path
-                                if os.path.isdir(sysmeta_full_path)
+                                if os.path.exists(sysmeta_full_path)
                                 else "Does not exist."
                             ),
                         }

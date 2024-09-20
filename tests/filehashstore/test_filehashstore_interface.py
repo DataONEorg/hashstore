@@ -1328,21 +1328,18 @@ def test_delete_object_pid_none(store):
 def test_delete_metadata(pids, store):
     """Test delete_metadata successfully deletes metadata."""
     test_dir = "tests/testdata/"
-    entity = "metadata"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _object_metadata = store.store_object(pid, path)
         _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
         store.delete_metadata(pid, format_id)
-    assert store._count(entity) == 0
+    assert store._count("metadata") == 0
 
 
 def test_delete_metadata_one_pid_multiple_metadata_documents(store):
     """Test delete_metadata for a pid with multiple metadata documents deletes
-    all metadata files as expected."""
+    all associated metadata files as expected."""
     test_dir = "tests/testdata/"
     entity = "metadata"
     pid = "jtao.1700.1"
@@ -1369,11 +1366,13 @@ def test_delete_metadata_specific_pid_multiple_metadata_documents(store):
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     format_id3 = "http://ns.dataone.org/service/types/v3.0"
     format_id4 = "http://ns.dataone.org/service/types/v4.0"
-    _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
-    _stored_metadata_path3 = store.store_metadata(pid, syspath, format_id3)
+    stored_metadata_path = store.store_metadata(pid, syspath, format_id)
+    stored_metadata_path3 = store.store_metadata(pid, syspath, format_id3)
     _stored_metadata_path4 = store.store_metadata(pid, syspath, format_id4)
     store.delete_metadata(pid, format_id4)
     assert store._count(entity) == 2
+    assert os.path.exists(stored_metadata_path)
+    assert os.path.exists(stored_metadata_path3)
 
 
 def test_delete_metadata_does_not_exist(pids, store):
@@ -1387,19 +1386,16 @@ def test_delete_metadata_does_not_exist(pids, store):
 def test_delete_metadata_default_format_id(store, pids):
     """Test delete_metadata deletes successfully with default format_id."""
     test_dir = "tests/testdata/"
-    entity = "metadata"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _object_metadata = store.store_object(pid, path)
         _stored_metadata_path = store.store_metadata(pid, syspath)
         store.delete_metadata(pid)
-    assert store._count(entity) == 0
+    assert store._count("metadata") == 0
 
 
 def test_delete_metadata_pid_empty(store):
-    """Test delete_object raises error when empty pid supplied."""
+    """Test delete_metadata raises error when empty pid supplied."""
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "    "
     with pytest.raises(ValueError):
@@ -1407,7 +1403,7 @@ def test_delete_metadata_pid_empty(store):
 
 
 def test_delete_metadata_pid_none(store):
-    """Test delete_object raises error when pid is 'None'."""
+    """Test delete_metadata raises error when pid is 'None'."""
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = None
     with pytest.raises(ValueError):
@@ -1415,7 +1411,7 @@ def test_delete_metadata_pid_none(store):
 
 
 def test_delete_metadata_format_id_empty(store):
-    """Test delete_object raises error when empty format_id supplied."""
+    """Test delete_metadata raises error when empty format_id supplied."""
     format_id = "    "
     pid = "jtao.1700.1"
     with pytest.raises(ValueError):

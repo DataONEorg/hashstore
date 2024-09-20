@@ -14,6 +14,8 @@ from hashstore.filehashstore_exceptions import (
     NonMatchingObjSize,
     PidRefsDoesNotExist,
     UnsupportedAlgorithm,
+    HashStoreRefsAlreadyExists,
+    PidRefsAlreadyExistsError,
 )
 
 # pylint: disable=W0212
@@ -29,12 +31,11 @@ slow_test = pytest.mark.skipif(
 def test_store_object_refs_files_and_object(pids, store):
     """Test store object stores objects and creates reference files."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = Path(test_dir + pid.replace("/", "_"))
         object_metadata = store.store_object(pid, path)
         assert object_metadata.cid == pids[pid][store.algorithm]
-    assert store._count(entity) == 3
+    assert store._count("objects") == 3
     assert store._count("pid") == 3
     assert store._count("cid") == 3
 
@@ -42,12 +43,11 @@ def test_store_object_refs_files_and_object(pids, store):
 def test_store_object_only_object(pids, store):
     """Test store object stores an object only (no reference files will be created)"""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = Path(test_dir + pid.replace("/", "_"))
         object_metadata = store.store_object(data=path)
         assert object_metadata.cid == pids[pid][store.algorithm]
-    assert store._count(entity) == 3
+    assert store._count("objects") == 3
     assert store._count("pid") == 0
     assert store._count("cid") == 0
 
@@ -55,36 +55,33 @@ def test_store_object_only_object(pids, store):
 def test_store_object_files_path(pids, store):
     """Test store object when given a path object."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = Path(test_dir + pid.replace("/", "_"))
         _object_metadata = store.store_object(pid, path)
-        assert store._exists(entity, pids[pid][store.algorithm])
-    assert store._count(entity) == 3
+        assert store._exists("objects", pids[pid][store.algorithm])
+    assert store._count("objects") == 3
 
 
 def test_store_object_files_string(pids, store):
     """Test store object when given a string object."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path_string = test_dir + pid.replace("/", "_")
         _object_metadata = store.store_object(pid, path_string)
-        assert store._exists(entity, pids[pid][store.algorithm])
-    assert store._count(entity) == 3
+        assert store._exists("objects", pids[pid][store.algorithm])
+    assert store._count("objects") == 3
 
 
 def test_store_object_files_input_stream(pids, store):
     """Test store object when given a stream object."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
         _object_metadata = store.store_object(pid, input_stream)
         input_stream.close()
-        assert store._exists(entity, pids[pid][store.algorithm])
-    assert store._count(entity) == 3
+        assert store._exists("objects", pids[pid][store.algorithm])
+    assert store._count("objects") == 3
 
 
 def test_store_object_cid(pids, store):
@@ -170,6 +167,23 @@ def test_store_object_data_incorrect_type_empty_spaces(store):
         store.store_object(pid, data=path)
 
 
+def test_store_object_data_incorrect_type_special_characters(store):
+    """Test store object raises error when data is empty string with special characters"""
+    pid = "jtao.1700.1"
+    path = "     \n\t"
+    with pytest.raises(TypeError):
+        store.store_object(pid, data=path)
+
+
+def test_store_object_data_incorrect_type_path_with_special_character(store):
+    """Test store object raises error when data path contains special characters."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid + "\n"
+    with pytest.raises(ValueError):
+        store.store_object("", path)
+
+
 def test_store_object_additional_algorithm_invalid(store):
     """Test store object raises error when supplied with unsupported algorithm."""
     test_dir = "tests/testdata/"
@@ -183,20 +197,18 @@ def test_store_object_additional_algorithm_invalid(store):
 def test_store_object_additional_algorithm_hyphen_uppercase(pids, store):
     """Test store object accepts an additional algo that's supported in uppercase."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_with_hyphen_and_upper = "SHA-384"
     object_metadata = store.store_object(pid, path, algorithm_with_hyphen_and_upper)
     sha256_cid = object_metadata.hex_digests.get("sha384")
     assert sha256_cid == pids[pid]["sha384"]
-    assert store._exists(entity, pids[pid][store.algorithm])
+    assert store._exists("objects", pids[pid][store.algorithm])
 
 
 def test_store_object_additional_algorithm_hyphen_lowercase(pids, store):
     """Test store object accepts an additional algo that's supported in lowercase."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_other = "sha3-256"
@@ -206,13 +218,12 @@ def test_store_object_additional_algorithm_hyphen_lowercase(pids, store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     assert additional_sha3_256_hex_digest == sha3_256_checksum
-    assert store._exists(entity, pids[pid][store.algorithm])
+    assert store._exists("objects", pids[pid][store.algorithm])
 
 
 def test_store_object_additional_algorithm_underscore(pids, store):
     """Test store object accepts an additional algo that's supported with underscore."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     pid = "jtao.1700.1"
     path = test_dir + pid
     algorithm_other = "sha3_256"
@@ -222,13 +233,12 @@ def test_store_object_additional_algorithm_underscore(pids, store):
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
     assert additional_sha3_256_hex_digest == sha3_256_checksum
-    assert store._exists(entity, pids[pid][store.algorithm])
+    assert store._exists("objects", pids[pid][store.algorithm])
 
 
 def test_store_object_checksum_correct(store):
     """Test store object does not throw exception with good checksum."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     pid = "jtao.1700.1"
     path = test_dir + pid
     checksum_algo = "sha3_256"
@@ -238,7 +248,7 @@ def test_store_object_checksum_correct(store):
     _object_metadata = store.store_object(
         pid, path, checksum=checksum_correct, checksum_algorithm=checksum_algo
     )
-    assert store._count(entity) == 1
+    assert store._count("objects") == 1
 
 
 def test_store_object_checksum_correct_and_additional_algo(store):
@@ -285,18 +295,6 @@ def test_store_object_checksum_correct_and_additional_algo_duplicate(store):
     assert object_metadata.hex_digests.get("sha3_256") == checksum_correct
 
 
-def test_store_object_checksum_algorithm_empty(store):
-    """Test store object raises error when checksum supplied with no checksum_algorithm."""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    checksum_correct = (
-        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
-    )
-    with pytest.raises(ValueError):
-        store.store_object(pid, path, checksum=checksum_correct, checksum_algorithm="")
-
-
 def test_store_object_checksum_empty(store):
     """Test store object raises error when checksum_algorithm supplied with
     an empty checksum."""
@@ -320,21 +318,6 @@ def test_store_object_checksum_empty_spaces(store):
     with pytest.raises(ValueError):
         store.store_object(
             pid, path, checksum="  ", checksum_algorithm=checksum_algorithm
-        )
-
-
-def test_store_object_checksum_algorithm_empty_spaces(store):
-    """Test store object raises error when checksum is supplied and with empty
-    spaces as the checksum_algorithm."""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    checksum_correct = (
-        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
-    )
-    with pytest.raises(ValueError):
-        store.store_object(
-            pid, path, checksum=checksum_correct, checksum_algorithm="   "
         )
 
 
@@ -368,19 +351,60 @@ def test_store_object_checksum_unsupported_checksum_algo(store):
         )
 
 
+def test_store_object_checksum_algorithm_empty(store):
+    """Test store object raises error when checksum supplied with no checksum_algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    with pytest.raises(ValueError):
+        store.store_object(pid, path, checksum=checksum_correct, checksum_algorithm="")
+
+
+def test_store_object_checksum_algorithm_empty_spaces(store):
+    """Test store object raises error when checksum is supplied and with empty
+    spaces as the checksum_algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    with pytest.raises(ValueError):
+        store.store_object(
+            pid, path, checksum=checksum_correct, checksum_algorithm="   "
+        )
+
+
+def test_store_object_checksum_algorithm_special_character(store):
+    """Test store object raises error when checksum is supplied and with special characters
+    as the checksum_algorithm."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    checksum_correct = (
+        "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
+    )
+    with pytest.raises(ValueError):
+        store.store_object(
+            pid, path, checksum=checksum_correct, checksum_algorithm="\n"
+        )
+
+
 def test_store_object_duplicate_does_not_store_duplicate(store):
     """Test that storing duplicate object does not store object twice."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    entity = "objects"
     # Store first blob
     _object_metadata_one = store.store_object(pid, path)
     # Store second blob
     pid_that_refs_existing_cid = "dou.test.1"
     _object_metadata_two = store.store_object(pid_that_refs_existing_cid, path)
     # Confirm only one object exists and the tmp file created is deleted
-    assert store._count(entity) == 1
+    assert store._count("objects") == 1
 
 
 def test_store_object_duplicate_object_references_file_count(store):
@@ -401,11 +425,12 @@ def test_store_object_duplicate_object_references_file_count(store):
     assert store._count("pid") == 3
     # Confirm that there are 1 cid reference files
     assert store._count("cid") == 1
+    assert store._count("objects") == 1
 
 
 def test_store_object_duplicate_object_references_file_content(pids, store):
     """Test that storing duplicate object but different pid updates the cid refs file
-    with the correct amount of pids."""
+    with the correct amount of pids and content."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
@@ -417,12 +442,16 @@ def test_store_object_duplicate_object_references_file_content(pids, store):
     # Store with third pid
     pid_three = "dou.test.2"
     store.store_object(pid_three, path)
-    # Confirm the content of the cid refence files
+    # Confirm the content of the cid reference files
     cid_ref_abs_path = store._get_hashstore_cid_refs_path(pids[pid][store.algorithm])
+    cid_count = 0
     with open(cid_ref_abs_path, "r", encoding="utf8") as f:
         for _, line in enumerate(f, start=1):
+            cid_count += 1
             value = line.strip()
             assert value == pid or value == pid_two or value == pid_three
+
+    assert cid_count == 3
 
 
 def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, store):
@@ -431,7 +460,6 @@ def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, stor
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    entity = "objects"
     # Store first blob
     _object_metadata_one = store.store_object(pid, path)
     # Store second blob
@@ -439,10 +467,10 @@ def test_store_object_duplicate_raises_error_with_bad_validation_data(pids, stor
         _object_metadata_two = store.store_object(
             pid, path, checksum="nonmatchingchecksum", checksum_algorithm="sha256"
         )
-    assert store._count(entity) == 1
+    assert store._count("objects") == 1
     # Confirm tmp files created during this process was handled
     assert store._count("tmp") == 0
-    assert store._exists(entity, pids[pid][store.algorithm])
+    assert store._exists("objects", pids[pid][store.algorithm])
 
 
 def test_store_object_with_obj_file_size(store, pids):
@@ -466,6 +494,7 @@ def test_store_object_with_obj_file_size_incorrect(store, pids):
         path = test_dir + pid.replace("/", "_")
         with pytest.raises(NonMatchingObjSize):
             store.store_object(pid, path, expected_object_size=obj_file_size)
+    assert store._count("objects") == 0
 
 
 def test_store_object_with_obj_file_size_non_integer(store, pids):
@@ -756,14 +785,33 @@ def test_tag_object_pid_refs_not_found_cid_refs_found(store):
     assert store._count("cid") == 1
 
 
-# TODO: Add tag_ojbect test for HashStoreRefsAlreadyExists
-# TODO: Add tag_ojbect test for PidRefsAlreadyExistsError
+def test_tag_object_hashstore_refs_already_exist(pids, store):
+    """Confirm that tag throws HashStoreRefsAlreadyExists when refs already exist"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+
+        with pytest.raises(HashStoreRefsAlreadyExists):
+            store.tag_object(pid, object_metadata.cid)
+
+
+def test_tag_object_pid_refs_already_exist(pids, store):
+    """Confirm that tag throws PidRefsAlreadyExistsError when a pid refs already exists"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid, path)
+        cid_refs_file_path = store._get_hashstore_cid_refs_path(object_metadata.cid)
+        os.remove(cid_refs_file_path)
+
+        with pytest.raises(PidRefsAlreadyExistsError):
+            store.tag_object(pid, "adifferentcid")
 
 
 def test_store_metadata(pids, store):
     """Test store metadata."""
     test_dir = "tests/testdata/"
-    entity = "metadata"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
@@ -777,7 +825,7 @@ def test_store_metadata(pids, store):
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
         assert metadata_cid == str(full_path)
-    assert store._count(entity) == 3
+    assert store._count("metadata") == 3
 
 
 def test_store_metadata_one_pid_multiple_docs_correct_location(store):

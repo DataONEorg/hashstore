@@ -1421,13 +1421,9 @@ def test_delete_metadata_format_id_empty(store):
 def test_get_hex_digest(store):
     """Test get_hex_digest for expected value."""
     test_dir = "tests/testdata/"
-    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    filename = pid + ".xml"
-    syspath = Path(test_dir) / filename
     _object_metadata = store.store_object(pid, path)
-    _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
     sha3_256_hex_digest = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )

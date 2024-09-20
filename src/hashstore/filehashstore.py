@@ -1327,12 +1327,11 @@ class FileHashStore(HashStore):
         checksum_algorithm=None,
         file_size_to_validate=None,
     ):
-        """Copy the contents of `stream` onto disk with an optional file
-        extension appended. The copy process uses a temporary file to store the
-        initial contents and returns a dictionary of algorithms and their
+        """Copy the contents of the `Stream` object onto disk. The copy process uses a temporary
+        file to store the initial contents and returns a dictionary of algorithms and their
         hex digest values. If the file already exists, the method will immediately
         raise an exception. If an algorithm and checksum are provided, it will proceed to
-        validate the object (and delete the tmpFile if the hex digest stored does
+        validate the object (and delete the temporary file created if the hex digest stored does
         not match what is provided).
 
         :param Optional[str] pid: Authority-based identifier.

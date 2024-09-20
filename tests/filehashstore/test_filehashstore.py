@@ -351,6 +351,7 @@ def test_find_object_pid_empty(store):
     with pytest.raises(ValueError):
         store._find_object("")
 
+
 def test_store_and_validate_data_files_path(pids, store):
     """Test _store_and_validate_data accepts path object for the path arg."""
     test_dir = "tests/testdata/"
@@ -493,7 +494,6 @@ def test_move_and_get_checksums_id(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
         (
             move_id,
             _,
@@ -509,7 +509,6 @@ def test_move_and_get_checksums_file_size(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
         (
             _,
             tmp_file_size,
@@ -525,7 +524,6 @@ def test_move_and_get_checksums_hex_digests(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
         (
             _,
             _,
@@ -542,26 +540,22 @@ def test_move_and_get_checksums_hex_digests(pids, store):
 def test_move_and_get_checksums_does_not_store_duplicate(pids, store):
     """Test _move_and_get_checksums does not store duplicate objects."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
         store._move_and_get_checksums(pid, input_stream)
         input_stream.close()
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
         store._move_and_get_checksums(pid, input_stream)
         input_stream.close()
-    assert store._count(entity) == 3
+    assert store._count("objects") == 3
 
 
 def test_move_and_get_checksums_raises_error_with_nonmatching_checksum(pids, store):
     """Test _move_and_get_checksums raises error when incorrect checksum supplied."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
@@ -574,18 +568,17 @@ def test_move_and_get_checksums_raises_error_with_nonmatching_checksum(pids, sto
                 checksum_algorithm="sha256",
             )
             input_stream.close()
-    assert store._count(entity) == 0
+    assert store._count("objects") == 0
 
 
 def test_move_and_get_checksums_incorrect_file_size(pids, store):
-    """Test move and get checksum raises error with an incorrect file size."""
+    """Test _move_and_get_checksums raises error with an incorrect file size."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         with pytest.raises(NonMatchingObjSize):
             path = test_dir + pid.replace("/", "_")
             input_stream = io.open(path, "rb")
             incorrect_file_size = 1000
-            # pylint: disable=W0212
             (_, _, _, _,) = store._move_and_get_checksums(
                 pid, input_stream, file_size_to_validate=incorrect_file_size
             )
@@ -602,7 +595,6 @@ def test_write_to_tmp_file_and_get_hex_digests_additional_algo(store):
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    # pylint: disable=W0212
     hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
         input_stream, additional_algorithm=checksum_algo
     )
@@ -621,7 +613,6 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_algo(store):
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    # pylint: disable=W0212
     hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
         input_stream, checksum_algorithm=checksum_algo
     )
@@ -644,7 +635,6 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo(stor
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    # pylint: disable=W0212
     hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
         input_stream,
         additional_algorithm=additional_algo,
@@ -666,7 +656,6 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo_dupl
     additional_algo = "sha224"
     checksum_algo = "sha224"
     checksum_correct = "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
-    # pylint: disable=W0212
     hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
         input_stream,
         additional_algorithm=additional_algo,
@@ -682,7 +671,6 @@ def test_write_to_tmp_file_and_get_hex_digests_file_size(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
         _, _, tmp_file_size = store._write_to_tmp_file_and_get_hex_digests(input_stream)
         input_stream.close()
         assert tmp_file_size == pids[pid]["file_size_bytes"]
@@ -694,7 +682,6 @@ def test_write_to_tmp_file_and_get_hex_digests_hex_digests(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
         hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(input_stream)
         input_stream.close()
         assert hex_digests.get("md5") == pids[pid]["md5"]
@@ -710,7 +697,6 @@ def test_write_to_tmp_file_and_get_hex_digests_tmpfile_object(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         input_stream = io.open(path, "rb")
-        # pylint: disable=W0212
         _, tmp_file_name, _ = store._write_to_tmp_file_and_get_hex_digests(input_stream)
         input_stream.close()
         assert os.path.isfile(tmp_file_name) is True
@@ -724,12 +710,10 @@ def test_write_to_tmp_file_and_get_hex_digests_with_unsupported_algorithm(pids, 
         input_stream = io.open(path, "rb")
         algo = "md2"
         with pytest.raises(UnsupportedAlgorithm):
-            # pylint: disable=W0212
             _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
                 input_stream, additional_algorithm=algo
             )
         with pytest.raises(UnsupportedAlgorithm):
-            # pylint: disable=W0212
             _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
                 input_stream, checksum_algorithm=algo
             )
@@ -740,7 +724,6 @@ def test_mktmpfile(store):
     """Test that _mktmpfile creates and returns a tmp file."""
     path = store.root + "/doutest/tmp/"
     store._create_path(path)
-    # pylint: disable=W0212
     tmp = store._mktmpfile(path)
     assert os.path.exists(tmp.name)
 
@@ -847,6 +830,195 @@ def test_store_hashstore_refs_files_refs_not_found_cid_refs_found(store):
     assert line_count == 2
     assert store._count("pid") == 2
     assert store._count("cid") == 1
+
+
+def test_untag_object(pids, store):
+    """Test _untag_object untags successfully."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        store._synchronize_referenced_locked_pids(pid)
+        store._synchronize_object_locked_cids(cid)
+        store._untag_object(pid, cid)
+        store._release_reference_locked_pids(pid)
+        store._release_object_locked_cids(cid)
+
+        assert store._count("pid") == 0
+        assert store._count("cid") == 0
+    assert store._count("objects") == 3
+
+
+def test_untag_object_pid_not_locked(pids, store):
+    """Test _untag_object throws exception when pid is not locked"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        with pytest.raises(IdentifierNotLocked):
+            store._untag_object(pid, cid)
+
+
+def test_untag_object_cid_not_locked(pids, store):
+    """Test _untag_object throws exception with cid is not locked"""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+        cid = object_metadata.cid
+
+        with pytest.raises(IdentifierNotLocked):
+            store._synchronize_referenced_locked_pids(pid)
+            store._untag_object(pid, cid)
+            store._release_reference_locked_pids(pid)
+
+
+def test_untag_object_orphan_pid_refs_file_found(store):
+    """Test _untag_object removes an orphan pid refs file"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    object_metadata = store.store_object(pid, path)
+    cid = object_metadata.cid
+
+    # Remove cid refs file
+    cid_refs_abs_path = store._get_hashstore_cid_refs_path(cid)
+    os.remove(cid_refs_abs_path)
+
+    with pytest.raises(OrphanPidRefsFileFound):
+        store._find_object(pid)
+
+    store._synchronize_referenced_locked_pids(pid)
+    store._synchronize_object_locked_cids(cid)
+    store._untag_object(pid, cid)
+    store._release_reference_locked_pids(pid)
+    store._release_object_locked_cids(cid)
+
+    assert store._count("pid") == 0
+
+
+def test_untag_object_orphan_refs_exist_but_data_object_not_found(store):
+    """Test _untag_object removes orphaned pid and cid refs files"""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    object_metadata = store.store_object(pid, path)
+    cid = object_metadata.cid
+
+    assert store._count("pid") == 1
+    assert store._count("cid") == 1
+
+    # Remove cid refs file
+    data_obj_path = store._get_hashstore_data_object_path(cid)
+    os.remove(data_obj_path)
+
+    with pytest.raises(RefsFileExistsButCidObjMissing):
+        store._find_object(pid)
+
+    store._synchronize_referenced_locked_pids(pid)
+    store._synchronize_object_locked_cids(cid)
+    store._untag_object(pid, cid)
+    store._release_reference_locked_pids(pid)
+    store._release_object_locked_cids(cid)
+
+    assert store._count("pid") == 0
+    assert store._count("cid") == 0
+
+
+def test_untag_object_refs_found_but_pid_not_in_cid_refs(store):
+    """Test _untag_object removes pid refs file whose pid is not found in the cid refs file."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    pid_two = pid + ".dou"
+    path = test_dir + pid
+    object_metadata = store.store_object(pid, path)
+    _object_metadata_two = store.store_object(pid_two, path)
+    cid = object_metadata.cid
+
+    assert store._count("pid") == 2
+    assert store._count("cid") == 1
+
+    # Remove pid from cid refs
+    cid_refs_file = store._get_hashstore_cid_refs_path(cid)
+    # First remove the pid
+    store._update_refs_file(cid_refs_file, pid, "remove")
+
+    with pytest.raises(PidNotFoundInCidRefsFile):
+        store._find_object(pid)
+
+    store._synchronize_referenced_locked_pids(pid)
+    store._synchronize_object_locked_cids(cid)
+    store._untag_object(pid, cid)
+    store._release_reference_locked_pids(pid)
+    store._release_object_locked_cids(cid)
+
+    assert store._count("pid") == 1
+    assert store._count("cid") == 1
+
+
+def test_untag_object_pid_refs_file_does_not_exist(store):
+    """Test _untag_object removes pid from cid refs file since the pid refs file does not exist,
+    and does not delete the cid refs file because a reference is still present."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    pid_two = pid + ".dou"
+    path = test_dir + pid
+    object_metadata = store.store_object(pid, path)
+    _object_metadata_two = store.store_object(pid_two, path)
+    cid = object_metadata.cid
+
+    assert store._count("pid") == 2
+    assert store._count("cid") == 1
+
+    # Remove pid from cid refs
+    pid_refs_file = store._get_hashstore_pid_refs_path(pid)
+    os.remove(pid_refs_file)
+
+    with pytest.raises(PidRefsDoesNotExist):
+        store._find_object(pid)
+
+    store._synchronize_referenced_locked_pids(pid)
+    store._synchronize_object_locked_cids(cid)
+    store._untag_object(pid, cid)
+    store._release_reference_locked_pids(pid)
+    store._release_object_locked_cids(cid)
+
+    assert store._count("pid") == 1
+    assert store._count("cid") == 1
+
+
+def test_untag_object_pid_refs_file_does_not_exist_and_cid_refs_is_empty(store):
+    """Test '_untag_object' removes pid from cid refs file since the pid refs file does not exist,
+    and deletes the cid refs file because it contains no more references (after the pid called
+    with '_untag_object' is removed from the cid refs)."""
+    test_dir = "tests/testdata/"
+    pid = "jtao.1700.1"
+    path = test_dir + pid
+    object_metadata = store.store_object(pid, path)
+    cid = object_metadata.cid
+
+    assert store._count("pid") == 1
+    assert store._count("cid") == 1
+
+    # Remove pid from cid refs
+    pid_refs_file = store._get_hashstore_pid_refs_path(pid)
+    os.remove(pid_refs_file)
+
+    with pytest.raises(PidRefsDoesNotExist):
+        store._find_object(pid)
+
+    store._synchronize_referenced_locked_pids(pid)
+    store._synchronize_object_locked_cids(cid)
+    store._untag_object(pid, cid)
+    store._release_reference_locked_pids(pid)
+    store._release_object_locked_cids(cid)
+
+    assert store._count("pid") == 0
+    assert store._count("cid") == 0
 
 
 def test_delete_marked_files(store):
@@ -1525,195 +1697,6 @@ def test_delete_with_object_metadata_id(pids, store):
         object_metadata_id = object_metadata.cid
         store._delete(entity, object_metadata_id)
     assert store._count(entity) == 0
-
-
-def test_untag_object(pids, store):
-    """Test _untag_object untags successfully."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = Path(test_dir + pid.replace("/", "_"))
-        object_metadata = store.store_object(pid, path)
-        cid = object_metadata.cid
-
-        store._synchronize_referenced_locked_pids(pid)
-        store._synchronize_object_locked_cids(cid)
-        store._untag_object(pid, cid)
-        store._release_reference_locked_pids(pid)
-        store._release_object_locked_cids(cid)
-
-        assert store._count("pid") == 0
-        assert store._count("cid") == 0
-    assert store._count("objects") == 3
-
-
-def test_untag_object_pid_not_locked(pids, store):
-    """Test _untag_object throws exception when pid is not locked"""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = Path(test_dir + pid.replace("/", "_"))
-        object_metadata = store.store_object(pid, path)
-        cid = object_metadata.cid
-
-        with pytest.raises(IdentifierNotLocked):
-            store._untag_object(pid, cid)
-
-
-def test_untag_object_cid_not_locked(pids, store):
-    """Test _untag_object throws exception with cid is not locked"""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = Path(test_dir + pid.replace("/", "_"))
-        object_metadata = store.store_object(pid, path)
-        cid = object_metadata.cid
-
-        with pytest.raises(IdentifierNotLocked):
-            store._synchronize_referenced_locked_pids(pid)
-            store._untag_object(pid, cid)
-            store._release_reference_locked_pids(pid)
-
-
-def test_untag_object_orphan_pid_refs_file_found(store):
-    """Test _untag_object removes an orphan pid refs file"""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    object_metadata = store.store_object(pid, path)
-    cid = object_metadata.cid
-
-    # Remove cid refs file
-    cid_refs_abs_path = store._get_hashstore_cid_refs_path(cid)
-    os.remove(cid_refs_abs_path)
-
-    with pytest.raises(OrphanPidRefsFileFound):
-        store._find_object(pid)
-
-    store._synchronize_referenced_locked_pids(pid)
-    store._synchronize_object_locked_cids(cid)
-    store._untag_object(pid, cid)
-    store._release_reference_locked_pids(pid)
-    store._release_object_locked_cids(cid)
-
-    assert store._count("pid") == 0
-
-
-def test_untag_object_orphan_refs_exist_but_data_object_not_found(store):
-    """Test _untag_object removes orphaned pid and cid refs files"""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    object_metadata = store.store_object(pid, path)
-    cid = object_metadata.cid
-
-    assert store._count("pid") == 1
-    assert store._count("cid") == 1
-
-    # Remove cid refs file
-    data_obj_path = store._get_hashstore_data_object_path(cid)
-    os.remove(data_obj_path)
-
-    with pytest.raises(RefsFileExistsButCidObjMissing):
-        store._find_object(pid)
-
-    store._synchronize_referenced_locked_pids(pid)
-    store._synchronize_object_locked_cids(cid)
-    store._untag_object(pid, cid)
-    store._release_reference_locked_pids(pid)
-    store._release_object_locked_cids(cid)
-
-    assert store._count("pid") == 0
-    assert store._count("cid") == 0
-
-
-def test_untag_object_refs_found_but_pid_not_in_cid_refs(store):
-    """Test _untag_object removes pid refs file whose pid is not found in the cid refs file."""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    pid_two = pid + ".dou"
-    path = test_dir + pid
-    object_metadata = store.store_object(pid, path)
-    _object_metadata_two = store.store_object(pid_two, path)
-    cid = object_metadata.cid
-
-    assert store._count("pid") == 2
-    assert store._count("cid") == 1
-
-    # Remove pid from cid refs
-    cid_refs_file = store._get_hashstore_cid_refs_path(cid)
-    # First remove the pid
-    store._update_refs_file(cid_refs_file, pid, "remove")
-
-    with pytest.raises(PidNotFoundInCidRefsFile):
-        store._find_object(pid)
-
-    store._synchronize_referenced_locked_pids(pid)
-    store._synchronize_object_locked_cids(cid)
-    store._untag_object(pid, cid)
-    store._release_reference_locked_pids(pid)
-    store._release_object_locked_cids(cid)
-
-    assert store._count("pid") == 1
-    assert store._count("cid") == 1
-
-
-def test_untag_object_pid_refs_file_does_not_exist(store):
-    """Test _untag_object removes pid from cid refs file since the pid refs file does not exist,
-    and does not delete the cid refs file because a reference is still present."""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    pid_two = pid + ".dou"
-    path = test_dir + pid
-    object_metadata = store.store_object(pid, path)
-    _object_metadata_two = store.store_object(pid_two, path)
-    cid = object_metadata.cid
-
-    assert store._count("pid") == 2
-    assert store._count("cid") == 1
-
-    # Remove pid from cid refs
-    pid_refs_file = store._get_hashstore_pid_refs_path(pid)
-    os.remove(pid_refs_file)
-
-    with pytest.raises(PidRefsDoesNotExist):
-        store._find_object(pid)
-
-    store._synchronize_referenced_locked_pids(pid)
-    store._synchronize_object_locked_cids(cid)
-    store._untag_object(pid, cid)
-    store._release_reference_locked_pids(pid)
-    store._release_object_locked_cids(cid)
-
-    assert store._count("pid") == 1
-    assert store._count("cid") == 1
-
-
-def test_untag_object_pid_refs_file_does_not_exist_and_cid_refs_is_empty(store):
-    """Test '_untag_object' removes pid from cid refs file since the pid refs file does not exist,
-    and deletes the cid refs file because it contains no more references (after the pid called
-    with '_untag_object' is removed from the cid refs)."""
-    test_dir = "tests/testdata/"
-    pid = "jtao.1700.1"
-    path = test_dir + pid
-    object_metadata = store.store_object(pid, path)
-    cid = object_metadata.cid
-
-    assert store._count("pid") == 1
-    assert store._count("cid") == 1
-
-    # Remove pid from cid refs
-    pid_refs_file = store._get_hashstore_pid_refs_path(pid)
-    os.remove(pid_refs_file)
-
-    with pytest.raises(PidRefsDoesNotExist):
-        store._find_object(pid)
-
-    store._synchronize_referenced_locked_pids(pid)
-    store._synchronize_object_locked_cids(cid)
-    store._untag_object(pid, cid)
-    store._release_reference_locked_pids(pid)
-    store._release_object_locked_cids(cid)
-
-    assert store._count("pid") == 0
-    assert store._count("cid") == 0
 
 
 def test_create_path(pids, store):

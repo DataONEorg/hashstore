@@ -809,6 +809,146 @@ def test_tag_object_pid_refs_already_exist(pids, store):
             store.tag_object(pid, "adifferentcid")
 
 
+def test_delete_if_invalid_object(pids, store):
+    """Test delete_if_invalid_object does not throw exception given good arguments."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+        store.delete_if_invalid_object(
+            object_metadata, checksum, checksum_algorithm, expected_file_size
+        )
+        assert store._exists("objects", object_metadata.cid)
+
+
+def test_delete_if_invalid_object_supported_other_algo_not_in_default(pids, store):
+    """Test delete_if_invalid_object does not throw exception when supported add algo is
+    supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        supported_algo = "sha224"
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = pids[pid][supported_algo]
+        expected_file_size = object_metadata.obj_size
+        store.delete_if_invalid_object(
+            object_metadata, checksum, supported_algo, expected_file_size
+        )
+        assert store._exists("objects", object_metadata.cid)
+
+
+def test_delete_if_invalid_object_exception_incorrect_object_metadata_type(pids, store):
+    """Test delete_if_invalid_object throws exception when incorrect obj type is given to
+    object_metadata arg."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(ValueError):
+            store.delete_if_invalid_object(
+                "not_object_metadata", checksum, checksum_algorithm, expected_file_size
+            )
+
+
+def test_delete_if_invalid_object_exception_incorrect_size(pids, store):
+    """Test delete_if_invalid_object throws exception when incorrect size is supplied and that data
+    object is deleted as we are storing without a pid."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+
+        with pytest.raises(NonMatchingObjSize):
+            store.delete_if_invalid_object(
+                object_metadata, checksum, checksum_algorithm, 1000
+            )
+
+        assert not store._exists("objects", object_metadata.cid)
+
+
+def test_delete_if_invalid_object_exception_incorrect_size_object_exists(pids, store):
+    """Test delete_if_invalid_object throws exception when incorrect size is supplied and that data
+    object is not deleted since it already exists (a cid refs file is present)."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        store.store_object(pid, data=path)
+    # Store again without pid and wrong object size
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        checksum_algorithm = store.algorithm
+
+        with pytest.raises(NonMatchingObjSize):
+            store.delete_if_invalid_object(
+                object_metadata, checksum, checksum_algorithm, 1000
+            )
+
+        assert store._exists("objects", object_metadata.cid)
+        assert store._count("tmp") == 0
+
+
+def test_delete_if_invalid_object_exception_incorrect_checksum(pids, store):
+    """Test delete_if_invalid_object throws exception when incorrect checksum is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum_algorithm = store.algorithm
+        expected_file_size = object_metadata.obj_size
+
+        with pytest.raises(NonMatchingChecksum):
+            store.delete_if_invalid_object(
+                object_metadata, "abc123", checksum_algorithm, expected_file_size
+            )
+
+        assert not store._exists("objects", object_metadata.cid)
+
+
+def test_delete_if_invalid_object_exception_incorrect_checksum_algo(pids, store):
+    """Test delete_if_invalid_object throws exception when unsupported algorithm is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(UnsupportedAlgorithm):
+            store.delete_if_invalid_object(
+                object_metadata, checksum, "md2", expected_file_size
+            )
+
+        assert store._exists("objects", object_metadata.cid)
+        assert store._count("tmp") == 0
+
+
+def test_delete_if_invalid_object_exception_supported_other_algo_bad_checksum(
+    pids, store
+):
+    """Test delete_if_invalid_object throws exception when incorrect checksum is supplied."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum = object_metadata.hex_digests.get(store.algorithm)
+        expected_file_size = object_metadata.obj_size
+        with pytest.raises(NonMatchingChecksum):
+            store.delete_if_invalid_object(
+                object_metadata, checksum, "sha224", expected_file_size
+            )
+
+        assert not store._exists("objects", object_metadata.cid)
+
+
 def test_store_metadata(pids, store):
     """Test store metadata."""
     test_dir = "tests/testdata/"
@@ -1191,143 +1331,6 @@ def test_delete_object_pid_none(store):
     pid = None
     with pytest.raises(ValueError):
         store.delete_object(pid)
-
-
-def test_delete_invalid_object(pids, store):
-    """Test delete_invalid_object does not throw exception given good arguments."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        checksum = object_metadata.hex_digests.get(store.algorithm)
-        checksum_algorithm = store.algorithm
-        expected_file_size = object_metadata.obj_size
-        store.delete_if_invalid_object(
-            object_metadata, checksum, checksum_algorithm, expected_file_size
-        )
-        assert store._exists("objects", object_metadata.cid)
-
-
-def test_delete_invalid_object_supported_other_algo_not_in_default(pids, store):
-    """Test delete_invalid_object does not throw exception when supported add algo is supplied."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        supported_algo = "sha224"
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        checksum = pids[pid][supported_algo]
-        expected_file_size = object_metadata.obj_size
-        store.delete_if_invalid_object(
-            object_metadata, checksum, supported_algo, expected_file_size
-        )
-        assert store._exists("objects", object_metadata.cid)
-
-
-def test_delete_invalid_object_exception_incorrect_object_metadata_type(pids, store):
-    """Test delete_invalid_object throws exception when incorrect class type is given to
-    object_metadata arg."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        checksum = object_metadata.hex_digests.get(store.algorithm)
-        checksum_algorithm = store.algorithm
-        expected_file_size = object_metadata.obj_size
-        with pytest.raises(ValueError):
-            store.delete_if_invalid_object(
-                "not_object_metadata", checksum, checksum_algorithm, expected_file_size
-            )
-
-
-def test_delete_invalid_object_exception_incorrect_size(pids, store):
-    """Test delete_invalid_object throws exception when incorrect size is supplied and that data
-    object is deleted as we are storing without a pid."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        checksum = object_metadata.hex_digests.get(store.algorithm)
-        checksum_algorithm = store.algorithm
-
-        with pytest.raises(NonMatchingObjSize):
-            store.delete_if_invalid_object(
-                object_metadata, checksum, checksum_algorithm, 1000
-            )
-
-        assert not store._exists("objects", object_metadata.cid)
-
-
-def test_delete_invalid_object_exception_incorrect_size_object_exists(pids, store):
-    """Test delete_invalid_object throws exception when incorrect size is supplied and that data
-    object is not deleted since it already exists (a cid refs file is present)."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        store.store_object(pid, data=path)
-    # Store again without pid and wrong object size
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        checksum = object_metadata.hex_digests.get(store.algorithm)
-        checksum_algorithm = store.algorithm
-
-        with pytest.raises(NonMatchingObjSize):
-            store.delete_if_invalid_object(
-                object_metadata, checksum, checksum_algorithm, 1000
-            )
-
-        assert store._exists("objects", object_metadata.cid)
-        assert store._count("tmp") == 0
-
-
-def test_delete_invalid_object_exception_incorrect_checksum(pids, store):
-    """Test delete_invalid_object throws exception when incorrect checksum is supplied."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        checksum_algorithm = store.algorithm
-        expected_file_size = object_metadata.obj_size
-
-        with pytest.raises(NonMatchingChecksum):
-            store.delete_if_invalid_object(
-                object_metadata, "abc123", checksum_algorithm, expected_file_size
-            )
-
-        assert not store._exists("objects", object_metadata.cid)
-
-
-def test_delete_invalid_object_exception_incorrect_checksum_algo(pids, store):
-    """Test delete_invalid_object throws exception when unsupported algorithm is supplied."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        checksum = object_metadata.hex_digests.get(store.algorithm)
-        expected_file_size = object_metadata.obj_size
-        with pytest.raises(UnsupportedAlgorithm):
-            store.delete_if_invalid_object(
-                object_metadata, checksum, "md2", expected_file_size
-            )
-
-        assert store._exists("objects", object_metadata.cid)
-        assert store._count("tmp") == 0
-
-
-def test_delete_invalid_object_exception_supported_other_algo_bad_checksum(pids, store):
-    """Test delete_invalid_object throws exception when incorrect checksum is supplied."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(data=path)
-        checksum = object_metadata.hex_digests.get(store.algorithm)
-        expected_file_size = object_metadata.obj_size
-        with pytest.raises(NonMatchingChecksum):
-            store.delete_if_invalid_object(
-                object_metadata, checksum, "sha224", expected_file_size
-            )
-
-        assert not store._exists("objects", object_metadata.cid)
 
 
 def test_delete_metadata(pids, store):

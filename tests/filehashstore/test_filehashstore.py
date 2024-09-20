@@ -1021,6 +1021,64 @@ def test_untag_object_pid_refs_file_does_not_exist_and_cid_refs_is_empty(store):
     assert store._count("cid") == 0
 
 
+def test_put_metadata_with_path(pids, store):
+    """Test _put_metadata with path object for the path arg."""
+    entity = "metadata"
+    test_dir = "tests/testdata/"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        metadata_stored_path = store._put_metadata(syspath, pid, format_id)
+        assert store._exists(entity, metadata_stored_path)
+    assert store._count(entity) == 3
+
+
+def test_put_metadata_with_string(pids, store):
+    """Test_put metadata with string for the path arg."""
+    entity = "metadata"
+    test_dir = "tests/testdata/"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = str(Path(test_dir) / filename)
+        metadata_stored_path = store._put_metadata(syspath, pid, format_id)
+        assert store._exists(entity, metadata_stored_path)
+    assert store._count(entity) == 3
+
+
+def test_put_metadata_stored_path(pids, store):
+    """Test put metadata returns correct path to the metadata stored."""
+    test_dir = "tests/testdata/"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    for pid in pids.keys():
+        metadata_document_name = store._computehash(pid + format_id)
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        metadata_stored_path = store._put_metadata(syspath, pid, metadata_document_name)
+
+        # Manually calculate expected path
+        metadata_directory = store._computehash(pid)
+        rel_path = "/".join(store._shard(metadata_directory))
+        full_path = (
+            store._get_store_path("metadata") / rel_path / metadata_document_name
+        )
+        assert metadata_stored_path == full_path
+
+
+def test_mktmpmetadata(pids, store):
+    """Test mktmpmetadata creates tmpFile."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        sys_stream = io.open(syspath, "rb")
+        # pylint: disable=W0212
+        tmp_name = store._mktmpmetadata(sys_stream)
+        sys_stream.close()
+        assert os.path.exists(tmp_name)
+
+
 def test_delete_marked_files(store):
     """Test that _delete_marked_files removes all items from a given list"""
     pid = "jtao.1700.1"
@@ -1249,64 +1307,6 @@ def test_update_refs_file_empty_file(pids, store):
 
         assert os.path.exists(tmp_cid_refs_file)
         assert os.path.getsize(tmp_cid_refs_file) == 0
-
-
-def test_put_metadata_with_path(pids, store):
-    """Test _put_metadata with path object for the path arg."""
-    entity = "metadata"
-    test_dir = "tests/testdata/"
-    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        metadata_cid = store._put_metadata(syspath, pid, format_id)
-        assert store._exists(entity, metadata_cid)
-    assert store._count(entity) == 3
-
-
-def test_put_metadata_with_string(pids, store):
-    """Test_put metadata with string for the path arg."""
-    entity = "metadata"
-    test_dir = "tests/testdata/"
-    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = str(Path(test_dir) / filename)
-        metadata_cid = store._put_metadata(syspath, pid, format_id)
-        assert store._exists(entity, metadata_cid)
-    assert store._count(entity) == 3
-
-
-def test_put_metadata_cid(pids, store):
-    """Test put metadata returns correct id."""
-    test_dir = "tests/testdata/"
-    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
-        metadata_document_name = store._computehash(pid + format_id)
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        metadata_cid = store._put_metadata(syspath, pid, metadata_document_name)
-
-        # Manually calculate expected path
-        metadata_directory = store._computehash(pid)
-        rel_path = "/".join(store._shard(metadata_directory))
-        full_path = (
-            store._get_store_path("metadata") / rel_path / metadata_document_name
-        )
-        assert metadata_cid == full_path
-
-
-def test_mktmpmetadata(pids, store):
-    """Test mktmpmetadata creates tmpFile."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
-        sys_stream = io.open(syspath, "rb")
-        # pylint: disable=W0212
-        tmp_name = store._mktmpmetadata(sys_stream)
-        sys_stream.close()
-        assert os.path.exists(tmp_name)
 
 
 # Tests for FileHashStore Utility & Supporting Methods
@@ -1621,8 +1621,8 @@ def test_exists_metadata_files_path(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
-        assert store._exists(entity, metadata_cid)
+        metadata_stored_path = store.store_metadata(pid, syspath, format_id)
+        assert store._exists(entity, metadata_stored_path)
 
 
 def test_exists_object_with_nonexistent_file(store):
@@ -1680,7 +1680,7 @@ def test_delete_object_only_cid_refs_file_exists(pids, store):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        _metadata_stored_path = store.store_metadata(pid, syspath, format_id)
         store._delete_object_only(object_metadata.cid)
     assert store._count(entity) == 3
     assert store._count("pid") == 3
@@ -1745,8 +1745,8 @@ def test_get_real_path_with_metadata_id(store, pids):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        metadata_cid = store.store_metadata(pid, syspath, format_id)
-        metadata_abs_path = store._get_hashstore_metadata_path(metadata_cid)
+        metadata_stored_path = store.store_metadata(pid, syspath, format_id)
+        metadata_abs_path = store._get_hashstore_metadata_path(metadata_stored_path)
         assert os.path.exists(metadata_abs_path)
 
 
@@ -1800,7 +1800,7 @@ def test_get_hashstore_metadata_path_metadata(pids, store):
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        _metadata_cid = store.store_metadata(pid, syspath, format_id)
+        _metadata_stored_path = store.store_metadata(pid, syspath, format_id)
 
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)

@@ -1,8 +1,9 @@
 [tool.poetry]
 name = "hashstore"
-version = "1.0.0"
+version = "1.1.0"
 description = "HashStore, an object storage system using content identifiers."
-authors = ["Dou Mok <douming.mok@gmail.com>", "Matt Jones <gitcode@magisa.org>"]
+authors = ["Dou Mok <douming.mok@gmail.com>", "Matt Jones <gitcode@magisa.org>",
+  "Matthew Brooke", "Jing Tao", "Jeanette Clark", "Ian M. Nesbitt"]
 readme = "README.md"
 keywords = ["filesystem", "object storage", "hashstore", "storage"]
 classifiers = [

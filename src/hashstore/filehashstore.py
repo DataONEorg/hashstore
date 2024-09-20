@@ -587,6 +587,30 @@ class FileHashStore(HashStore):
 
         return object_metadata
 
+    def tag_object(self, pid, cid):
+        logging.debug(
+            "FileHashStore - tag_object: Tagging object cid: %s with pid: %s.",
+            cid,
+            pid,
+        )
+        self._check_string(pid, "pid")
+        self._check_string(cid, "cid")
+
+        try:
+            self._store_hashstore_refs_files(pid, cid)
+        except HashStoreRefsAlreadyExists as hrae:
+            err_msg = (
+                f"FileHashStore - tag_object: reference files for pid: {pid} and {cid} "
+                "already exist. " + str(hrae)
+            )
+            raise HashStoreRefsAlreadyExists(err_msg)
+        except PidRefsAlreadyExistsError as praee:
+            err_msg = (
+                f"FileHashStore - tag_object: A pid can only reference one cid. "
+                + str(praee)
+            )
+            raise PidRefsAlreadyExistsError(err_msg)
+
     def delete_if_invalid_object(
         self, object_metadata, checksum, checksum_algorithm, expected_file_size
     ):
@@ -632,30 +656,6 @@ class FileHashStore(HashStore):
                 "FileHashStore - verify_object: object has been validated for cid: %s",
                 object_metadata.cid,
             )
-
-    def tag_object(self, pid, cid):
-        logging.debug(
-            "FileHashStore - tag_object: Tagging object cid: %s with pid: %s.",
-            cid,
-            pid,
-        )
-        self._check_string(pid, "pid")
-        self._check_string(cid, "cid")
-
-        try:
-            self._store_hashstore_refs_files(pid, cid)
-        except HashStoreRefsAlreadyExists as hrae:
-            err_msg = (
-                f"FileHashStore - tag_object: reference files for pid: {pid} and {cid} "
-                "already exist. " + str(hrae)
-            )
-            raise HashStoreRefsAlreadyExists(err_msg)
-        except PidRefsAlreadyExistsError as praee:
-            err_msg = (
-                f"FileHashStore - tag_object: A pid can only reference one cid. "
-                + str(praee)
-            )
-            raise PidRefsAlreadyExistsError(err_msg)
 
     def store_metadata(self, pid, metadata, format_id=None):
         logging.debug(

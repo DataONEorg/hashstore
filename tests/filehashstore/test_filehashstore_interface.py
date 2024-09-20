@@ -1237,8 +1237,7 @@ def test_delete_object_object_deleted(pids, store):
 
 
 def test_delete_object_metadata_deleted(pids, store):
-    """Test delete_object successfully deletes relevant metadata
-    files and refs files."""
+    """Test delete_object successfully deletes associated metadata files."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
@@ -1251,7 +1250,7 @@ def test_delete_object_metadata_deleted(pids, store):
     assert store._count("metadata") == 0
 
 
-def test_delete_object_all_refs_files_deleted(pids, store):
+def test_delete_object_refs_files_deleted(pids, store):
     """Test delete_object successfully deletes refs files."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
@@ -1305,11 +1304,11 @@ def test_delete_object_cid_refs_file_with_pid_refs_remaining(pids, store):
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.cid
         cid_refs_abs_path = store._get_hashstore_cid_refs_path(cid)
-        # pylint: disable=W0212
         store._update_refs_file(cid_refs_abs_path, "dou.test.1", "add")
         store.delete_object(pid)
         cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
         assert os.path.exists(cid_refs_file_path)
+    assert store._count("cid") == 3
 
 
 def test_delete_object_pid_empty(store):

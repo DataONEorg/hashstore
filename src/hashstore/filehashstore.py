@@ -1129,58 +1129,6 @@ class FileHashStore(HashStore):
 
     # FileHashStore Core Methods
 
-    def _store_and_validate_data(
-        self,
-        pid,
-        file,
-        additional_algorithm=None,
-        checksum=None,
-        checksum_algorithm=None,
-        file_size_to_validate=None,
-    ):
-        """Store contents of `file` on disk, validate the object's parameters if provided,
-        and tag/reference the object.
-
-        :param str pid: Authority-based identifier.
-        :param mixed file: Readable object or path to file.
-        :param str additional_algorithm: Optional algorithm value to include when returning
-            hex digests.
-        :param str checksum: Optional checksum to validate object against hex digest before moving
-            to permanent location.
-        :param str checksum_algorithm: Algorithm value of the given checksum.
-        :param int file_size_to_validate: Expected size of the object.
-
-        :return: ObjectMetadata - object that contains the object id, object file size,
-            and hex digest dictionary.
-        """
-        stream = Stream(file)
-
-        logging.debug(
-            "FileHashStore - put_object: Request to put object for pid: %s", pid
-        )
-        with closing(stream):
-            (
-                object_cid,
-                obj_file_size,
-                hex_digest_dict,
-            ) = self._move_and_get_checksums(
-                pid,
-                stream,
-                additional_algorithm,
-                checksum,
-                checksum_algorithm,
-                file_size_to_validate,
-            )
-
-        object_metadata = ObjectMetadata(
-            pid, object_cid, obj_file_size, hex_digest_dict
-        )
-        logging.debug(
-            "FileHashStore - put_object: Successfully put object for pid: %s",
-            pid,
-        )
-        return object_metadata
-
     def _find_object(self, pid):
         """Check if an object referenced by a pid exists and retrieve its content identifier.
         The `find_object` method validates the existence of an object based on the provided
@@ -1265,6 +1213,58 @@ class FileHashStore(HashStore):
             )
             logging.error(err_msg)
             raise PidRefsDoesNotExist(err_msg)
+
+    def _store_and_validate_data(
+        self,
+        pid,
+        file,
+        additional_algorithm=None,
+        checksum=None,
+        checksum_algorithm=None,
+        file_size_to_validate=None,
+    ):
+        """Store contents of `file` on disk, validate the object's parameters if provided,
+        and tag/reference the object.
+
+        :param str pid: Authority-based identifier.
+        :param mixed file: Readable object or path to file.
+        :param str additional_algorithm: Optional algorithm value to include when returning
+            hex digests.
+        :param str checksum: Optional checksum to validate object against hex digest before moving
+            to permanent location.
+        :param str checksum_algorithm: Algorithm value of the given checksum.
+        :param int file_size_to_validate: Expected size of the object.
+
+        :return: ObjectMetadata - object that contains the object id, object file size,
+            and hex digest dictionary.
+        """
+        stream = Stream(file)
+
+        logging.debug(
+            "FileHashStore - put_object: Request to put object for pid: %s", pid
+        )
+        with closing(stream):
+            (
+                object_cid,
+                obj_file_size,
+                hex_digest_dict,
+            ) = self._move_and_get_checksums(
+                pid,
+                stream,
+                additional_algorithm,
+                checksum,
+                checksum_algorithm,
+                file_size_to_validate,
+            )
+
+        object_metadata = ObjectMetadata(
+            pid, object_cid, obj_file_size, hex_digest_dict
+        )
+        logging.debug(
+            "FileHashStore - put_object: Successfully put object for pid: %s",
+            pid,
+        )
+        return object_metadata
 
     def _store_data_only(self, data):
         """Store an object to HashStore and return a metadata object containing the content

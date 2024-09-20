@@ -1137,13 +1137,9 @@ def test_store_metadata_thread_lock(store):
 def test_retrieve_object(pids, store):
     """Test retrieve_object returns a stream to the correct object data."""
     test_dir = "tests/testdata/"
-    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        filename = pid.replace("/", "_") + ".xml"
-        syspath = Path(test_dir) / filename
         object_metadata = store.store_object(pid, path)
-        store.store_metadata(pid, syspath, format_id)
         obj_stream = store.retrieve_object(pid)
         sha256_hex = store._computehash(obj_stream)
         obj_stream.close()

@@ -1166,10 +1166,8 @@ def test_retrieve_metadata(store):
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "jtao.1700.1"
-    path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    _object_metadata = store.store_object(pid, path)
     _stored_metadata_path = store.store_metadata(pid, syspath, format_id)
     metadata_stream = store.retrieve_metadata(pid, format_id)
     metadata_content = metadata_stream.read().decode("utf-8")
@@ -1182,10 +1180,8 @@ def test_retrieve_metadata_default_format_id(store):
     """Test retrieve_metadata retrieves expected metadata without a format_id."""
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
-    path = test_dir + pid
     filename = pid + ".xml"
     syspath = Path(test_dir) / filename
-    _object_metadata = store.store_object(pid, path)
     _stored_metadata_path = store.store_metadata(pid, syspath)
     metadata_stream = store.retrieve_metadata(pid)
     metadata_content = metadata_stream.read().decode("utf-8")
@@ -1195,16 +1191,15 @@ def test_retrieve_metadata_default_format_id(store):
 
 
 def test_retrieve_metadata_bytes_pid_invalid(store):
-    """Test retrieve_metadata raises error when supplied with bad pid."""
+    """Test retrieve_metadata raises exception when supplied with pid with no system metadata."""
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    pid = "jtao.1700.1"
-    pid_does_not_exist = pid + "test"
+    pid_does_not_exist = "jtao.1700.1.metadata.does.not.exist"
     with pytest.raises(ValueError):
         store.retrieve_metadata(pid_does_not_exist, format_id)
 
 
 def test_retrieve_metadata_bytes_pid_empty(store):
-    """Test retrieve_metadata raises error when supplied with empty pid."""
+    """Test retrieve_metadata raises exception when supplied with empty pid."""
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     pid = "    "
     with pytest.raises(ValueError):
@@ -1220,7 +1215,7 @@ def test_retrieve_metadata_format_id_empty(store):
 
 
 def test_retrieve_metadata_format_id_empty_spaces(store):
-    """Test retrieve_metadata raises error when supplied with empty spaces as the format_id."""
+    """Test retrieve_metadata raises exception when supplied with empty spaces as the format_id."""
     format_id = "    "
     pid = "jtao.1700.1"
     with pytest.raises(ValueError):

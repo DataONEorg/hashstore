@@ -1079,6 +1079,9 @@ def test_mktmpmetadata(pids, store):
         assert os.path.exists(tmp_name)
 
 
+# Tests for FileHashStore Utility & Supporting Methods
+
+
 def test_delete_marked_files(store):
     """Test that _delete_marked_files removes all items from a given list"""
     pid = "jtao.1700.1"
@@ -1183,14 +1186,14 @@ def test_validate_and_check_cid_lock_identifier_not_locked(store):
 
 
 def test_write_refs_file_ref_type_cid(store):
-    """Test that write_refs_file writes a reference file."""
+    """Test that write_refs_file writes a reference file when given a 'cid' update_type."""
     tmp_root_path = store._get_store_path("refs") / "tmp"
     tmp_cid_refs_file = store._write_refs_file(tmp_root_path, "test_pid", "cid")
     assert os.path.exists(tmp_cid_refs_file)
 
 
-def test_write_refs_file_ref_type_cid_content(pids, store):
-    """Test that write_refs_file writes the expected content."""
+def test_write_refs_file_ref_type_content_cid(pids, store):
+    """Test that write_refs_file writes the expected content when given a 'cid' update_type."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
@@ -1201,7 +1204,7 @@ def test_write_refs_file_ref_type_cid_content(pids, store):
 
 
 def test_write_refs_file_ref_type_pid(pids, store):
-    """Test that write_pid_refs_file writes a reference file."""
+    """Test that write_pid_refs_file writes a reference file when given a 'pid' update_type."""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         tmp_root_path = store._get_store_path("refs") / "tmp"
@@ -1210,7 +1213,7 @@ def test_write_refs_file_ref_type_pid(pids, store):
 
 
 def test_write_refs_file_ref_type_content_pid(pids, store):
-    """Test that write_pid_refs_file writes the expected content."""
+    """Test that write_refs_file writes the expected content when given a 'pid' update_type"""
     for pid in pids.keys():
         cid = pids[pid]["sha256"]
         tmp_root_path = store._get_store_path("refs") / "tmp"
@@ -1256,8 +1259,8 @@ def test_update_refs_file_content_multiple(pids, store):
         assert line_count == 6
 
 
-def test_update_refs_file_content_pid_exists(pids, store):
-    """Test that _update_refs_file does add a pid to a refs file that already
+def test_update_refs_file_deduplicates_pid_already_found(pids, store):
+    """Test that _update_refs_file does not add a pid to a refs file that already
     contains the pid."""
     for pid in pids.keys():
         tmp_root_path = store._get_store_path("refs") / "tmp"
@@ -1309,7 +1312,18 @@ def test_update_refs_file_empty_file(pids, store):
         assert os.path.getsize(tmp_cid_refs_file) == 0
 
 
-# Tests for FileHashStore Utility & Supporting Methods
+def test_is_string_in_refs_file(pids, store):
+    """Test that _update_refs_file leaves a file empty when removing the last pid."""
+    for pid in pids.keys():
+        tmp_root_path = store._get_store_path("refs") / "tmp"
+        tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
+
+        cid_reference_list = [pid]
+        for i in range(0, 5):
+            store._update_refs_file(tmp_cid_refs_file, f"dou.test.{i}", "add")
+            cid_reference_list.append(f"dou.test.{i}")
+
+        assert store._is_string_in_refs_file("dou.test.2", tmp_cid_refs_file) is True
 
 
 def test_verify_object_information(pids, store):

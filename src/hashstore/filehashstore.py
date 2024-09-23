@@ -2169,8 +2169,9 @@ class FileHashStore(HashStore):
                     exception_string = (
                         "FileHashStore - _verify_object_information: checksum_algorithm"
                         + f" ({checksum_algorithm}) cannot be found in the default hex digests"
-                        + " dict, but is supported. New checksum calculated but does not match"
-                        + " what has been provided."
+                        + f" dict, but is supported. New checksum calculated: "
+                        f"{hex_digest_calculated}, does not match what has been provided: "
+                        + checksum
                     )
                     logging.debug(exception_string)
                     raise NonMatchingChecksum(exception_string)

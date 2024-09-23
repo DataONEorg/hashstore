@@ -1336,7 +1336,6 @@ def test_verify_object_information(pids, store):
         checksum = object_metadata.hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
-        # pylint: disable=W0212
         store._verify_object_information(
             None,
             checksum,
@@ -1359,7 +1358,6 @@ def test_verify_object_information_incorrect_size(pids, store):
         checksum = hex_digests.get(store.algorithm)
         checksum_algorithm = store.algorithm
         with pytest.raises(NonMatchingObjSize):
-            # pylint: disable=W0212
             store._verify_object_information(
                 None,
                 checksum,
@@ -1385,7 +1383,6 @@ def test_verify_object_information_incorrect_size_with_pid(pids, store):
         expected_file_size = object_metadata.obj_size
 
         objects_tmp_folder = store.objects + "/tmp"
-        # pylint: disable=W0212
         tmp_file = store._mktmpfile(objects_tmp_folder)
         assert os.path.isfile(tmp_file.name)
         with pytest.raises(NonMatchingObjSize):
@@ -1415,7 +1412,6 @@ def test_verify_object_information_missing_key_in_hex_digests_unsupported_algo(
         checksum_algorithm = "md10"
         expected_file_size = object_metadata.obj_size
         with pytest.raises(UnsupportedAlgorithm):
-            # pylint: disable=W0212
             store._verify_object_information(
                 None,
                 checksum,
@@ -1432,7 +1428,7 @@ def test_verify_object_information_missing_key_in_hex_digests_supported_algo(
     pids, store
 ):
     """Test _verify_object_information throws exception when algorithm is not found
-    in hex digests but is supported, however the checksum calculated does not match."""
+    in hex digests but is supported, and the checksum calculated does not match."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -1441,7 +1437,6 @@ def test_verify_object_information_missing_key_in_hex_digests_supported_algo(
         checksum_algorithm = "blake2s"
         expected_file_size = object_metadata.obj_size
         with pytest.raises(NonMatchingChecksum):
-            # pylint: disable=W0212
             store._verify_object_information(
                 None,
                 checksum,
@@ -1452,6 +1447,30 @@ def test_verify_object_information_missing_key_in_hex_digests_supported_algo(
                 expected_file_size,
                 expected_file_size,
             )
+
+
+def test_verify_object_information_missing_key_in_hex_digests_matching_checksum(
+    pids, store
+):
+    """Test _verify_object_information does not throw exception when algorithm is not found
+    in hex digests but is supported, and the checksum calculated matches."""
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(data=path)
+        checksum_algorithm = "blake2s"
+        checksum = pids[pid][checksum_algorithm]
+        expected_file_size = object_metadata.obj_size
+        store._verify_object_information(
+            None,
+            checksum,
+            checksum_algorithm,
+            "objects",
+            object_metadata.hex_digests,
+            None,
+            expected_file_size,
+            expected_file_size,
+        )
 
 
 def test_verify_hashstore_references_pid_refs_file_missing(pids, store):

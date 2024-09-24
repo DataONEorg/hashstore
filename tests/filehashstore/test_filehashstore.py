@@ -1160,9 +1160,10 @@ def test_remove_pid_and_handle_cid_refs_deletion_cid_refs_empty(store):
 
     cid_refs_path = store._get_hashstore_cid_refs_path(cid)
     store._remove_pid_and_handle_cid_refs_deletion(pid, list_to_check, cid_refs_path)
+    delete_path = cid_refs_path.with_name(cid_refs_path.name + "_delete")
 
     assert not os.path.exists(cid_refs_path)
-    assert os.path.exists(cid_refs_path + "_delete")
+    assert os.path.exists(delete_path)
     assert len(list_to_check) == 1
 
 
@@ -1836,7 +1837,7 @@ def test_get_hashstore_metadata_path_relative_path(pids, store):
             store.metadata + "/" + rel_path + "/" + metadata_document_name
         )
 
-        assert calculated_metadata_path == metadata_resolved_path
+        assert Path(calculated_metadata_path) == metadata_resolved_path
 
 
 def test_get_hashstore_pid_refs_path(pids, store):
@@ -1852,7 +1853,7 @@ def test_get_hashstore_pid_refs_path(pids, store):
             store.pids + "/" + "/".join(store._shard(pid_refs_metadata_hashid))
         )
 
-        assert resolved_pid_ref_abs_path == calculated_pid_ref_path
+        assert resolved_pid_ref_abs_path == Path(calculated_pid_ref_path)
 
 
 def test_get_hashstore_cid_refs_path(pids, store):
@@ -1866,7 +1867,7 @@ def test_get_hashstore_cid_refs_path(pids, store):
         resolved_cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
         calculated_cid_ref_path = store.cids + "/" + "/".join(store._shard(cid))
 
-        assert resolved_cid_ref_abs_path == calculated_cid_ref_path
+        assert resolved_cid_ref_abs_path == Path(calculated_cid_ref_path)
 
 
 def test_check_string(store):

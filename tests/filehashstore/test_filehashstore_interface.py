@@ -1104,7 +1104,7 @@ def test_store_metadata_metadata_path(pids, store):
         _object_metadata = store.store_object(pid, path)
         stored_metadata_path = store.store_metadata(pid, syspath, format_id)
         metadata_path = store._get_hashstore_metadata_path(stored_metadata_path)
-        assert stored_metadata_path == metadata_path
+        assert Path(stored_metadata_path) == metadata_path
 
 
 def test_store_metadata_thread_lock(store):

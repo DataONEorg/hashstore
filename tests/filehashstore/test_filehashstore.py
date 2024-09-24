@@ -1059,7 +1059,7 @@ def test_put_metadata_stored_path(pids, store):
 
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
-        rel_path = "/".join(store._shard(metadata_directory))
+        rel_path = Path(*store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
@@ -1667,8 +1667,7 @@ def test_exists_object_with_sharded_path(pids, store):
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
-        object_metadata_shard = store._shard(object_metadata.cid)
-        object_metadata_shard_path = "/".join(object_metadata_shard)
+        object_metadata_shard_path = os.path.join(*store._shard(object_metadata.cid))
         assert store._exists(entity, object_metadata_shard_path)
 
 
@@ -1728,9 +1727,7 @@ def test_private_delete_metadata(pids, store):
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)
-        rel_path = (
-            Path("/".join(store._shard(metadata_directory))) / metadata_document_name
-        )
+        rel_path = Path(*store._shard(metadata_directory)) / metadata_document_name
 
         store._delete("metadata", rel_path)
 
@@ -1827,7 +1824,7 @@ def test_get_hashstore_metadata_path_relative_path(pids, store):
 
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)
-        rel_path = "/".join(store._shard(metadata_directory))
+        rel_path = Path(*store._shard(metadata_directory))
         full_path_without_dir = Path(rel_path) / metadata_document_name
 
         metadata_resolved_path = store._get_hashstore_metadata_path(
@@ -1848,7 +1845,7 @@ def test_get_hashstore_pid_refs_path(pids, store):
         resolved_pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
         pid_refs_metadata_hashid = store._computehash(pid)
         calculated_pid_ref_path = store.pids / Path(
-            "/".join(store._shard(pid_refs_metadata_hashid))
+            *store._shard(pid_refs_metadata_hashid)
         )
 
         assert resolved_pid_ref_abs_path == Path(calculated_pid_ref_path)
@@ -1863,7 +1860,7 @@ def test_get_hashstore_cid_refs_path(pids, store):
         cid = object_metadata.cid
 
         resolved_cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
-        calculated_cid_ref_path = store.cids / Path("/".join(store._shard(cid)))
+        calculated_cid_ref_path = store.cids / Path(*store._shard(cid))
 
         assert resolved_cid_ref_abs_path == Path(calculated_cid_ref_path)
 

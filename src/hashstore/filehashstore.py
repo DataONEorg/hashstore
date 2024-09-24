@@ -678,8 +678,8 @@ class FileHashStore(HashStore):
         )
         # Validate input parameters
         self._check_string(pid, "pid")
-        checked_format_id = self._check_arg_format_id(format_id, "store_metadata")
         self._check_arg_data(metadata)
+        checked_format_id = self._check_arg_format_id(format_id, "store_metadata")
         pid_doc = self._computehash(pid + checked_format_id)
 
         sync_begin_debug_msg = (
@@ -775,12 +775,13 @@ class FileHashStore(HashStore):
             metadata_document_name = self._computehash(pid + self.sysmeta_ns)
         else:
             metadata_document_name = self._computehash(pid + checked_format_id)
-        rel_path = "/".join(self._shard(metadata_directory))
-        metadata_rel_path = rel_path + "/" + metadata_document_name
-        metadata_exists = self._exists(entity, metadata_rel_path)
+        metadata_rel_path = (
+            Path(*self._shard(metadata_directory)) / metadata_document_name
+        )
+        metadata_exists = self._exists(entity, str(metadata_rel_path))
 
         if metadata_exists:
-            metadata_stream = self._open(entity, metadata_rel_path)
+            metadata_stream = self._open(entity, str(metadata_rel_path))
             logging.info(
                 "FileHashStore - retrieve_metadata: Retrieved metadata for pid: %s", pid
             )
@@ -993,7 +994,7 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid")
         checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
         metadata_directory = self._computehash(pid)
-        rel_path = "/".join(self._shard(metadata_directory))
+        rel_path = Path(*self._shard(metadata_directory))
 
         if format_id is None:
             # Delete all metadata documents
@@ -1183,7 +1184,7 @@ class FileHashStore(HashStore):
                     else:
                         sysmeta_doc_name = self._computehash(pid + self.sysmeta_ns)
                         metadata_directory = self._computehash(pid)
-                        metadata_rel_path = "/".join(self._shard(metadata_directory))
+                        metadata_rel_path = Path(*self._shard(metadata_directory))
                         sysmeta_full_path = (
                             self._get_store_path("metadata")
                             / metadata_rel_path
@@ -1878,7 +1879,7 @@ class FileHashStore(HashStore):
         # Get target and related paths (permanent location)
         metadata_directory = self._computehash(pid)
         metadata_document_name = metadata_doc_name
-        rel_path = "/".join(self._shard(metadata_directory))
+        rel_path = Path(*self._shard(metadata_directory))
         full_path = self._get_store_path("metadata") / rel_path / metadata_document_name
 
         # Move metadata to target path

@@ -139,7 +139,7 @@ def test_store_metadata(capsys, store, pids):
 
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + namespace)
-        rel_path = "/".join(store._shard(metadata_directory))
+        rel_path = Path(*store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )

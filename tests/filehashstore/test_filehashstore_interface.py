@@ -960,7 +960,7 @@ def test_store_metadata(pids, store):
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)
-        rel_path = "/".join(store._shard(metadata_directory))
+        rel_path = Path(*store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
@@ -976,7 +976,7 @@ def test_store_metadata_one_pid_multiple_docs_correct_location(store):
     filename = pid.replace("/", "_") + ".xml"
     syspath = Path(test_dir) / filename
     metadata_directory = store._computehash(pid)
-    rel_path = "/".join(store._shard(metadata_directory))
+    rel_path = Path(*store._shard(metadata_directory))
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     format_id3 = "http://ns.dataone.org/service/types/v3.0"
     format_id4 = "http://ns.dataone.org/service/types/v4.0"
@@ -1008,7 +1008,7 @@ def test_store_metadata_default_format_id(pids, store):
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)
-        rel_path = "/".join(store._shard(metadata_directory))
+        rel_path = Path(*store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )

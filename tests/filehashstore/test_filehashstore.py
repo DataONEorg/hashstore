@@ -1560,13 +1560,39 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
-        cid_reference_list = [pid]
         for i in range(0, 5):
             store._update_refs_file(cid_ref_abs_path, f"dou.test.{i}", "add")
-            cid_reference_list.append(f"dou.test.{i}")
 
         with pytest.raises(CidRefsContentError):
             store._verify_hashstore_references(pid, cid)
+
+
+def test_delete_object_only(pids, store):
+    """Test _delete_object successfully deletes only object."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        object_metadata = store.store_object(pid=None, data=path)
+        store._delete_object_only(object_metadata.cid)
+    assert store._count(entity) == 0
+
+
+def test_delete_object_only_cid_refs_file_exists(pids, store):
+    """Test _delete_object does not delete object if a cid refs file still exists."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        filename = pid.replace("/", "_") + ".xml"
+        syspath = Path(test_dir) / filename
+        object_metadata = store.store_object(pid, path)
+        _metadata_stored_path = store.store_metadata(pid, syspath, format_id)
+        store._delete_object_only(object_metadata.cid)
+    assert store._count(entity) == 3
+    assert store._count("pid") == 3
+    assert store._count("cid") == 3
 
 
 def test_clean_algorithm(store):
@@ -1600,28 +1626,27 @@ def test_computehash(pids, store):
         assert pids[pid]["sha256"] == obj_sha256_hash
 
 
-def test_get_store_path_object(store):
-    """Check get_store_path for object path."""
-    # pylint: disable=W0212
-    path_objects = store._get_store_path("objects")
-    path_objects_string = str(path_objects)
-    assert path_objects_string.endswith("/metacat/hashstore/objects")
+def test_shard(store):
+    """Test shard creates list."""
+    hash_id = "0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e"
+    predefined_list = [
+        "0d",
+        "55",
+        "5e",
+        "d77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e",
+    ]
+    sharded_list = store._shard(hash_id)
+    assert predefined_list == sharded_list
 
 
-def test_get_store_path_metadata(store):
-    """Check get_store_path for metadata path."""
-    # pylint: disable=W0212
-    path_metadata = store._get_store_path("metadata")
-    path_metadata_string = str(path_metadata)
-    assert path_metadata_string.endswith("/metacat/hashstore/metadata")
-
-
-def test_get_store_path_refs(store):
-    """Check get_store_path for refs path."""
-    # pylint: disable=W0212
-    path_metadata = store._get_store_path("refs")
-    path_metadata_string = str(path_metadata)
-    assert path_metadata_string.endswith("/metacat/hashstore/refs")
+def test_count(pids, store):
+    """Check that count returns expected number of objects."""
+    test_dir = "tests/testdata/"
+    entity = "objects"
+    for pid in pids.keys():
+        path_string = test_dir + pid.replace("/", "_")
+        store._store_and_validate_data(pid, path_string)
+    assert store._count(entity) == 3
 
 
 def test_exists_object_with_object_metadata_id(pids, store):
@@ -1666,19 +1691,6 @@ def test_exists_object_with_nonexistent_file(store):
     assert does_not_exist is False
 
 
-def test_shard(store):
-    """Test shard creates list."""
-    hash_id = "0d555ed77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e"
-    predefined_list = [
-        "0d",
-        "55",
-        "5e",
-        "d77052d7e166017f779cbc193357c3a5006ee8b8457230bcf7abcef65e",
-    ]
-    sharded_list = store._shard(hash_id)
-    assert predefined_list == sharded_list
-
-
 def test_open_objects(pids, store):
     """Test open returns a stream."""
     test_dir = "tests/testdata/"
@@ -1692,44 +1704,52 @@ def test_open_objects(pids, store):
         io_buffer.close()
 
 
-def test_delete_object_only(pids, store):
-    """Test _delete_object successfully deletes only object."""
+def test_private_delete_objects(pids, store):
+    """Confirm _delete deletes for entity type 'objects'"""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store.store_object(pid=None, data=path)
-        store._delete_object_only(object_metadata.cid)
-    assert store._count(entity) == 0
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+
+        store._delete("objects", object_metadata.cid)
+        assert store._count("objects") == 0
 
 
-def test_delete_object_only_cid_refs_file_exists(pids, store):
-    """Test _delete_object does not delete object if a cid refs file still exists."""
+def test_private_delete_metadata(pids, store):
+    """Confirm _delete deletes for entity type 'metadata'"""
     test_dir = "tests/testdata/"
-    entity = "objects"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        object_metadata = store.store_object(pid, path)
-        _metadata_stored_path = store.store_metadata(pid, syspath, format_id)
-        store._delete_object_only(object_metadata.cid)
-    assert store._count(entity) == 3
-    assert store._count("pid") == 3
-    assert store._count("cid") == 3
+        store.store_metadata(pid, syspath, format_id)
+
+        # Manually calculate expected path
+        metadata_directory = store._computehash(pid)
+        metadata_document_name = store._computehash(pid + format_id)
+        rel_path = (
+            Path("/".join(store._shard(metadata_directory))) / metadata_document_name
+        )
+
+        store._delete("metadata", rel_path)
+
+        assert store._count("metadata") == 0
 
 
-def test_delete_with_object_metadata_id(pids, store):
-    """Check objects are deleted after calling delete with object id."""
+def test_private_delete_absolute_path(pids, store):
+    """Confirm _delete deletes for absolute paths'"""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store._store_and_validate_data(pid, path)
-        object_metadata_id = object_metadata.cid
-        store._delete(entity, object_metadata_id)
-    assert store._count(entity) == 0
+        path = Path(test_dir + pid.replace("/", "_"))
+        object_metadata = store.store_object(pid, path)
+
+        cid_refs_path = store._get_hashstore_cid_refs_path(object_metadata.cid)
+        store._delete("other", cid_refs_path)
+        assert store._count("cid") == 0
+
+        pid_refs_path = store._get_hashstore_pid_refs_path(pid)
+        store._delete("other", pid_refs_path)
+        assert store._count("pid") == 0
 
 
 def test_create_path(pids, store):
@@ -1742,15 +1762,39 @@ def test_create_path(pids, store):
         assert os.path.isdir(pid_directory)
 
 
-def test_get_real_path_file_does_not_exist(store):
-    """Test get_real_path returns None when object does not exist."""
+def test_get_store_path_object(store):
+    """Check get_store_path for object path."""
+    # pylint: disable=W0212
+    path_objects = store._get_store_path("objects")
+    path_objects_string = str(path_objects)
+    assert path_objects_string.endswith("/metacat/hashstore/objects")
+
+
+def test_get_store_path_metadata(store):
+    """Check get_store_path for metadata path."""
+    # pylint: disable=W0212
+    path_metadata = store._get_store_path("metadata")
+    path_metadata_string = str(path_metadata)
+    assert path_metadata_string.endswith("/metacat/hashstore/metadata")
+
+
+def test_get_store_path_refs(store):
+    """Check get_store_path for refs path."""
+    # pylint: disable=W0212
+    path_metadata = store._get_store_path("refs")
+    path_metadata_string = str(path_metadata)
+    assert path_metadata_string.endswith("/metacat/hashstore/refs")
+
+
+def test_get_hashstore_data_object_path_file_does_not_exist(store):
+    """Test _get_hashstore_data_object_path returns None when object does not exist."""
     test_path = "tests/testdata/helloworld.txt"
     with pytest.raises(FileNotFoundError):
         store._get_hashstore_data_object_path(test_path)
 
 
-def test_get_real_path_with_object_id(store, pids):
-    """Test get_real_path returns absolute path given an object id."""
+def test_get_hashstore_data_object_path_with_object_id(store, pids):
+    """Test _get_hashstore_data_object_path returns absolute path given an object id."""
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
@@ -1759,20 +1803,8 @@ def test_get_real_path_with_object_id(store, pids):
         assert os.path.exists(obj_abs_path)
 
 
-def test_get_real_path_with_object_id_sharded(pids, store):
-    """Test exists method with a sharded path (relative path)."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        object_metadata = store._store_and_validate_data(pid, path)
-        object_metadata_shard = store._shard(object_metadata.cid)
-        object_metadata_shard_path = "/".join(object_metadata_shard)
-        obj_abs_path = store._get_hashstore_data_object_path(object_metadata_shard_path)
-        assert os.path.exists(obj_abs_path)
-
-
-def test_get_real_path_with_metadata_id(store, pids):
-    """Test get_real_path returns absolute path given a metadata id."""
+def test_get_hashstore_metadata_path_absolute_path(store, pids):
+    """Test _get_hashstore_metadata_path returns absolute path given a metadata id."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
@@ -1783,50 +1815,7 @@ def test_get_real_path_with_metadata_id(store, pids):
         assert os.path.exists(metadata_abs_path)
 
 
-def test_build_hashstore_data_object_path(store, pids):
-    """Test _build_hashstore_data_object_path builds the hashstore data object file path."""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
-        _ = store._store_and_validate_data(pid, path)
-        # pylint: disable=W0212
-        abs_path = store._build_hashstore_data_object_path(pids[pid][store.algorithm])
-        assert os.path.exists(abs_path)
-
-
-def test_count(pids, store):
-    """Check that count returns expected number of objects."""
-    test_dir = "tests/testdata/"
-    entity = "objects"
-    for pid in pids.keys():
-        path_string = test_dir + pid.replace("/", "_")
-        store._store_and_validate_data(pid, path_string)
-    assert store._count(entity) == 3
-
-
-def test_cast_to_bytes(store):
-    """Test _to_bytes returns bytes."""
-    string = "teststring"
-    # pylint: disable=W0212
-    string_bytes = store._cast_to_bytes(string)
-    assert isinstance(string_bytes, bytes)
-
-
-def test_get_hashstore_data_object_path(pids, store):
-    """Confirm resolve path returns correct object path"""
-    test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        path = Path(test_dir + pid.replace("/", "_"))
-        object_metadata = store.store_object(pid, path)
-        cid = object_metadata.cid
-
-        obj_resolved_path = store._get_hashstore_data_object_path(cid)
-        calculated_obj_path = store.objects + "/" + "/".join(store._shard(cid))
-
-        assert calculated_obj_path == obj_resolved_path
-
-
-def test_get_hashstore_metadata_path_metadata(pids, store):
+def test_get_hashstore_metadata_path_relative_path(pids, store):
     """Confirm resolve path returns correct metadata path."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
@@ -1902,6 +1891,14 @@ def test_check_string(store):
     tab_line = "\t"
     with pytest.raises(ValueError):
         store._check_string(tab_line, "tab_line")
+
+
+def test_cast_to_bytes(store):
+    """Test _to_bytes returns bytes."""
+    string = "teststring"
+    # pylint: disable=W0212
+    string_bytes = store._cast_to_bytes(string)
+    assert isinstance(string_bytes, bytes)
 
 
 def test_stream_reads_file(pids):

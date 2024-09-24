@@ -2572,7 +2572,11 @@ class FileHashStore(HashStore):
             elif entity == "objects":
                 realpath = self._get_hashstore_data_object_path(file)
             elif entity == "metadata":
-                realpath = self._get_hashstore_metadata_path(file)
+                try:
+                    realpath = self._get_hashstore_metadata_path(file)
+                except FileNotFoundError:
+                    # Swallow file not found exceptions for metadata
+                    realpath = None
             elif os.path.exists(file):
                 # Check if the given path is an absolute path
                 realpath = file
@@ -2580,13 +2584,10 @@ class FileHashStore(HashStore):
                 raise IOError(
                     f"FileHashStore - delete(): Could not locate file: {file}"
                 )
-        except FileNotFoundError:
-            realpath = None
-
-        try:
             if realpath is not None:
                 os.remove(realpath)
-        except OSError as err:
+
+        except Exception as err:
             exception_string = (
                 f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
             )
@@ -2603,6 +2604,30 @@ class FileHashStore(HashStore):
             os.makedirs(path, self.dmode)
         except FileExistsError:
             assert os.path.isdir(path), f"expected {path} to be a directory"
+
+    def _get_store_path(self, entity):
+        """Return a path object to the root directory of the requested hashstore directory type
+
+        :param str entity: Desired entity type: "objects", "metadata", "refs", "cid" and "pid".
+        Note, "cid" and "pid" are refs specific directories.
+
+        :return: Path to requested store entity type
+        :rtype: Path
+        """
+        if entity == "objects":
+            return Path(self.objects)
+        elif entity == "metadata":
+            return Path(self.metadata)
+        elif entity == "refs":
+            return Path(self.refs)
+        elif entity == "cid":
+            return Path(self.cids)
+        elif entity == "pid":
+            return Path(self.pids)
+        else:
+            raise ValueError(
+                f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
+            )
 
     def _build_hashstore_data_object_path(self, hash_id):
         """Build the absolute file path for a given content identifier
@@ -2698,30 +2723,6 @@ class FileHashStore(HashStore):
         directories_and_path = self._shard(cid)
         cid_ref_file_abs_path = os.path.join(root_dir, *directories_and_path)
         return cid_ref_file_abs_path
-
-    def _get_store_path(self, entity):
-        """Return a path object to the root directory of the requested hashstore directory type
-
-        :param str entity: Desired entity type: "objects", "metadata", "refs", "cid" and "pid".
-        Note, "cid" and "pid" are refs specific directories.
-
-        :return: Path to requested store entity type
-        :rtype: Path
-        """
-        if entity == "objects":
-            return Path(self.objects)
-        elif entity == "metadata":
-            return Path(self.metadata)
-        elif entity == "refs":
-            return Path(self.refs)
-        elif entity == "cid":
-            return Path(self.cids)
-        elif entity == "pid":
-            return Path(self.pids)
-        else:
-            raise ValueError(
-                f"entity: {entity} does not exist. Do you mean 'objects', 'metadata' or 'refs'?"
-            )
 
     # Synchronization Methods
 

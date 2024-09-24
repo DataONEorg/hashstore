@@ -201,7 +201,6 @@ class FileHashStore(HashStore):
             - store_width (int): Width of directories when sharding an object's hex digest.
             - store_algorithm (str): Hash algo used for calculating the object's hex digest.
             - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
-        :rtype: dict
         """
         if not os.path.exists(hashstore_yaml_path):
             exception_string = (
@@ -305,7 +304,6 @@ class FileHashStore(HashStore):
         :param str store_metadata_namespace: Namespace for the HashStore's system metadata.
 
         :return: A YAML string representing the configuration for a HashStore.
-        :rtype: str
         """
         hashstore_configuration_yaml = f"""
         # Default configuration variables for HashStore
@@ -411,7 +409,6 @@ class FileHashStore(HashStore):
         :raises ValueError: If value is missing for a required key.
 
         :return: The given properties object (that has been validated).
-        :rtype: dict
         """
         if not isinstance(properties, dict):
             exception_string = (
@@ -1150,7 +1147,7 @@ class FileHashStore(HashStore):
 
         :param str pid: Authority-based or persistent identifier of the object.
 
-        :return: obj_info_dict (dict):
+        :return: obj_info_dict:
             - cid: content identifier
             - cid_object_path: path to the object
             - cid_refs_path: path to the cid refs file
@@ -1866,7 +1863,6 @@ class FileHashStore(HashStore):
         :param str metadata_doc_name: Metadata document name
 
         :return: Address of the metadata document.
-        :rtype: Path
         """
         logging.debug(
             "FileHashStore - _put_metadata: Request to put metadata for pid: %s", pid
@@ -1921,7 +1917,6 @@ class FileHashStore(HashStore):
         :param Stream stream: Metadata stream.
 
         :return: Path/name of temporary file created and written into.
-        :rtype: str
         """
         # Create temporary file in .../{store_path}/tmp
         tmp_root_path = self._get_store_path("metadata") / "tmp"
@@ -2035,7 +2030,6 @@ class FileHashStore(HashStore):
         :param str ref_type: 'cid' or 'pid'
 
         :return: tmp_file_path - Path to the tmp refs file
-        :rtype: string
         """
         logging.debug(
             "FileHashStore - _write_refs_file: Writing id (%s) into a tmp file in: %s",
@@ -2125,7 +2119,6 @@ class FileHashStore(HashStore):
         :param path refs_file_path: Path to the refs file
 
         :return: pid_found
-        :rtype: boolean
         """
         with open(refs_file_path, "r", encoding="utf8") as ref_file:
             # Confirm that pid is not currently already tagged
@@ -2359,7 +2352,6 @@ class FileHashStore(HashStore):
 
         :return: Hashlib-compatible string or 'None' for additional_algorithm and
             checksum_algorithm.
-        :rtype: str
         """
         additional_algorithm_checked = None
         if additional_algorithm != self.algorithm and additional_algorithm is not None:
@@ -2382,7 +2374,6 @@ class FileHashStore(HashStore):
         :param str method: Calling method for logging purposes.
 
         :return: Valid metadata namespace.
-        :rtype: str
         """
         if format_id and not format_id.strip():
             exception_string = f"FileHashStore - {method}: Format_id cannot be empty."
@@ -2404,7 +2395,6 @@ class FileHashStore(HashStore):
         :param str checksum_algorithm: Checksum algorithm.
 
         :return: De-duplicated list of hash algorithms.
-        :rtype: set
         """
         algorithm_list_to_calculate = self.default_algo_list
         if checksum_algorithm is not None:
@@ -2437,7 +2427,6 @@ class FileHashStore(HashStore):
         :param str algorithm_string: Algorithm to validate.
 
         :return: `hashlib` supported algorithm string.
-        :rtype: str
         """
         count = 0
         for char in algorithm_string:
@@ -2471,7 +2460,6 @@ class FileHashStore(HashStore):
         :param str algorithm: Algorithm of hex digest to generate.
 
         :return: Hex digest.
-        :rtype: str
         """
         if algorithm is None:
             hashobj = hashlib.new(self.algorithm)
@@ -2500,7 +2488,6 @@ class FileHashStore(HashStore):
 
         :return: A list where each element is a token of fixed width, with any leftover
         characters as the last element.
-        :rtype: list
         """
 
         def compact(items: List[Any]) -> List[Any]:
@@ -2527,7 +2514,6 @@ class FileHashStore(HashStore):
         :param str entity: Desired entity type (ex. "objects", "metadata").
 
         :return: Number of files in the directory.
-        :rtype: int
         """
         count = 0
         if entity == "objects":
@@ -2557,7 +2543,6 @@ class FileHashStore(HashStore):
         :param str file: The name of the file to check.
 
         :return: True if the file exists.
-        :rtype: bool
         """
         if entity == "objects":
             try:
@@ -2581,7 +2566,6 @@ class FileHashStore(HashStore):
         :param str mode: Mode to open file in. Defaults to 'rb'.
 
         :return: An `io` stream dependent on the `mode`.
-        :rtype: io.BufferedReader
         """
         realpath = None
         if entity == "objects":
@@ -2649,7 +2633,6 @@ class FileHashStore(HashStore):
         Note, "cid" and "pid" are refs specific directories.
 
         :return: Path to requested store entity type
-        :rtype: Path
         """
         if entity == "objects":
             return Path(self.objects)
@@ -2672,7 +2655,6 @@ class FileHashStore(HashStore):
         :param str hash_id: A hash ID to build a file path for.
 
         :return: An absolute file path for the specified hash ID.
-        :rtype: str
         """
         paths = self._shard(hash_id)
         root_dir = self._get_store_path("objects")
@@ -2685,7 +2667,6 @@ class FileHashStore(HashStore):
         :param str cid_or_relative_path: Content identifier or relative path in '/objects' to check
 
         :return: Path to the data object referenced by the pid
-        :rtype: Path
         """
         expected_abs_data_obj_path = self._build_hashstore_data_object_path(
             cid_or_relative_path
@@ -2715,7 +2696,6 @@ class FileHashStore(HashStore):
         to check
 
         :return: Path to the data object referenced by the pid
-        :rtype: Path
         """
         # Form the absolute path to the metadata file
         expected_abs_metadata_path = os.path.join(self.metadata, metadata_relative_path)
@@ -2738,7 +2718,6 @@ class FileHashStore(HashStore):
         :param str pid: Persistent or authority-based identifier
 
         :return: Path to pid reference file
-        :rtype: Path
         """
         # The pid refs file is named after the hash of the pid using the store's algorithm
         hash_id = self._computehash(pid, self.algorithm)
@@ -2753,7 +2732,6 @@ class FileHashStore(HashStore):
         :param str cid: Content identifier
 
         :return: Path to cid reference file
-        :rtype: Path
         """
         root_dir = self._get_store_path("cid")
         # The content identifier is to be split into directories as is supplied
@@ -2940,7 +2918,6 @@ class FileHashStore(HashStore):
         :param path path_to_file: Path to the file to read
 
         :return: Content of the given file
-        :rtype: str
         """
         with open(path_to_file, "r", encoding="utf8") as opened_path:
             content = opened_path.read()
@@ -2953,7 +2930,6 @@ class FileHashStore(HashStore):
         :param Path path: Path to file to rename
 
         :return: Path to the renamed file
-        :rtype: str
         """
         if isinstance(path, str):
             path = Path(path)
@@ -2971,7 +2947,6 @@ class FileHashStore(HashStore):
         :raises FileNotFoundError: If the directory doesn't exist
 
         :return: file_paths - File paths of the given directory or None if directory doesn't exist
-        :rtype: List
         """
         if os.path.exists(directory):
             files = os.listdir(directory)
@@ -2991,7 +2966,6 @@ class FileHashStore(HashStore):
         :type data: str, os.PathLike, io.BufferedReader
 
         :return: True if valid.
-        :rtype: bool
         """
         if (
             not isinstance(data, str)
@@ -3058,7 +3032,6 @@ class FileHashStore(HashStore):
 
         :param Any text: String to convert.
         :return: Bytes with utf-8 encoding.
-        :rtype: bytes
         """
         if not isinstance(text, bytes):
             text = bytes(text, "utf8")

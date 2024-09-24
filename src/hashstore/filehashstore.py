@@ -153,7 +153,7 @@ class FileHashStore(HashStore):
             self.width = prop_store_width
             self.sysmeta_ns = prop_store_metadata_namespace
             # Write 'hashstore.yaml' to store path
-            if not os.path.exists(self.hashstore_configuration_yaml):
+            if not os.path.isfile(self.hashstore_configuration_yaml):
                 # pylint: disable=W1201
                 logging.debug(
                     "FileHashStore - HashStore does not exist & configuration file not found."
@@ -202,7 +202,7 @@ class FileHashStore(HashStore):
             - store_algorithm (str): Hash algo used for calculating the object's hex digest.
             - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         """
-        if not os.path.exists(hashstore_yaml_path):
+        if not os.path.isfile(hashstore_yaml_path):
             exception_string = (
                 "FileHashStore - load_properties: hashstore.yaml not found"
                 + " in store root path."
@@ -235,7 +235,7 @@ class FileHashStore(HashStore):
             - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         """
         # If hashstore.yaml already exists, must throw exception and proceed with caution
-        if os.path.exists(self.hashstore_configuration_yaml):
+        if os.path.isfile(self.hashstore_configuration_yaml):
             exception_string = (
                 "FileHashStore - write_properties: configuration file 'hashstore.yaml'"
                 + " already exists."
@@ -357,7 +357,7 @@ class FileHashStore(HashStore):
         :param dict properties: HashStore properties.
         :param str prop_store_path: Store path to check.
         """
-        if os.path.exists(self.hashstore_configuration_yaml):
+        if os.path.isfile(self.hashstore_configuration_yaml):
             logging.debug(
                 "FileHashStore - Config found (hashstore.yaml) at {%s}. Verifying properties.",
                 self.hashstore_configuration_yaml,
@@ -473,7 +473,7 @@ class FileHashStore(HashStore):
             }
             return dataone_algo_translation[algo_to_translate]
 
-        if not os.path.exists(self.hashstore_configuration_yaml):
+        if not os.path.isfile(self.hashstore_configuration_yaml):
             exception_string = (
                 "FileHashStore - set_default_algorithms: hashstore.yaml not found"
                 + " in store root path."
@@ -1160,13 +1160,13 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid")
 
         pid_ref_abs_path = self._get_hashstore_pid_refs_path(pid)
-        if os.path.exists(pid_ref_abs_path):
+        if os.path.isfile(pid_ref_abs_path):
             # Read the file to get the cid from the pid reference
             pid_refs_cid = self._read_small_file_content(pid_ref_abs_path)
 
             # Confirm that the cid reference file exists
             cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
-            if os.path.exists(cid_ref_abs_path):
+            if os.path.isfile(cid_ref_abs_path):
                 # Check that the pid is actually found in the cid reference file
                 if self._is_string_in_refs_file(pid, cid_ref_abs_path):
                     # Object must also exist in order to return the cid retrieved
@@ -1196,7 +1196,7 @@ class FileHashStore(HashStore):
                             "pid_refs_path": pid_ref_abs_path,
                             "sysmeta_path": (
                                 sysmeta_full_path
-                                if os.path.exists(sysmeta_full_path)
+                                if os.path.isfile(sysmeta_full_path)
                                 else "Does not exist."
                             ),
                         }
@@ -1482,7 +1482,7 @@ class FileHashStore(HashStore):
             finally:
                 # Ensure that the tmp file has been removed, the data object already exists, so it
                 # is redundant. No exception is thrown so 'store_object' can proceed to tag object
-                if os.path.exists(tmp_file_name):
+                if os.path.isfile(tmp_file_name):
                     self._delete("tmp", tmp_file_name)
 
         return object_cid, tmp_file_size, hex_digests
@@ -1566,12 +1566,12 @@ class FileHashStore(HashStore):
                 + " Keyboard interruption by user."
             )
             logging.error(exception_string)
-            if os.path.exists(tmp.name):
+            if os.path.isfile(tmp.name):
                 os.remove(tmp.name)
         finally:
             if not tmp_file_completion_flag:
                 try:
-                    if os.path.exists(tmp.name):
+                    if os.path.isfile(tmp.name):
                         os.remove(tmp.name)
                 # pylint: disable=W0718
                 except Exception as err:
@@ -1597,7 +1597,7 @@ class FileHashStore(HashStore):
 
         # Delete tmp file if python interpreter crashes or thread is interrupted
         def delete_tmp_file():
-            if os.path.exists(tmp.name):
+            if os.path.isfile(tmp.name):
                 os.remove(tmp.name)
 
         atexit.register(delete_tmp_file)
@@ -1631,7 +1631,7 @@ class FileHashStore(HashStore):
                 self._create_path(Path(os.path.dirname(pid_refs_path)))
                 self._create_path(Path(os.path.dirname(cid_refs_path)))
 
-                if os.path.exists(pid_refs_path) and os.path.exists(cid_refs_path):
+                if os.path.isfile(pid_refs_path) and os.path.isfile(cid_refs_path):
                     # If both reference files exist, we confirm that reference files are where they
                     # are expected to be and throw an exception to inform the client that everything
                     # is in place - and include other issues for context
@@ -1654,7 +1654,7 @@ class FileHashStore(HashStore):
                         logging.error(rev_msg)
                         raise HashStoreRefsAlreadyExists(err_msg)
 
-                elif os.path.exists(pid_refs_path) and not os.path.exists(
+                elif os.path.isfile(pid_refs_path) and not os.path.isfile(
                     cid_refs_path
                 ):
                     # If pid refs exists, the pid has already been claimed and cannot be tagged we
@@ -1666,7 +1666,7 @@ class FileHashStore(HashStore):
                     logging.error(error_msg)
                     raise PidRefsAlreadyExistsError(error_msg)
 
-                elif not os.path.exists(pid_refs_path) and os.path.exists(
+                elif not os.path.isfile(pid_refs_path) and os.path.isfile(
                     cid_refs_path
                 ):
                     debug_msg = (
@@ -1879,7 +1879,7 @@ class FileHashStore(HashStore):
         full_path = self._get_store_path("metadata") / rel_path / metadata_document_name
 
         # Move metadata to target path
-        if os.path.exists(metadata_tmp):
+        if os.path.isfile(metadata_tmp):
             try:
                 parent = full_path.parent
                 parent.mkdir(parents=True, exist_ok=True)
@@ -1895,7 +1895,7 @@ class FileHashStore(HashStore):
                     f"FileHashStore - _put_metadata: Unexpected {err=}, {type(err)=}"
                 )
                 logging.error(exception_string)
-                if os.path.exists(metadata_tmp):
+                if os.path.isfile(metadata_tmp):
                     # Remove tmp metadata, calling app must re-upload
                     logging.debug(
                         "FileHashStore - _put_metadata: Deleting metadata for pid: %s",
@@ -2068,7 +2068,7 @@ class FileHashStore(HashStore):
             + f" at refs file: {refs_file_path}."
         )
         logging.debug(debug_msg)
-        if not os.path.exists(refs_file_path):
+        if not os.path.isfile(refs_file_path):
             exception_string = (
                 f"FileHashStore - _update_refs_file: {refs_file_path} does not exist."
                 + f" Cannot {update_type} ref_id: {ref_id}"
@@ -2245,7 +2245,7 @@ class FileHashStore(HashStore):
             cid_refs_path = self._get_hashstore_cid_refs_path(cid)
 
         # Check that reference files were created
-        if not os.path.exists(pid_refs_path):
+        if not os.path.isfile(pid_refs_path):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file missing: "
                 + str(pid_refs_path)
@@ -2253,7 +2253,7 @@ class FileHashStore(HashStore):
             )
             logging.error(exception_string)
             raise PidRefsFileNotFound(exception_string)
-        if not os.path.exists(cid_refs_path):
+        if not os.path.isfile(cid_refs_path):
             exception_string = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file missing: "
                 + str(cid_refs_path)
@@ -2291,7 +2291,7 @@ class FileHashStore(HashStore):
         """
         cid_refs_abs_path = self._get_hashstore_cid_refs_path(cid)
         # If the refs file still exists, do not delete the object
-        if not os.path.exists(cid_refs_abs_path):
+        if not os.path.isfile(cid_refs_abs_path):
             sync_begin_debug_msg = (
                 f"FileHashStore - delete_object: Cid ({cid}) to locked list."
             )
@@ -2598,7 +2598,7 @@ class FileHashStore(HashStore):
                 except FileNotFoundError:
                     # Swallow file not found exceptions for metadata
                     realpath = None
-            elif os.path.exists(file):
+            elif os.path.isfile(file):
                 # Check if the given path is an absolute path
                 realpath = file
             else:

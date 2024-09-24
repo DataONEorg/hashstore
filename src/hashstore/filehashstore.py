@@ -931,7 +931,7 @@ class FileHashStore(HashStore):
                 return
             except OrphanPidRefsFileFound:
                 # Delete pid refs file
-                pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
+                pid_ref_abs_path = self._get_hashstore_pid_refs_path(pid)
                 objects_to_delete.append(
                     self._rename_path_for_deletion(pid_ref_abs_path)
                 )
@@ -948,10 +948,10 @@ class FileHashStore(HashStore):
                 )
                 # Remove pid from cid refs file
                 pid_refs_cid = self._read_small_file_content(pid_ref_abs_path)
-                cid_ref_abs_str = str(self._get_hashstore_cid_refs_path(pid_refs_cid))
+                cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
                 # Remove if the pid refs is found
-                if self._is_string_in_refs_file(pid, Path(cid_ref_abs_str)):
-                    self._update_refs_file(Path(cid_ref_abs_str), pid, "remove")
+                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
+                    self._update_refs_file(cid_ref_abs_path, pid, "remove")
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
                 # Remove all files confirmed for deletion
@@ -959,7 +959,7 @@ class FileHashStore(HashStore):
                 return
             except PidNotFoundInCidRefsFile:
                 # Add pid refs file to be permanently deleted
-                pid_ref_abs_path = str(self._get_hashstore_pid_refs_path(pid))
+                pid_ref_abs_path = self._get_hashstore_pid_refs_path(pid)
                 objects_to_delete.append(
                     self._rename_path_for_deletion(pid_ref_abs_path)
                 )

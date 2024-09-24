@@ -65,8 +65,8 @@ class FileHashStore(HashStore):
         "store_metadata_namespace",
     ]
     # Permissions settings for writing files and creating directories
-    fmode = 0o664
-    dmode = 0o755
+    f_mode = 0o664
+    d_mode = 0o755
     # The other algorithm list consists of additional algorithms that can be included
     # for calculating when storing objects, in addition to the default list.
     other_algo_list = [
@@ -1603,12 +1603,12 @@ class FileHashStore(HashStore):
         atexit.register(delete_tmp_file)
 
         # Ensure tmp file is created with desired permissions
-        if self.fmode is not None:
-            oldmask = os.umask(0)
+        if self.f_mode is not None:
+            old_mask = os.umask(0)
             try:
-                os.chmod(tmp.name, self.fmode)
+                os.chmod(tmp.name, self.f_mode)
             finally:
-                os.umask(oldmask)
+                os.umask(old_mask)
         return tmp
 
     def _store_hashstore_refs_files(self, pid: str, cid: str) -> None:
@@ -2462,13 +2462,13 @@ class FileHashStore(HashStore):
         :return: Hex digest.
         """
         if algorithm is None:
-            hashobj = hashlib.new(self.algorithm)
+            hash_obj = hashlib.new(self.algorithm)
         else:
             check_algorithm = self._clean_algorithm(algorithm)
-            hashobj = hashlib.new(check_algorithm)
+            hash_obj = hashlib.new(check_algorithm)
         for data in stream:
-            hashobj.update(self._cast_to_bytes(data))
-        hex_digest = hashobj.hexdigest()
+            hash_obj.update(self._cast_to_bytes(data))
+        hex_digest = hash_obj.hexdigest()
         return hex_digest
 
     def _shard(self, checksum: str) -> List[str]:
@@ -2622,7 +2622,7 @@ class FileHashStore(HashStore):
         :raises AssertionError: If the path already exists but is not a directory.
         """
         try:
-            os.makedirs(path, self.dmode)
+            os.makedirs(path, self.d_mode)
         except FileExistsError:
             assert os.path.isdir(path), f"expected {path} to be a directory"
 

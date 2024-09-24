@@ -19,3 +19,4 @@ processes that function across a cluster environment. Some properties:
 from hashstore.hashstore import HashStore, HashStoreFactory
 
 __all__ = ("HashStore", "HashStoreFactory")
+__version__ = "1.1.0"

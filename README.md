@@ -311,9 +311,9 @@ To install `hashstore` locally, create a virtual environment for python 3.9+,
 install poetry, and then install or build the package with `poetry install` or `poetry build`,
 respectively.
 
-To run tests, navigate to the root directory and run `pytest -s`. The test suite contains tests that
+To run tests, navigate to the root directory and run `pytest`. The test suite contains tests that
 take a longer time to run (relating to the storage of large files) - to execute all tests, run
-`pytest --run-slow`. To see detailed
+`pytest --run-slow`.
 
 ## HashStore Client
 

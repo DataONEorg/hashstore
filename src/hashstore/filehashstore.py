@@ -197,10 +197,10 @@ class FileHashStore(HashStore):
         """Get and return the contents of the current HashStore configuration.
 
         :return: HashStore properties with the following keys (and values):
-            - ``store_depth`` (int): Depth when sharding an object's hex digest.
-            - ``store_width`` (int): Width of directories when sharding an object's hex digest.
-            - ``store_algorithm`` (str): Hash algo used for calculating the object's hex digest.
-            - ``store_metadata_namespace`` (str): Namespace for the HashStore's system metadata.
+            - store_depth (int): Depth when sharding an object's hex digest.
+            - store_width (int): Width of directories when sharding an object's hex digest.
+            - store_algorithm (str): Hash algo used for calculating the object's hex digest.
+            - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         :rtype: dict
         """
         if not os.path.exists(hashstore_yaml_path):
@@ -229,12 +229,11 @@ class FileHashStore(HashStore):
         """Writes 'hashstore.yaml' to FileHashStore's root directory with the respective
         properties object supplied.
 
-        :param properties: A Python dictionary with the following keys (and values):
-            - ``store_depth`` (int): Depth when sharding an object's hex digest.
-            - ``store_width`` (int): Width of directories when sharding an object's hex digest.
-            - ``store_algorithm`` (str): Hash algo used for calculating the object's hex digest.
-            - ``store_metadata_namespace`` (str): Namespace for the HashStore's system metadata.
-        :type properties: dict
+        :param dict properties: A Python dictionary with the following keys (and values):
+            - store_depth (int): Depth when sharding an object's hex digest.
+            - store_width (int): Width of directories when sharding an object's hex digest.
+            - store_algorithm (str): Hash algo used for calculating the object's hex digest.
+            - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         """
         # If hashstore.yaml already exists, must throw exception and proceed with caution
         if os.path.exists(self.hashstore_configuration_yaml):

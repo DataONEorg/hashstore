@@ -143,12 +143,12 @@ class FileHashStore(HashStore):
             ]
 
             # Check to see if a configuration is present in the given store path
-            self.hashstore_configuration_yaml = prop_store_path + "/hashstore.yaml"
+            self.hashstore_configuration_yaml = Path(prop_store_path) / "hashstore.yaml"
             self._verify_hashstore_properties(properties, prop_store_path)
 
             # If no exceptions thrown, FileHashStore ready for initialization
             logging.debug("FileHashStore - Initializing, properties verified.")
-            self.root = prop_store_path
+            self.root = Path(prop_store_path)
             self.depth = prop_store_depth
             self.width = prop_store_width
             self.sysmeta_ns = prop_store_metadata_namespace
@@ -163,19 +163,19 @@ class FileHashStore(HashStore):
             # Default algorithm list for FileHashStore based on config file written
             self._set_default_algorithms()
             # Complete initialization/instantiation by setting and creating store directories
-            self.objects = self.root + "/objects"
-            self.metadata = self.root + "/metadata"
-            self.refs = self.root + "/refs"
-            self.cids = self.refs + "/cids"
-            self.pids = self.refs + "/pids"
+            self.objects = self.root / "objects"
+            self.metadata = self.root / "metadata"
+            self.refs = self.root / "refs"
+            self.cids = self.refs / "cids"
+            self.pids = self.refs / "pids"
             if not os.path.exists(self.objects):
-                self._create_path(self.objects + "/tmp")
+                self._create_path(self.objects / "tmp")
             if not os.path.exists(self.metadata):
-                self._create_path(self.metadata + "/tmp")
+                self._create_path(self.metadata / "tmp")
             if not os.path.exists(self.refs):
-                self._create_path(self.refs + "/tmp")
-                self._create_path(self.refs + "/pids")
-                self._create_path(self.refs + "/cids")
+                self._create_path(self.refs / "tmp")
+                self._create_path(self.refs / "pids")
+                self._create_path(self.refs / "cids")
             logging.debug(
                 "FileHashStore - Initialization success. Store root: %s", self.root
             )
@@ -192,7 +192,7 @@ class FileHashStore(HashStore):
 
     @staticmethod
     def _load_properties(
-        hashstore_yaml_path: str, hashstore_required_prop_keys: List[str]
+        hashstore_yaml_path: Path, hashstore_required_prop_keys: List[str]
     ) -> Dict[str, Union[str, int]]:
         """Get and return the contents of the current HashStore configuration.
 
@@ -1089,9 +1089,7 @@ class FileHashStore(HashStore):
                     logging.debug(sync_begin_debug_msg)
                     self.metadata_locked_docs_th.append(pid_doc)
             try:
-                full_path_without_directory = (
-                    self.metadata + "/" + rel_path + "/" + pid_doc
-                )
+                full_path_without_directory = Path(self.metadata / rel_path / pid_doc)
                 self._delete("metadata", full_path_without_directory)
                 info_string = (
                     "FileHashStore - delete_metadata: Successfully deleted metadata for pid:"
@@ -1907,7 +1905,7 @@ class FileHashStore(HashStore):
                         "FileHashStore - _put_metadata: Deleting metadata for pid: %s",
                         pid,
                     )
-                    self.metadata.delete(metadata_tmp)
+                    self._delete("metadata", metadata_tmp)
                 raise
         else:
             exception_string = (
@@ -2541,7 +2539,7 @@ class FileHashStore(HashStore):
         elif entity == "cid":
             directory_to_count = self.cids
         elif entity == "tmp":
-            directory_to_count = self.objects + "tmp"
+            directory_to_count = self.objects / "tmp"
         else:
             raise ValueError(
                 f"entity: {entity} does not exist. Do you mean 'objects' or 'metadata'?"
@@ -2713,8 +2711,8 @@ class FileHashStore(HashStore):
     def _get_hashstore_metadata_path(self, metadata_relative_path: str) -> Path:
         """Return the expected metadata path to a hashstore metadata object that exists.
 
-        :param str metadata_relative_path: Metadata path to check or relative path in
-        '/metadata' to check
+        :param str metadata_relative_path: Metadata path to check or relative path in '/metadata'
+        to check
 
         :return: Path to the data object referenced by the pid
         :rtype: Path
@@ -2731,7 +2729,7 @@ class FileHashStore(HashStore):
                 raise FileNotFoundError(
                     "FileHashStore - _get_hashstore_metadata_path: could not locate a"
                     + "metadata object in '/metadata' for the supplied metadata_relative_path: "
-                    + metadata_relative_path
+                    + str(metadata_relative_path)
                 )
 
     def _get_hashstore_pid_refs_path(self, pid: str) -> Path:

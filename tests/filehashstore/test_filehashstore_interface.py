@@ -650,9 +650,9 @@ def test_store_object_threads_multiple_pids_one_cid_files(store):
                 file_count += len(files)
         return file_count
 
-    assert get_number_of_files(store.refs + "/pids") == 6
-    assert get_number_of_files(store.refs + "/cids") == 1
-    assert folder_has_files(store.refs + "/tmp") is False
+    assert get_number_of_files(store.refs / "pids") == 6
+    assert get_number_of_files(store.refs / "cids") == 1
+    assert folder_has_files(store.refs / "tmp") is False
 
 
 @slow_test
@@ -1491,22 +1491,22 @@ def test_store_and_delete_objects_100_pids_1_cid(store):
     deletes all related files"""
     test_dir = "tests/testdata/"
     path = test_dir + "jtao.1700.1"
+    refs_pids_path = store.root / "refs" / "pids"
+    refs_cids_path = store.root / "refs" / "cids"
     # Store
     upper_limit = 101
     for i in range(1, upper_limit):
         pid_modified = f"dou.test.{str(i)}"
         store.store_object(pid_modified, path)
-    assert (
-        sum([len(files) for _, _, files in os.walk(store.root + "/refs/pids")]) == 100
-    )
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cids")]) == 1
+    assert sum([len(files) for _, _, files in os.walk(refs_pids_path)]) == 100
+    assert sum([len(files) for _, _, files in os.walk(refs_cids_path)]) == 1
     assert store._count("objects") == 1
     # Delete
     for i in range(1, upper_limit):
         pid_modified = f"dou.test.{str(i)}"
         store.delete_object(pid_modified)
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pids")]) == 0
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cids")]) == 0
+    assert sum([len(files) for _, _, files in os.walk(refs_pids_path)]) == 0
+    assert sum([len(files) for _, _, files in os.walk(refs_cids_path)]) == 0
     assert store._count("objects") == 0
 
 
@@ -1557,6 +1557,8 @@ def test_store_and_delete_object_300_pids_1_cid_threads(store):
     thread5.join()
     thread6.join()
 
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 0
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 0
+    refs_pids_path = store.root / "refs" / "pids"
+    refs_cids_path = store.root / "refs" / "cids"
+    assert sum([len(files) for _, _, files in os.walk(refs_pids_path)]) == 0
+    assert sum([len(files) for _, _, files in os.walk(refs_cids_path)]) == 0
     assert store._count("objects") == 0

@@ -53,7 +53,7 @@ def test_get_checksum(capsys, store, pids):
         store.store_object(pid, path)
 
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         get_checksum_opt = "-getchecksum"
         client_pid_arg = f"-pid={pid}"
         algo_arg = f"-algo={store.algorithm}"
@@ -86,7 +86,7 @@ def test_store_object(store, pids):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         store_object_opt = "-storeobject"
         client_pid_arg = f"-pid={pid}"
         path = f'-path={test_dir + pid.replace("/", "_")}'
@@ -117,7 +117,7 @@ def test_store_metadata(capsys, store, pids):
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         store_metadata_opt = "-storemetadata"
         client_pid_arg = f"-pid={pid}"
         path = f"-path={syspath}"
@@ -159,7 +159,7 @@ def test_retrieve_objects(capsys, pids, store):
         store.store_object(pid, path)
 
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         delete_object_opt = "-retrieveobject"
         client_pid_arg = f"-pid={pid}"
         chs_args = [
@@ -199,7 +199,7 @@ def test_retrieve_metadata(capsys, pids, store):
         _metadata_cid = store.store_metadata(pid, syspath, namespace)
 
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         retrieve_metadata_opt = "-retrievemetadata"
         client_pid_arg = f"-pid={pid}"
         format_id = f"-formatid={namespace}"
@@ -239,7 +239,7 @@ def test_delete_objects(pids, store):
         store.store_object(pid, path)
 
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         delete_object_opt = "-deleteobject"
         client_pid_arg = f"-pid={pid}"
         chs_args = [
@@ -269,7 +269,7 @@ def test_delete_metadata(pids, store):
         _metadata_cid = store.store_metadata(pid, syspath, namespace)
 
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         delete_metadata_opt = "-deletemetadata"
         client_pid_arg = f"-pid={pid}"
         format_id = f"-formatid={namespace}"

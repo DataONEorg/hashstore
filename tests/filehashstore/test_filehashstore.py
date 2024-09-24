@@ -32,13 +32,13 @@ def test_init_directories_created(store):
     """Confirm that object and metadata directories have been created."""
     assert os.path.exists(store.root)
     assert os.path.exists(store.objects)
-    assert os.path.exists(store.objects + "/tmp")
+    assert os.path.exists(store.objects / "tmp")
     assert os.path.exists(store.metadata)
-    assert os.path.exists(store.metadata + "/tmp")
+    assert os.path.exists(store.metadata / "tmp")
     assert os.path.exists(store.refs)
-    assert os.path.exists(store.refs + "/tmp")
-    assert os.path.exists(store.refs + "/pids")
-    assert os.path.exists(store.refs + "/cids")
+    assert os.path.exists(store.refs / "tmp")
+    assert os.path.exists(store.refs / "pids")
+    assert os.path.exists(store.refs / "cids")
 
 
 def test_init_existing_store_incorrect_algorithm_format(store):
@@ -46,7 +46,7 @@ def test_init_existing_store_incorrect_algorithm_format(store):
     the string must exactly match the expected format). DataONE uses the library of congress
     vocabulary to standardize algorithm types."""
     properties = {
-        "store_path": store.root + "/incorrect_algo_format",
+        "store_path": store.root / "incorrect_algo_format",
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
@@ -722,7 +722,7 @@ def test_write_to_tmp_file_and_get_hex_digests_with_unsupported_algorithm(pids, 
 
 def test_mktmpfile(store):
     """Test that _mktmpfile creates and returns a tmp file."""
-    path = store.root + "/doutest/tmp/"
+    path = store.root / "doutest" / "tmp"
     store._create_path(path)
     tmp = store._mktmpfile(path)
     assert os.path.exists(tmp.name)
@@ -1383,7 +1383,7 @@ def test_verify_object_information_incorrect_size_with_pid(pids, store):
         checksum_algorithm = store.algorithm
         expected_file_size = object_metadata.obj_size
 
-        objects_tmp_folder = store.objects + "/tmp"
+        objects_tmp_folder = store.objects / "tmp"
         tmp_file = store._mktmpfile(objects_tmp_folder)
         assert os.path.isfile(tmp_file.name)
         with pytest.raises(NonMatchingObjSize):
@@ -1758,7 +1758,7 @@ def test_create_path(pids, store):
     for pid in pids:
         root_directory = store.root
         pid_hex_digest_directory = pids[pid]["metadata_cid"][:2]
-        pid_directory = root_directory + pid_hex_digest_directory
+        pid_directory = root_directory / pid_hex_digest_directory
         store._create_path(pid_directory)
         assert os.path.isdir(pid_directory)
 
@@ -1828,14 +1828,12 @@ def test_get_hashstore_metadata_path_relative_path(pids, store):
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)
         rel_path = "/".join(store._shard(metadata_directory))
-        full_path_without_dir = rel_path + "/" + metadata_document_name
+        full_path_without_dir = Path(rel_path) / metadata_document_name
 
         metadata_resolved_path = store._get_hashstore_metadata_path(
             full_path_without_dir
         )
-        calculated_metadata_path = (
-            store.metadata + "/" + rel_path + "/" + metadata_document_name
-        )
+        calculated_metadata_path = store.metadata / rel_path / metadata_document_name
 
         assert Path(calculated_metadata_path) == metadata_resolved_path
 
@@ -1849,8 +1847,8 @@ def test_get_hashstore_pid_refs_path(pids, store):
 
         resolved_pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
         pid_refs_metadata_hashid = store._computehash(pid)
-        calculated_pid_ref_path = (
-            store.pids + "/" + "/".join(store._shard(pid_refs_metadata_hashid))
+        calculated_pid_ref_path = store.pids / Path(
+            "/".join(store._shard(pid_refs_metadata_hashid))
         )
 
         assert resolved_pid_ref_abs_path == Path(calculated_pid_ref_path)
@@ -1865,7 +1863,7 @@ def test_get_hashstore_cid_refs_path(pids, store):
         cid = object_metadata.cid
 
         resolved_cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
-        calculated_cid_ref_path = store.cids + "/" + "/".join(store._shard(cid))
+        calculated_cid_ref_path = store.cids / Path("/".join(store._shard(cid)))
 
         assert resolved_cid_ref_abs_path == Path(calculated_cid_ref_path)
 

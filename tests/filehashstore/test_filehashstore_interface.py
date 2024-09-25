@@ -650,9 +650,9 @@ def test_store_object_threads_multiple_pids_one_cid_files(store):
                 file_count += len(files)
         return file_count
 
-    assert get_number_of_files(store.refs + "/pids") == 6
-    assert get_number_of_files(store.refs + "/cids") == 1
-    assert folder_has_files(store.refs + "/tmp") is False
+    assert get_number_of_files(store.refs / "pids") == 6
+    assert get_number_of_files(store.refs / "cids") == 1
+    assert folder_has_files(store.refs / "tmp") is False
 
 
 @slow_test
@@ -960,7 +960,7 @@ def test_store_metadata(pids, store):
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)
-        rel_path = "/".join(store._shard(metadata_directory))
+        rel_path = Path(*store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
@@ -976,7 +976,7 @@ def test_store_metadata_one_pid_multiple_docs_correct_location(store):
     filename = pid.replace("/", "_") + ".xml"
     syspath = Path(test_dir) / filename
     metadata_directory = store._computehash(pid)
-    rel_path = "/".join(store._shard(metadata_directory))
+    rel_path = Path(*store._shard(metadata_directory))
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     format_id3 = "http://ns.dataone.org/service/types/v3.0"
     format_id4 = "http://ns.dataone.org/service/types/v4.0"
@@ -1008,7 +1008,7 @@ def test_store_metadata_default_format_id(pids, store):
         # Manually calculate expected path
         metadata_directory = store._computehash(pid)
         metadata_document_name = store._computehash(pid + format_id)
-        rel_path = "/".join(store._shard(metadata_directory))
+        rel_path = Path(*store._shard(metadata_directory))
         full_path = (
             store._get_store_path("metadata") / rel_path / metadata_document_name
         )
@@ -1491,22 +1491,22 @@ def test_store_and_delete_objects_100_pids_1_cid(store):
     deletes all related files"""
     test_dir = "tests/testdata/"
     path = test_dir + "jtao.1700.1"
+    refs_pids_path = store.root / "refs" / "pids"
+    refs_cids_path = store.root / "refs" / "cids"
     # Store
     upper_limit = 101
     for i in range(1, upper_limit):
         pid_modified = f"dou.test.{str(i)}"
         store.store_object(pid_modified, path)
-    assert (
-        sum([len(files) for _, _, files in os.walk(store.root + "/refs/pids")]) == 100
-    )
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cids")]) == 1
+    assert sum([len(files) for _, _, files in os.walk(refs_pids_path)]) == 100
+    assert sum([len(files) for _, _, files in os.walk(refs_cids_path)]) == 1
     assert store._count("objects") == 1
     # Delete
     for i in range(1, upper_limit):
         pid_modified = f"dou.test.{str(i)}"
         store.delete_object(pid_modified)
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pids")]) == 0
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cids")]) == 0
+    assert sum([len(files) for _, _, files in os.walk(refs_pids_path)]) == 0
+    assert sum([len(files) for _, _, files in os.walk(refs_cids_path)]) == 0
     assert store._count("objects") == 0
 
 
@@ -1557,6 +1557,8 @@ def test_store_and_delete_object_300_pids_1_cid_threads(store):
     thread5.join()
     thread6.join()
 
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/pid")]) == 0
-    assert sum([len(files) for _, _, files in os.walk(store.root + "/refs/cid")]) == 0
+    refs_pids_path = store.root / "refs" / "pids"
+    refs_cids_path = store.root / "refs" / "cids"
+    assert sum([len(files) for _, _, files in os.walk(refs_pids_path)]) == 0
+    assert sum([len(files) for _, _, files in os.walk(refs_cids_path)]) == 0
     assert store._count("objects") == 0

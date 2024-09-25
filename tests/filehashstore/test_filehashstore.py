@@ -1940,6 +1940,7 @@ def test_stream_returns_to_original_position_on_close(pids):
         input_stream.close()
 
 
+# noinspection PyTypeChecker
 def test_stream_raises_error_for_invalid_object():
     """Test that a stream raises ValueError for an invalid input object."""
     with pytest.raises(ValueError):

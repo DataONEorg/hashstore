@@ -193,7 +193,8 @@ class HashStoreParser:
             help="Flag to delete a metadata document from a HashStore",
         )
 
-    def load_store_properties(self, hashstore_yaml):
+    @staticmethod
+    def load_store_properties(hashstore_yaml):
         """Get and return the contents of the current HashStore config file.
 
         :return: HashStore properties with the following keys (and values):
@@ -291,6 +292,7 @@ class HashStoreClient:
         logging.info(info_msg)
 
         # Get list of objects to store from metacat db
+        checked_obj_list = None
         if obj_type == self.OBJ_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_objects(
                 metacat_obj_list, "store"
@@ -373,6 +375,7 @@ class HashStoreClient:
 
         # Get list of objects to store from metacat db
         logging.info("HashStore Client - Refining object list for %s", obj_type)
+        checked_obj_list = None
         if obj_type == self.OBJ_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_objects(
                 metacat_obj_list, "retrieve"
@@ -469,6 +472,7 @@ class HashStoreClient:
         )
 
         # Get list of objects to store from metacat db
+        checked_obj_list = None
         if obj_type == self.OBJ_TYPE:
             checked_obj_list = self.metacatdb.refine_list_for_objects(
                 metacat_obj_list, "delete"
@@ -597,8 +601,9 @@ class MetacatDB:
             limit_query = f" LIMIT {num}"
         query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
                 systemmetadata.object_format, systemmetadata.checksum,
-                systemmetadata.checksum_algorithm, systemmetadata.size FROM identifier INNER JOIN systemmetadata
-                ON identifier.guid = systemmetadata.guid ORDER BY identifier.guid{limit_query};"""
+                systemmetadata.checksum_algorithm, systemmetadata.size FROM identifier INNER JOIN
+                systemmetadata ON identifier.guid = systemmetadata.guid ORDER BY
+                identifier.guid{limit_query};"""
         cursor.execute(query)
 
         # Fetch all rows from the result set
@@ -639,7 +644,8 @@ class MetacatDB:
 
         return object_metadata_list
 
-    def refine_list_for_objects(self, metacat_obj_list, action):
+    @staticmethod
+    def refine_list_for_objects(metacat_obj_list, action):
         """Refine a list of objects by checking for file existence and removing duplicates.
 
         :param List metacat_obj_list: List of tuple objects representing rows from Metacat database.
@@ -681,7 +687,8 @@ class MetacatDB:
 
         return refined_object_list
 
-    def refine_list_for_metadata(self, metacat_obj_list, action):
+    @staticmethod
+    def refine_list_for_metadata(metacat_obj_list, action):
         """Refine a list of metadata by checking for file existence and removing duplicates.
 
         :param List metacat_obj_list: List of tuple objects representing rows from metacat db.

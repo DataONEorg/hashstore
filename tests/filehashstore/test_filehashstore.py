@@ -364,7 +364,6 @@ def test_store_and_validate_data_files_path(pids, store):
 def test_store_and_validate_data_files_string(pids, store):
     """Test _store_and_validate_data accepts string for the path arg."""
     test_dir = "tests/testdata/"
-    entity = "objects"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)

@@ -3052,7 +3052,7 @@ class Stream:
     set its position back to ``0``.
     """
 
-    def __init__(self, obj: Union[IO[bytes], str]):
+    def __init__(self, obj: Union[IO[bytes], str, Path]):
         if hasattr(obj, "read"):
             pos = obj.tell()
         elif os.path.isfile(obj):

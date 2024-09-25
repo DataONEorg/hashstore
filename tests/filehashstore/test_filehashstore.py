@@ -1917,11 +1917,11 @@ def test_stream_reads_path_object(pids):
     for pid in pids.keys():
         path = Path(test_dir + pid.replace("/", "_"))
         obj_stream = Stream(path)
-        hashobj = hashlib.new("sha256")
+        hash_obj = hashlib.new("sha256")
         for data in obj_stream:
-            hashobj.update(data)
+            hash_obj.update(data)
         obj_stream.close()
-        hex_digest = hashobj.hexdigest()
+        hex_digest = hash_obj.hexdigest()
         assert pids[pid]["sha256"] == hex_digest
 
 

@@ -761,27 +761,13 @@ class FileHashStore(HashStore):
         # will wait for a pid to be released if it's found to be in use before proceeding.
         sync_begin_debug_msg = f"Pid ({pid}) to locked list."
         sync_wait_msg = f"Pid ({pid}) is locked. Waiting."
-        if self.use_multiprocessing:
-            with self.object_pid_condition_mp:
-                # Wait for the pid to release if it's in use
-                while pid in self.object_locked_pids_mp:
-                    self.fhs_logger.debug(sync_wait_msg)
-                    self.object_pid_condition_mp.wait()
-                # Modify object_locked_pids consecutively
-                self.fhs_logger.debug(sync_begin_debug_msg)
-                self.object_locked_pids_mp.append(pid)
-        else:
-            with self.object_pid_condition_th:
-                while pid in self.object_locked_pids_th:
-                    self.fhs_logger.debug(sync_wait_msg)
-                    self.object_pid_condition_th.wait()
-                self.fhs_logger.debug(sync_begin_debug_msg)
-                self.object_locked_pids_th.append(pid)
 
         try:
             # Before we begin deletion process, we look for the `cid` by calling
             # `find_object` which will throw custom exceptions if there is an issue with
             # the reference files, which help us determine the path to proceed with.
+            self._synchronize_object_locked_pids(pid)
+
             try:
                 object_info_dict = self._find_object(pid)
                 cid = object_info_dict.get("cid")
@@ -789,24 +775,7 @@ class FileHashStore(HashStore):
                 # Proceed with next steps - cid has been retrieved without any issues
                 # We must synchronize here based on the `cid` because multiple threads may
                 # try to access the `cid_reference_file`
-                sync_begin_debug_msg = f"Cid ({cid}) to locked list."
-                sync_wait_msg = f"Cid ({cid}) is locked. Waiting."
-                if self.use_multiprocessing:
-                    with self.object_cid_condition_mp:
-                        # Wait for the cid to release if it's in use
-                        while cid in self.object_locked_cids_mp:
-                            self.fhs_logger.debug(sync_wait_msg)
-                            self.object_cid_condition_mp.wait()
-                        # Modify reference_locked_cids consecutively
-                        self.fhs_logger.debug(sync_begin_debug_msg)
-                        self.object_locked_cids_mp.append(cid)
-                else:
-                    with self.object_cid_condition_th:
-                        while cid in self.object_locked_cids_th:
-                            self.fhs_logger.debug(sync_wait_msg)
-                            self.object_cid_condition_th.wait()
-                        self.fhs_logger.debug(sync_begin_debug_msg)
-                        self.object_locked_cids_th.append(cid)
+                self._synchronize_object_locked_cids(cid)
 
                 try:
                     cid_ref_abs_path = object_info_dict.get("cid_refs_path")
@@ -846,31 +815,8 @@ class FileHashStore(HashStore):
 
                 finally:
                     # Release cid
-                    end_sync_debug_msg = f"Releasing cid ({cid}) from locked list"
-                    if self.use_multiprocessing:
-                        with self.object_cid_condition_mp:
-                            self.fhs_logger.debug(end_sync_debug_msg)
-                            self.object_locked_cids_mp.remove(cid)
-                            self.object_cid_condition_mp.notify()
-                    else:
-                        with self.object_cid_condition_th:
-                            self.fhs_logger.debug(end_sync_debug_msg)
-                            self.object_locked_cids_th.remove(cid)
-                            self.object_cid_condition_th.notify()
+                    self._release_object_locked_cids(cid)
 
-            except PidRefsDoesNotExist:
-                warn_msg = (
-                    f"Pid reference file does not exist for pid: {pid} Skipping object deletion. "
-                    + "Deleting pid metadata documents."
-                )
-                self.fhs_logger.warning(warn_msg)
-
-                # Remove metadata files if they exist
-                self.delete_metadata(pid)
-
-                # Remove all files confirmed for deletion
-                self._delete_marked_files(objects_to_delete)
-                return
             except OrphanPidRefsFileFound:
                 warn_msg = (
                     f"Orphan pid reference file found for pid: {pid}. Skipping object deletion. "
@@ -903,10 +849,16 @@ class FileHashStore(HashStore):
                 )
                 # Remove pid from cid refs file
                 pid_refs_cid = self._read_small_file_content(pid_ref_abs_path)
-                cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
-                # Remove if the pid refs is found
-                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
-                    self._update_refs_file(cid_ref_abs_path, pid, "remove")
+                try:
+                    self._synchronize_object_locked_cids(pid_refs_cid)
+
+                    cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
+                    # Remove if the pid refs is found
+                    if self._is_string_in_refs_file(pid, cid_ref_abs_path):
+                        self._update_refs_file(cid_ref_abs_path, pid, "remove")
+                finally:
+                    self._release_object_locked_cids(pid_refs_cid)
+
                 # Remove metadata files if they exist
                 self.delete_metadata(pid)
                 # Remove all files confirmed for deletion
@@ -931,18 +883,7 @@ class FileHashStore(HashStore):
                 return
         finally:
             # Release pid
-            end_sync_debug_msg = f"Releasing pid ({pid}) from locked list"
-            if self.use_multiprocessing:
-                with self.object_pid_condition_mp:
-                    self.fhs_logger.debug(end_sync_debug_msg)
-                    self.object_locked_pids_mp.remove(pid)
-                    self.object_pid_condition_mp.notify()
-            else:
-                # Release pid
-                with self.object_pid_condition_th:
-                    self.fhs_logger.debug(end_sync_debug_msg)
-                    self.object_locked_pids_th.remove(pid)
-                    self.object_pid_condition_th.notify()
+            self._release_object_locked_pids(pid)
 
     def delete_metadata(self, pid: str, format_id: Optional[str] = None) -> None:
         self.fhs_logger.debug("Request to delete metadata for pid: %s", pid)
@@ -2680,6 +2621,38 @@ class FileHashStore(HashStore):
         return Path(cid_ref_file_abs_path)
 
     # Synchronization Methods
+
+    def _synchronize_object_locked_pids(self, pid: str) -> None:
+        """Threads must work with 'pid's one identifier at a time to ensure thread safety when
+        handling requests to store, delete or tag pids.
+
+        :param str pid: Persistent or authority-based identifier
+        """
+        if self.use_multiprocessing:
+            with self.object_pid_condition_mp:
+                # Wait for the cid to release if it's being tagged
+                while pid in self.object_locked_pids_mp:
+                    logging.debug(
+                        f"_synchronize_object_locked_pids: Pid ({pid}) is locked. Waiting."
+                    )
+                    self.object_pid_condition_mp.wait()
+                self.object_locked_pids_mp.append(pid)
+                logging.debug(
+                    f"_synchronize_object_locked_pids: Synchronizing object_locked_pids_mp for"
+                    + f" pid: {pid}"
+                )
+        else:
+            with self.object_pid_condition_th:
+                while pid in self.object_locked_pids_th:
+                    logging.debug(
+                        f"_synchronize_object_locked_pids: Pid ({pid}) is locked. Waiting."
+                    )
+                    self.object_pid_condition_th.wait()
+                self.object_locked_pids_th.append(pid)
+                logging.debug(
+                    f"_synchronize_object_locked_pids: Synchronizing object_locked_pids_th for"
+                    + f" cid: {pid}"
+                )
 
     def _release_object_locked_pids(self, pid: str) -> None:
         """Remove the given persistent identifier from 'object_locked_pids' and notify other

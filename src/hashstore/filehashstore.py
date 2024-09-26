@@ -190,11 +190,11 @@ class FileHashStore(HashStore):
             self.fhs_logger.debug("Initialization success. Store root: %s", self.root)
         else:
             # Cannot instantiate or initialize FileHashStore without config
-            exception_string = (
+            err_msg = (
                 "HashStore properties must be supplied." + f" Properties: {properties}"
             )
-            self.fhs_logger.debug(exception_string)
-            raise ValueError(exception_string)
+            self.fhs_logger.debug(err_msg)
+            raise ValueError(err_msg)
 
     # Configuration and Related Methods
 
@@ -211,12 +211,12 @@ class FileHashStore(HashStore):
             - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         """
         if not os.path.isfile(hashstore_yaml_path):
-            exception_string = (
+            err_msg = (
                 "FileHashStore - load_properties: hashstore.yaml not found"
                 + " in store root path."
             )
-            logging.critical(exception_string)
-            raise FileNotFoundError(exception_string)
+            logging.critical(err_msg)
+            raise FileNotFoundError(err_msg)
 
         # Open file
         with open(hashstore_yaml_path, "r", encoding="utf-8") as hs_yaml_file:
@@ -244,12 +244,12 @@ class FileHashStore(HashStore):
         """
         # If hashstore.yaml already exists, must throw exception and proceed with caution
         if os.path.isfile(self.hashstore_configuration_yaml):
-            exception_string = (
+            err_msg = (
                 "FileHashStore - write_properties: configuration file 'hashstore.yaml'"
                 + " already exists."
             )
-            logging.error(exception_string)
-            raise FileExistsError(exception_string)
+            logging.error(err_msg)
+            raise FileExistsError(err_msg)
         # Validate properties
         checked_properties = self._validate_properties(properties)
 
@@ -265,14 +265,14 @@ class FileHashStore(HashStore):
         if store_algorithm in accepted_store_algorithms:
             checked_store_algorithm = store_algorithm
         else:
-            exception_string = (
+            err_msg = (
                 f"FileHashStore - write_properties: algorithm supplied ({store_algorithm})"
                 f" cannot be used as default for HashStore. Must be one of: "
                 + f"{', '.join(accepted_store_algorithms)}"
                 f" which are DataONE controlled algorithm values"
             )
-            logging.error(exception_string)
-            raise ValueError(exception_string)
+            logging.error(err_msg)
+            raise ValueError(err_msg)
 
         # If given store path doesn't exist yet, create it.
         if not os.path.exists(self.root):
@@ -455,13 +455,13 @@ class FileHashStore(HashStore):
                     if key == "store_depth" or key == "store_width":
                         supplied_key = int(properties[key])
                     if hashstore_yaml_dict[key] != supplied_key:
-                        exception_string = (
+                        err_msg = (
                             f"FileHashStore - Given properties ({key}: {properties[key]}) does not"
                             + f" match. HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
                             + f" found at: {self.hashstore_configuration_yaml}"
                         )
-                        logging.critical(exception_string)
-                        raise ValueError(exception_string)
+                        logging.critical(err_msg)
+                        raise ValueError(err_msg)
         else:
             if os.path.exists(prop_store_path):
                 # Check if HashStore exists and throw exception if found
@@ -470,14 +470,14 @@ class FileHashStore(HashStore):
                     os.path.isdir(os.path.join(prop_store_path, sub))
                     for sub in subfolders
                 ):
-                    exception_string = (
+                    err_msg = (
                         "FileHashStore - Unable to initialize HashStore. `hashstore.yaml` is not"
                         + " present but conflicting HashStore directory exists. Please delete"
                         + " '/objects', '/metadata' and/or '/refs' at the store path or supply"
                         + " a new path."
                     )
-                    logging.critical(exception_string)
-                    raise RuntimeError(exception_string)
+                    logging.critical(err_msg)
+                    raise RuntimeError(err_msg)
 
     def _validate_properties(
         self, properties: Dict[str, Union[str, int]]
@@ -493,33 +493,33 @@ class FileHashStore(HashStore):
         :return: The given properties object (that has been validated).
         """
         if not isinstance(properties, dict):
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _validate_properties: Invalid argument -"
                 + " expected a dictionary."
             )
-            logging.debug(exception_string)
-            raise ValueError(exception_string)
+            logging.debug(err_msg)
+            raise ValueError(err_msg)
 
         # New dictionary for validated properties
         checked_properties = {}
 
         for key in self.property_required_keys:
             if key not in properties:
-                exception_string = (
+                err_msg = (
                     "FileHashStore - _validate_properties: Missing required"
                     + f" key: {key}."
                 )
-                logging.debug(exception_string)
-                raise KeyError(exception_string)
+                logging.debug(err_msg)
+                raise KeyError(err_msg)
 
             value = properties.get(key)
             if value is None:
-                exception_string = (
+                err_msg = (
                     "FileHashStore - _validate_properties: Value for key:"
                     + f" {key} is none."
                 )
-                logging.debug(exception_string)
-                raise ValueError(exception_string)
+                logging.debug(err_msg)
+                raise ValueError(err_msg)
 
             # Add key and values to checked_properties
             if key == "store_depth" or key == "store_width":
@@ -527,13 +527,13 @@ class FileHashStore(HashStore):
                 try:
                     checked_properties[key] = int(value)
                 except Exception as err:
-                    exception_string = (
+                    err_msg = (
                         "FileHashStore - _validate_properties: Unexpected exception when"
                         " attempting to ensure store depth and width are integers. Details: "
                         + str(err)
                     )
-                    logging.debug(exception_string)
-                    raise ValueError(exception_string)
+                    logging.debug(err_msg)
+                    raise ValueError(err_msg)
             else:
                 checked_properties[key] = value
 
@@ -556,12 +556,12 @@ class FileHashStore(HashStore):
             return dataone_algo_translation[algo_to_translate]
 
         if not os.path.isfile(self.hashstore_configuration_yaml):
-            exception_string = (
+            err_msg = (
                 "FileHashStore - set_default_algorithms: hashstore.yaml not found"
                 + " in store root path."
             )
-            logging.critical(exception_string)
-            raise FileNotFoundError(exception_string)
+            logging.critical(err_msg)
+            raise FileNotFoundError(err_msg)
 
         with open(
             self.hashstore_configuration_yaml, "r", encoding="utf-8"
@@ -662,12 +662,12 @@ class FileHashStore(HashStore):
                     pid,
                 )
             except Exception as err:
-                exception_string = (
+                err_msg = (
                     f"FileHashStore - store_object: failed to store object for pid: {pid}."
                     + " Reference files will not be created or tagged. Unexpected error: "
                     + str(err)
                 )
-                logging.error(exception_string)
+                logging.error(err_msg)
                 raise err
             finally:
                 # Release pid
@@ -710,12 +710,12 @@ class FileHashStore(HashStore):
         self._check_string(checksum_algorithm, "checksum_algorithm")
         self._check_integer(expected_file_size)
         if object_metadata is None or not isinstance(object_metadata, ObjectMetadata):
-            exception_string = (
+            err_msg = (
                 "FileHashStore - verify_object: 'object_metadata' cannot be None."
                 + " Must be a 'ObjectMetadata' object."
             )
-            logging.error(exception_string)
-            raise ValueError(exception_string)
+            logging.error(err_msg)
+            raise ValueError(err_msg)
         else:
             logging.info(
                 "FileHashStore - verify_object: Called to verify object with id: %s",
@@ -829,11 +829,9 @@ class FileHashStore(HashStore):
             )
             obj_stream = self._open(entity, object_cid)
         else:
-            exception_string = (
-                f"FileHashStore - retrieve_object: No object found for pid: {pid}"
-            )
-            logging.error(exception_string)
-            raise ValueError(exception_string)
+            err_msg = f"FileHashStore - retrieve_object: No object found for pid: {pid}"
+            logging.error(err_msg)
+            raise ValueError(err_msg)
         logging.info(
             "FileHashStore - retrieve_object: Retrieved object for pid: %s", pid
         )
@@ -866,11 +864,11 @@ class FileHashStore(HashStore):
             )
             return metadata_stream
         else:
-            exception_string = (
+            err_msg = (
                 f"FileHashStore - retrieve_metadata: No metadata found for pid: {pid}"
             )
-            logging.error(exception_string)
-            raise ValueError(exception_string)
+            logging.error(err_msg)
+            raise ValueError(err_msg)
 
     def delete_object(self, pid: str) -> None:
         logging.debug(
@@ -1205,11 +1203,9 @@ class FileHashStore(HashStore):
         algorithm = self._clean_algorithm(algorithm)
         object_cid = self._find_object(pid).get("cid")
         if not self._exists(entity, object_cid):
-            exception_string = (
-                f"FileHashStore - get_hex_digest: No object found for pid: {pid}"
-            )
-            logging.error(exception_string)
-            raise ValueError(exception_string)
+            err_msg = f"FileHashStore - get_hex_digest: No object found for pid: {pid}"
+            logging.error(err_msg)
+            raise ValueError(err_msg)
         cid_stream = self._open(entity, object_cid)
         hex_digest = self._computehash(cid_stream, algorithm=algorithm)
 
@@ -1404,11 +1400,11 @@ class FileHashStore(HashStore):
             return object_metadata
         # pylint: disable=W0718
         except Exception as err:
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _store_data_only: failed to store object."
                 + f" Unexpected {err=}, {type(err)=}"
             )
-            logging.error(exception_string)
+            logging.error(err_msg)
             raise err
 
     def _move_and_get_checksums(
@@ -1483,11 +1479,11 @@ class FileHashStore(HashStore):
                 shutil.move(tmp_file_name, abs_file_path)
             except Exception as err:
                 # Revert storage process
-                exception_string = (
+                err_msg = (
                     "FileHashStore - _move_and_get_checksums:"
                     + f" Unexpected Error: {err}"
                 )
-                logging.warning(exception_string)
+                logging.warning(err_msg)
                 if os.path.isfile(abs_file_path):
                     # Check to see if object exists before determining whether to delete
                     debug_msg = (
@@ -1498,12 +1494,12 @@ class FileHashStore(HashStore):
                     pid_checksum = self.get_hex_digest(pid, self.algorithm)
                     if pid_checksum == hex_digests.get(self.algorithm):
                         # If the checksums match, return and log warning
-                        exception_string = (
+                        err_msg = (
                             "FileHashStore - _move_and_get_checksums: Object exists at:"
                             + f" {abs_file_path} but an unexpected issue has been encountered."
                             + " Reference files will not be created and/or tagged."
                         )
-                        logging.warning(exception_string)
+                        logging.warning(err_msg)
                         raise err
                     else:
                         debug_msg = (
@@ -1545,22 +1541,22 @@ class FileHashStore(HashStore):
                 )
             except NonMatchingObjSize as nmose:
                 # If any exception is thrown during validation, we do not tag.
-                exception_string = (
+                err_msg = (
                     f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
                     + " , deleting temp file. Reference files will not be created and/or tagged"
                     + f" due to an issue with the supplied pid object metadata. {str(nmose)}"
                 )
-                logging.debug(exception_string)
-                raise NonMatchingObjSize(exception_string) from nmose
+                logging.debug(err_msg)
+                raise NonMatchingObjSize(err_msg) from nmose
             except NonMatchingChecksum as nmce:
                 # If any exception is thrown during validation, we do not tag.
-                exception_string = (
+                err_msg = (
                     f"FileHashStore - _move_and_get_checksums: Object already exists for pid: {pid}"
                     + " , deleting temp file. Reference files will not be created and/or tagged"
                     + f" due to an issue with the supplied pid object metadata. {str(nmce)}"
                 )
-                logging.debug(exception_string)
-                raise NonMatchingChecksum(exception_string) from nmce
+                logging.debug(err_msg)
+                raise NonMatchingChecksum(err_msg) from nmce
             finally:
                 # Ensure that the tmp file has been removed, the data object already exists, so it
                 # is redundant. No exception is thrown so 'store_object' can proceed to tag object
@@ -1635,19 +1631,19 @@ class FileHashStore(HashStore):
             return hex_digest_dict, tmp.name, tmp_file_size
         # pylint: disable=W0718
         except Exception as err:
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _write_to_tmp_file_and_get_hex_digests:"
                 + f" Unexpected {err=}, {type(err)=}"
             )
-            logging.error(exception_string)
+            logging.error(err_msg)
             # pylint: disable=W0707,W0719
-            raise Exception(exception_string)
+            raise Exception(err_msg)
         except KeyboardInterrupt:
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _write_to_tmp_file_and_get_hex_digests:"
                 + " Keyboard interruption by user."
             )
-            logging.error(exception_string)
+            logging.error(err_msg)
             if os.path.isfile(tmp.name):
                 os.remove(tmp.name)
         finally:
@@ -1657,12 +1653,12 @@ class FileHashStore(HashStore):
                         os.remove(tmp.name)
                 # pylint: disable=W0718
                 except Exception as err:
-                    exception_string = (
+                    err_msg = (
                         "FileHashStore - _write_to_tmp_file_and_get_hex_digests:"
                         + f"Unexpected {err=} while attempting to"
                         + f" delete tmp file: {tmp.name}, {type(err)=}"
                     )
-                    logging.error(exception_string)
+                    logging.error(err_msg)
 
     def _mktmpfile(self, path: Path) -> IO[bytes]:
         """Create a temporary file at the given path ready to be written.
@@ -1973,10 +1969,10 @@ class FileHashStore(HashStore):
                 )
                 return full_path
             except Exception as err:
-                exception_string = (
+                err_msg = (
                     f"FileHashStore - _put_metadata: Unexpected {err=}, {type(err)=}"
                 )
-                logging.error(exception_string)
+                logging.error(err_msg)
                 if os.path.isfile(metadata_tmp):
                     # Remove tmp metadata, calling app must re-upload
                     logging.debug(
@@ -1986,12 +1982,12 @@ class FileHashStore(HashStore):
                     self._delete("metadata", metadata_tmp)
                 raise
         else:
-            exception_string = (
+            err_msg = (
                 f"FileHashStore - _put_metadata: Attempt to move metadata for pid: {pid}"
                 + f", but metadata temp file not found: {metadata_tmp}"
             )
-            logging.error(exception_string)
-            raise FileNotFoundError(exception_string)
+            logging.error(err_msg)
+            raise FileNotFoundError(err_msg)
 
     def _mktmpmetadata(self, stream: "Stream") -> str:
         """Create a named temporary file with `stream` (metadata).
@@ -2129,11 +2125,11 @@ class FileHashStore(HashStore):
                     return tmp_file_path
 
         except Exception as err:
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _write_refs_file: failed to write cid refs file for pid:"
                 + f" {ref_id} into path: {path}. Unexpected {err=}, {type(err)=}"
             )
-            logging.error(exception_string)
+            logging.error(err_msg)
             raise err
 
     def _update_refs_file(
@@ -2151,12 +2147,12 @@ class FileHashStore(HashStore):
         )
         logging.debug(debug_msg)
         if not os.path.isfile(refs_file_path):
-            exception_string = (
+            err_msg = (
                 f"FileHashStore - _update_refs_file: {refs_file_path} does not exist."
                 + f" Cannot {update_type} ref_id: {ref_id}"
             )
-            logging.error(exception_string)
-            raise FileNotFoundError(exception_string)
+            logging.error(err_msg)
+            raise FileNotFoundError(err_msg)
         try:
             if update_type == "add":
                 pid_found = self._is_string_in_refs_file(ref_id, refs_file_path)
@@ -2186,11 +2182,11 @@ class FileHashStore(HashStore):
             )
             logging.debug(debug_msg)
         except Exception as err:
-            exception_string = (
+            err_msg = (
                 f"FileHashStore - _update_refs_file: failed to {update_type} for ref_id: {ref_id}"
                 + f" at refs file: {refs_file_path}. Unexpected {err=}, {type(err)=}"
             )
-            logging.error(exception_string)
+            logging.error(err_msg)
             raise err
 
     @staticmethod
@@ -2235,22 +2231,22 @@ class FileHashStore(HashStore):
         """
         if file_size_to_validate is not None and file_size_to_validate > 0:
             if file_size_to_validate != tmp_file_size:
-                exception_string = (
+                err_msg = (
                     "FileHashStore - _verify_object_information: Object file size calculated: "
                     + f" {tmp_file_size} does not match with expected size:"
                     + f" {file_size_to_validate}."
                 )
                 if pid is not None:
                     self._delete(entity, tmp_file_name)
-                    exception_string_for_pid = (
-                        exception_string
+                    err_msg_for_pid = (
+                        err_msg
                         + f" Tmp file deleted and file not stored for pid: {pid}"
                     )
-                    logging.debug(exception_string_for_pid)
-                    raise NonMatchingObjSize(exception_string_for_pid)
+                    logging.debug(err_msg_for_pid)
+                    raise NonMatchingObjSize(err_msg_for_pid)
                 else:
-                    logging.debug(exception_string)
-                    raise NonMatchingObjSize(exception_string)
+                    logging.debug(err_msg)
+                    raise NonMatchingObjSize(err_msg)
         if checksum_algorithm is not None and checksum is not None:
             if checksum_algorithm not in hex_digests:
                 # Check to see if it is a supported algorithm
@@ -2269,19 +2265,19 @@ class FileHashStore(HashStore):
                         cid_stream, algorithm=checksum_algorithm
                     )
                 if hex_digest_calculated != checksum:
-                    exception_string = (
+                    err_msg = (
                         "FileHashStore - _verify_object_information: checksum_algorithm"
                         + f" ({checksum_algorithm}) cannot be found in the default hex digests"
                         + f" dict, but is supported. New checksum calculated: "
                         f"{hex_digest_calculated}, does not match what has been provided: "
                         + checksum
                     )
-                    logging.debug(exception_string)
-                    raise NonMatchingChecksum(exception_string)
+                    logging.debug(err_msg)
+                    raise NonMatchingChecksum(err_msg)
             else:
                 hex_digest_stored = hex_digests[checksum_algorithm]
                 if hex_digest_stored != checksum.lower():
-                    exception_string = (
+                    err_msg = (
                         "FileHashStore - _verify_object_information: Hex digest and checksum"
                         + f" do not match - file not stored for pid: {pid}. Algorithm:"
                         + f" {checksum_algorithm}. Checksum provided: {checksum} !="
@@ -2290,14 +2286,14 @@ class FileHashStore(HashStore):
                     if pid is not None:
                         # Delete the tmp file
                         self._delete(entity, tmp_file_name)
-                        exception_string_for_pid = (
-                            exception_string + f" Tmp file ({tmp_file_name}) deleted."
+                        err_msg_for_pid = (
+                            err_msg + f" Tmp file ({tmp_file_name}) deleted."
                         )
-                        logging.debug(exception_string_for_pid)
-                        raise NonMatchingChecksum(exception_string_for_pid)
+                        logging.debug(err_msg_for_pid)
+                        raise NonMatchingChecksum(err_msg_for_pid)
                     else:
-                        logging.debug(exception_string)
-                        raise NonMatchingChecksum(exception_string)
+                        logging.debug(err_msg)
+                        raise NonMatchingChecksum(err_msg)
 
     def _verify_hashstore_references(
         self,
@@ -2328,42 +2324,42 @@ class FileHashStore(HashStore):
 
         # Check that reference files were created
         if not os.path.isfile(pid_refs_path):
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file missing: "
                 + str(pid_refs_path)
                 + f" . Additional Context: {additional_log_string}"
             )
-            logging.error(exception_string)
-            raise PidRefsFileNotFound(exception_string)
+            logging.error(err_msg)
+            raise PidRefsFileNotFound(err_msg)
         if not os.path.isfile(cid_refs_path):
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file missing: "
                 + str(cid_refs_path)
                 + f" . Additional Context: {additional_log_string}"
             )
-            logging.error(exception_string)
-            raise CidRefsFileNotFound(exception_string)
+            logging.error(err_msg)
+            raise CidRefsFileNotFound(err_msg)
         # Check the content of the reference files
         # Start with the cid
         retrieved_cid = self._read_small_file_content(pid_refs_path)
         if retrieved_cid != cid:
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _verify_hashstore_references: Pid refs file exists"
                 + f" ({pid_refs_path}) but cid ({cid}) does not match."
                 + f" Additional Context: {additional_log_string}"
             )
-            logging.error(exception_string)
-            raise PidRefsContentError(exception_string)
+            logging.error(err_msg)
+            raise PidRefsContentError(err_msg)
         # Then the pid
         pid_found = self._is_string_in_refs_file(pid, cid_refs_path)
         if not pid_found:
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _verify_hashstore_references: Cid refs file exists"
                 + f" ({cid_refs_path}) but pid ({pid}) not found."
                 + f" Additional Context:  {additional_log_string}"
             )
-            logging.error(exception_string)
-            raise CidRefsContentError(exception_string)
+            logging.error(err_msg)
+            raise CidRefsContentError(err_msg)
 
     def _delete_object_only(self, cid: str) -> None:
         """Attempt to delete an object based on the given content identifier (cid). If the object
@@ -2458,9 +2454,9 @@ class FileHashStore(HashStore):
         :return: Valid metadata namespace.
         """
         if format_id and not format_id.strip():
-            exception_string = f"FileHashStore - {method}: Format_id cannot be empty."
-            logging.error(exception_string)
-            raise ValueError(exception_string)
+            err_msg = f"FileHashStore - {method}: Format_id cannot be empty."
+            logging.error(err_msg)
+            raise ValueError(err_msg)
         elif format_id is None:
             # Use default value set by hashstore config
             checked_format_id = self.sysmeta_ns
@@ -2523,12 +2519,12 @@ class FileHashStore(HashStore):
             cleaned_string not in self.default_algo_list
             and cleaned_string not in self.other_algo_list
         ):
-            exception_string = (
+            err_msg = (
                 "FileHashStore: _clean_algorithm: Algorithm not supported:"
                 + cleaned_string
             )
-            logging.error(exception_string)
-            raise UnsupportedAlgorithm(exception_string)
+            logging.error(err_msg)
+            raise UnsupportedAlgorithm(err_msg)
         return cleaned_string
 
     def _computehash(
@@ -2691,10 +2687,8 @@ class FileHashStore(HashStore):
                 os.remove(realpath)
 
         except Exception as err:
-            exception_string = (
-                f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
-            )
-            logging.error(exception_string)
+            err_msg = f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
+            logging.error(err_msg)
             raise err
 
     def _create_path(self, path: Path) -> None:
@@ -3054,19 +3048,19 @@ class FileHashStore(HashStore):
             and not isinstance(data, Path)
             and not isinstance(data, io.BufferedIOBase)
         ):
-            exception_string = (
+            err_msg = (
                 "FileHashStore - _validate_arg_data: Data must be a path, string or buffered"
                 + f" stream type. Data type supplied: {type(data)}"
             )
-            logging.error(exception_string)
-            raise TypeError(exception_string)
+            logging.error(err_msg)
+            raise TypeError(err_msg)
         if isinstance(data, str):
             if data.strip() == "":
-                exception_string = (
+                err_msg = (
                     "FileHashStore - _validate_arg_data: Data string cannot be empty."
                 )
-                logging.error(exception_string)
-                raise TypeError(exception_string)
+                logging.error(err_msg)
+                raise TypeError(err_msg)
         return True
 
     @staticmethod
@@ -3078,18 +3072,16 @@ class FileHashStore(HashStore):
         """
         if file_size is not None:
             if not isinstance(file_size, int):
-                exception_string = (
+                err_msg = (
                     "FileHashStore - _check_integer: size given must be an integer."
                     + f" File size: {file_size}. Arg Type: {type(file_size)}."
                 )
-                logging.error(exception_string)
-                raise TypeError(exception_string)
+                logging.error(err_msg)
+                raise TypeError(err_msg)
             if file_size < 1:
-                exception_string = (
-                    "FileHashStore - _check_integer: size given must be > 0"
-                )
-                logging.error(exception_string)
-                raise ValueError(exception_string)
+                err_msg = "FileHashStore - _check_integer: size given must be > 0"
+                logging.error(err_msg)
+                raise ValueError(err_msg)
 
     @staticmethod
     def _check_string(string: str, arg: str) -> None:
@@ -3101,12 +3093,12 @@ class FileHashStore(HashStore):
         """
         if string is None or string.strip() == "" or any(ch.isspace() for ch in string):
             method = inspect.stack()[1].function
-            exception_string = (
+            err_msg = (
                 f"FileHashStore - {method}: {arg} cannot be None"
                 + f" or empty, {arg}: {string}."
             )
-            logging.error(exception_string)
-            raise ValueError(exception_string)
+            logging.error(err_msg)
+            raise ValueError(err_msg)
 
     @staticmethod
     def _cast_to_bytes(text: any) -> bytes:

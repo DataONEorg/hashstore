@@ -80,6 +80,7 @@ class FileHashStore(HashStore):
     ]
 
     def __init__(self, properties=None):
+        self.fhs_logger = logging.getLogger(__name__)
         # Now check properties
         if properties:
             # Validate properties against existing configuration if present
@@ -100,7 +101,7 @@ class FileHashStore(HashStore):
             self._verify_hashstore_properties(properties, prop_store_path)
 
             # If no exceptions thrown, FileHashStore ready for initialization
-            logging.debug("FileHashStore - Initializing, properties verified.")
+            self.fhs_logger.debug("Initializing, properties verified.")
             self.root = Path(prop_store_path)
             self.depth = prop_store_depth
             self.width = prop_store_width
@@ -108,8 +109,8 @@ class FileHashStore(HashStore):
             # Write 'hashstore.yaml' to store path
             if not os.path.isfile(self.hashstore_configuration_yaml):
                 # pylint: disable=W1201
-                logging.debug(
-                    "FileHashStore - HashStore does not exist & configuration file not found."
+                self.fhs_logger.debug(
+                    "HashStore does not exist & configuration file not found."
                     + " Writing configuration file."
                 )
                 self._write_properties(properties)
@@ -186,16 +187,13 @@ class FileHashStore(HashStore):
                 )
                 self.reference_locked_pids_th = []
 
-            logging.debug(
-                "FileHashStore - Initialization success. Store root: %s", self.root
-            )
+            self.fhs_logger.debug("Initialization success. Store root: %s", self.root)
         else:
             # Cannot instantiate or initialize FileHashStore without config
             exception_string = (
-                "FileHashStore - HashStore properties must be supplied."
-                + f" Properties: {properties}"
+                "HashStore properties must be supplied." + f" Properties: {properties}"
             )
-            logging.debug(exception_string)
+            self.fhs_logger.debug(exception_string)
             raise ValueError(exception_string)
 
     # Configuration and Related Methods

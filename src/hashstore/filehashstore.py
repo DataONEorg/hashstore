@@ -80,53 +80,6 @@ class FileHashStore(HashStore):
     ]
 
     def __init__(self, properties=None):
-        # Variables to orchestrate parallelization
-        # Check to see whether a multiprocessing or threading sync lock should be used
-        self.use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
-        if self.use_multiprocessing == "True":
-            # Create multiprocessing synchronization variables
-            # Synchronization values for object locked pids
-            self.object_pid_lock_mp = multiprocessing.Lock()
-            self.object_pid_condition_mp = multiprocessing.Condition(
-                self.object_pid_lock_mp
-            )
-            self.object_locked_pids_mp = multiprocessing.Manager().list()
-            # Synchronization values for object locked cids
-            self.object_cid_lock_mp = multiprocessing.Lock()
-            self.object_cid_condition_mp = multiprocessing.Condition(
-                self.object_cid_lock_mp
-            )
-            self.object_locked_cids_mp = multiprocessing.Manager().list()
-            # Synchronization values for metadata locked documents
-            self.metadata_lock_mp = multiprocessing.Lock()
-            self.metadata_condition_mp = multiprocessing.Condition(
-                self.metadata_lock_mp
-            )
-            self.metadata_locked_docs_mp = multiprocessing.Manager().list()
-            # Synchronization values for reference locked pids
-            self.reference_pid_lock_mp = multiprocessing.Lock()
-            self.reference_pid_condition_mp = multiprocessing.Condition(
-                self.reference_pid_lock_mp
-            )
-            self.reference_locked_pids_mp = multiprocessing.Manager().list()
-        else:
-            # Create threading synchronization variables
-            # Synchronization values for object locked pids
-            self.object_pid_lock_th = threading.Lock()
-            self.object_pid_condition_th = threading.Condition(self.object_pid_lock_th)
-            self.object_locked_pids_th = []
-            # Synchronization values for object locked cids
-            self.object_cid_lock_th = threading.Lock()
-            self.object_cid_condition_th = threading.Condition(self.object_cid_lock_th)
-            self.object_locked_cids_th = []
-            # Synchronization values for metadata locked documents
-            self.metadata_lock_th = threading.Lock()
-            self.metadata_condition_th = threading.Condition(self.metadata_lock_th)
-            self.metadata_locked_docs_th = []
-            # Synchronization values for reference locked pids
-            self.reference_pid_lock_th = threading.Lock()
-            self.reference_pid_condition_th = threading.Condition(self.metadata_lock_th)
-            self.reference_locked_pids_th = []
         # Now check properties
         if properties:
             # Validate properties against existing configuration if present
@@ -176,6 +129,63 @@ class FileHashStore(HashStore):
                 self._create_path(self.refs / "tmp")
                 self._create_path(self.refs / "pids")
                 self._create_path(self.refs / "cids")
+
+            # Variables to orchestrate parallelization
+            # Check to see whether a multiprocessing or threading sync lock should be used
+            self.use_multiprocessing = (
+                os.getenv("USE_MULTIPROCESSING", "False") == "True"
+            )
+            if self.use_multiprocessing == "True":
+                # Create multiprocessing synchronization variables
+                # Synchronization values for object locked pids
+                self.object_pid_lock_mp = multiprocessing.Lock()
+                self.object_pid_condition_mp = multiprocessing.Condition(
+                    self.object_pid_lock_mp
+                )
+                self.object_locked_pids_mp = multiprocessing.Manager().list()
+                # Synchronization values for object locked cids
+                self.object_cid_lock_mp = multiprocessing.Lock()
+                self.object_cid_condition_mp = multiprocessing.Condition(
+                    self.object_cid_lock_mp
+                )
+                self.object_locked_cids_mp = multiprocessing.Manager().list()
+                # Synchronization values for metadata locked documents
+                self.metadata_lock_mp = multiprocessing.Lock()
+                self.metadata_condition_mp = multiprocessing.Condition(
+                    self.metadata_lock_mp
+                )
+                self.metadata_locked_docs_mp = multiprocessing.Manager().list()
+                # Synchronization values for reference locked pids
+                self.reference_pid_lock_mp = multiprocessing.Lock()
+                self.reference_pid_condition_mp = multiprocessing.Condition(
+                    self.reference_pid_lock_mp
+                )
+                self.reference_locked_pids_mp = multiprocessing.Manager().list()
+            else:
+                # Create threading synchronization variables
+                # Synchronization values for object locked pids
+                self.object_pid_lock_th = threading.Lock()
+                self.object_pid_condition_th = threading.Condition(
+                    self.object_pid_lock_th
+                )
+                self.object_locked_pids_th = []
+                # Synchronization values for object locked cids
+                self.object_cid_lock_th = threading.Lock()
+                self.object_cid_condition_th = threading.Condition(
+                    self.object_cid_lock_th
+                )
+                self.object_locked_cids_th = []
+                # Synchronization values for metadata locked documents
+                self.metadata_lock_th = threading.Lock()
+                self.metadata_condition_th = threading.Condition(self.metadata_lock_th)
+                self.metadata_locked_docs_th = []
+                # Synchronization values for reference locked pids
+                self.reference_pid_lock_th = threading.Lock()
+                self.reference_pid_condition_th = threading.Condition(
+                    self.metadata_lock_th
+                )
+                self.reference_locked_pids_th = []
+
             logging.debug(
                 "FileHashStore - Initialization success. Store root: %s", self.root
             )

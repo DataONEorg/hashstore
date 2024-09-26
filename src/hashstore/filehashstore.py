@@ -290,7 +290,7 @@ class FileHashStore(HashStore):
         return
 
     @staticmethod
-    def _build_hashstore_yaml_string(
+    def _build_hashstore_yaml_string_old(
         store_depth: int,
         store_width: int,
         store_algorithm: str,
@@ -340,6 +340,80 @@ class FileHashStore(HashStore):
         - "SHA-512"
         """
         return hashstore_configuration_yaml
+
+    @staticmethod
+    def _build_hashstore_yaml_string(
+        store_depth: int,
+        store_width: int,
+        store_algorithm: str,
+        store_metadata_namespace: str,
+    ) -> str:
+        """Build a YAML string representing the configuration for a HashStore.
+
+        :param int store_depth: Depth when sharding an object's hex digest.
+        :param int store_width: Width of directories when sharding an object's hex digest.
+        :param str store_algorithm: Hash algorithm used for calculating the object's hex digest.
+        :param str store_metadata_namespace: Namespace for the HashStore's system metadata.
+
+        :return: A YAML string representing the configuration for a HashStore.
+        """
+        hashstore_configuration = {
+            "store_depth": store_depth,
+            "store_width": store_width,
+            "store_metadata_namespace": store_metadata_namespace,
+            "store_algorithm": store_algorithm,
+            "store_default_algo_list": [
+                "MD5",
+                "SHA-1",
+                "SHA-256",
+                "SHA-384",
+                "SHA-512",
+            ],
+        }
+
+        # The tabbing here is intentional otherwise the created .yaml will have extra tabs
+        hashstore_configuration_comments = f"""
+# Default configuration variables for HashStore
+
+############### HashStore Config Notes ###############
+############### Directory Structure ###############
+# store_depth
+# - Desired amount of directories when sharding an object to form the permanent address
+# - **WARNING**: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
+#
+# store_width
+# - Width of directories created when sharding an object to form the permanent address
+# - **WARNING**: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
+#
+# Example:
+# Below, objects are shown listed in directories that are 3 levels deep (DIR_DEPTH=3),
+# with each directory consisting of 2 characters (DIR_WIDTH=2).
+#    /var/filehashstore/objects
+#    ├── 7f
+#    │   └── 5c
+#    │       └── c1
+#    │           └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
+
+############### Format of the Metadata ###############
+# store_metadata_namespace
+# - The default metadata format (ex. system metadata)
+
+############### Hash Algorithms ###############
+# store_algorithm
+# - Hash algorithm to use when calculating object's hex digest for the permanent address
+#
+# store_default_algo_list
+# - Algorithm values supported by python hashlib 3.9.0+ for File Hash Store (FHS)
+# - The default algorithm list includes the hash algorithms calculated when storing an
+# - object to disk and returned to the caller after successful storage.
+
+"""
+
+        hashstore_yaml_with_comments = hashstore_configuration_comments + yaml.dump(
+            hashstore_configuration, sort_keys=False
+        )
+
+        return hashstore_yaml_with_comments
 
     def _verify_hashstore_properties(
         self, properties: Dict[str, Union[str, int]], prop_store_path: str

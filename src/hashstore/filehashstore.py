@@ -211,10 +211,7 @@ class FileHashStore(HashStore):
             - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
         """
         if not os.path.isfile(hashstore_yaml_path):
-            err_msg = (
-                "FileHashStore - load_properties: hashstore.yaml not found"
-                + " in store root path."
-            )
+            err_msg = "'hashstore.yaml' not found in store root path."
             logging.critical(err_msg)
             raise FileNotFoundError(err_msg)
 
@@ -227,9 +224,7 @@ class FileHashStore(HashStore):
         for key in hashstore_required_prop_keys:
             if key != "store_path":
                 hashstore_yaml_dict[key] = yaml_data[key]
-        logging.debug(
-            "FileHashStore - load_properties: Successfully retrieved 'hashstore.yaml' properties."
-        )
+        logging.debug("Successfully retrieved 'hashstore.yaml' properties.")
         return hashstore_yaml_dict
 
     def _write_properties(self, properties: Dict[str, Union[str, int]]) -> None:
@@ -244,10 +239,7 @@ class FileHashStore(HashStore):
         """
         # If hashstore.yaml already exists, must throw exception and proceed with caution
         if os.path.isfile(self.hashstore_configuration_yaml):
-            err_msg = (
-                "FileHashStore - write_properties: configuration file 'hashstore.yaml'"
-                + " already exists."
-            )
+            err_msg = "Configuration file 'hashstore.yaml' already exists."
             logging.error(err_msg)
             raise FileExistsError(err_msg)
         # Validate properties
@@ -266,9 +258,8 @@ class FileHashStore(HashStore):
             checked_store_algorithm = store_algorithm
         else:
             err_msg = (
-                f"FileHashStore - write_properties: algorithm supplied ({store_algorithm})"
-                f" cannot be used as default for HashStore. Must be one of: "
-                + f"{', '.join(accepted_store_algorithms)}"
+                f"Algorithm supplied ({store_algorithm}) cannot be used as default for"
+                f" HashStore. Must be one of: {', '.join(accepted_store_algorithms)}"
                 f" which are DataONE controlled algorithm values"
             )
             logging.error(err_msg)
@@ -292,62 +283,9 @@ class FileHashStore(HashStore):
             hs_yaml_file.write(hashstore_configuration_yaml)
 
         logging.debug(
-            "FileHashStore - write_properties: Configuration file written to: %s",
-            self.hashstore_configuration_yaml,
+            "Configuration file written to: %s", self.hashstore_configuration_yaml
         )
         return
-
-    @staticmethod
-    def _build_hashstore_yaml_string_old(
-        store_depth: int,
-        store_width: int,
-        store_algorithm: str,
-        store_metadata_namespace: str,
-    ) -> str:
-        """Build a YAML string representing the configuration for a HashStore.
-
-        :param int store_depth: Depth when sharding an object's hex digest.
-        :param int store_width: Width of directories when sharding an object's hex digest.
-        :param str store_algorithm: Hash algorithm used for calculating the object's hex digest.
-        :param str store_metadata_namespace: Namespace for the HashStore's system metadata.
-
-        :return: A YAML string representing the configuration for a HashStore.
-        """
-        hashstore_configuration_yaml = f"""
-        # Default configuration variables for HashStore
-
-        ############### Directory Structure ###############
-        # Desired amount of directories when sharding an object to form the permanent address
-        store_depth: {store_depth}  # WARNING: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
-        # Width of directories created when sharding an object to form the permanent address
-        store_width: {store_width}  # WARNING: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
-        # Example:
-        # Below, objects are shown listed in directories that are 3 levels deep (DIR_DEPTH=3),
-        # with each directory consisting of 2 characters (DIR_WIDTH=2).
-        #    /var/filehashstore/objects
-        #    ├── 7f
-        #    │   └── 5c
-        #    │       └── c1
-        #    │           └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
-
-        ############### Format of the Metadata ###############
-        # The default metadata format
-        store_metadata_namespace: "{store_metadata_namespace}"
-
-        ############### Hash Algorithms ###############
-        # Hash algorithm to use when calculating object's hex digest for the permanent address
-        store_algorithm: "{store_algorithm}"
-        # Algorithm values supported by python hashlib 3.9.0+ for File Hash Store (FHS)
-        # The default algorithm list includes the hash algorithms calculated when storing an
-        # object to disk and returned to the caller after successful storage.
-        store_default_algo_list:
-        - "MD5"
-        - "SHA-1"
-        - "SHA-256"
-        - "SHA-384"
-        - "SHA-512"
-        """
-        return hashstore_configuration_yaml
 
     @staticmethod
     def _build_hashstore_yaml_string(
@@ -440,8 +378,8 @@ class FileHashStore(HashStore):
         :param str prop_store_path: Store path to check.
         """
         if os.path.isfile(self.hashstore_configuration_yaml):
-            logging.debug(
-                "FileHashStore - Config found (hashstore.yaml) at {%s}. Verifying properties.",
+            self.fhs_logger.debug(
+                "Config found (hashstore.yaml) at {%s}. Verifying properties.",
                 self.hashstore_configuration_yaml,
             )
             # If 'hashstore.yaml' is found, verify given properties before init
@@ -456,11 +394,11 @@ class FileHashStore(HashStore):
                         supplied_key = int(properties[key])
                     if hashstore_yaml_dict[key] != supplied_key:
                         err_msg = (
-                            f"FileHashStore - Given properties ({key}: {properties[key]}) does not"
-                            + f" match. HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
+                            f"Given properties ({key}: {properties[key]}) does not match."
+                            + f" HashStore configuration ({key}: {hashstore_yaml_dict[key]})"
                             + f" found at: {self.hashstore_configuration_yaml}"
                         )
-                        logging.critical(err_msg)
+                        self.fhs_logger.critical(err_msg)
                         raise ValueError(err_msg)
         else:
             if os.path.exists(prop_store_path):
@@ -471,12 +409,11 @@ class FileHashStore(HashStore):
                     for sub in subfolders
                 ):
                     err_msg = (
-                        "FileHashStore - Unable to initialize HashStore. `hashstore.yaml` is not"
-                        + " present but conflicting HashStore directory exists. Please delete"
-                        + " '/objects', '/metadata' and/or '/refs' at the store path or supply"
-                        + " a new path."
+                        "Unable to initialize HashStore. `hashstore.yaml` is not present but "
+                        "conflicting HashStore directory exists. Please delete '/objects', "
+                        "'/metadata' and/or '/refs' at the store path or supply a new path."
                     )
-                    logging.critical(err_msg)
+                    self.fhs_logger.critical(err_msg)
                     raise RuntimeError(err_msg)
 
     def _validate_properties(
@@ -493,11 +430,8 @@ class FileHashStore(HashStore):
         :return: The given properties object (that has been validated).
         """
         if not isinstance(properties, dict):
-            err_msg = (
-                "FileHashStore - _validate_properties: Invalid argument -"
-                + " expected a dictionary."
-            )
-            logging.debug(err_msg)
+            err_msg = "Invalid argument expected a dictionary."
+            self.fhs_logger.error(err_msg)
             raise ValueError(err_msg)
 
         # New dictionary for validated properties
@@ -505,20 +439,14 @@ class FileHashStore(HashStore):
 
         for key in self.property_required_keys:
             if key not in properties:
-                err_msg = (
-                    "FileHashStore - _validate_properties: Missing required"
-                    + f" key: {key}."
-                )
-                logging.debug(err_msg)
+                err_msg = "Missing required key: {key}."
+                self.fhs_logger.error(err_msg)
                 raise KeyError(err_msg)
 
             value = properties.get(key)
             if value is None:
-                err_msg = (
-                    "FileHashStore - _validate_properties: Value for key:"
-                    + f" {key} is none."
-                )
-                logging.debug(err_msg)
+                err_msg = "Value for key: {key} is none."
+                self.fhs_logger.error(err_msg)
                 raise ValueError(err_msg)
 
             # Add key and values to checked_properties
@@ -528,11 +456,10 @@ class FileHashStore(HashStore):
                     checked_properties[key] = int(value)
                 except Exception as err:
                     err_msg = (
-                        "FileHashStore - _validate_properties: Unexpected exception when"
-                        " attempting to ensure store depth and width are integers. Details: "
-                        + str(err)
+                        "Unexpected exception when attempting to ensure store depth and width "
+                        f"are integers. Details: {err}"
                     )
-                    logging.debug(err_msg)
+                    self.fhs_logger.error(err_msg)
                     raise ValueError(err_msg)
             else:
                 checked_properties[key] = value
@@ -556,11 +483,8 @@ class FileHashStore(HashStore):
             return dataone_algo_translation[algo_to_translate]
 
         if not os.path.isfile(self.hashstore_configuration_yaml):
-            err_msg = (
-                "FileHashStore - set_default_algorithms: hashstore.yaml not found"
-                + " in store root path."
-            )
-            logging.critical(err_msg)
+            err_msg = "hashstore.yaml not found in store root path."
+            self.fhs_logger.critical(err_msg)
             raise FileNotFoundError(err_msg)
 
         with open(

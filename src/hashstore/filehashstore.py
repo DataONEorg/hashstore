@@ -2071,50 +2071,23 @@ class FileHashStore(HashStore):
 
         :param str cid: Content identifier
         """
-        cid_refs_abs_path = self._get_hashstore_cid_refs_path(cid)
-        # If the refs file still exists, do not delete the object
-        if not os.path.isfile(cid_refs_abs_path):
-            sync_begin_debug_msg = (
-                f"FileHashStore - delete_object: Cid ({cid}) to locked list."
-            )
-            sync_wait_msg = (
-                f"FileHashStore - delete_object: Cid ({cid}) is locked. Waiting."
-            )
-            if self.use_multiprocessing:
-                with self.object_cid_condition_mp:
-                    # Wait for the cid to release if it's in use
-                    while cid in self.object_locked_cids_mp:
-                        self.fhs_logger.debug(sync_wait_msg)
-                        self.object_cid_condition_mp.wait()
-                    # Modify reference_locked_cids consecutively
-                    self.fhs_logger.debug(sync_begin_debug_msg)
-                    self.object_locked_cids_mp.append(cid)
-            else:
-                with self.object_cid_condition_th:
-                    while cid in self.object_locked_cids_th:
-                        self.fhs_logger.debug(sync_wait_msg)
-                        self.object_cid_condition_th.wait()
-                    self.fhs_logger.debug(sync_begin_debug_msg)
-                    self.object_locked_cids_th.append(cid)
-
-            try:
-                self._delete("objects", cid)
-            finally:
-                # Release cid
-                end_sync_debug_msg = (
-                    f"FileHashStore - delete_object: Releasing cid ({cid})"
-                    + " from locked list"
+        try:
+            cid_refs_abs_path = self._get_hashstore_cid_refs_path(cid)
+            # If the refs file still exists, do not delete the object
+            self._synchronize_object_locked_cids(cid)
+            if os.path.isfile(cid_refs_abs_path):
+                debug_msg = (
+                    f"Cid reference file exists for: {cid}, skipping delete request."
                 )
-                if self.use_multiprocessing:
-                    with self.object_cid_condition_mp:
-                        self.fhs_logger.debug(end_sync_debug_msg)
-                        self.object_locked_cids_mp.remove(cid)
-                        self.object_cid_condition_mp.notify()
-                else:
-                    with self.object_cid_condition_th:
-                        self.fhs_logger.debug(end_sync_debug_msg)
-                        self.object_locked_cids_th.remove(cid)
-                        self.object_cid_condition_th.notify()
+                self.fhs_logger.debug(debug_msg)
+
+            else:
+                self._delete("objects", cid)
+                info_msg = f"Deleted object only for cid: {cid}"
+                self.fhs_logger.info(info_msg)
+
+        finally:
+            self._release_object_locked_cids(cid)
 
     def _check_arg_algorithms_and_checksum(
         self,

@@ -2651,7 +2651,7 @@ class FileHashStore(HashStore):
                 self.object_locked_pids_th.append(pid)
                 logging.debug(
                     f"_synchronize_object_locked_pids: Synchronizing object_locked_pids_th for"
-                    + f" cid: {pid}"
+                    + f" pid: {pid}"
                 )
 
     def _release_object_locked_pids(self, pid: str) -> None:

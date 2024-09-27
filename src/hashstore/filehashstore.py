@@ -2132,7 +2132,7 @@ class FileHashStore(HashStore):
         """
         if format_id and not format_id.strip():
             err_msg = f"FileHashStore - {method}: Format_id cannot be empty."
-            logging.error(err_msg)
+            self.fhs_logger.error(err_msg)
             raise ValueError(err_msg)
         elif format_id is None:
             # Use default value set by hashstore config
@@ -2156,19 +2156,19 @@ class FileHashStore(HashStore):
             self._clean_algorithm(checksum_algorithm)
             if checksum_algorithm in self.other_algo_list:
                 debug_additional_other_algo_str = (
-                    f"FileHashStore - _refine_algorithm_list: checksum algo: {checksum_algorithm}"
-                    + " found in other_algo_lists, adding to list of algorithms to calculate."
+                    f"Checksum algo: {checksum_algorithm} found in other_algo_lists, adding to "
+                    + f"list of algorithms to calculate."
                 )
-                logging.debug(debug_additional_other_algo_str)
+                self.fhs_logger.debug(debug_additional_other_algo_str)
                 algorithm_list_to_calculate.append(checksum_algorithm)
         if additional_algorithm is not None:
             self._clean_algorithm(additional_algorithm)
             if additional_algorithm in self.other_algo_list:
                 debug_additional_other_algo_str = (
-                    f"FileHashStore - _refine_algorithm_list: addit algo: {additional_algorithm}"
-                    + " found in other_algo_lists, adding to list of algorithms to calculate."
+                    f"Additional algo: {additional_algorithm} found in other_algo_lists, "
+                    + f"adding to list of algorithms to calculate."
                 )
-                logging.debug(debug_additional_other_algo_str)
+                self.fhs_logger.debug(debug_additional_other_algo_str)
                 algorithm_list_to_calculate.append(additional_algorithm)
 
         # Remove duplicates
@@ -2196,11 +2196,8 @@ class FileHashStore(HashStore):
             cleaned_string not in self.default_algo_list
             and cleaned_string not in self.other_algo_list
         ):
-            err_msg = (
-                "FileHashStore: _clean_algorithm: Algorithm not supported:"
-                + cleaned_string
-            )
-            logging.error(err_msg)
+            err_msg = f"Algorithm not supported: {cleaned_string}"
+            self.fhs_logger.error(err_msg)
             raise UnsupportedAlgorithm(err_msg)
         return cleaned_string
 
@@ -2365,7 +2362,7 @@ class FileHashStore(HashStore):
 
         except Exception as err:
             err_msg = f"FileHashStore - delete(): Unexpected {err=}, {type(err)=}"
-            logging.error(err_msg)
+            self.fhs_logger.error(err_msg)
             raise err
 
     def _create_path(self, path: Path) -> None:
@@ -2437,9 +2434,8 @@ class FileHashStore(HashStore):
                     return Path(relpath)
                 else:
                     raise FileNotFoundError(
-                        "FileHashStore - _get_hashstore_data_object_path: could not locate a"
-                        + "data object in '/objects' for the supplied cid_or_relative_path: "
-                        + cid_or_relative_path
+                        "Could not locate a data object in '/objects' for the supplied "
+                        + f"cid_or_relative_path: {cid_or_relative_path}"
                     )
 
     def _get_hashstore_metadata_path(self, metadata_relative_path: str) -> Path:
@@ -2460,9 +2456,8 @@ class FileHashStore(HashStore):
                 return Path(metadata_relative_path)
             else:
                 raise FileNotFoundError(
-                    "FileHashStore - _get_hashstore_metadata_path: could not locate a"
-                    + "metadata object in '/metadata' for the supplied metadata_relative_path: "
-                    + str(metadata_relative_path)
+                    "Could not locate a metadata object in '/metadata' for the supplied "
+                    + f"metadata_relative_path: {metadata_relative_path}"
                 )
 
     def _get_hashstore_pid_refs_path(self, pid: str) -> Path:
@@ -2504,27 +2499,17 @@ class FileHashStore(HashStore):
             with self.object_pid_condition_mp:
                 # Wait for the cid to release if it's being tagged
                 while pid in self.object_locked_pids_mp:
-                    logging.debug(
-                        f"_synchronize_object_locked_pids: Pid ({pid}) is locked. Waiting."
-                    )
+                    self.fhs_logger.debug(f"Pid ({pid}) is locked. Waiting.")
                     self.object_pid_condition_mp.wait()
                 self.object_locked_pids_mp.append(pid)
-                logging.debug(
-                    f"_synchronize_object_locked_pids: Synchronizing object_locked_pids_mp for"
-                    + f" pid: {pid}"
-                )
+            self.fhs_logger.debug(f"Synchronizing object_locked_pids_mp for pid: {pid}")
         else:
             with self.object_pid_condition_th:
                 while pid in self.object_locked_pids_th:
-                    logging.debug(
-                        f"_synchronize_object_locked_pids: Pid ({pid}) is locked. Waiting."
-                    )
+                    self.fhs_logger.debug(f"Pid ({pid}) is locked. Waiting.")
                     self.object_pid_condition_th.wait()
                 self.object_locked_pids_th.append(pid)
-                logging.debug(
-                    f"_synchronize_object_locked_pids: Synchronizing object_locked_pids_th for"
-                    + f" pid: {pid}"
-                )
+            self.fhs_logger.debug(f"Synchronizing object_locked_pids_th for pid: {pid}")
 
     def _release_object_locked_pids(self, pid: str) -> None:
         """Remove the given persistent identifier from 'object_locked_pids' and notify other
@@ -2536,11 +2521,15 @@ class FileHashStore(HashStore):
             with self.object_pid_condition_mp:
                 self.object_locked_pids_mp.remove(pid)
                 self.object_pid_condition_mp.notify()
+            end_sync_debug_msg = f"Releasing pid ({pid}) from object_locked_pids_mp."
+            self.fhs_logger.debug(end_sync_debug_msg)
         else:
             # Release pid
             with self.object_pid_condition_th:
                 self.object_locked_pids_th.remove(pid)
                 self.object_pid_condition_th.notify()
+            end_sync_debug_msg = f"Releasing pid ({pid}) from object_locked_pids_th."
+            self.fhs_logger.debug(end_sync_debug_msg)
 
     def _synchronize_object_locked_cids(self, cid: str) -> None:
         """Multiple threads may access a data object via its 'cid' or the respective 'cid
@@ -2553,28 +2542,18 @@ class FileHashStore(HashStore):
             with self.object_cid_condition_mp:
                 # Wait for the cid to release if it's being tagged
                 while cid in self.object_locked_cids_mp:
-                    logging.debug(
-                        f"synchronize_referenced_locked_cids: Cid ({cid}) is locked. Waiting."
-                    )
+                    self.fhs_logger.debug(f"Cid ({cid}) is locked. Waiting.")
                     self.object_cid_condition_mp.wait()
                 # Modify reference_locked_cids consecutively
                 self.object_locked_cids_mp.append(cid)
-                logging.debug(
-                    f"synchronize_referenced_locked_cids: Synchronizing object_locked_cids_mp for"
-                    + f" cid: {cid}"
-                )
+            self.fhs_logger.debug(f"Synchronizing object_locked_cids_mp for cid: {cid}")
         else:
             with self.object_cid_condition_th:
                 while cid in self.object_locked_cids_th:
-                    logging.debug(
-                        f"synchronize_referenced_locked_cids: Cid ({cid}) is locked. Waiting."
-                    )
+                    self.fhs_logger.debug(f"Cid ({cid}) is locked. Waiting.")
                     self.object_cid_condition_th.wait()
                 self.object_locked_cids_th.append(cid)
-                logging.debug(
-                    f"synchronize_referenced_locked_cids: Synchronizing object_locked_cids_th for"
-                    + f" cid: {cid}"
-                )
+            self.fhs_logger.debug(f"Synchronizing object_locked_cids_th for cid: {cid}")
 
     def _check_object_locked_cids(self, cid: str) -> None:
         """Check that a given content identifier is currently locked (found in the
@@ -2584,13 +2563,13 @@ class FileHashStore(HashStore):
         """
         if self.use_multiprocessing:
             if cid not in self.object_locked_cids_mp:
-                err_msg = f"_check_object_locked_cids: cid {cid} is not locked."
-                logging.error(err_msg)
+                err_msg = f"Cid {cid} is not locked."
+                self.fhs_logger.error(err_msg)
                 raise IdentifierNotLocked(err_msg)
         else:
             if cid not in self.object_locked_cids_th:
-                err_msg = f"_check_object_locked_cids: cid {cid} is not locked."
-                logging.error(err_msg)
+                err_msg = f"Cid {cid} is not locked."
+                self.fhs_logger.error(err_msg)
                 raise IdentifierNotLocked(err_msg)
 
     def _release_object_locked_cids(self, cid: str) -> None:
@@ -2603,20 +2582,14 @@ class FileHashStore(HashStore):
             with self.object_cid_condition_mp:
                 self.object_locked_cids_mp.remove(cid)
                 self.object_cid_condition_mp.notify()
-                end_sync_debug_msg = (
-                    f"FileHashStore - _release_object_locked_cids: Releasing cid ({cid}) from"
-                    + " object_cid_condition_mp."
-                )
-                logging.debug(end_sync_debug_msg)
+            end_sync_debug_msg = f"Releasing cid ({cid}) from object_cid_condition_mp."
+            self.fhs_logger.debug(end_sync_debug_msg)
         else:
             with self.object_cid_condition_th:
                 self.object_locked_cids_th.remove(cid)
                 self.object_cid_condition_th.notify()
-                end_sync_debug_msg = (
-                    f"FileHashStore - _release_object_locked_cids: Releasing cid ({cid}) from"
-                    + " object_cid_condition_th."
-                )
-                logging.debug(end_sync_debug_msg)
+            end_sync_debug_msg = f"Releasing cid ({cid}) from object_cid_condition_th."
+            self.fhs_logger.debug(end_sync_debug_msg)
 
     def _synchronize_referenced_locked_pids(self, pid: str) -> None:
         """Multiple threads may interact with a pid (to tag, untag, delete) and these actions
@@ -2628,28 +2601,22 @@ class FileHashStore(HashStore):
             with self.reference_pid_condition_mp:
                 # Wait for the pid to release if it's in use
                 while pid in self.reference_locked_pids_mp:
-                    logging.debug(
-                        f"_synchronize_referenced_locked_pids: Pid ({pid}) is locked. Waiting."
-                    )
+                    self.fhs_logger.debug(f"Pid ({pid}) is locked. Waiting.")
                     self.reference_pid_condition_mp.wait()
                 # Modify reference_locked_pids consecutively
                 self.reference_locked_pids_mp.append(pid)
-                logging.debug(
-                    f"_synchronize_referenced_locked_pids: Synchronizing reference_locked_pids_mp"
-                    + f" for pid: {pid}"
-                )
+            self.fhs_logger.debug(
+                f"Synchronizing reference_locked_pids_mp for pid: {pid}"
+            )
         else:
             with self.reference_pid_condition_th:
                 while pid in self.reference_locked_pids_th:
-                    logging.debug(
-                        f"_synchronize_referenced_locked_pids: Pid ({pid}) is locked. Waiting."
-                    )
+                    logging.debug(f"Pid ({pid}) is locked. Waiting.")
                     self.reference_pid_condition_th.wait()
                 self.reference_locked_pids_th.append(pid)
-                logging.debug(
-                    f"_synchronize_referenced_locked_pids: Synchronizing reference_locked_pids_th"
-                    + f" for pid: {pid}"
-                )
+            self.fhs_logger.debug(
+                f"Synchronizing reference_locked_pids_th for pid: {pid}"
+            )
 
     def _check_reference_locked_pids(self, pid: str) -> None:
         """Check that a given persistent identifier is currently locked (found in the
@@ -2659,13 +2626,13 @@ class FileHashStore(HashStore):
         """
         if self.use_multiprocessing:
             if pid not in self.reference_locked_pids_mp:
-                err_msg = f"_check_reference_locked_pids: pid {pid} is not locked."
-                logging.error(err_msg)
+                err_msg = f"Pid {pid} is not locked."
+                self.fhs_logger.error(err_msg)
                 raise IdentifierNotLocked(err_msg)
         else:
             if pid not in self.reference_locked_pids_th:
-                err_msg = f"_check_reference_locked_pids: pid {pid} is not locked."
-                logging.error(err_msg)
+                err_msg = f"Pid {pid} is not locked."
+                self.fhs_logger.error(err_msg)
                 raise IdentifierNotLocked(err_msg)
 
     def _release_reference_locked_pids(self, pid: str) -> None:
@@ -2678,21 +2645,15 @@ class FileHashStore(HashStore):
             with self.reference_pid_condition_mp:
                 self.reference_locked_pids_mp.remove(pid)
                 self.reference_pid_condition_mp.notify()
-                end_sync_debug_msg = (
-                    f"FileHashStore - _release_reference_locked_pids: Releasing pid ({pid}) from"
-                    + " reference_locked_pids_mp."
-                )
-                logging.debug(end_sync_debug_msg)
+            end_sync_debug_msg = f"Releasing pid ({pid}) from reference_locked_pids_mp."
+            self.fhs_logger.debug(end_sync_debug_msg)
         else:
             # Release pid
             with self.reference_pid_condition_th:
                 self.reference_locked_pids_th.remove(pid)
                 self.reference_pid_condition_th.notify()
-                end_sync_debug_msg = (
-                    f"FileHashStore - _release_reference_locked_pids: Releasing pid ({pid}) from"
-                    + " reference_locked_pids_th."
-                )
-                logging.debug(end_sync_debug_msg)
+            end_sync_debug_msg = f"Releasing pid ({pid}) from reference_locked_pids_th."
+            self.fhs_logger.debug(end_sync_debug_msg)
 
     # Other Static Methods
     @staticmethod

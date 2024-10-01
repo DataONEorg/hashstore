@@ -759,8 +759,6 @@ class FileHashStore(HashStore):
         # Storing and deleting objects are synchronized together
         # Duplicate store object requests for a pid are rejected, but deleting an object
         # will wait for a pid to be released if it's found to be in use before proceeding.
-        sync_begin_debug_msg = f"Pid ({pid}) to locked list."
-        sync_wait_msg = f"Pid ({pid}) is locked. Waiting."
 
         try:
             # Before we begin deletion process, we look for the `cid` by calling
@@ -983,7 +981,10 @@ class FileHashStore(HashStore):
             try:
                 full_path_without_directory = Path(self.metadata / rel_path / pid_doc)
                 self._delete("metadata", full_path_without_directory)
-                info_string = f"Successfully deleted metadata for pid: {pid} for format_id: {format_id}"
+                info_string = (
+                    f"Deleted metadata for pid: {pid} for format_id: {format_id}"
+                )
+
                 self.fhs_logger.info(info_string)
             finally:
                 # Release pid
@@ -1774,7 +1775,9 @@ class FileHashStore(HashStore):
             delete_list.append(self._rename_path_for_deletion(pid_refs_path))
 
         except Exception as e:
-            err_msg = f"Unable to delete pid refs file: {pid_refs_path} for pid: {pid}. Details: {e}"
+            err_msg = (
+                f"Unable to delete pid refs file: {pid_refs_path} for pid: {pid}. {e}"
+            )
             self.fhs_logger.error(err_msg)
 
     def _remove_pid_and_handle_cid_refs_deletion(
@@ -2027,7 +2030,9 @@ class FileHashStore(HashStore):
         :param path cid_refs_path: Path to cid refs file
         :param str additional_log_string: String to append to exception statement
         """
-        debug_msg = f"Verifying pid ({pid}) and cid ({cid}) refs files. Note: {additional_log_string}"
+        debug_msg = (
+            f"Verifying pid ({pid}) and cid ({cid}) refs files. {additional_log_string}"
+        )
         self.fhs_logger.debug(debug_msg)
         if pid_refs_path is None:
             pid_refs_path = self._get_hashstore_pid_refs_path(pid)

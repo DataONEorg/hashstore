@@ -1,11 +1,26 @@
 ## HashStore: hash-based object storage for DataONE data packages
 
+Version: 1.1.0
+DOI: DOI_ID_PLACEHOLDER
+
+## Contributors
+
 - **Author**: Dou Mok, Matthew Brooke, Jing Tao, Jeanette Clarke, Ian Nesbitt, Matthew B. Jones
 - **License**: [Apache 2](http://opensource.org/licenses/Apache-2.0)
 - [Package source code on GitHub](https://github.com/DataONEorg/hashstore)
 - [**Submit Bugs and feature requests**](https://github.com/DataONEorg/hashstore/issues)
 - Contact us: support@dataone.org
 - [DataONE discussions](https://github.com/DataONEorg/dataone/discussions)
+
+## Citation
+
+Cite this software as:
+
+> Dou Mok, Matthew Brooke, Jing Tao, Jeanette Clarke, Ian Nesbitt, Matthew B. Jones. 2024. 
+> HashStore: hash-based object storage for DataONE data packages. Arctic Data Center.
+> [doi-id-plchldr](doi-url-plchldr)
+
+## Introduction
 
 HashStore is a server-side python package that implements an object storage file system for storing
 and accessing data and metadata for DataONE services. The package is used in DataONE system

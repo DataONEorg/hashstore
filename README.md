@@ -55,12 +55,12 @@ the expected usage of HashStore.
 ### Public API Methods
 
 - store_object
-- verify_object
 - tag_object
 - store_metadata
 - retrieve_object
 - retrieve_metadata
 - delete_object
+- delete_if_invalid_object
 - delete_metadata
 - get_hex_digest
 

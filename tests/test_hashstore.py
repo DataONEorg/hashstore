@@ -23,8 +23,8 @@ def test_factory_get_hashstore_filehashstore(factory, props):
     module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
     # These props can be found in tests/conftest.py
-    store = factory.get_hashstore(module_name, class_name, props)
-    assert isinstance(store, FileHashStore)
+    this_store = factory.get_hashstore(module_name, class_name, props)
+    assert isinstance(this_store, FileHashStore)
 
 
 def test_factory_get_hashstore_unsupported_class(factory):

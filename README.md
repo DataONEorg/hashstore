@@ -1,7 +1,7 @@
 ## HashStore: hash-based object storage for DataONE data packages
 
 Version: 1.1.0
-DOI: DOI_ID_PLACEHOLDER
+DOI: [doi:10.18739/A2ZG6G87Q](https://doi.org/10.18739/A2ZG6G87Q)
 
 ## Contributors
 
@@ -18,7 +18,7 @@ Cite this software as:
 
 > Dou Mok, Matthew Brooke, Jing Tao, Jeanette Clarke, Ian Nesbitt, Matthew B. Jones. 2024. 
 > HashStore: hash-based object storage for DataONE data packages. Arctic Data Center.
-> [doi-id-plchldr](doi-url-plchldr)
+> [doi:10.18739/A2ZG6G87Q](https://doi.org/10.18739/A2ZG6G87Q)
 
 ## Introduction
 

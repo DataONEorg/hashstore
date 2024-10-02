@@ -1,8 +1,11 @@
-"""Test module for the Python client (Public API calls only)"""
+"""Test module for the Python client (Public API calls only)."""
+
 import sys
 import os
 from pathlib import Path
-from hashstore import client
+from hashstore import hashstoreclient
+
+# pylint: disable=W0212
 
 
 def test_create_hashstore(tmp_path):
@@ -29,7 +32,7 @@ def test_create_hashstore(tmp_path):
     sys.path.append(client_directory)
     # Manually change sys args to simulate command line arguments
     sys.argv = chs_args
-    client.main()
+    hashstoreclient.main()
 
     hashstore_yaml = Path(client_test_store + "/hashstore.yaml")
     hashstore_object_path = Path(client_test_store + "/objects")
@@ -41,14 +44,49 @@ def test_create_hashstore(tmp_path):
     assert os.path.exists(hashstore_client_python_log)
 
 
+def test_get_checksum(capsys, store, pids):
+    """Test calculating a hash via HashStore through client."""
+    client_directory = os.getcwd() + "/src/hashstore"
+    test_dir = "tests/testdata/"
+    for pid in pids.keys():
+        path = test_dir + pid.replace("/", "_")
+        store.store_object(pid, path)
+
+        client_module_path = f"{client_directory}/client.py"
+        test_store = str(store.root)
+        get_checksum_opt = "-getchecksum"
+        client_pid_arg = f"-pid={pid}"
+        algo_arg = f"-algo={store.algorithm}"
+        chs_args = [
+            client_module_path,
+            test_store,
+            get_checksum_opt,
+            client_pid_arg,
+            algo_arg,
+        ]
+
+        # Add file path of HashStore to sys so modules can be discovered
+        sys.path.append(client_directory)
+        # Manually change sys args to simulate command line arguments
+        sys.argv = chs_args
+        hashstoreclient.main()
+
+        capsystext = capsys.readouterr().out
+        expected_output = (
+            f"guid/pid: {pid}\n"
+            + f"algorithm: {store.algorithm}\n"
+            + f"Checksum/Hex Digest: {pids[pid][store.algorithm]}\n"
+        )
+        assert capsystext == expected_output
+
+
 def test_store_object(store, pids):
     """Test storing objects to HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         store_object_opt = "-storeobject"
         client_pid_arg = f"-pid={pid}"
         path = f'-path={test_dir + pid.replace("/", "_")}'
@@ -64,22 +102,22 @@ def test_store_object(store, pids):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
-        assert store.exists("objects", pids[pid]["object_cid"])
+        assert store._exists("objects", pids[pid][store.algorithm])
 
 
-def test_store_metadata(store, pids):
+def test_store_metadata(capsys, store, pids):
     """Test storing metadata to HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    namespace = "http://ns.dataone.org/service/types/v2.0"
+    namespace = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    entity = "metadata"
     for pid in pids.keys():
-        path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         store_metadata_opt = "-storemetadata"
         client_pid_arg = f"-pid={pid}"
         path = f"-path={syspath}"
@@ -97,9 +135,19 @@ def test_store_metadata(store, pids):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
-        assert store.exists("metadata", pids[pid]["metadata_cid"])
+        metadata_directory = store._computehash(pid)
+        metadata_document_name = store._computehash(pid + namespace)
+        rel_path = Path(*store._shard(metadata_directory))
+        full_path = (
+            store._get_store_path("metadata") / rel_path / metadata_document_name
+        )
+        capsystext = capsys.readouterr().out
+        expected_output = f"Metadata Path: {full_path}\n"
+        assert capsystext == expected_output
+
+    assert store._count(entity) == 3
 
 
 def test_retrieve_objects(capsys, pids, store):
@@ -108,10 +156,10 @@ def test_retrieve_objects(capsys, pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        _object_metadata = store.store_object(pid, path)
+        store.store_object(pid, path)
 
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         delete_object_opt = "-retrieveobject"
         client_pid_arg = f"-pid={pid}"
         chs_args = [
@@ -125,7 +173,7 @@ def test_retrieve_objects(capsys, pids, store):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
         object_stream = store.retrieve_object(pid)
         object_content = (
@@ -144,14 +192,14 @@ def test_retrieve_metadata(capsys, pids, store):
     """Test retrieving metadata from a HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    namespace = "http://ns.dataone.org/service/types/v2.0"
+    namespace = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _metadata_cid = store.store_metadata(pid, syspath, namespace)
 
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         retrieve_metadata_opt = "-retrievemetadata"
         client_pid_arg = f"-pid={pid}"
         format_id = f"-formatid={namespace}"
@@ -167,7 +215,7 @@ def test_retrieve_metadata(capsys, pids, store):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
         metadata_stream = store.retrieve_metadata(pid, namespace)
         metadata_content = (
@@ -188,10 +236,10 @@ def test_delete_objects(pids, store):
     test_dir = "tests/testdata/"
     for pid in pids.keys():
         path = test_dir + pid.replace("/", "_")
-        _object_metadata = store.store_object(pid, path)
+        store.store_object(pid, path)
 
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         delete_object_opt = "-deleteobject"
         client_pid_arg = f"-pid={pid}"
         chs_args = [
@@ -205,23 +253,23 @@ def test_delete_objects(pids, store):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
-        assert not store.exists("objects", pids[pid]["object_cid"])
+        assert not store._exists("objects", pids[pid][store.algorithm])
 
 
 def test_delete_metadata(pids, store):
     """Test deleting metadata from a HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    namespace = "http://ns.dataone.org/service/types/v2.0"
+    namespace = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     for pid in pids.keys():
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _metadata_cid = store.store_metadata(pid, syspath, namespace)
 
         client_module_path = f"{client_directory}/client.py"
-        test_store = store.root
+        test_store = str(store.root)
         delete_metadata_opt = "-deletemetadata"
         client_pid_arg = f"-pid={pid}"
         format_id = f"-formatid={namespace}"
@@ -237,6 +285,6 @@ def test_delete_metadata(pids, store):
         sys.path.append(client_directory)
         # Manually change sys args to simulate command line arguments
         sys.argv = chs_args
-        client.main()
+        hashstoreclient.main()
 
-        assert not store.exists("metadata", pids[pid]["metadata_cid"])
+        assert not store._exists("metadata", pids[pid]["metadata_cid"])

@@ -1,13 +1,13 @@
 """Hashstore Interface"""
+
 from abc import ABC, abstractmethod
-from collections import namedtuple
 import importlib.metadata
+import importlib.util
 
 
 class HashStore(ABC):
-    """HashStore is a content-addressable file management system that
-    utilizes a persistent identifier (PID) in the form of a hex digest
-    value to address files."""
+    """HashStore is a content-addressable file management system that utilizes
+    an object's content identifier (hex digest/checksum) to address files."""
 
     @staticmethod
     def version():
@@ -25,174 +25,185 @@ class HashStore(ABC):
         checksum_algorithm,
         expected_object_size,
     ):
-        """The `store_object` method is responsible for the atomic storage of objects to
-        disk using a given InputStream and a persistent identifier (pid). Upon
-        successful storage, the method returns a ObjectMetadata object containing
-        relevant file information, such as the file's id (which can be used to locate the
-        object on disk), the file's size, and a hex digest map of algorithms and checksums.
-        `store_object` also ensures that an object is stored only once by synchronizing
-        multiple calls and rejecting calls to store duplicate objects.
+        """Atomic storage of objects to disk using a given stream. Upon successful storage,
+        it returns an `ObjectMetadata` object containing relevant file information, such as
+        a persistent identifier that references the data file, the file's size, and a hex digest
+        dictionary of  algorithms and checksums. The method also tags the object, creating
+        references for discoverability.
 
-        The file's id is determined by calculating the SHA-256 hex digest of the
-        provided pid, which is also used as the permanent address of the file. The
-        file's identifier is then sharded using a depth of 3 and width of 2,
-        delimited by '/' and concatenated to produce the final permanent address
-        and is stored in the `/store_directory/objects/` directory.
+        `store_object` ensures that an object is stored only once by synchronizing multiple calls
+        and rejecting attempts to store duplicate objects. If called without a pid, it stores the
+        object without tagging, and it becomes the caller's responsibility to finalize the process
+        by calling `tag_object` after verifying the correct object is stored.
 
-        By default, the hex digest map includes the following hash algorithms:
-        Default algorithms and hex digests to return: md5, sha1, sha256, sha384, sha512,
-        which are the most commonly used algorithms in dataset submissions to DataONE
-        and the Arctic Data Center. If an additional algorithm is provided, the
-        `store_object` method checks if it is supported and adds it to the map along
-        with its corresponding hex digest. An algorithm is considered "supported" if it
-        is recognized as a valid hash algorithm in the `hashlib` library.
+        The file's permanent address is determined by calculating the object's content identifier
+        based on the store's default algorithm, which is also the permanent address of the file.
+        The content identifier is then sharded using the store's configured depth and width,
+        delimited by '/', and concatenated to produce the final permanent address. This address
+        is stored in the `/store_directory/objects/` directory.
 
-        Similarly, if a file size and/or checksum & checksumAlgorithm value are provided,
-        `store_object` validates the object to ensure it matches the given arguments
-        before moving the file to its permanent address.
+        By default, the hex digest map includes common hash algorithms (md5, sha1, sha256, sha384,
+        sha512). If an additional algorithm is provided, the method checks if it is supported and
+        adds it to the hex digests dictionary along with its corresponding hex digest. An algorithm
+        is considered "supported" if it is recognized as a valid hash algorithm in the `hashlib`
+        library.
 
-        Args:
-            pid (string): Authority-based identifier.
-            data (mixed): String or path to object.
-            additional_algorithm (string): Additional hex digest to include.
-            checksum (string): Checksum to validate against.
-            checksum_algorithm (string): Algorithm of supplied checksum.
-            expected_object_size (int): Size of object to verify
+        If file size and/or checksum & checksum_algorithm values are provided, `store_object`
+        validates the object to ensure it matches the given arguments before moving the file to
+        its permanent address.
 
-        Returns:
-            object_metadata (ObjectMetadata): Object that contains the permanent address,
-            file size, duplicate file boolean and hex digest dictionary.
+        :param str pid: Authority-based identifier.
+        :param mixed data: String or path to the object.
+        :param str additional_algorithm: Additional hex digest to include.
+        :param str checksum: Checksum to validate against.
+        :param str checksum_algorithm: Algorithm of the supplied checksum.
+        :param int expected_object_size: Size of the object to verify.
+
+        :return: ObjectMetadata - Object containing the persistent identifier (pid),
+        content identifier (cid), object size and hex digests dictionary (checksums).
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def tag_object(self, pid, cid):
+        """Creates references that allow objects stored in HashStore to be discoverable.
+        Retrieving, deleting or calculating a hex digest of an object is based on a pid
+        argument, to proceed, we must be able to find the object associated with the pid.
+
+        :param str pid: Authority-based or persistent identifier of the object.
+        :param str cid: Content identifier of the object.
         """
         raise NotImplementedError()
 
     @abstractmethod
     def store_metadata(self, pid, metadata, format_id):
-        """The `store_metadata` method is responsible for adding and/or updating metadata
-        (ex. `sysmeta`) to disk using a given path/stream, a persistent identifier `pid`
-        and a metadata `format_id`. The metadata object's permanent address, which is
-        determined by calculating the SHA-256 hex digest of the provided `pid` + `format_id`.
+        """Add or update metadata, such as `sysmeta`, to disk using the given path/stream. The
+        `store_metadata` method uses a persistent identifier `pid` and a metadata `format_id`
+        to determine the permanent address of the metadata object. All metadata documents for a
+        given `pid` will be stored in a directory that follows the HashStore configuration
+        settings (under ../metadata) that is determined by calculating the hash of the given pid.
+        Metadata documents are stored in this directory, and is each named using the hash of the pid
+        and metadata format (`pid` + `format_id`).
 
-        Upon successful storage of metadata, `store_metadata` returns a string that
-        represents the file's permanent address. Lastly, the metadata objects are stored
-        in parallel to objects in the `/store_directory/metadata/` directory.
+        Upon successful storage of metadata, the method returns a string representing the file's
+        permanent address. Metadata objects are stored in parallel to objects in the
+        `/store_directory/metadata/` directory.
 
-        Args:
-            pid (string): Authority-based identifier.
-            format_id (string): Metadata format
-            metadata (mixed): String or path to metadata document.
+        :param str pid: Authority-based identifier.
+        :param mixed metadata: String or path to the metadata document.
+        :param str format_id: Metadata format.
 
-        Returns:
-            metadata_cid (string): Address of the metadata document.
+        :return: str - Address of the metadata document.
         """
         raise NotImplementedError()
 
     @abstractmethod
     def retrieve_object(self, pid):
-        """The `retrieve_object` method retrieves an object from disk using a given
-        persistent identifier (pid). If the object exists (determined by calculating
-        the object's permanent address using the SHA-256 hash of the given pid), the
-        method will open and return a buffered object stream ready to read from.
+        """Retrieve an object from disk using a persistent identifier (pid). The `retrieve_object`
+        method opens and returns a buffered object stream ready for reading if the object
+        associated with the provided `pid` exists on disk.
 
-        Args:
-            pid (string): Authority-based identifier.
+        :param str pid: Authority-based identifier.
 
-        Returns:
-            obj_stream (io.BufferedReader): A buffered stream of a data object.
+        :return: io.BufferedReader - Buffered stream of the data object.
         """
         raise NotImplementedError()
 
     @abstractmethod
     def retrieve_metadata(self, pid, format_id):
-        """The 'retrieve_metadata' method retrieves the metadata object from disk using
-        a given persistent identifier (pid) and metadata namespace (format_id).
-        If the object exists (determined by calculating the metadata object's permanent
-        address using the SHA-256 hash of the given pid+format_id), the method will open
-        and return a buffered metadata stream ready to read from.
+        """Retrieve the metadata object from disk using a persistent identifier (pid)
+        and metadata namespace (format_id). If the metadata document exists, the method opens
+        and returns a buffered metadata stream ready for reading.
 
-        Args:
-            pid (string): Authority-based identifier
-            format_id (string): Metadata format
+        :param str pid: Authority-based identifier.
+        :param str format_id: Metadata format.
 
-        Returns:
-            metadata_stream (io.BufferedReader): A buffered stream of a metadata object.
+        :return: io.BufferedReader - Buffered stream of the metadata object.
         """
         raise NotImplementedError()
 
     @abstractmethod
     def delete_object(self, pid):
-        """The 'delete_object' method deletes an object permanently from disk using a
-        given persistent identifier.
+        """Deletes an object and its related data permanently from HashStore using a given
+        persistent identifier. The object associated with the pid will be deleted if it is not
+        referenced by any other pids, along with its reference files and all metadata documents
+        found in its respective metadata directory.
 
-        Args:
-            pid (string): Authority-based identifier.
+        :param str pid: Persistent or Authority-based identifier.
+        """
+        raise NotImplementedError()
 
-        Returns:
-            boolean: `True` upon successful deletion.
+    @abstractmethod
+    def delete_if_invalid_object(
+        self, object_metadata, checksum, checksum_algorithm, expected_file_size
+    ):
+        """Confirm equality of content in an ObjectMetadata. The `delete_invalid_object` method
+        will delete a data object if the object_metadata does not match the specified values.
+
+        :param ObjectMetadata object_metadata: ObjectMetadata object.
+        :param str checksum: Value of the checksum.
+        :param str checksum_algorithm: Algorithm of the checksum.
+        :param int expected_file_size: Size of the temporary file.
         """
         raise NotImplementedError()
 
     @abstractmethod
     def delete_metadata(self, pid, format_id):
-        """The 'delete_metadata' method deletes a metadata document permanently
-        from disk using a given persistent identifier and format_id.
+        """Deletes a metadata document (ex. `sysmeta`) permanently from HashStore using a given
+        persistent identifier (`pid`) and format_id (metadata namespace). If a `format_id` is
+        not supplied, all metadata documents associated with the given `pid` will be deleted.
 
-        Args:
-            pid (string): Authority-based identifier
-            format_id (string): Metadata format
-
-        Returns:
-            boolean: `True` upon successful deletion.
+        :param str pid: Authority-based identifier.
+        :param str format_id: Metadata format.
         """
         raise NotImplementedError()
 
     @abstractmethod
     def get_hex_digest(self, pid, algorithm):
-        """The 'get_hex_digest' method calculates the hex digest of an object that exists
-        in HashStore using a given persistent identifier and hash algorithm.
+        """Calculates the hex digest of an object that exists in HashStore using a given persistent
+        identifier and hash algorithm.
 
-        Args:
-            pid (string): Authority-based identifier.
-            algorithm (string): Algorithm of hex digest to generate.
+        :param str pid: Authority-based identifier.
+        :param str algorithm: Algorithm of hex digest to generate.
 
-        Returns:
-            hex_digest (string): Hex digest of the object.
+        :return: str - Hex digest of the object.
         """
         raise NotImplementedError()
 
 
 class HashStoreFactory:
-    """A factory class for creating `HashStore`-like objects (classes
-    that implement the 'HashStore' abstract methods)
+    """A factory class for creating `HashStore`-like objects.
 
-    This factory class provides a method to retrieve a `HashStore` object
-    based on a given module (ex. "hashstore.filehashstore.filehashstore")
-    and class name (ex. "FileHashStore").
+    The `HashStoreFactory` class serves as a factory for creating `HashStore`-like objects,
+    which are classes that implement the 'HashStore' abstract methods.
+
+    This factory class provides a method to retrieve a `HashStore` object based on a given module
+    (e.g., "hashstore.filehashstore.filehashstore") and class name (e.g., "FileHashStore").
     """
 
     @staticmethod
     def get_hashstore(module_name, class_name, properties=None):
         """Get a `HashStore`-like object based on the specified `module_name` and `class_name`.
 
-        Args:
-            module_name (str): Name of package (ex. "hashstore.filehashstore") \n
-            class_name (str): Name of class in the given module (ex. "FileHashStore") \n
-            properties (dict, optional): Desired HashStore properties, if 'None', default values
-            will be used. \n
-                Example Properties Dictionary:
-                {
-                    "store_path": "var/metacat",\n
-                    "store_depth": 3,\n
-                    "store_width": 2,\n
-                    "store_algorithm": "sha256",\n
-                    "store_sysmeta_namespace": "http://ns.dataone.org/service/types/v2.0"\n
-                }
+        The `get_hashstore` method retrieves a `HashStore`-like object based on the provided
+        `module_name` and `class_name`, with optional custom properties.
 
-        Returns:
-            HashStore: A hash store object based on the given `module_name` and `class_name`
+        :param str module_name: Name of the package (e.g., "hashstore.filehashstore").
+        :param str class_name: Name of the class in the given module (e.g., "FileHashStore").
+        :param dict properties: Desired HashStore properties (optional). If `None`, default values
+            will be used. Example Properties Dictionary:
+            {
+                "store_path": "var/metacat",
+                "store_depth": 3,
+                "store_width": 2,
+                "store_algorithm": "SHA-256",
+                "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+            }
 
-        Raises:
-            ModuleNotFoundError: If module is not found
-            AttributeError: If class does not exist within the module
+        :return: HashStore - A hash store object based on the given `module_name` and `class_name`.
+
+        :raises ModuleNotFoundError: If the module is not found.
+        :raises AttributeError: If the class does not exist within the module.
         """
         # Validate module
         if importlib.util.find_spec(module_name) is None:
@@ -208,18 +219,3 @@ class HashStoreFactory:
         raise AttributeError(
             f"Class name '{class_name}' is not an attribute of module '{module_name}'"
         )
-
-
-class ObjectMetadata(namedtuple("ObjectMetadata", ["id", "obj_size", "hex_digests"])):
-    """File address containing file's path on disk and its content hash ID.
-
-    Args:
-        ab_id (str): Hash ID (hexdigest) of file contents.
-        obj_size (bytes): Size of the object
-        hex_digests (dict, optional): A list of hex digests to validate objects
-            (md5, sha1, sha256, sha384, sha512)
-    """
-
-    # Default value to prevent dangerous default value
-    def __new__(cls, ab_id, obj_size, hex_digests=None):
-        return super(ObjectMetadata, cls).__new__(cls, ab_id, obj_size, hex_digests)

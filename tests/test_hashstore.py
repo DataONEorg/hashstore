@@ -1,7 +1,8 @@
-"""Test module for HashStore Module"""
+"""Test module for HashStore's HashStoreFactory and ObjectMetadata class."""
+
 import os
 import pytest
-from hashstore.hashstore import ObjectMetadata, HashStoreFactory
+from hashstore.hashstore import HashStoreFactory
 from hashstore.filehashstore import FileHashStore
 
 
@@ -22,8 +23,8 @@ def test_factory_get_hashstore_filehashstore(factory, props):
     module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
     # These props can be found in tests/conftest.py
-    store = factory.get_hashstore(module_name, class_name, props)
-    assert isinstance(store, FileHashStore)
+    this_store = factory.get_hashstore(module_name, class_name, props)
+    assert isinstance(this_store, FileHashStore)
 
 
 def test_factory_get_hashstore_unsupported_class(factory):
@@ -43,53 +44,146 @@ def test_factory_get_hashstore_unsupported_module(factory):
 
 
 def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
-    """Check factory raises exception with store algorithm value that part of the default list"""
+    """Check factory raises exception with store algorithm value that is not part of
+    the default list."""
     module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
 
     properties = {
-        "store_path": os.getcwd() + "/metacat/test",
+        "store_path": os.getcwd() + "/metacat/hashstore",
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "MD2",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(ValueError):
         factory.get_hashstore(module_name, class_name, properties)
 
 
 def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory):
-    """Check factory raises exception with incorrectly formatted algorithm value"""
+    """Check factory raises exception with incorrectly formatted algorithm value."""
     module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
 
     properties = {
-        "store_path": os.getcwd() + "/metacat/test",
+        "store_path": os.getcwd() + "/metacat/hashstore",
         "store_depth": 3,
         "store_width": 2,
-        "store_algorithm": "sha256",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v2.0",
+        "store_algorithm": "dou_algo",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(ValueError):
         factory.get_hashstore(module_name, class_name, properties)
 
 
-def test_objectmetadata():
-    """Test class returns correct values via dot notation."""
-    ab_id = "hashstoretest"
-    obj_size = 1234
-    hex_digest_dict = {
-        "md5": "md5value",
-        "sha1": "sha1value",
-        "sha224": "sha224value",
-        "sha256": "sha256value",
-        "sha512": "sha512value",
+def test_factory_get_hashstore_filehashstore_conflicting_obj_dir(factory, tmp_path):
+    """Check factory raises exception when existing `/objects` directory exists."""
+    module_name = "hashstore.filehashstore"
+    class_name = "FileHashStore"
+
+    directory = tmp_path / "douhs" / "objects"
+    directory.mkdir(parents=True)
+    douhspath = (tmp_path / "douhs").as_posix()
+
+    properties = {
+        "store_path": douhspath,
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    object_metadata = ObjectMetadata(ab_id, obj_size, hex_digest_dict)
-    assert object_metadata.id == ab_id
-    assert object_metadata.obj_size == obj_size
-    assert object_metadata.hex_digests.get("md5") == hex_digest_dict["md5"]
-    assert object_metadata.hex_digests.get("sha1") == hex_digest_dict["sha1"]
-    assert object_metadata.hex_digests.get("sha224") == hex_digest_dict["sha224"]
-    assert object_metadata.hex_digests.get("sha256") == hex_digest_dict["sha256"]
-    assert object_metadata.hex_digests.get("sha512") == hex_digest_dict["sha512"]
+    with pytest.raises(RuntimeError):
+        factory.get_hashstore(module_name, class_name, properties)
+
+
+def test_factory_get_hashstore_filehashstore_conflicting_metadata_dir(
+    factory, tmp_path
+):
+    """Check factory raises exception when existing `/metadata` directory exists."""
+    module_name = "hashstore.filehashstore"
+    class_name = "FileHashStore"
+
+    directory = tmp_path / "douhs" / "metadata"
+    directory.mkdir(parents=True)
+    douhspath = (tmp_path / "douhs").as_posix()
+
+    properties = {
+        "store_path": douhspath,
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    }
+    with pytest.raises(RuntimeError):
+        factory.get_hashstore(module_name, class_name, properties)
+
+
+def test_factory_get_hashstore_filehashstore_conflicting_refs_dir(factory, tmp_path):
+    """Check factory raises exception when existing `/refs` directory exists."""
+    module_name = "hashstore.filehashstore"
+    class_name = "FileHashStore"
+
+    directory = tmp_path / "douhs" / "refs"
+    directory.mkdir(parents=True)
+    douhspath = (tmp_path / "douhs").as_posix()
+
+    properties = {
+        "store_path": douhspath,
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    }
+    with pytest.raises(RuntimeError):
+        factory.get_hashstore(module_name, class_name, properties)
+
+
+def test_factory_get_hashstore_filehashstore_nonconflicting_dir(factory, tmp_path):
+    """Check factory does not raise exception when existing non-conflicting directory exists."""
+    module_name = "hashstore.filehashstore"
+    class_name = "FileHashStore"
+
+    directory = tmp_path / "douhs" / "other"
+    directory.mkdir(parents=True)
+    douhspath = (tmp_path / "douhs").as_posix()
+
+    properties = {
+        "store_path": douhspath,
+        "store_depth": 3,
+        "store_width": 2,
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    }
+
+    factory.get_hashstore(module_name, class_name, properties)
+
+
+def test_factory_get_hashstore_filehashstore_string_int_prop(factory, tmp_path):
+    """Check factory does not raise exception when an integer is passed as a string in a
+    properties object."""
+    module_name = "hashstore.filehashstore"
+    class_name = "FileHashStore"
+
+    directory = tmp_path / "douhs" / "inttest"
+    directory.mkdir(parents=True)
+    douhspath = (tmp_path / "douhs").as_posix()
+
+    properties = {
+        "store_path": douhspath,
+        "store_depth": "3",
+        "store_width": "2",
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    }
+
+    factory.get_hashstore(module_name, class_name, properties)
+
+    properties = {
+        "store_path": douhspath,
+        "store_depth": str(3),
+        "store_width": str(2),
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    }
+
+    factory.get_hashstore(module_name, class_name, properties)

@@ -22,14 +22,13 @@ Cite this software as:
 
 ## Introduction
 
-HashStore is a server-side python package that implements an object storage file system for storing
-and accessing data and metadata for DataONE services. The package is used in DataONE system
-components that need direct, filesystem-based access to data objects, their system metadata, and
-extended metadata about the objects. This package is a core component of
-the [DataONE federation](https://dataone.org), and supports large-scale object storage for a variety
-of repositories, including the [KNB Data Repository](http://knb.ecoinformatics.org),
-the [NSF Arctic Data Center](https://arcticdata.io/catalog/),
-the [DataONE search service](https://search.dataone.org), and other repositories.
+HashStore is a server-side python package that implements a hash-based object storage file system 
+for storing and accessing data and metadata for DataONE services. The package is used in DataONE 
+system components that need direct, filesystem-based access to data objects, their system 
+metadata, and extended metadata about the objects. This package is a core component of the 
+[DataONE federation](https://dataone.org), and supports large-scale object storage for a variety 
+of repositories, including the [KNB Data Repository](http://knb.ecoinformatics.org), the [NSF 
+Arctic Data Center](https://arcticdata.io/catalog/), the [DataONE search service](https://search.dataone.org), and other repositories.
 
 DataONE in general, and HashStore in particular, are open source, community projects.
 We [welcome contributions](https://github.com/DataONEorg/hashstore/blob/main/CONTRIBUTING.md) in
@@ -39,18 +38,18 @@ contributions with us.
 
 ## Documentation
 
-Documentation is a work in progress, and can be found on
-the [Metacat repository](https://github.com/NCEAS/metacat/blob/feature-1436-storage-and-indexing/docs/user/metacat/source/storage-subsystem.rst#physical-file-layout)
-as part of the storage redesign planning. Future updates will include documentation here as the
+The documentation around HashStore's initial design phase can be found here in the [Metacat 
+repository](https://github.com/NCEAS/metacat/blob/feature-1436-storage-and-indexing/docs/user/metacat/source/storage-subsystem.rst#physical-file-layout)
+as part of the storage re-design planning. Future updates will include documentation here as the
 package matures.
 
 ## HashStore Overview
 
-HashStore is an object storage system that provides persistent file-based storage using content
-hashes to de-duplicate data. The system stores both objects, references (refs) and metadata in its
-respective directories and utilizes an identifier-based API for interacting with the store.
-HashStore storage classes (like `filehashstore`) must implement the HashStore interface to ensure
-the expected usage of HashStore.
+HashStore is a hash-based object storage system that provides persistent file-based storage using 
+content hashes to de-duplicate data. The system stores data objects, references (refs) and 
+metadata in its respective directories and utilizes an identifier-based API for interacting 
+with the store. HashStore storage classes (like `filehashstore`) must implement the HashStore 
+interface to ensure the consistent and expected usage of HashStore.
 
 ### Public API Methods
 
@@ -161,12 +160,12 @@ metadata_cid_two = hashstore.store_metadata(pid, metadata, format_id)
 
 ### Working with objects (store, retrieve, delete)
 
-In HashStore, objects are first saved as temporary files while their content identifiers are
+In HashStore, data objects begin as temporary files while their content identifiers are 
 calculated. Once the default hash algorithm list and their hashes are generated, objects are stored
-in their permanent location using the store's algorithm's corresponding hash value, the store depth
-and the store width. Lastly, objects are 'tagged' with a given identifier (ex. persistent
-identifier (pid)). This process produces reference files, which allow objects to be found and
-retrieved with a given identifier.
+in their permanent locations using the hash value of the store's configured algorithm, and 
+then divided accordingly based on the configured width and depth. Lastly, objects are 'tagged' 
+with a given identifier (ex. persistent identifier (pid)). This process produces reference 
+files, which allow objects to be found and retrieved with a given identifier.
 
 - Note 1: An identifier can only be used once
 - Note 2: Each object is stored once and only once using its content identifier (a checksum
@@ -177,11 +176,10 @@ retrieved with a given identifier.
 By calling the various interface methods for  `store_object`, the calling app/client can validate,
 store and tag an object simultaneously if the relevant data is available. In the absence of an
 identifier (ex. persistent identifier (pid)), `store_object` can be called to solely store an
-object. The client is then expected to call `verify_object` when the relevant metadata is available
-to confirm that the object has been stored as expected. The client is then expected to call
-`delete_if_invalid_object` when the relevant metadata is available to confirm that the object is
-what is expected. And to finalize the process (to make the object discoverable), the client
-calls `tagObject``. In summary, there are two expected paths to store an object:
+object. The client is then expected to call `delete_if_invalid_object` when the relevant 
+metadata is available to confirm that the object is what is expected. And to finalize the data-only
+storage process (to make the object discoverable), the client calls `tagObject``. In summary, there 
+are two expected paths to store an object:
 
 ```py
 import io
@@ -212,7 +210,7 @@ path = "/path/to/dou.test.1"
 input_stream = io.open(path, "rb")
 pid = "dou.test.1"
 # All-in-one process which stores, validates and tags an object
-obj_info_allinone = hashstore.store_object(input_stream, pid, additional_algo, checksum,
+obj_info_all_in_one = hashstore.store_object(input_stream, pid, additional_algo, checksum,
                                            checksum_algo, obj_size)
 
 # Manual Process
@@ -233,11 +231,9 @@ hashstore.tag_object(pid, obj_info_manual.cid)
 
 - To delete an object and all its associated reference files, call the Public API
   method `delete_object`.
-- Note, `delete_object` and `store_object` are synchronized based on a given 'pid'. An object that
-  is in the process of being stored based on a pid should not be deleted at the same time.
+- Note, `delete_object` and `store_object` are synchronized processes based on a given `pid`.
   Additionally, `delete_object` further synchronizes with `tag_object` based on a `cid`. Every
-  object is stored once, is unique and shares one cid reference file. The API calls to access this
-  cid reference file must be coordinated to prevent file system locking exceptions.
+  object is stored once, is unique and shares one cid reference file.
 
 ###### Working with metadata (store, retrieve, delete)
 
@@ -267,17 +263,17 @@ ex. `store_metadata(stream, pid, format_id)`).
 
 ### What are HashStore reference files?
 
-HashStore assumes that every object to store has a respective identifier. This identifier is then
-used when storing, retrieving and deleting an object. In order to facilitate this process, we create
-two types of reference files:
+HashStore assumes that every data object is referenced by its a respective identifier. This 
+identifier is then used when storing, retrieving and deleting an object. In order to facilitate 
+this process, we create two types of reference files:
 
 - pid (persistent identifier) reference files
 - cid (content identifier) reference files
 
 These reference files are implemented in HashStore underneath the hood with no expectation for
-modification from the calling app/client. The one and only exception to this process when the
-calling client/app does not have an identifier, and solely stores an objects raw bytes in
-HashStore (calling `store_object(stream)`).
+modification from the calling app/client. The one and only exception to this process is when the
+calling client/app does not have an identifier available (i.e. they receive the stream to store 
+the data object first without any metadata, thus calling `store_object(stream)`).
 
 **'pid' Reference Files**
 
@@ -286,10 +282,10 @@ HashStore (calling `store_object(stream)`).
 - If an identifier is not available at the time of storing an object, the calling app/client must
   create this association between a pid and the object it represents by calling `tag_object`
   separately.
-- Each pid reference file contains a string that represents the content identifier of the object it
-  references
+- Each pid reference file contains a single string that represents the content identifier of the 
+  object it references
 - Like how objects are stored once and only once, there is also only one pid reference file for each
-  object.
+  data object.
 
 **'cid' Reference Files**
 
@@ -301,11 +297,12 @@ HashStore (calling `store_object(stream)`).
 
 ## Concurrency in HashStore
 
-HashStore is both thread and process safe, and by default synchronizes calls to store & delete
-objects/metadata with Python's threading module. If you wish to use multiprocessing to parallelize
-your application, please declare a global environment variable `USE_MULTIPROCESSING` as `True`
-before initializing Hashstore. This will direct the relevant Public API calls to synchronize using
-the Python `multiprocessing` module's locks and conditions. Please see below for example:
+HashStore is both threading and multiprocessing safe, and by default synchronizes calls to store & 
+delete objects/metadata with Python's threading module. If you wish to use multiprocessing to 
+parallelize your application, please declare a global environment variable `USE_MULTIPROCESSING` 
+as `True` before initializing Hashstore. This will direct the relevant Public API calls to 
+synchronize using the Python `multiprocessing` module's locks and conditions.
+Please see below for example:
 
 ```py
 import os
@@ -324,7 +321,8 @@ build tool.
 
 To install `hashstore` locally, create a virtual environment for python 3.9+,
 install poetry, and then install or build the package with `poetry install` or `poetry build`,
-respectively.
+respectively. Note, installing `hashstore` with poetry will also make the `hashstore` command 
+available through the command line terminal (see `HashStore Client` section below for details).
 
 To run tests, navigate to the root directory and run `pytest`. The test suite contains tests that
 take a longer time to run (relating to the storage of large files) - to execute all tests, run
@@ -334,14 +332,13 @@ take a longer time to run (relating to the storage of large files) - to execute 
 
 Client API Options:
 
-- `-getchecksum` (get_hex_digest)
-- `-findobject`
 - `-storeobject`
 - `-storemetadata`
 - `-retrieveobject`
 - `-retrievemetadata`
 - `-deleteobject`
 - `-deletemetadata`
+- `-getchecksum` (get_hex_digest)
 
 How to use HashStore client (command line app)
 

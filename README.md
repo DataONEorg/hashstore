@@ -1,7 +1,7 @@
 ## HashStore: hash-based object storage for DataONE data packages
 
 Version: 1.1.0
-DOI: [doi:10.18739/A2ZG6G87Q](https://doi.org/10.18739/A2ZG6G87Q)
+- DOI: [doi:10.18739/A2ZG6G87Q](https://doi.org/10.18739/A2ZG6G87Q)
 
 ## Contributors
 

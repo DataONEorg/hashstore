@@ -1762,7 +1762,7 @@ def test_private_delete_absolute_path(pids, store):
 
 
 def test_create_path(pids, store):
-    """Test makepath creates folder successfully."""
+    """Test _create_path creates folder successfully."""
     for pid in pids:
         root_directory = store.root
         pid_hex_digest_directory = pids[pid]["metadata_cid"][:2]
@@ -1772,13 +1772,12 @@ def test_create_path(pids, store):
 
 
 def test_create_path_permissions(pids, store):
-    """Test makepath creates folder with expected permissions"""
+    """Test _create_path creates folder with expected permissions"""
     for pid in pids:
         root_directory = store.root
         pid_hex_digest_directory = pids[pid]["metadata_cid"][:2]
         pid_directory = root_directory / pid_hex_digest_directory
         store._create_path(pid_directory)
-        assert os.path.isdir(pid_directory)
 
         # Get the file's permission mode
         file_stat = os.stat(pid_directory)

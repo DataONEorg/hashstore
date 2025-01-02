@@ -727,6 +727,18 @@ def test_mktmpfile(store):
     assert os.path.exists(tmp.name)
 
 
+def test_mktmpfile_permissions(store):
+    """Test that _mktmpfile generates tmp file with expected permissions"""
+    path = store.root / "doutest" / "tmp"
+    store._create_path(path)
+    tmp = store._mktmpfile(path)
+
+    # Get the file's permission mode
+    file_stat = os.stat(tmp.name)
+    file_mode = file_stat.st_mode & 0o777
+    assert file_mode == 0o640  # rw- r-- ---
+
+
 def test_store_hashstore_refs_files_(pids, store):
     """Test _store_hashstore_refs_files does not throw exception when successful."""
     for pid in pids.keys():
@@ -1750,13 +1762,27 @@ def test_private_delete_absolute_path(pids, store):
 
 
 def test_create_path(pids, store):
-    """Test makepath creates folder successfully."""
+    """Test _create_path creates folder successfully."""
     for pid in pids:
         root_directory = store.root
         pid_hex_digest_directory = pids[pid]["metadata_cid"][:2]
         pid_directory = root_directory / pid_hex_digest_directory
         store._create_path(pid_directory)
         assert os.path.isdir(pid_directory)
+
+
+def test_create_path_permissions(pids, store):
+    """Test _create_path creates folder with expected permissions"""
+    for pid in pids:
+        root_directory = store.root
+        pid_hex_digest_directory = pids[pid]["metadata_cid"][:2]
+        pid_directory = root_directory / pid_hex_digest_directory
+        store._create_path(pid_directory)
+
+        # Get the file's permission mode
+        file_stat = os.stat(pid_directory)
+        file_mode = file_stat.st_mode & 0o777
+        assert file_mode == 0o750  # rwx r-x ---
 
 
 def test_get_store_path_object(store):

@@ -316,13 +316,23 @@ use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
 
 ## Development build
 
-HashStore is a python package, and built using the [Python Poetry](https://python-poetry.org)
-build tool.
+HashStore is a python package. We recommend installing it using `uv`. Instructions on how to install and set up `uv` can be found [here](https://gist.github.com/datadavev/3975f244e5db500ba0328ef771ca74dd).
 
-To install `hashstore` locally, create a virtual environment for python 3.9+,
-install poetry, and then install or build the package with `poetry install` or `poetry build`,
-respectively. Note, installing `hashstore` with poetry will also make the `hashstore` command 
-available through the command line terminal (see `HashStore Client` section below for details).
+Friendly Notes:
+ - You may run into a `command not found: compdef` when adding code to your `.zshrc` file, this can be resolved by adjusting the code to be:
+    ```sh
+    # .zshrc
+    autoload -Uz compinit
+    compinit
+    eval "$(uv generate-shell-completion zsh)"
+    eval "$(uvx --generate-shell-completion zsh)"
+    ```
+  - When downloading the script `uv-python-symlink`, an extension may be added to it, for example: `uv-python-symlink.txt`. It may also not have an executable status. You can execute the following to adjust it:
+    ```sh
+    $ mv uv-python-symlink uv-python-symlink.sh
+    chmod +x uv-python-symlink.sh
+    ```
+  - After following the steps and navigating to the python project, `uv` may not have sufficient permissions to run. Follow the given prompts and execute `direnv allow`
 
 To run tests, navigate to the root directory and run `pytest`. The test suite contains tests that
 take a longer time to run (relating to the storage of large files) - to execute all tests, run

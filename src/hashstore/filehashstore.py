@@ -1033,8 +1033,8 @@ class FileHashStore(HashStore):
     def store_folder(
         self,
         pid: str,
-        root_path: str | Path,
-        child_path: Optional[str | Path] = None,
+        root_path: Union[str, Path],
+        child_path: Optional[Union[str, Path]] = None,
         additional_algorithm: Optional[str] = None,
         checksum: Optional[str] = None,
         checksum_algorithm: Optional[str] = None,
@@ -1111,7 +1111,7 @@ class FileHashStore(HashStore):
             expected_object_size=expected_object_size,
         )
 
-    def retrieve_folder(self, pid:str, destination_path:str|Path, child_path:Optional[str|Path]=None):
+    def retrieve_folder(self, pid:str, destination_path:Union[str, Path], child_path:Optional[Union[str, Path]]=None):
         """Retrieve a folder (and subfolders) stored as container objects.
 
         Args:

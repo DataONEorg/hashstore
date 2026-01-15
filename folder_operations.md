@@ -84,14 +84,14 @@ Persistent identifiers for objects within a folder hierarchy are constructed by 
 ```
 hashstore = HashStore(...)
 path_pid = "<PID>" + " " + "<path>"
-object_stream = hashstore.get_object(path_pid)
+object_stream = hashstore.retrieve_object(path_pid)
 ```
 
 ### Store a new folder hierarchy
 
 To store a new folder hierarchy, recursively create `container` entries for each folder in the hierarchy, starting from the leaves and working up to the root. For each folder, create a `container` with entries for its subfolders and files, compute the CID for the container, and store it in hashstore. Finally, associate the root container's CID with the PID representing the entire folder hierarchy.
 
-This is achieved by the `hash_store.store_folder()` method.
+This is achieved by the `hashstore.store_folder()` method.
 
 ```
 hashstore = HashStore(...)
@@ -104,7 +104,7 @@ hashstore.store_folder(pid, source_path)
 
 To retrieve the structure of a folder hierarchy identified by a PID, recursively resolve each `container` starting from the root PID. For each folder, read its `container` entries to identify subfolders and files, and continue resolving subfolders until the entire hierarchy is reconstructed.
 
-This is achieved by the `hash_store.retrieve_folder()` method.
+This is achieved by the `hashstore.retrieve_folder()` method.
 
 ```
 hashstore = HashStore(...)

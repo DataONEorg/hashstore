@@ -1,38 +1,40 @@
 """Core module for FileHashStore"""
 
 import atexit
+import fcntl
+import hashlib
+import inspect
 import io
+import logging
 import multiprocessing
+import os
 import shutil
 import threading
-import hashlib
-import os
-import logging
-import inspect
-import fcntl
-import yaml
-from typing import List, Dict, Union, Optional, IO, Tuple, Set, Any
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
-from contextlib import closing
 from tempfile import NamedTemporaryFile
+from typing import IO, Any, Dict, List, Optional, Set, Tuple, Union
+
+import yaml
+
 from hashstore import HashStore
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
-    OrphanPidRefsFileFound,
     CidRefsFileNotFound,
     HashStoreRefsAlreadyExists,
+    IdentifierNotLocked,
     NonMatchingChecksum,
     NonMatchingObjSize,
-    PidRefsAlreadyExistsError,
+    OrphanPidRefsFileFound,
     PidNotFoundInCidRefsFile,
+    PidRefsAlreadyExistsError,
     PidRefsContentError,
     PidRefsDoesNotExist,
     PidRefsFileNotFound,
     RefsFileExistsButCidObjMissing,
-    UnsupportedAlgorithm,
     StoreObjectForPidAlreadyInProgress,
-    IdentifierNotLocked,
+    UnsupportedAlgorithm,
 )
 
 
@@ -246,7 +248,13 @@ class FileHashStore(HashStore):
         checked_properties = self._validate_properties(properties)
 
         # Collect configuration properties from validated & supplied dictionary
-        (_, store_depth, store_width, store_algorithm, store_metadata_namespace,) = [
+        (
+            _,
+            store_depth,
+            store_width,
+            store_algorithm,
+            store_metadata_namespace,
+        ) = [
             checked_properties[property_name]
             for property_name in self.property_required_keys
         ]
@@ -1022,7 +1030,139 @@ class FileHashStore(HashStore):
         logging.info(info_string)
         return hex_digest
 
+    def store_folder(
+        self,
+        pid: str,
+        root_path: str | Path,
+        child_path: Optional[str | Path] = None,
+        additional_algorithm: Optional[str] = None,
+        checksum: Optional[str] = None,
+        checksum_algorithm: Optional[str] = None,
+        expected_object_size: Optional[int] = None,
+    ) -> "ObjectMetadata":
+        """Store a folder (and subfolders) as container objects.
+
+        Args:
+            pid (str): The context within which this folder is being stored
+            root_path (str): Path to the root of the folder.
+            child_path (str): Path to folder being stored relative to the root_path. If None, assumes root_path.
+            
+        Returns:
+            str: CID for the container
+        """
+        # Get the relative path for the object / folder
+        root_path = Path(root_path)
+        if child_path is None:
+            child_path = root_path
+        else:
+            child_path = Path(child_path)
+        relative_path = child_path.relative_to(root_path)
+        path_pid = pid
+        container_name = "root"
+        if str(relative_path) != ".":
+            path_pid = f"{pid} {relative_path}"
+            container_name = str(relative_path)
+
+        # Check if this container already exists
+        try:
+            # resolve pid, path to CID. This raises if not found
+            _entry = self._find_object(path_pid)
+            size = os.path.getsize(
+                self._build_hashstore_data_object_path(_entry["cid"])
+            )
+            return ObjectMetadata(
+                pid=path_pid, cid=_entry["cid"], obj_size=size, hex_digests={}
+            )
+        except PidNotFoundInCidRefsFile:
+            pass
+        except PidRefsDoesNotExist:
+            pass
+
+        manifest = []
+        for item in child_path.iterdir():
+            if item.is_dir():
+                meta = self.store_folder(
+                    pid,
+                    root_path,
+                    child_path=item.absolute(),
+                    additional_algorithm=additional_algorithm,
+                    checksum=checksum,
+                    checksum_algorithm=checksum_algorithm,
+                    expected_object_size=expected_object_size,
+                )
+                manifest.append((0, meta.cid, item.name))
+            elif item.is_file():
+                item_pid = f"{pid} {item.relative_to(root_path)}"
+                meta = self.store_object(item_pid, str(item.absolute()))
+                manifest.append((1, meta.cid, item.name))
+        manifest.sort(key=lambda x: (x[0], x[1]))
+        dest_stream = io.BytesIO()
+        dest_stream.name = container_name
+        for row in manifest:
+            dest_stream.write(f"{row[0]} {row[1]} {row[2]}\n".encode("utf-8"))
+        dest_stream.seek(0)
+        # TODO: error handling
+        return self.store_object(
+            path_pid,
+            data=dest_stream,
+            additional_algorithm=additional_algorithm,
+            checksum=checksum,
+            checksum_algorithm=checksum_algorithm,
+            expected_object_size=expected_object_size,
+        )
+
+    def retrieve_folder(self, pid:str, destination_path:str|Path, child_path:Optional[str|Path]=None):
+        """Retrieve a folder (and subfolders) stored as container objects.
+
+        Args:
+            pid (str): The context within which this folder is being retrieved
+            destination_path (str|Path): Path to the root of the folder to create.
+            child_path (str|Path): Path to folder being retrieved relative to the destination_path. If None, assumes destination_path.
+        Returns:
+            None
+        """
+        # TODO: Error handling
+        # TODO: read access control considerations
+        destination_path = Path(destination_path)
+        if child_path is None:
+            child_path = Path("")
+        else:
+            child_path = Path(child_path)
+        path_pid = pid
+        if str(child_path) != ".":
+            path_pid = f"{pid} {child_path}"
+
+        # Retrieve the container object
+        obj_stream = self.retrieve_object(path_pid)
+        with closing(obj_stream):
+            for line in obj_stream:
+                line = line.decode("utf-8").strip()
+                type_flag, cid, name = line.split(" ", 2)
+                if type_flag == "0":
+                    # Directory
+                    (destination_path / child_path / name).mkdir(parents=True, exist_ok=True)
+                    self.retrieve_folder(
+                        pid,
+                        destination_path,
+                        child_path=child_path / name,
+                    )
+                elif type_flag == "1":
+                    # File
+                    item_pid = f"{pid} {child_path / name}"
+                    file_stream = self.retrieve_object(item_pid)
+                    with closing(file_stream):
+                        dest_file_path = destination_path / child_path / name
+                        dest_file_path.parent.mkdir(parents=True, exist_ok=True)
+                        with open(dest_file_path, "wb") as dest_file:
+                            shutil.copyfileobj(file_stream, dest_file)
+
     # FileHashStore Core Methods
+
+    def _deserialize_container(self, cid) -> Dict[str, Any]:
+        pass
+
+    def _serialize_container(self, container: Dict[str, Any]) -> str:
+        pass
 
     def _find_object(self, pid: str) -> Dict[str, str]:
         """Check if an object referenced by a pid exists and retrieve its content identifier.
@@ -2768,7 +2908,7 @@ class FileHashStore(HashStore):
         :param str string: Value to check.
         :param str arg: Name of the argument to check.
         """
-        if string is None or string.strip() == "" or any(ch.isspace() for ch in string):
+        if string is None or string.strip() == "":
             method = inspect.stack()[1].function
             err_msg = (
                 f"FileHashStore - {method}: {arg} cannot be None"

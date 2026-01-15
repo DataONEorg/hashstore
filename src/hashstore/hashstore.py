@@ -1,8 +1,10 @@
 """Hashstore Interface"""
 
-from abc import ABC, abstractmethod
 import importlib.metadata
 import importlib.util
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Optional
 
 
 class HashStore(ABC):
@@ -61,6 +63,68 @@ class HashStore(ABC):
 
         :return: ObjectMetadata - Object containing the persistent identifier (pid),
         content identifier (cid), object size and hex digests dictionary (checksums).
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def store_folder(
+        self,
+        pid:str,
+        root_path:str|Path,
+        child_path:Optional[str|Path]=None,
+        additional_algorithm:Optional[str]=None,
+        checksum:Optional[str]=None,
+        checksum_algorithm:Optional[str]=None,
+        expected_object_size:Optional[int]=None,
+    ):
+        """Stores a folder and subfolders.
+        
+        The `store_folder` method stores a folder and its subfolders to HashStore. Each file within the folder
+        is processed and stored individually, following the same procedures as the `store_object` method. The 
+        folder structure is preserved within HashStore, allowing for easy retrieval of the entire folder or 
+        individual files as needed.
+        
+        The root of a folder is specified by the `root_path` argument and must be identified by a PID.
+        
+        This method performs a recursive, depth firth traversal of the folder structure, storing each file it encounters and
+        storing folders as a container object that lists the files and subfolders contained within it.
+
+        Args:
+            pid (str): Identifier for the context of this folder hierarchy.
+            root_path (str | Path): The physical path to the root folder being stored.
+            child_path (Optional[str | Path], optional): Path to a subfolder of root_path. This is 
+                normally None for the initial invocation of this method, and recursive calls will set the 
+                child_path as needed. Defaults to None.
+            additional_algorithm (Optional[str], optional): See `store_object`. Defaults to None.
+            checksum (Optional[str], optional): See `store_object`. Defaults to None.
+            checksum_algorithm (Optional[str], optional): See `store_object`. Defaults to None.
+            expected_object_size (Optional[int], optional): See `store_object`. Defaults to None.
+
+        Raises:
+            NotImplementedError: Must be implemented in subclass.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def retrieve_folder(self, pid:str, destination_path:str|Path, child_path:Optional[str|Path]=None):
+        """Retrieves a folder and its subfolders from HashStore.
+
+        The `retrieve_folder` method retrieves a folder and its subfolders from HashStore, reconstructing
+        the original folder structure at the specified target path. Each file within the folder is retrieved
+        individually, following the same procedures as the `retrieve_object` method. The folder structure
+        is preserved during retrieval, allowing for easy access to the entire folder or individual files as needed.
+
+        The root of a folder is specified by the `pid` argument, which identifies the context of the folder hierarchy. The
+        optional child_path argument can be used to specify a subfolder within the root folder for retrieval.
+        
+        Output files and folders will be created under the `destination_path`.
+
+        Args:
+            pid (str): Identifier for the context of this folder hierarchy.
+            destination_path (str | Path): The physical path where the retrieved folder will be reconstructed.
+            child_path (Optional[str|Path|], optional): Path to a subfolder of the root folder. This is 
+                normally None for the initial invocation of this method, and recursive calls will set the 
+                child_path as needed. Defaults to None.
         """
         raise NotImplementedError()
 

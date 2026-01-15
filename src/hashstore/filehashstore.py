@@ -2908,7 +2908,7 @@ class FileHashStore(HashStore):
         :param str string: Value to check.
         :param str arg: Name of the argument to check.
         """
-        if string is None or string.strip() == "":
+        if string is None or string.strip() == "" or string.strip() != string:
             method = inspect.stack()[1].function
             err_msg = (
                 f"FileHashStore - {method}: {arg} cannot be None"

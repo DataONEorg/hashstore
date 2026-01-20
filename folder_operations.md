@@ -1,4 +1,4 @@
-# hashtree
+# Folders in HashStore
 
 Describes storing directory trees in hashstore.
 
@@ -32,11 +32,11 @@ Since the CID for a container is dependent on its content, the content order is 
 For example, given the folder hierarchy:
 
 ```
-PID_1
-├── A
+PID_1             <- dbc15
+├── A             <- ad5eb
 │   ├── a1.txt
 │   └── a2.txt
-└── B
+└── B             <- cc08d
     └── b1.csv
 ```
 

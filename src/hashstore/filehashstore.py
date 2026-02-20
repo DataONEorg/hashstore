@@ -8,13 +8,14 @@ import io
 import logging
 import multiprocessing
 import os
+import re
 import shutil
 import threading
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, Dict, List, Optional, Set, Tuple, Union
+from typing import IO, Any, Dict, Generator, List, Optional, Set, Tuple, Union
 
 import yaml
 
@@ -755,8 +756,8 @@ class FileHashStore(HashStore):
             return metadata_stream
         else:
             err_msg = f"No metadata found for pid: {pid}"
-            self.fhs_logger.error(err_msg)
-            raise ValueError(err_msg)
+            self.fhs_logger.warning(err_msg)            
+            raise KeyError(err_msg)
 
     def delete_object(self, pid: str) -> None:
         self.fhs_logger.debug("Request to delete object for id: %s", pid)
@@ -1155,6 +1156,24 @@ class FileHashStore(HashStore):
                         dest_file_path.parent.mkdir(parents=True, exist_ok=True)
                         with open(dest_file_path, "wb") as dest_file:
                             shutil.copyfileobj(file_stream, dest_file)
+
+    def list_pids(self, pattern: Optional[str]=None) -> Generator:
+        rpattern = None
+        if pattern is not None:
+            rpattern = re.compile(pattern)
+        ignore_names = [".DS_Store", ]
+        for cid_entry in self.cids.rglob('*'):
+            if cid_entry.is_file() and cid_entry.name not in ignore_names:
+                self.fhs_logger.debug(str(cid_entry))
+                for _, entry in enumerate(open(cid_entry, "r", encoding="utf-8")):
+                    pid = entry.strip()
+                    if len(pid) > 0:
+                        if rpattern is not None:
+                            if rpattern.fullmatch(pid):
+                                yield pid
+                        else:
+                            yield pid
+                                
 
     # FileHashStore Core Methods
 
@@ -2908,7 +2927,7 @@ class FileHashStore(HashStore):
         :param str string: Value to check.
         :param str arg: Name of the argument to check.
         """
-        if string is None or string.strip() == "" or string.strip() != string:
+        if not string or string.strip() != string:
             method = inspect.stack()[1].function
             err_msg = (
                 f"FileHashStore - {method}: {arg} cannot be None"

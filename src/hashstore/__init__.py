@@ -16,7 +16,7 @@ processes that function across a cluster environment. Some properties:
     system.
 """
 
-from hashstore.hashstore import HashStore, HashStoreFactory
+from hashstore.basehashstore import HashStore, HashStoreFactory
 
 __all__ = ("HashStore", "HashStoreFactory")
 __version__ = "1.1.0"

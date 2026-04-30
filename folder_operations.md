@@ -1,6 +1,6 @@
 # hashtree
 
-Describes storing directory trees in hashstore.
+Describes storing directory trees in hashstore (hs).
 
 ## Assumptions
 
@@ -12,6 +12,16 @@ Describes storing directory trees in hashstore.
 - Permissions are associated with a PID and so apply to content of PID identified containers or files.
 - A folder hierarchy may reference all or part of another identified folder hierarchy
 - A folder is represented by a `container` in hashstore.
+
+## Virtual hashstore
+
+When a folder is added to `hs`, it is necessary to calculate file and folder hashes and compare these with any existing content in the target `hs`. The efficiency of updating an existing folder entry in `hs` can be significantly improved by computing the hashes locally and determining what may need to be sent to the target `hs`. This is especially important for large folder structures that may have isolated changes.
+
+A virtual `hs` (`vhs`) is a local folder structure that is similar to a `hs` except that the content bytes are not stored (except for containers), only hashes of the content. Time stamps of the hash entries are compared with content time stamps to identify candidates for hash recalculation. If hash values have changed, then the files are tagged for upload to the target hs.
+
+A `vhs` is composed of CID and PID ref files, and container files for folder hashes. Even though content ids are calculated, the content files are not stored.
+
+
 
 ## Containers
 
@@ -112,3 +122,43 @@ pid = "<PID>"
 destination_path = "<local_folder_path>"
 hashstore.retrieve_folder(pid, destination_path)
 ```
+
+
+---
+
+## `add`
+
+`add(PID:str, path:pathlib.Path)->None`
+
+Add an object or folder to `vhs`. 
+
+
+## `init`
+
+`init(path:pathlib.Path)->None`
+
+Initializes a `vhs` folder within the current folder.
+
+
+## `status`
+
+`status()->VhsStatus`
+
+Reports the status of the entries in the `vhs` versus the current contents of 
+registered content.
+
+
+## `update`
+
+`update(PID:str|None)`
+
+Recalculates CID values based on the current content of registered entries.
+
+
+## `commit`
+
+`commit()`
+
+Makes entries in the `vhs` immutable preventing any further updates to existing 
+PIDs. Any further changes require new PID.
+

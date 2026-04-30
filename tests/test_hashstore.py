@@ -2,7 +2,7 @@
 
 import os
 import pytest
-from hashstore.hashstore import HashStoreFactory
+from hashstore.basehashstore import HashStoreFactory
 from hashstore.filehashstore import FileHashStore
 
 

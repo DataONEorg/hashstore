@@ -606,6 +606,30 @@ class FileHashStore(HashStore):
             self.fhs_logger.error(err_msg)
             raise PidRefsAlreadyExistsError(err_msg)
 
+    def get_object_status(self, pid: str) -> dict:
+        logging.debug("Request to get object status for pid: %s", pid)
+        self._check_string(pid, "pid")
+
+        object_status_dict = {}
+        try:
+            object_info_dict = self._find_object(pid)
+            object_cid = object_info_dict.get("cid")
+            if object_cid:
+                obj_path = self._get_hashstore_data_object_path(object_cid)
+                object_status_dict["size"] = os.path.getsize(obj_path)
+                object_status_dict["modtime"] = os.path.getmtime(obj_path)
+                object_status_dict["accesstime"] = os.path.getatime(obj_path)
+            else:
+                err_msg = f"No object found for pid: {pid}"
+                self.fhs_logger.warning(err_msg)
+                raise KeyError(err_msg)
+        except KeyError as ke:
+            err_msg = f"No object found for pid: {pid}. Details: {ke}"
+            self.fhs_logger.warning(err_msg)
+            raise KeyError(err_msg)
+
+        return object_status_dict
+
     def delete_if_invalid_object(
         self,
         object_metadata: "ObjectMetadata",
@@ -1031,6 +1055,50 @@ class FileHashStore(HashStore):
         logging.info(info_string)
         return hex_digest
 
+    def _store_container(
+            self, 
+            pid:str, 
+            name:str, 
+            manifest:list[tuple[int, str, str]],
+            additional_algorithm: Optional[str] = None,
+            checksum: Optional[str] = None,
+            checksum_algorithm: Optional[str] = None,
+        ) -> "ObjectMetadata":
+        self.fhs_logger.debug(f"_store_container {pid=}")        
+        manifest.sort(key=lambda x: (x[0], x[1]))
+        dest_stream = io.BytesIO()
+        dest_stream.name = name
+        dest_stream.write(f"container {len(manifest)}\n".encode("utf-8"))
+        for row in manifest:
+            dest_stream.write(f"{row[0]} {row[1]} {row[2]}\n".encode("utf-8"))
+        dest_stream.seek(0)
+        return self.store_object(
+            pid,
+            data=dest_stream,
+            additional_algorithm=additional_algorithm,
+            checksum=checksum,
+            checksum_algorithm=checksum_algorithm,
+            expected_object_size=None,
+        )
+        
+    def _load_container(self, pid:str) -> list[tuple[int, str, str]]:
+        self.fhs_logger.debug(f"_load_container {pid=}")
+        obj_stream = self.retrieve_object(pid)
+        row = 0
+        manifest = []
+        with closing(obj_stream):            
+            for line in obj_stream:
+                line = line.decode("utf-8").strip()
+                if row == 0:
+                    if not line.startswith("container "):
+                        msg = f"{pid} is not a container."
+                        raise ValueError(msg)
+                else:
+                    type_flag, cid, name = line.split(" ", 2)
+                    manifest.append((int(type_flag), cid, name))
+                row += 1            
+        return manifest
+
     def store_folder(
         self,
         pid: str,
@@ -1040,8 +1108,12 @@ class FileHashStore(HashStore):
         checksum: Optional[str] = None,
         checksum_algorithm: Optional[str] = None,
         expected_object_size: Optional[int] = None,
-    ) -> "ObjectMetadata":
+        pattern: Optional[str] = None,
+    ) -> Optional["ObjectMetadata"]:
         """Store a folder (and subfolders) as container objects.
+
+        Traverses the folder hierarchy in a depth first manner so that
+        the leaf elements are computed for inclusion in parent hashes.
 
         Args:
             pid (str): The context within which this folder is being stored
@@ -1051,6 +1123,7 @@ class FileHashStore(HashStore):
         Returns:
             str: CID for the container
         """
+        raise NotImplementedError
         # Get the relative path for the object / folder
         root_path = Path(root_path)
         if child_path is None:
@@ -1061,9 +1134,10 @@ class FileHashStore(HashStore):
         path_pid = pid
         container_name = "root"
         if str(relative_path) != ".":
-            path_pid = f"{pid} {relative_path}"
+            path_pid = f"{pid}/{relative_path}"
             container_name = str(relative_path)
 
+        self.fhs_logger.debug("store_folder {path_pid=}")
         # Check if this container already exists
         try:
             # resolve pid, path to CID. This raises if not found
@@ -1079,6 +1153,7 @@ class FileHashStore(HashStore):
         except PidRefsDoesNotExist:
             pass
 
+        # Container doesn't exist
         manifest = []
         for item in child_path.iterdir():
             if item.is_dir():
@@ -1090,27 +1165,55 @@ class FileHashStore(HashStore):
                     checksum=checksum,
                     checksum_algorithm=checksum_algorithm,
                     expected_object_size=expected_object_size,
+                    pattern=pattern,
                 )
-                manifest.append((0, meta.cid, item.name))
-            elif item.is_file():
-                item_pid = f"{pid} {item.relative_to(root_path)}"
+                if meta is not None:
+                    manifest.append((0, meta.cid, item.name))
+            elif pattern is None and item.is_file():
+                # If no pattern then grab all files, otherwise defer to 
+                # globbing match later.
+                item_pid = f"{pid}/{item.relative_to(root_path)}"
+                self.fhs_logger.debug("store_folder {item_pid=}")
                 meta = self.store_object(item_pid, str(item.absolute()))
                 manifest.append((1, meta.cid, item.name))
-        manifest.sort(key=lambda x: (x[0], x[1]))
-        dest_stream = io.BytesIO()
-        dest_stream.name = container_name
-        for row in manifest:
-            dest_stream.write(f"{row[0]} {row[1]} {row[2]}\n".encode("utf-8"))
-        dest_stream.seek(0)
-        # TODO: error handling
-        return self.store_object(
+        if pattern is not None:
+            # globbing pattern was specified. Grab the matching files here.
+            for item in child_path.glob(pattern):
+                if item.is_file():
+                    item_pid = f"{pid}/{item.relative_to(root_path)}"
+                    meta = self.store_object(item_pid, str(item.absolute()))
+                    manifest.append((1, meta.cid, item.name))
+        if len(manifest) == 0:
+            return None
+        return self._store_container(
             path_pid,
-            data=dest_stream,
+            container_name,
+            manifest,
             additional_algorithm=additional_algorithm,
             checksum=checksum,
-            checksum_algorithm=checksum_algorithm,
-            expected_object_size=expected_object_size,
-        )
+            checksum_algorithm=checksum_algorithm
+        )                    
+        
+    def folder_content(self, pid:str, depth:int=0, depth_first:bool=True) -> Generator:
+        """Yield the content of a folder, breadth first, recursively.
+            (depth, type, CID, name)
+        """
+        # Retrieve the container object
+        manifest = self._load_container(pid)
+        if depth_first:
+            for entry in manifest:
+                if entry[0] == 0:
+                    yield (depth, entry[0], entry[1], f"{pid}/{entry[2]}")
+                    yield from self.folder_content(f"{pid}/{entry[2]}", depth=depth+1, depth_first=depth_first)
+                else:
+                    yield (depth, entry[0], entry[1], f"{pid}/{entry[2]}")
+        else:
+            for entry in manifest:
+                yield (depth, entry[0], entry[1], f"{pid}/{entry[2]}")
+            for entry in manifest:
+                if entry[0] == 0:
+                    # folder, recurse
+                    yield from self.folder_content(f"{pid}/{entry[2]}", depth=depth+1, depth_first=depth_first)
 
     def retrieve_folder(self, pid:str, destination_path:Union[str, Path], child_path:Optional[Union[str, Path]]=None):
         """Retrieve a folder (and subfolders) stored as container objects.
@@ -1176,12 +1279,6 @@ class FileHashStore(HashStore):
                                 
 
     # FileHashStore Core Methods
-
-    def _deserialize_container(self, cid) -> Dict[str, Any]:
-        pass
-
-    def _serialize_container(self, container: Dict[str, Any]) -> str:
-        pass
 
     def _find_object(self, pid: str) -> Dict[str, str]:
         """Check if an object referenced by a pid exists and retrieve its content identifier.

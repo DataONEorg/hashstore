@@ -33,14 +33,20 @@ classifiers = [
     "Topic :: System :: Filesystems",
 ]
 dependencies = [
+    "click>=8.3.1",
     "pathlib>=1.0.1",
     "pyyaml>=6.0",
+    "xattr-compat>=1.0.0",
 ]
 
 [project.scripts]
 hashstore = "hashstore.hashstoreclient:main"
+hs = "hashstore.__main__:main"
 
 [dependency-groups]
+cli = [
+    "rich>=14.3.3",
+]
 dev = [
     "pytest>=7.2.0",
     "exceptiongroup>=1.1.0",

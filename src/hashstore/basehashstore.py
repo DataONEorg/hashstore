@@ -4,7 +4,7 @@ import importlib.metadata
 import importlib.util
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Generator
 
 
 class HashStore(ABC):
@@ -234,6 +234,23 @@ class HashStore(ABC):
         """
         raise NotImplementedError()
 
+    @abstractmethod
+    def list_pids(self, pattern:Optional[str]=None) -> Generator:
+        """Yields PIDs from the hashstore.
+        
+        :param str pattern: Optional regexp pattern to match.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_object_status(self, pid) -> dict:
+        """Returns a dictionary of the object size, modtime, accesstime for the given pid.
+
+        :param str pid: Object identifier
+
+        :return: dict - Dictionary containing information about the object.
+        """
+        raise NotImplementedError()
 
 class HashStoreFactory:
     """A factory class for creating `HashStore`-like objects.

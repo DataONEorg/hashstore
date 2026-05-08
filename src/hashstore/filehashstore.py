@@ -20,7 +20,7 @@ from typing import IO, Any, Dict, Generator, List, Optional, Set, Tuple, Union
 import yaml
 
 import hashstore.folderentry
-from hashstore import HashStore
+from hashstore import HashStore, pidlogger
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
@@ -134,6 +134,8 @@ class FileHashStore(HashStore):
                 self._create_path(self.refs / "tmp")
                 self._create_path(self.refs / "pids")
                 self._create_path(self.refs / "cids")
+            # pidlog is used to create an index of cid - pid
+            self.pidlog = logging.getLogger("pid_logger")
 
             # Variables to orchestrate parallelization
             # Check to see whether a multiprocessing or threading sync lock should be used
@@ -578,6 +580,7 @@ class FileHashStore(HashStore):
                     cid = object_metadata.cid
                     self.tag_object(pid, cid)
                     self.fhs_logger.info("Successfully stored object for pid: %s", pid)
+                    self.pidlog.info(cid, extra={"pid": pid})
                 finally:
                     # Release pid
                     self._release_object_locked_pids(pid)
@@ -1068,6 +1071,8 @@ class FileHashStore(HashStore):
     ) -> Optional["ObjectMetadata"]:
         """Store a folder object.
 
+        #TODO: important: Make thread and multi processing safe.
+
         A Folder is a list of entries that appear in a folder. Each entry
         may be a file or a Folder. This method is used instead of store_object
         because Folders have special requirements to ensure deterministic serialization.
@@ -1139,6 +1144,7 @@ class FileHashStore(HashStore):
         # of folder entries increases.
         obj_size = entries.to_parquet(cid_path, pid=folder_pid)
         self.tag_object(folder_pid, folder_cid)
+        self.pidlog.info(folder_cid, extra={"pid": folder_pid})
         return ObjectMetadata(
             pid=folder_pid,
             cid=folder_cid,
@@ -1214,22 +1220,31 @@ class FileHashStore(HashStore):
         return current_folder
 
     def list_pids(self, pattern: Optional[str] = None) -> Generator:
+        """Yield create_timestamp, CID, PID.
+
+        Iterates over all CID entries and yields the create timestamp,
+        CID value, and PID value for all entries or those PIDs that match
+        the optionally provided regexp pattern.
+        """
         rpattern = None
         if pattern is not None:
             rpattern = re.compile(pattern)
         ignore_names = [
             ".DS_Store",
         ]
+        cids_path = str(self.cids)
         for cid_entry in self.cids.rglob("*"):
             if cid_entry.is_file() and cid_entry.name not in ignore_names:
+                cid_value = str(cid_entry).replace(cids_path, "").replace("/", "")
+                ctime = cid_entry.stat().st_ctime
                 for _, entry in enumerate(open(cid_entry, "r", encoding="utf-8")):
                     pid = entry.strip()
                     if len(pid) > 0:
                         if rpattern is not None:
                             if rpattern.fullmatch(pid):
-                                yield pid
+                                yield ctime, cid_value, pid
                         else:
-                            yield pid
+                            yield ctime, cid_value, pid
 
     # FileHashStore Core Methods
 

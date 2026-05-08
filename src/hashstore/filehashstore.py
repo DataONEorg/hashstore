@@ -613,7 +613,7 @@ class FileHashStore(HashStore):
 
         object_status_dict = {}
         try:
-            object_info_dict = self._find_object(pid)
+            object_info_dict = self.find_object(pid)
             object_cid = object_info_dict.get("cid")
             if object_cid:
                 obj_path = self._get_hashstore_data_object_path(object_cid)
@@ -742,7 +742,7 @@ class FileHashStore(HashStore):
         self.fhs_logger.debug("Request to retrieve object for pid: %s", pid)
         self._check_string(pid, "pid")
 
-        object_info_dict = self._find_object(pid)
+        object_info_dict = self.find_object(pid)
         object_cid = object_info_dict.get("cid")
         entity = "objects"
 
@@ -801,7 +801,7 @@ class FileHashStore(HashStore):
             self._synchronize_object_locked_pids(pid)
 
             try:
-                object_info_dict = self._find_object(pid)
+                object_info_dict = self.find_object(pid)
                 cid = object_info_dict.get("cid")
 
                 # Proceed with next steps - cid has been retrieved without any issues
@@ -1044,7 +1044,7 @@ class FileHashStore(HashStore):
 
         entity = "objects"
         algorithm = self._clean_algorithm(algorithm)
-        object_cid = self._find_object(pid).get("cid")
+        object_cid = self.find_object(pid).get("cid")
         if not self._exists(entity, object_cid):
             err_msg = f"No object found for pid: {pid}"
             self.fhs_logger.error(err_msg)
@@ -1174,7 +1174,7 @@ class FileHashStore(HashStore):
         self._check_string(folder_pid, "PID")
         # try direct reference to CID using folder_pid
         try:
-            object_info_dict = self._find_object(folder_pid)
+            object_info_dict = self.find_object(folder_pid)
             folder_cid = object_info_dict.get("cid")
             if folder_cid is None:
                 raise PidRefsDoesNotExist("Entry has no cid?")
@@ -1186,7 +1186,7 @@ class FileHashStore(HashStore):
 
         # otherwise, get the root, split the path, and start iterating.
         # This will raise PidRefsDoesNotExist if the root PID isn't there
-        object_info_dict = self._find_object(pid)
+        object_info_dict = self.find_object(pid)
         folder_cid = object_info_dict.get("cid")
         if folder_cid is None:
             # Should never reach this...
@@ -1203,7 +1203,7 @@ class FileHashStore(HashStore):
             if entry.type == hashstore.folderentry.FTYPE_FILE:
                 # it's a file!
                 raise ValueError(f"Path {path} is a file.")
-            object_info_dict = self._find_object(pid)
+            object_info_dict = self.find_object(pid)
             folder_cid = object_info_dict.get("cid")
             if folder_cid is None:
                 # Should never reach this...
@@ -1233,7 +1233,7 @@ class FileHashStore(HashStore):
 
     # FileHashStore Core Methods
 
-    def _find_object(self, pid: str) -> Dict[str, str]:
+    def find_object(self, pid: str) -> Dict[str, str]:
         """Check if an object referenced by a pid exists and retrieve its content identifier.
         The `find_object` method validates the existence of an object based on the provided
         pid and returns the associated content identifier.
@@ -1269,7 +1269,7 @@ class FileHashStore(HashStore):
                         self.fhs_logger.error(err_msg)
                         raise RefsFileExistsButCidObjMissing(err_msg)
                     else:
-                        sysmeta_doc_name = self._computehash(pid + self.sysmeta_ns)
+                        sysmeta_doc_name = self._computehash(f"{pid}{self.sysmeta_ns}")
                         metadata_directory = self._computehash(pid)
                         metadata_rel_path = Path(*self._shard(metadata_directory))
                         sysmeta_full_path = (
@@ -1310,7 +1310,8 @@ class FileHashStore(HashStore):
             err_msg = (
                 f"Pid reference file not found for pid ({pid}): {pid_ref_abs_path}"
             )
-            self.fhs_logger.error(err_msg)
+            # This can be an expected case, so not really an error.
+            self.fhs_logger.debug(err_msg)
             raise PidRefsDoesNotExist(err_msg)
 
     def _store_and_validate_data(
@@ -1782,7 +1783,7 @@ class FileHashStore(HashStore):
         # which will throw custom exceptions if there is an issue with the reference files,
         # which help us determine the path to proceed with.
         try:
-            obj_info_dict = self._find_object(pid)
+            obj_info_dict = self.find_object(pid)
             cid_to_check = obj_info_dict["cid"]
             self._validate_and_check_cid_lock(pid, cid, cid_to_check)
 

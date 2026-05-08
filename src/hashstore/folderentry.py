@@ -1,0 +1,118 @@
+"""Implements FolderEntry class."""
+
+import collections.abc
+import dataclasses
+import json
+import logging
+import os
+
+import pyarrow
+import pyarrow.parquet
+
+FTYPE_FOLDER = 0
+"""FolderEntry is for a FolderEntry"""
+FTYPE_FILE = 1
+"""FolderEntry is for a file."""
+# TODO: Ratify this key
+PARQUET_METADATA_KEY = b"https://ns.dataone.org/types/FolderEntries"
+"""Key in parquet file metadata pointing to dict of properties."""
+PARQUET_READ_BATCH_SIZE = 10000
+"""Number of entries to read at a time from FolderEntries parquet file."""
+
+
+def get_logger():
+    return logging.getLogger("FolderEntry")
+
+
+@dataclasses.dataclass
+class FolderEntry:
+    """Represents a file or folder entry in a folder manifest."""
+
+    name: str
+    """The name portion of the path (not full path) for the file or folder."""
+    cid: str
+    """The content hash (CID) for the entry."""
+    type: int  # '1' for file, '0' for directory
+    """The type of manifest entry: '1' for file, '0' for directory."""
+    size: int = 0
+    """Size of the file in bytes or number of entries for directories."""
+    formatid: str | None = None
+    """Optional format identifier for files."""
+
+    def __post_init__(self):
+        if self.type not in (FTYPE_FILE, FTYPE_FOLDER):
+            raise ValueError(f"Invalid type: {self.type}")
+
+    def __repr__(self) -> str:
+        # Representation of a FolderEntry
+        return json.dumps(
+            {
+                "cid": self.cid,
+                "type": self.type,
+                "name": self.name,
+                "size": self.size,
+                "formatid": self.formatid,
+            },
+            ensure_ascii=False,
+        )
+
+
+class FolderEntries(list[FolderEntry]):
+    def entry_by_name(self, name) -> FolderEntry | None:
+        """Find the entry with name that matches."""
+        for entry in self:
+            if entry.name == name:
+                return entry
+        return None
+
+    def to_parquet(
+        self, pq_path: str, pid: str | None = None, writer_args: dict = {}
+    ) -> int:
+        """Writes the list of folder entries to a parquet file.
+
+        See also: https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html
+
+        #TODO: There are quite a few options for tweaking the written parquet file,
+        # e.g. with respect to column sorting, a UI may prefer sorting by type or formatid
+
+        args:
+            pq_path: path to destination parquet file
+            pid: Optional PID+path used to create this folder.
+            writer_args: optional dict of arguments for the parquet writer.
+        """
+        # Add some metadata to the parquet file to help identify it as a list of FolderEntries
+        pq_metadata = {
+            "type": "FolderEntries",
+            "version": "1.0",
+            "pid": pid,
+        }
+        metadata_bytes = json.dumps(pq_metadata).encode("utf-8")
+        table = pyarrow.Table.from_pylist([dataclasses.asdict(entry) for entry in self])
+        table = table.replace_schema_metadata({PARQUET_METADATA_KEY: metadata_bytes})
+        pyarrow.parquet.write_table(table, pq_path, **writer_args)
+        return os.path.getsize(pq_path)
+
+    @classmethod
+    def from_parquet(cls, pq_path) -> "FolderEntries":
+        """Create an instance of FolderEntries from a parquet source."""
+        pq_metadata = pyarrow.parquet.read_metadata(pq_path)
+        try:
+            metadata = json.loads(pq_metadata.metadata[PARQUET_METADATA_KEY].decode())
+            _ = metadata["version"]
+        except KeyError:
+            raise ValueError(f"File {pq_path} is not a FolderEntry list.")
+
+        pq_file = pyarrow.parquet.ParquetFile(pq_path)
+        entries = cls()
+        for batch in pq_file.iter_batches(batch_size=PARQUET_READ_BATCH_SIZE):
+            for row in batch.to_pylist():
+                entries.append(
+                    FolderEntry(
+                        name=row["name"],
+                        cid=row["cid"],
+                        type=row["type"],
+                        size=row["size"],
+                        formatid=row["formatid"],
+                    )
+                )
+        return entries

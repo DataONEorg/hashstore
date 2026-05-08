@@ -19,6 +19,7 @@ from typing import IO, Any, Dict, Generator, List, Optional, Set, Tuple, Union
 
 import yaml
 
+import hashstore.folderentry
 from hashstore import HashStore
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
@@ -780,7 +781,7 @@ class FileHashStore(HashStore):
             return metadata_stream
         else:
             err_msg = f"No metadata found for pid: {pid}"
-            self.fhs_logger.warning(err_msg)            
+            self.fhs_logger.warning(err_msg)
             raise KeyError(err_msg)
 
     def delete_object(self, pid: str) -> None:
@@ -1055,219 +1056,172 @@ class FileHashStore(HashStore):
         logging.info(info_string)
         return hex_digest
 
-    def _store_container(
-            self, 
-            pid:str, 
-            name:str, 
-            manifest:list[tuple[int, str, str]],
-            additional_algorithm: Optional[str] = None,
-            checksum: Optional[str] = None,
-            checksum_algorithm: Optional[str] = None,
-        ) -> "ObjectMetadata":
-        self.fhs_logger.debug(f"_store_container {pid=}")        
-        manifest.sort(key=lambda x: (x[0], x[1]))
-        dest_stream = io.BytesIO()
-        dest_stream.name = name
-        dest_stream.write(f"container {len(manifest)}\n".encode("utf-8"))
-        for row in manifest:
-            dest_stream.write(f"{row[0]} {row[1]} {row[2]}\n".encode("utf-8"))
-        dest_stream.seek(0)
-        return self.store_object(
-            pid,
-            data=dest_stream,
-            additional_algorithm=additional_algorithm,
-            checksum=checksum,
-            checksum_algorithm=checksum_algorithm,
-            expected_object_size=None,
-        )
-        
-    def _load_container(self, pid:str) -> list[tuple[int, str, str]]:
-        self.fhs_logger.debug(f"_load_container {pid=}")
-        obj_stream = self.retrieve_object(pid)
-        row = 0
-        manifest = []
-        with closing(obj_stream):            
-            for line in obj_stream:
-                line = line.decode("utf-8").strip()
-                if row == 0:
-                    if not line.startswith("container "):
-                        msg = f"{pid} is not a container."
-                        raise ValueError(msg)
-                else:
-                    type_flag, cid, name = line.split(" ", 2)
-                    manifest.append((int(type_flag), cid, name))
-                row += 1            
-        return manifest
-
     def store_folder(
         self,
         pid: str,
-        root_path: Union[str, Path],
-        child_path: Optional[Union[str, Path]] = None,
+        path: str,
+        entries: hashstore.folderentry.FolderEntries,
         additional_algorithm: Optional[str] = None,
         checksum: Optional[str] = None,
         checksum_algorithm: Optional[str] = None,
-        expected_object_size: Optional[int] = None,
-        pattern: Optional[str] = None,
+        verify_entry_cids: bool = True,
     ) -> Optional["ObjectMetadata"]:
-        """Store a folder (and subfolders) as container objects.
+        """Store a folder object.
 
-        Traverses the folder hierarchy in a depth first manner so that
-        the leaf elements are computed for inclusion in parent hashes.
+        A Folder is a list of entries that appear in a folder. Each entry
+        may be a file or a Folder. This method is used instead of store_object
+        because Folders have special requirements to ensure deterministic serialization.
+
+        The Folder is tagged with an identifier that is "{PID} {path}", that is, the
+        PID followed by a single space, then the path. If the path portion is an empty
+        string, ".", or "/" then the Folder is the root Folder.
+
+        Note that since the hash of a Folder is computed from hashes of its content,
+        a Folder hierarchy must be stored starting with the leaves. This method
+        will raise a ValueError if the hash of an entry does not already exist in
+        the hashstore. Hence the general pattern for storing a folder hierarchy is
+        to do a depth first traversal of the hierarchy, storing the files (ensuring
+        their hashes are available) and computing the hash for the containing folder
+        for use in the parent folder reference to the child.
 
         Args:
             pid (str): The context within which this folder is being stored
-            root_path (str): Path to the root of the folder.
-            child_path (str): Path to folder being stored relative to the root_path. If None, assumes root_path.
-            
-        Returns:
-            str: CID for the container
-        """
-        raise NotImplementedError
-        # Get the relative path for the object / folder
-        root_path = Path(root_path)
-        if child_path is None:
-            child_path = root_path
-        else:
-            child_path = Path(child_path)
-        relative_path = child_path.relative_to(root_path)
-        path_pid = pid
-        container_name = "root"
-        if str(relative_path) != ".":
-            path_pid = f"{pid}/{relative_path}"
-            container_name = str(relative_path)
+            path (str): Path to this folder relative to the root.
+            entries (list[FolderEntry]): A list of FolderEntry objects.
+            verify_entry_cids: If True then FolderEntry CID values are
+                verified to to ensure they exist in the hashstore.
 
-        self.fhs_logger.debug("store_folder {path_pid=}")
-        # Check if this container already exists
+        Returns:
+            ObjectMetadata: The computed ObjectMetadata for this entry.
+        """
+        if path in ("", ".", "/"):
+            path = ""
+        folder_pid = f"{pid} {path}" if path != "" else pid
+        self._check_string(folder_pid, "PID")
+        if verify_entry_cids:
+            # check that each entry CID is present in the hashstore.
+            for entry in entries:
+                if not self._exists("objects", entry.cid):
+                    raise ValueError(
+                        f"object {entry.name} cid {entry.cid} does not exist."
+                    )
+        # Sort the entries by cid
+        entries.sort(key=lambda entry: entry.cid)
+
+        hash_algorithms = {
+            self.algorithm: hashlib.new(self.algorithm),
+        }
+        if additional_algorithm is not None:
+            hash_algorithms[additional_algorithm] = hashlib.new(additional_algorithm)
+
+        # Compute the CID for the folder by iterating over the
+        # list of CIDs and updating the hash being computed. This
+        # is about as fast as serializing the cids to a big string
+        # but much more memory efficient.
+        for entry in entries:
+            v = entry.cid.encode("utf-8")
+            for fhasher in hash_algorithms.values():
+                fhasher.update(v)
+        hex_digests = {
+            name: hasher.hexdigest() for name, hasher in hash_algorithms.items()
+        }
+        folder_cid = hex_digests[self.algorithm]
+
+        # Compute the physical path for the computed CID
+        cid_path = self._build_hashstore_data_object_path(folder_cid)
+        # ensure the folder path exists
+        self._create_path(Path(os.path.dirname(cid_path)))
+
+        # Store the entries to disk. Records are serialized as parquet
+        # which is an indeterminate file format. Hence the need for
+        # computing the hashes seperately to the actual bytes on disk.
+        # The parquet format is very efficient especially as the number
+        # of folder entries increases.
+        obj_size = entries.to_parquet(cid_path, pid=folder_pid)
+        self.tag_object(folder_pid, folder_cid)
+        return ObjectMetadata(
+            pid=folder_pid,
+            cid=folder_cid,
+            hex_digests=hex_digests,
+            obj_size=obj_size,
+        )
+
+    def retrieve_folder(
+        self,
+        pid: str,
+        path: str,
+    ) -> hashstore.folderentry.FolderEntries:
+        """Retrieve a FolderEntries instance from the hashstore.
+
+        We first check to see if a CID is available for the combination of
+        "{PID} {path}", and if so, return that entry. Otherwise, we iterate
+        over path segments to find the correspoding FolderEntry, if any.
+        This iterative approach is necesary if since entire trees are not
+        stored when a new version of a folder hierarchy is stored. Hence, it
+        may be necessary to jump back to a branch that is recorded in an
+        earlier version but not recorded in the current version since it
+        was unchanged between versions.
+
+        Args:
+            pid (str): The context (i.e. VMDAG version) within which this folder is being retrieved
+            path (str): Path within the context to the desired entry
+        Returns:
+            FolderEntries
+        """
+        if path in ("", ".", "/"):
+            path = ""
+        folder_pid = f"{pid} {path}" if path != "" else pid
+        self._check_string(folder_pid, "PID")
+        # try direct reference to CID using folder_pid
         try:
-            # resolve pid, path to CID. This raises if not found
-            _entry = self._find_object(path_pid)
-            size = os.path.getsize(
-                self._build_hashstore_data_object_path(_entry["cid"])
-            )
-            return ObjectMetadata(
-                pid=path_pid, cid=_entry["cid"], obj_size=size, hex_digests={}
-            )
-        except PidNotFoundInCidRefsFile:
-            pass
+            object_info_dict = self._find_object(folder_pid)
+            folder_cid = object_info_dict.get("cid")
+            if folder_cid is None:
+                raise PidRefsDoesNotExist("Entry has no cid?")
+            cid_path = object_info_dict.get("cid_object_path")
+            # self._build_hashstore_data_object_path(folder_cid)
+            return hashstore.folderentry.FolderEntries.from_parquet(cid_path)
         except PidRefsDoesNotExist:
             pass
 
-        # Container doesn't exist
-        manifest = []
-        for item in child_path.iterdir():
-            if item.is_dir():
-                meta = self.store_folder(
-                    pid,
-                    root_path,
-                    child_path=item.absolute(),
-                    additional_algorithm=additional_algorithm,
-                    checksum=checksum,
-                    checksum_algorithm=checksum_algorithm,
-                    expected_object_size=expected_object_size,
-                    pattern=pattern,
-                )
-                if meta is not None:
-                    manifest.append((0, meta.cid, item.name))
-            elif pattern is None and item.is_file():
-                # If no pattern then grab all files, otherwise defer to 
-                # globbing match later.
-                item_pid = f"{pid}/{item.relative_to(root_path)}"
-                self.fhs_logger.debug("store_folder {item_pid=}")
-                meta = self.store_object(item_pid, str(item.absolute()))
-                manifest.append((1, meta.cid, item.name))
-        if pattern is not None:
-            # globbing pattern was specified. Grab the matching files here.
-            for item in child_path.glob(pattern):
-                if item.is_file():
-                    item_pid = f"{pid}/{item.relative_to(root_path)}"
-                    meta = self.store_object(item_pid, str(item.absolute()))
-                    manifest.append((1, meta.cid, item.name))
-        if len(manifest) == 0:
-            return None
-        return self._store_container(
-            path_pid,
-            container_name,
-            manifest,
-            additional_algorithm=additional_algorithm,
-            checksum=checksum,
-            checksum_algorithm=checksum_algorithm
-        )                    
-        
-    def folder_content(self, pid:str, depth:int=0, depth_first:bool=True) -> Generator:
-        """Yield the content of a folder, breadth first, recursively.
-            (depth, type, CID, name)
-        """
-        # Retrieve the container object
-        manifest = self._load_container(pid)
-        if depth_first:
-            for entry in manifest:
-                if entry[0] == 0:
-                    yield (depth, entry[0], entry[1], f"{pid}/{entry[2]}")
-                    yield from self.folder_content(f"{pid}/{entry[2]}", depth=depth+1, depth_first=depth_first)
-                else:
-                    yield (depth, entry[0], entry[1], f"{pid}/{entry[2]}")
-        else:
-            for entry in manifest:
-                yield (depth, entry[0], entry[1], f"{pid}/{entry[2]}")
-            for entry in manifest:
-                if entry[0] == 0:
-                    # folder, recurse
-                    yield from self.folder_content(f"{pid}/{entry[2]}", depth=depth+1, depth_first=depth_first)
+        # otherwise, get the root, split the path, and start iterating.
+        # This will raise PidRefsDoesNotExist if the root PID isn't there
+        object_info_dict = self._find_object(pid)
+        folder_cid = object_info_dict.get("cid")
+        if folder_cid is None:
+            # Should never reach this...
+            raise PidRefsDoesNotExist("Entry has no cid?")
+        cid_path = object_info_dict.get("cid_object_path")
+        # self._build_hashstore_data_object_path(folder_cid)
+        current_folder = hashstore.folderentry.FolderEntries.from_parquet(cid_path)
+        path_segments = path.split("/")
+        # iterate over segments, saving last
+        for name in path_segments:
+            entry = current_folder.entry_by_name(name)
+            if entry is None:
+                raise KeyError(f"PID {pid} {path} not found.")
+            if entry.type == hashstore.folderentry.FTYPE_FILE:
+                # it's a file!
+                raise ValueError(f"Path {path} is a file.")
+            object_info_dict = self._find_object(pid)
+            folder_cid = object_info_dict.get("cid")
+            if folder_cid is None:
+                # Should never reach this...
+                raise PidRefsDoesNotExist("Entry has no cid?")
+            cid_path = object_info_dict.get("cid_object_path")
+            # cid_path = self._build_hashstore_data_object_path(folder_cid)
+            current_folder = hashstore.folderentry.FolderEntries.from_parquet(cid_path)
+        return current_folder
 
-    def retrieve_folder(self, pid:str, destination_path:Union[str, Path], child_path:Optional[Union[str, Path]]=None):
-        """Retrieve a folder (and subfolders) stored as container objects.
-
-        Args:
-            pid (str): The context within which this folder is being retrieved
-            destination_path (str|Path): Path to the root of the folder to create.
-            child_path (str|Path): Path to folder being retrieved relative to the destination_path. If None, assumes destination_path.
-        Returns:
-            None
-        """
-        # TODO: Error handling
-        # TODO: read access control considerations
-        destination_path = Path(destination_path)
-        if child_path is None:
-            child_path = Path("")
-        else:
-            child_path = Path(child_path)
-        path_pid = pid
-        if str(child_path) != ".":
-            path_pid = f"{pid} {child_path}"
-
-        # Retrieve the container object
-        obj_stream = self.retrieve_object(path_pid)
-        with closing(obj_stream):
-            for line in obj_stream:
-                line = line.decode("utf-8").strip()
-                type_flag, cid, name = line.split(" ", 2)
-                if type_flag == "0":
-                    # Directory
-                    (destination_path / child_path / name).mkdir(parents=True, exist_ok=True)
-                    self.retrieve_folder(
-                        pid,
-                        destination_path,
-                        child_path=child_path / name,
-                    )
-                elif type_flag == "1":
-                    # File
-                    item_pid = f"{pid} {child_path / name}"
-                    file_stream = self.retrieve_object(item_pid)
-                    with closing(file_stream):
-                        dest_file_path = destination_path / child_path / name
-                        dest_file_path.parent.mkdir(parents=True, exist_ok=True)
-                        with open(dest_file_path, "wb") as dest_file:
-                            shutil.copyfileobj(file_stream, dest_file)
-
-    def list_pids(self, pattern: Optional[str]=None) -> Generator:
+    def list_pids(self, pattern: Optional[str] = None) -> Generator:
         rpattern = None
         if pattern is not None:
             rpattern = re.compile(pattern)
-        ignore_names = [".DS_Store", ]
-        for cid_entry in self.cids.rglob('*'):
+        ignore_names = [
+            ".DS_Store",
+        ]
+        for cid_entry in self.cids.rglob("*"):
             if cid_entry.is_file() and cid_entry.name not in ignore_names:
-                self.fhs_logger.debug(str(cid_entry))
                 for _, entry in enumerate(open(cid_entry, "r", encoding="utf-8")):
                     pid = entry.strip()
                     if len(pid) > 0:
@@ -1276,7 +1230,6 @@ class FileHashStore(HashStore):
                                 yield pid
                         else:
                             yield pid
-                                
 
     # FileHashStore Core Methods
 
@@ -3018,8 +2971,14 @@ class FileHashStore(HashStore):
 
     @staticmethod
     def _check_string(string: str, arg: str) -> None:
-        """Check whether a string is None or empty - or if it contains an illegal character;
-        throws an exception if so.
+        """Raises ValueError if string is empty or has leading or trailing whitespace.
+
+        Note: This checks string for valid use as a PID or CID in hashstore. It is
+        the responsibility of the calling application to ensure the string is a
+        valid PID or CID in the context of the application. For example, hashstore
+        allows whitespace in PIDs though Metacat / DataONE does not. This allows
+        for storing a path segment after a Metacat PID which is needed for referencing
+        entries within a folder identified by a PID.
 
         :param str string: Value to check.
         :param str arg: Name of the argument to check.

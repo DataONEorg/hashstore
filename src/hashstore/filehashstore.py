@@ -1233,10 +1233,14 @@ class FileHashStore(HashStore):
 
     # FileHashStore Core Methods
 
-    def find_object(self, pid: str) -> Dict[str, str]:
+    def find_object(self, pid: str) -> dict[str, str]:
         """Check if an object referenced by a pid exists and retrieve its content identifier.
+
         The `find_object` method validates the existence of an object based on the provided
-        pid and returns the associated content identifier.
+        pid and returns the associated content identifier and information about how to
+        retrieve various accoutrements. Note that the returned dict will contain values
+        relevant to the type of store, but will always contain a `cid` key if the object
+        is present.
 
         :param str pid: Authority-based or persistent identifier of the object.
 

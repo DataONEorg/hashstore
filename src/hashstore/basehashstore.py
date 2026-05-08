@@ -261,6 +261,27 @@ class HashStore(ABC):
         """
         raise NotImplementedError()
 
+    @abstractmethod
+    def find_object(self, pid: str) -> dict[str, str]:
+        """Check if an object referenced by a pid exists and retrieve its content identifier.
+
+        The `find_object` method validates the existence of an object based on the provided
+        pid and returns the associated content identifier and information about how to
+        retrieve various accoutrements. Note that the returned dict will contain values
+        relevant to the type of store, but will always contain a `cid` key if the object
+        is present.
+
+        :param str pid: Authority-based or persistent identifier of the object.
+
+        :return: obj_info_dict:
+            - cid: content identifier
+            - cid_object_path: path to the object
+            - cid_refs_path: path to the cid refs file
+            - pid_refs_path: path to the pid refs file
+            - sysmeta_path: path to the sysmeta file
+        """
+        raise NotImplementedError()
+
 
 class HashStoreFactory:
     """A factory class for creating `HashStore`-like objects.

@@ -4,7 +4,9 @@ import importlib.metadata
 import importlib.util
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union, Generator
+from typing import Generator, Optional, Union
+
+import hashstore.folderentry
 
 
 class HashStore(ABC):
@@ -69,36 +71,41 @@ class HashStore(ABC):
     @abstractmethod
     def store_folder(
         self,
-        pid:str,
-        root_path:Union[str,Path],
-        child_path:Optional[Union[str,Path]]=None,
-        additional_algorithm:Optional[str]=None,
-        checksum:Optional[str]=None,
-        checksum_algorithm:Optional[str]=None,
-        expected_object_size:Optional[int]=None,
+        pid: str,
+        path: str,
+        entries: hashstore.folderentry.FolderEntries,
+        additional_algorithm: Optional[str] = None,
+        checksum: Optional[str] = None,
+        checksum_algorithm: Optional[str] = None,
+        verify_entry_cids: bool = True,
     ):
-        """Stores a folder and subfolders.
-        
-        The `store_folder` method stores a folder and its subfolders to HashStore. Each file within the folder
-        is processed and stored individually, following the same procedures as the `store_object` method. The 
-        folder structure is preserved within HashStore, allowing for easy retrieval of the entire folder or 
-        individual files as needed.
-        
-        The root of a folder is specified by the `root_path` argument and must be identified by a PID.
-        
-        This method performs a recursive, depth firth traversal of the folder structure, storing each file it encounters and
-        storing folders as a container object that lists the files and subfolders contained within it.
+        """Store a folder object.
+
+        A Folder is a list of entries that appear in a folder. Each entry
+        may be a file or a Folder. This method is used instead of store_object
+        because Folders have special requirements to ensure deterministic serialization.
+
+        The Folder is tagged with an identifier that is "{PID} {path}", that is, the
+        PID followed by a single space, then the path. If the path portion is an empty
+        string, ".", or "/" then the Folder is the root Folder.
+
+        Note that since the hash of a Folder is computed from hashes of its content,
+        a Folder hierarchy must be stored starting with the leaves. This method
+        will raise a ValueError if the hash of an entry does not already exist in
+        the hashstore. Hence the general pattern for storing a folder hierarchy is
+        to do a depth first traversal of the hierarchy, storing the files (ensuring
+        their hashes are available) and computing the hash for the containing folder
+        for use in the parent folder reference to the child.
 
         Args:
-            pid (str): Identifier for the context of this folder hierarchy.
-            root_path (str | Path): The physical path to the root folder being stored.
-            child_path (Optional[str | Path], optional): Path to a subfolder of root_path. This is 
-                normally None for the initial invocation of this method, and recursive calls will set the 
-                child_path as needed. Defaults to None.
-            additional_algorithm (Optional[str], optional): See `store_object`. Defaults to None.
-            checksum (Optional[str], optional): See `store_object`. Defaults to None.
-            checksum_algorithm (Optional[str], optional): See `store_object`. Defaults to None.
-            expected_object_size (Optional[int], optional): See `store_object`. Defaults to None.
+            pid (str): The context within which this folder is being stored
+            path (str): Path to this folder relative to the root.
+            entries (list[FolderEntry]): A list of FolderEntry objects.
+            verify_entry_cids: If True then FolderEntry CID values are
+                verified to to ensure they exist in the hashstore.
+
+        Returns:
+            ObjectMetadata: The computed ObjectMetadata for this entry.
 
         Raises:
             NotImplementedError: Must be implemented in subclass.
@@ -106,25 +113,27 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def retrieve_folder(self, pid:str, destination_path:Union[str,Path], child_path:Optional[Union[str,Path]]=None):
-        """Retrieves a folder and its subfolders from HashStore.
+    def retrieve_folder(
+        self,
+        pid: str,
+        path: str,
+    ) -> hashstore.folderentry.FolderEntries:
+        """Retrieve a FolderEntries instance from the hashstore.
 
-        The `retrieve_folder` method retrieves a folder and its subfolders from HashStore, reconstructing
-        the original folder structure at the specified target path. Each file within the folder is retrieved
-        individually, following the same procedures as the `retrieve_object` method. The folder structure
-        is preserved during retrieval, allowing for easy access to the entire folder or individual files as needed.
-
-        The root of a folder is specified by the `pid` argument, which identifies the context of the folder hierarchy. The
-        optional child_path argument can be used to specify a subfolder within the root folder for retrieval.
-        
-        Output files and folders will be created under the `destination_path`.
+        We first check to see if a CID is available for the combination of
+        "{PID} {path}", and if so, return that entry. Otherwise, we iterate
+        over path segments to find the correspoding FolderEntry, if any.
+        This iterative approach is necesary if since entire trees are not
+        stored when a new version of a folder hierarchy is stored. Hence, it
+        may be necessary to jump back to a branch that is recorded in an
+        earlier version but not recorded in the current version since it
+        was unchanged between versions.
 
         Args:
-            pid (str): Identifier for the context of this folder hierarchy.
-            destination_path (str | Path): The physical path where the retrieved folder will be reconstructed.
-            child_path (Optional[str|Path|], optional): Path to a subfolder of the root folder. This is 
-                normally None for the initial invocation of this method, and recursive calls will set the 
-                child_path as needed. Defaults to None.
+            pid (str): The context (i.e. VMDAG version) within which this folder is being retrieved
+            path (str): Path within the context to the desired entry
+        Returns:
+            FolderEntries
         """
         raise NotImplementedError()
 
@@ -235,9 +244,9 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def list_pids(self, pattern:Optional[str]=None) -> Generator:
+    def list_pids(self, pattern: Optional[str] = None) -> Generator:
         """Yields PIDs from the hashstore.
-        
+
         :param str pattern: Optional regexp pattern to match.
         """
         raise NotImplementedError()
@@ -251,6 +260,7 @@ class HashStore(ABC):
         :return: dict - Dictionary containing information about the object.
         """
         raise NotImplementedError()
+
 
 class HashStoreFactory:
     """A factory class for creating `HashStore`-like objects.

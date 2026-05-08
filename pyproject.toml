@@ -10,7 +10,7 @@ authors = [
     { name = "Jeanette Clark" },
     { name = "Ian M. Nesbitt" },
 ]
-requires-python = ">=3.9, <4.0"
+requires-python = ">=3.10, <4.0"
 readme = "README.md"
 keywords = [
     "filesystem",
@@ -35,6 +35,7 @@ classifiers = [
 dependencies = [
     "click>=8.3.1",
     "pathlib>=1.0.1",
+    "pyarrow>=24.0.0",
     "pyyaml>=6.0",
     "xattr-compat>=1.0.0",
 ]

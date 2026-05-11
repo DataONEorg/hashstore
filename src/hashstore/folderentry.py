@@ -9,10 +9,6 @@ import os
 import pyarrow
 import pyarrow.parquet
 
-FTYPE_FOLDER = 0
-"""FolderEntry is for a FolderEntry"""
-FTYPE_FILE = 1
-"""FolderEntry is for a file."""
 # TODO: Ratify this key
 PARQUET_METADATA_KEY = b"https://ns.dataone.org/types/FolderEntries"
 """Key in parquet file metadata pointing to dict of properties."""
@@ -32,23 +28,19 @@ class FolderEntry:
     """The name portion of the path (not full path) for the file or folder."""
     cid: str
     """The content hash (CID) for the entry."""
-    type: int  # '1' for file, '0' for directory
+    is_file: bool  # True for file, False for Folder
     """The type of manifest entry: '1' for file, '0' for directory."""
     size: int = 0
     """Size of the file in bytes or number of entries for directories."""
     formatid: str | None = None
     """Optional format identifier for files."""
 
-    def __post_init__(self):
-        if self.type not in (FTYPE_FILE, FTYPE_FOLDER):
-            raise ValueError(f"Invalid type: {self.type}")
-
     def __repr__(self) -> str:
         # Representation of a FolderEntry
         return json.dumps(
             {
                 "cid": self.cid,
-                "type": self.type,
+                "is_file": self.is_file,
                 "name": self.name,
                 "size": self.size,
                 "formatid": self.formatid,
@@ -61,7 +53,7 @@ class FolderEntry:
         return pyarrow.schema(
             (
                 ("cid", pyarrow.string()),
-                ("type", pyarrow.bool_()),
+                ("is_file", pyarrow.bool_()),
                 ("name", pyarrow.string()),
                 ("size", pyarrow.int64()),
                 ("formatid", pyarrow.string()),
@@ -100,9 +92,12 @@ class FolderEntries(list[FolderEntry]):
         }
         pq_schema = FolderEntry.parquet_schema()
         metadata_bytes = json.dumps(pq_metadata).encode("utf-8")
-        table = pyarrow.Table.from_pylist([dataclasses.asdict(entry) for entry in self])
+        table = pyarrow.Table.from_pylist(
+            [dataclasses.asdict(entry) for entry in self],
+            schema=pq_schema,
+        )
         table = table.replace_schema_metadata({PARQUET_METADATA_KEY: metadata_bytes})
-        pyarrow.parquet.write_table(table, pq_path, schema=pq_schema, **writer_args)
+        pyarrow.parquet.write_table(table, pq_path, **writer_args)
         return os.path.getsize(pq_path)
 
     @classmethod
@@ -123,7 +118,7 @@ class FolderEntries(list[FolderEntry]):
                     FolderEntry(
                         name=row["name"],
                         cid=row["cid"],
-                        type=row["type"],
+                        is_file=row["is_file"],
                         size=row["size"],
                         formatid=row["formatid"],
                     )

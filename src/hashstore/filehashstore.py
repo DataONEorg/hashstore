@@ -1121,7 +1121,7 @@ class FileHashStore(HashStore):
                         raise ValueError(
                             f"object {entry.name} cid {entry.cid} does not exist."
                         )
-        # Sort the entries by cid
+        # Sort the entries by cid for consistent hashing
         entries.sort(key=lambda entry: entry.cid)
 
         hash_algorithms = {
@@ -1217,7 +1217,7 @@ class FileHashStore(HashStore):
             entry = current_folder.entry_by_name(name)
             if entry is None:
                 raise KeyError(f"PID {pid} {path} not found.")
-            if entry.type == hashstore.folderentry.FTYPE_FILE:
+            if entry.is_file:
                 # it's a file!
                 raise ValueError(f"Path {path} is a file.")
             object_info_dict = self.find_object(pid)

@@ -56,6 +56,18 @@ class FolderEntry:
             ensure_ascii=False,
         )
 
+    @classmethod
+    def parquet_schema(cls):
+        return pyarrow.schema(
+            (
+                ("cid", pyarrow.string()),
+                ("type", pyarrow.bool_()),
+                ("name", pyarrow.string()),
+                ("size", pyarrow.int64()),
+                ("formatid", pyarrow.string()),
+            )
+        )
+
 
 class FolderEntries(list[FolderEntry]):
     def entry_by_name(self, name) -> FolderEntry | None:
@@ -86,10 +98,11 @@ class FolderEntries(list[FolderEntry]):
             "version": "1.0",
             "pid": pid,
         }
+        pq_schema = FolderEntry.parquet_schema()
         metadata_bytes = json.dumps(pq_metadata).encode("utf-8")
         table = pyarrow.Table.from_pylist([dataclasses.asdict(entry) for entry in self])
         table = table.replace_schema_metadata({PARQUET_METADATA_KEY: metadata_bytes})
-        pyarrow.parquet.write_table(table, pq_path, **writer_args)
+        pyarrow.parquet.write_table(table, pq_path, schema=pq_schema, **writer_args)
         return os.path.getsize(pq_path)
 
     @classmethod

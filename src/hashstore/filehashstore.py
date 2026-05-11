@@ -1077,6 +1077,10 @@ class FileHashStore(HashStore):
         may be a file or a Folder. This method is used instead of store_object
         because Folders have special requirements to ensure deterministic serialization.
 
+        If FolderEntries have cid = '' | None, then the cid is looked up using
+
+            pid + " " + path + "/" + entry.name
+
         The Folder is tagged with an identifier that is "{PID} {path}", that is, the
         PID followed by a single space, then the path. If the path portion is an empty
         string, ".", or "/" then the Folder is the root Folder.
@@ -1106,10 +1110,17 @@ class FileHashStore(HashStore):
         if verify_entry_cids:
             # check that each entry CID is present in the hashstore.
             for entry in entries:
-                if not self._exists("objects", entry.cid):
-                    raise ValueError(
-                        f"object {entry.name} cid {entry.cid} does not exist."
-                    )
+                if entry.cid is None or entry.cid == "":
+                    # no cid provided, so look it up
+                    _entry_pid = f"{folder_pid}/{entry.name}"
+                    _meta = self.find_object(_entry_pid)
+                    entry.cid = _meta["cid"]
+                else:
+                    # verify provided cid is legit
+                    if not self._exists("objects", entry.cid):
+                        raise ValueError(
+                            f"object {entry.name} cid {entry.cid} does not exist."
+                        )
         # Sort the entries by cid
         entries.sort(key=lambda entry: entry.cid)
 

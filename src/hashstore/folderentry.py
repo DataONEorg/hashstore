@@ -1,6 +1,5 @@
 """Implements FolderEntry class."""
 
-import collections.abc
 import dataclasses
 import json
 import logging
@@ -14,6 +13,7 @@ PARQUET_METADATA_KEY = b"https://ns.dataone.org/types/FolderEntries"
 """Key in parquet file metadata pointing to dict of properties."""
 PARQUET_READ_BATCH_SIZE = 10000
 """Number of entries to read at a time from FolderEntries parquet file."""
+PATH_DELIMITER = "→"
 
 
 def get_logger():

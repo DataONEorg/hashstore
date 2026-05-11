@@ -18,6 +18,7 @@ except ImportError:
 
 import hashstore
 import hashstore.filehashstore_exceptions
+from hashstore.folderentry import PATH_DELIMITER
 
 HASHSTORE_FOLDER_NAME = ".hashstore"
 DEFAULT_HASHSTORE = f"./{HASHSTORE_FOLDER_NAME}"
@@ -350,13 +351,15 @@ def get_folder_info(ctx, pid) -> None:
             stats["max_depth"] = depth
         current_folder = hs.retrieve_folder(pid, path=path)
         for entry in current_folder:
-            if entry.type == 0:
-                _path = f"{path}/{entry.name}" if path != "" else entry.name
-                stats["total_folders"] = stats["total_folders"] + 1
-                iterate_folder(hs, stats, pid, path=_path, depth=depth + 1)
-            else:
+            if entry.is_file == 0:
                 stats["total_bytes"] = stats["total_bytes"] + entry.size
                 stats["total_files"] += 1
+            else:
+                _path = (
+                    f"{path}{PATH_DELIMITER}{entry.name}" if path != "" else entry.name
+                )
+                stats["total_folders"] = stats["total_folders"] + 1
+                iterate_folder(hs, stats, pid, path=_path, depth=depth + 1)
 
     logger = get_logger()
     store = ctx.obj["hashstore_path"]
@@ -398,10 +401,14 @@ def get_folder_tree(ctx, pid: str, no_files: bool) -> None:
         n = 0
         s = 0
         for entry in current_folder:
-            if entry.type == 0 or with_files:
+            if not entry.is_file or with_files:
                 branch = tree.add(entry.name)
-                if entry.type == 0:
-                    _path = f"{path}/{entry.name}" if path != "" else entry.name
+                if not entry.is_file:
+                    _path = (
+                        f"{path}{PATH_DELIMITER}{entry.name}"
+                        if path != ""
+                        else entry.name
+                    )
                     iterate_folder(hs, branch, pid, path=_path, with_files=with_files)
             else:
                 n += 1

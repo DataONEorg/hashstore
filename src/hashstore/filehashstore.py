@@ -1190,6 +1190,7 @@ class FileHashStore(HashStore):
         An alternative strategy is to load the CID from each folder along
         the path, but that is more IO and iterations to find the target.
         """
+        self.fhs_logger.debug("Resolve: %s", pidpath)
         pid = hashstore.folderentry.join_pidpath(pidpath)
         self._check_string(pid, "PID")
         # first try the literal path
@@ -1202,8 +1203,9 @@ class FileHashStore(HashStore):
             pass
         # Path changes context at some point (or doesn't exist)
         context_switch = 1
-        for cpos in range(1, len(pidpath)):
+        for cpos in range(1, len(pidpath) + 1):
             # walk the path to find where context switches
+            self.fhs_logger.debug("At: %s", pidpath[:cpos])
             try:
                 current_pid = hashstore.folderentry.join_pidpath(pidpath[:cpos])
                 _ = self.find_object(current_pid)

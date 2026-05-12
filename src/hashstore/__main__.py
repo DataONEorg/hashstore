@@ -382,7 +382,7 @@ def get_folder_info(ctx, pid) -> None:
         "total_folders": 0,
         "max_depth": 0,
     }
-    path = hashstore.folderentry.split_pidpath(pid)
+    path = hashstore.folderentry.split_pidpath(pid, delimiter="|")
 
     iterate_folder(hash_store, info, path, depth=0)
     print(json.dumps(info, indent=2))
@@ -423,8 +423,8 @@ def get_folder_tree(ctx, pid: str, no_files: bool) -> None:
     except Exception as e:
         logger.error(f"Failed to open hashstore: {e}")
         return 1
-    path = hashstore.folderentry.split_pidpath(pid)
-    tree = rich.tree.Tree(path[0])
+    path = hashstore.folderentry.split_pidpath(pid, delimiter="|")
+    tree = rich.tree.Tree(pid)
     iterate_folder(hash_store, tree, path, with_files=not no_files)
     rich.print(tree)
 

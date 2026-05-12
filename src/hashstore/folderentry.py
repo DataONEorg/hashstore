@@ -13,11 +13,23 @@ PARQUET_METADATA_KEY = b"https://ns.dataone.org/types/FolderEntries"
 """Key in parquet file metadata pointing to dict of properties."""
 PARQUET_READ_BATCH_SIZE = 10000
 """Number of entries to read at a time from FolderEntries parquet file."""
-PATH_DELIMITER = "→"
+PATH_DELIMITER = "⫽"
 
 
 def get_logger():
     return logging.getLogger("FolderEntry")
+
+
+def split_pathpid(pathpid: str) -> list[str]:
+    pathpid = pathpid.strip(PATH_DELIMITER)
+    parts = pathpid.split(PATH_DELIMITER)
+    return parts
+
+
+def join_pathpid(path: list[str]) -> str:
+    # remove "", strings with only white space
+    cleaned = [s.strip() for s in path]
+    return PATH_DELIMITER.join(list(filter(str.strip, cleaned)))
 
 
 @dataclasses.dataclass
@@ -69,9 +81,7 @@ class FolderEntries(list[FolderEntry]):
                 return entry
         return None
 
-    def to_parquet(
-        self, pq_path: str, pid: str | None = None, writer_args: dict = {}
-    ) -> int:
+    def to_parquet(self, pq_path: str, pid: str, writer_args: dict = {}) -> int:
         """Writes the list of folder entries to a parquet file.
 
         See also: https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html
@@ -81,7 +91,7 @@ class FolderEntries(list[FolderEntry]):
 
         args:
             pq_path: path to destination parquet file
-            pid: Optional PID+path used to create this folder.
+            pid: PID+path used to create this folder.
             writer_args: optional dict of arguments for the parquet writer.
         """
         # Add some metadata to the parquet file to help identify it as a list of FolderEntries

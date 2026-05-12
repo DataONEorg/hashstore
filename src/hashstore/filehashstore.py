@@ -1061,8 +1061,7 @@ class FileHashStore(HashStore):
 
     def store_folder(
         self,
-        pid: str,
-        path: str,
+        pathpid: list[str],
         entries: hashstore.folderentry.FolderEntries,
         additional_algorithm: Optional[str] = None,
         checksum: Optional[str] = None,
@@ -1079,11 +1078,12 @@ class FileHashStore(HashStore):
 
         If FolderEntries have cid = '' | None, then the cid is looked up using
 
-            pid + " " + path + "/" + entry.name
+            pid + DELIM + path + DELIM + entry.name
 
-        The Folder is tagged with an identifier that is "{PID} {path}", that is, the
-        PID followed by a single space, then the path. If the path portion is an empty
-        string, ".", or "/" then the Folder is the root Folder.
+        The Folder is tagged with an identifier that is "{PID}{DELIM}{path}", that is, the
+        PID followed by a single delimiter, then the path. If the path portion is an empty
+        list or a list of length 1 with the first element ".", or DELIM then the Folder is
+        the root Folder within the context of PID.
 
         Note that since the hash of a Folder is computed from hashes of its content,
         a Folder hierarchy must be stored starting with the leaves. This method
@@ -1095,7 +1095,7 @@ class FileHashStore(HashStore):
 
         Args:
             pid (str): The context within which this folder is being stored
-            path (str): Path to this folder relative to the root.
+            path (list[str]): Path to this folder relative to the root.
             entries (list[FolderEntry]): A list of FolderEntry objects.
             verify_entry_cids: If True then FolderEntry CID values are
                 verified to to ensure they exist in the hashstore.
@@ -1103,17 +1103,23 @@ class FileHashStore(HashStore):
         Returns:
             ObjectMetadata: The computed ObjectMetadata for this entry.
         """
-        delim = hashstore.folderentry.PATH_DELIMITER
-        if path in ("", ".", delim):
-            path = ""
-        folder_pid = f"{pid} {path}" if path != "" else pid
+        # delim = hashstore.folderentry.PATH_DELIMITER
+        # if path in ("", ".", delim):
+        #    path = ""
+        # folder_pid = f"{pid} {path}" if path != "" else pid
+        folder_pid = hashstore.folderentry.join_pathpid(pathpid)
         self._check_string(folder_pid, "PID")
         if verify_entry_cids:
             # check that each entry CID is present in the hashstore.
             for entry in entries:
                 if entry.cid is None or entry.cid == "":
                     # no cid provided, so look it up
-                    _entry_pid = f"{folder_pid}{delim}{entry.name}"
+                    _entry_pid = hashstore.folderentry.join_pathpid(
+                        pathpid
+                        + [
+                            entry.name,
+                        ]
+                    )
                     _meta = self.find_object(_entry_pid)
                     entry.cid = _meta["cid"]
                 else:
@@ -1164,21 +1170,9 @@ class FileHashStore(HashStore):
             obj_size=obj_size,
         )
 
-    def _make_pidpath(self, pid, path_segments):
-        if len(path_segments) < 1:
-            return pid
-        return f"{pid} {hashstore.folderentry.PATH_DELIMITER.join(path_segments)}"
-
-    def _split_pidpath(self, pidpath: str) -> tuple[str, list[str]]:
-        parts = pidpath.split(" ")
-        if len(parts) == 1:
-            return (parts[0], [])
-        return (parts[0], parts[1].split(hashstore.folderentry.PATH_DELIMITER))
-
     def retrieve_folder(
         self,
-        pid: str,
-        path: str,
+        pathpid: list[str],
     ) -> hashstore.folderentry.FolderEntries:
         """Retrieve a FolderEntries instance from the hashstore.
 
@@ -1197,12 +1191,10 @@ class FileHashStore(HashStore):
         Returns:
             FolderEntries
         """
-        delim = hashstore.folderentry.PATH_DELIMITER
-        if path in ("", ".", delim):
-            path = ""
-        folder_pid = f"{pid} {path}" if path != "" else pid
+        folder_pid = hashstore.folderentry.join_pathpid(pathpid)
         self._check_string(folder_pid, "PID")
-        # try direct reference to CID using folder_pid
+        # try direct reference to CID using folder_pid. This works if
+        # there is no branching to other PID contexts (typical case)
         try:
             object_info_dict = self.find_object(folder_pid)
             folder_cid = object_info_dict.get("cid")
@@ -1214,46 +1206,24 @@ class FileHashStore(HashStore):
         except PidRefsDoesNotExist:
             pass
 
-        # otherwise, get the root, split the path, and start iterating.
+        # otherwise, iterate over the path, following a branch if needed.
+        # get the root, split the path, and start iterating.
         # This will raise PidRefsDoesNotExist if the root PID isn't there
-        object_info_dict = self.find_object(pid)
+        object_info_dict = self.find_object(pathpid[0])
         folder_cid = object_info_dict.get("cid")
         if folder_cid is None:
             # Should never reach this...
             raise PidRefsDoesNotExist("Entry has no cid?")
         cid_path = object_info_dict.get("cid_object_path")
         # self._build_hashstore_data_object_path(folder_cid)
+        # Get the root folder, then find the next path element in the folder
         current_folder = hashstore.folderentry.FolderEntries.from_parquet(cid_path)
-        # iterate over segments, saving last
-        current_pid = pid
-        path_segments = path.split(delim)
-        segment_index = 0
-        for name in path_segments:
-            entry = current_folder.entry_by_name(name)
+        for idx in range(1, len(pathpid)):
+            entry = current_folder.entry_by_name(pathpid[idx])
             if entry is None:
-                raise KeyError(f"PID {pid} {path} not found.")
-            if entry.is_file:
-                # it's a file!
-                raise ValueError(f"Path {path} is a file.")
-            segment_index += 1
-            try:
-                # Does name form a registered PID?
-                object_info_dict = self.find_object(name)
-                # if so, then return follow
-                return self.retrieve_folder(
-                    name, delim.join(path_segments[segment_index:])
-                )
-            except PidRefsDoesNotExist:
-                # continue but trye with pid + path
-                pass
-            folder_pid = self._make_pidpath(current_pid, path_segments[:segment_index])
-            object_info_dict = self.find_object(name)
-            folder_cid = object_info_dict.get("cid")
-            if folder_cid is None:
-                # Should never reach this...
-                raise PidRefsDoesNotExist("Entry has no cid?")
-            cid_path = object_info_dict.get("cid_object_path")
-            # cid_path = self._build_hashstore_data_object_path(folder_cid)
+                raise KeyError(f"PID {pathpid} not found.")
+            # given the entry, we have the cid. Use that to get the next folder
+            cid_path = self._get_hashstore_data_object_path(entry.cid)
             current_folder = hashstore.folderentry.FolderEntries.from_parquet(cid_path)
         return current_folder
 

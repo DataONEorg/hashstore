@@ -20,13 +20,13 @@ def get_logger():
     return logging.getLogger("FolderEntry")
 
 
-def split_pathpid(pathpid: str) -> list[str]:
-    pathpid = pathpid.strip(PATH_DELIMITER)
+def split_pidpath(pidpath: str) -> list[str]:
+    pathpid = pidpath.strip(PATH_DELIMITER)
     parts = pathpid.split(PATH_DELIMITER)
     return parts
 
 
-def join_pathpid(path: list[str]) -> str:
+def join_pidpath(path: list[str]) -> str:
     # remove "", strings with only white space
     cleaned = [s.strip() for s in path]
     return PATH_DELIMITER.join(list(filter(str.strip, cleaned)))

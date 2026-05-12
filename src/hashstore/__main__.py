@@ -18,7 +18,7 @@ except ImportError:
 
 import hashstore
 import hashstore.filehashstore_exceptions
-from hashstore.folderentry import PATH_DELIMITER
+import hashstore.folderentry
 
 HASHSTORE_FOLDER_NAME = ".hashstore"
 DEFAULT_HASHSTORE = f"./{HASHSTORE_FOLDER_NAME}"
@@ -345,23 +345,25 @@ def list_pids(ctx, pattern, human_readable, show_metadata, reference, list_only)
 @click.argument("pid", type=str)
 def get_folder_info(ctx, pid) -> None:
     """Compute basic stats for a folder and sub-folders."""
+    logger = get_logger()
 
-    def iterate_folder(hs, stats, pid, path="", depth: int = 1):
+    def iterate_folder(hs, stats, path, depth: int = 1):
+        logger.debug("Current path=%s", path)
         if depth > stats["max_depth"]:
             stats["max_depth"] = depth
-        current_folder = hs.retrieve_folder(pid, path=path)
+        current_folder = hs.retrieve_folder(path)
         for entry in current_folder:
-            if entry.is_file == 0:
+            logger.debug(str(entry))
+            if entry.is_file:
                 stats["total_bytes"] = stats["total_bytes"] + entry.size
                 stats["total_files"] += 1
             else:
-                _path = (
-                    f"{path}{PATH_DELIMITER}{entry.name}" if path != "" else entry.name
-                )
                 stats["total_folders"] = stats["total_folders"] + 1
-                iterate_folder(hs, stats, pid, path=_path, depth=depth + 1)
+                _path = path + [
+                    entry.name,
+                ]
+                iterate_folder(hs, stats, _path, depth=depth + 1)
 
-    logger = get_logger()
     store = ctx.obj["hashstore_path"]
     properties = load_hashstore_properties(store)
     hashstore_factory = hashstore.HashStoreFactory()
@@ -380,12 +382,9 @@ def get_folder_info(ctx, pid) -> None:
         "total_folders": 0,
         "max_depth": 0,
     }
-    parts = pid.split(" ", 1)
-    path = ""
-    if len(parts) > 1:
-        path = parts[1].strip()
+    path = hashstore.folderentry.split_pidpath(pid)
 
-    iterate_folder(hash_store, info, parts[0], path=path, depth=0)
+    iterate_folder(hash_store, info, path, depth=0)
     print(json.dumps(info, indent=2))
 
 
@@ -395,28 +394,24 @@ def get_folder_info(ctx, pid) -> None:
 @click.option("-n", "--no-files", is_flag=True, help="Show folders but not content.")
 def get_folder_tree(ctx, pid: str, no_files: bool) -> None:
     """Generate a tree representation of the folder and sub-folders."""
+    logger = get_logger()
 
-    def iterate_folder(hs, tree, pid, path="", with_files: bool = True):
-        current_folder = hs.retrieve_folder(pid, path=path)
+    def iterate_folder(hs, tree, path, with_files: bool = True):
+        current_folder = hs.retrieve_folder(path)
         n = 0
         s = 0
         for entry in current_folder:
             if not entry.is_file or with_files:
                 branch = tree.add(entry.name)
                 if not entry.is_file:
-                    _path = (
-                        f"{path}{PATH_DELIMITER}{entry.name}"
-                        if path != ""
-                        else entry.name
-                    )
-                    iterate_folder(hs, branch, pid, path=_path, with_files=with_files)
+                    _path = path + [entry.name]
+                    iterate_folder(hs, branch, _path, with_files=with_files)
             else:
                 n += 1
                 s += entry.size
         if not with_files:
             branch = tree.add(f"{n:,} files, {s:,} bytes")
 
-    logger = get_logger()
     store = ctx.obj["hashstore_path"]
     properties = load_hashstore_properties(store)
     hashstore_factory = hashstore.HashStoreFactory()
@@ -428,12 +423,9 @@ def get_folder_tree(ctx, pid: str, no_files: bool) -> None:
     except Exception as e:
         logger.error(f"Failed to open hashstore: {e}")
         return 1
-    parts = pid.split(" ", 1)
-    path = ""
-    if len(parts) > 1:
-        path = parts[1].strip()
-    tree = rich.tree.Tree(pid)
-    iterate_folder(hash_store, tree, parts[0], path=path, with_files=not no_files)
+    path = hashstore.folderentry.split_pidpath(pid)
+    tree = rich.tree.Tree(path[0])
+    iterate_folder(hash_store, tree, path, with_files=not no_files)
     rich.print(tree)
 
 

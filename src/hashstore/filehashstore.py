@@ -1061,7 +1061,7 @@ class FileHashStore(HashStore):
 
     def store_folder(
         self,
-        pathpid: list[str],
+        pidpath: list[str],
         entries: hashstore.folderentry.FolderEntries,
         additional_algorithm: Optional[str] = None,
         checksum: Optional[str] = None,
@@ -1107,15 +1107,15 @@ class FileHashStore(HashStore):
         # if path in ("", ".", delim):
         #    path = ""
         # folder_pid = f"{pid} {path}" if path != "" else pid
-        folder_pid = hashstore.folderentry.join_pathpid(pathpid)
+        folder_pid = hashstore.folderentry.join_pidpath(pidpath)
         self._check_string(folder_pid, "PID")
         if verify_entry_cids:
             # check that each entry CID is present in the hashstore.
             for entry in entries:
                 if entry.cid is None or entry.cid == "":
                     # no cid provided, so look it up
-                    _entry_pid = hashstore.folderentry.join_pathpid(
-                        pathpid
+                    _entry_pid = hashstore.folderentry.join_pidpath(
+                        pidpath
                         + [
                             entry.name,
                         ]
@@ -1170,62 +1170,89 @@ class FileHashStore(HashStore):
             obj_size=obj_size,
         )
 
+    def resolve_pidpath(self, pidpath: list[str]) -> dict[str, str]:
+        """Return object info dict given a path.
+
+        A path may reference another path:
+            c_1 -> sub_1 -> c_0 -> sub_2 -> x
+        In such cases, the full path is not stored as a cidref, instead
+        we have:
+            path           name
+            c_1            sub_1
+            c_1, sub_1     c_0      <- change of context
+            c_0            sub_2
+            c_0, sub_2     x
+            c_0, sub_2, x
+
+        Hence it is necessary to walk the path to find the next context,
+        switch to that context, then continue looking for the target.
+
+        An alternative strategy is to load the CID from each folder along
+        the path, but that is more IO and iterations to find the target.
+        """
+        pid = hashstore.folderentry.join_pidpath(pidpath)
+        self._check_string(pid, "PID")
+        # first try the literal path
+        try:
+            return self.find_object(pid)
+        except PidRefsDoesNotExist as e:
+            # End of the line
+            if len(pidpath) == 1:
+                raise e
+            pass
+        # Path changes context at some point (or doesn't exist)
+        context_switch = 1
+        for cpos in range(1, len(pidpath)):
+            # walk the path to find where context switches
+            try:
+                current_pid = hashstore.folderentry.join_pidpath(pidpath[:cpos])
+                _ = self.find_object(current_pid)
+            except PidRefsDoesNotExist:
+                # context switch, start over with segment from current context onwards
+                context_switch = cpos
+                break
+        return self.resolve_pidpath(pidpath[context_switch - 1 :])
+
+    def retrieve_object_path(self, pidpath: list[str]) -> IO[bytes]:
+        object_info_dict = self.resolve_pidpath(pidpath)
+        object_cid = object_info_dict.get("cid")
+        entity = "objects"
+        if object_cid:
+            self.fhs_logger.debug(
+                "Metadata exists for pid: %s, retrieving object.", pidpath
+            )
+            obj_stream = self._open(entity, object_cid)
+        else:
+            err_msg = f"No object found for pid: {pidpath}"
+            self.fhs_logger.error(err_msg)
+            raise ValueError(err_msg)
+        self.fhs_logger.info("Retrieved object for pid: %s", pidpath)
+        return obj_stream
+
     def retrieve_folder(
         self,
-        pathpid: list[str],
+        pidpath: list[str],
     ) -> hashstore.folderentry.FolderEntries:
         """Retrieve a FolderEntries instance from the hashstore.
 
-        We first check to see if a CID is available for the combination of
-        "{PID} {path}", and if so, return that entry. Otherwise, we iterate
-        over path segments to find the correspoding FolderEntry, if any.
-        This iterative approach is necesary if since entire trees are not
-        stored when a new version of a folder hierarchy is stored. Hence, it
-        may be necessary to jump back to a branch that is recorded in an
-        earlier version but not recorded in the current version since it
-        was unchanged between versions.
+        Given a sequence of path segments to a FolderEntries object,
+        return the object.
 
         Args:
-            pid (str): The context (i.e. VMDAG version) within which this folder is being retrieved
-            path (str): Path within the context to the desired entry, using folderentry.PATH_DELIMITER
+            pidpath (list[str]): Path segments to the folder
         Returns:
             FolderEntries
+        Raises:
+            PidRefsDoesNotExist
         """
-        folder_pid = hashstore.folderentry.join_pathpid(pathpid)
-        self._check_string(folder_pid, "PID")
-        # try direct reference to CID using folder_pid. This works if
-        # there is no branching to other PID contexts (typical case)
-        try:
-            object_info_dict = self.find_object(folder_pid)
-            folder_cid = object_info_dict.get("cid")
-            if folder_cid is None:
-                raise PidRefsDoesNotExist("Entry has no cid?")
-            cid_path = object_info_dict.get("cid_object_path")
-            # self._build_hashstore_data_object_path(folder_cid)
-            return hashstore.folderentry.FolderEntries.from_parquet(cid_path)
-        except PidRefsDoesNotExist:
-            pass
-
-        # otherwise, iterate over the path, following a branch if needed.
-        # get the root, split the path, and start iterating.
-        # This will raise PidRefsDoesNotExist if the root PID isn't there
-        object_info_dict = self.find_object(pathpid[0])
+        # this will raise if pidpath isn't found
+        object_info_dict = self.resolve_pidpath(pidpath)
+        # have info, load the folder object from the cid path
         folder_cid = object_info_dict.get("cid")
         if folder_cid is None:
-            # Should never reach this...
-            raise PidRefsDoesNotExist("Entry has no cid?")
+            raise PidRefsDoesNotExist(f"Entry {pidpath} has no cid?")
         cid_path = object_info_dict.get("cid_object_path")
-        # self._build_hashstore_data_object_path(folder_cid)
-        # Get the root folder, then find the next path element in the folder
-        current_folder = hashstore.folderentry.FolderEntries.from_parquet(cid_path)
-        for idx in range(1, len(pathpid)):
-            entry = current_folder.entry_by_name(pathpid[idx])
-            if entry is None:
-                raise KeyError(f"PID {pathpid} not found.")
-            # given the entry, we have the cid. Use that to get the next folder
-            cid_path = self._get_hashstore_data_object_path(entry.cid)
-            current_folder = hashstore.folderentry.FolderEntries.from_parquet(cid_path)
-        return current_folder
+        return hashstore.folderentry.FolderEntries.from_parquet(cid_path)
 
     def list_pids(self, pattern: Optional[str] = None) -> Generator:
         """Yield create_timestamp, CID, PID.

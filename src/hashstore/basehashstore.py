@@ -4,7 +4,7 @@ import importlib.metadata
 import importlib.util
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Generator, Optional, Union
+from typing import IO, Generator, Optional, Union
 
 import hashstore.folderentry
 
@@ -69,10 +69,32 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def resolve_pidpath(self, pidpath: list[str]) -> dict[str, str]:
+        """Return object info dict given a path.
+
+        A path may reference another path:
+            c_1 -> sub_1 -> c_0 -> sub_2 -> x
+        In such cases, the full path is not stored as a cidref, instead
+        we have:
+            path           name
+            c_1            sub_1
+            c_1, sub_1     c_0      <- change of context
+            c_0            sub_2
+            c_0, sub_2     x
+            c_0, sub_2, x
+
+        Hence it is necessary to walk the path to find the next context,
+        switch to that context, then continue looking for the target.
+
+        An alternative strategy is to load the CID from each folder along
+        the path, but that is more IO and iterations to find the target.
+        """
+        raise NotADirectoryError()
+
+    @abstractmethod
     def store_folder(
         self,
-        pid: str,
-        path: str,
+        pidpath: list[str],
         entries: hashstore.folderentry.FolderEntries,
         additional_algorithm: Optional[str] = None,
         checksum: Optional[str] = None,
@@ -115,8 +137,7 @@ class HashStore(ABC):
     @abstractmethod
     def retrieve_folder(
         self,
-        pid: str,
-        path: str,
+        pidpath: list[str],
     ) -> hashstore.folderentry.FolderEntries:
         """Retrieve a FolderEntries instance from the hashstore.
 
@@ -172,6 +193,18 @@ class HashStore(ABC):
 
     @abstractmethod
     def retrieve_object(self, pid):
+        """Retrieve an object from disk using a persistent identifier (pid). The `retrieve_object`
+        method opens and returns a buffered object stream ready for reading if the object
+        associated with the provided `pid` exists on disk.
+
+        :param str pid: Authority-based identifier.
+
+        :return: io.BufferedReader - Buffered stream of the data object.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def retrieve_object_path(self, pidpath: list[str]) -> IO[bytes]:
         """Retrieve an object from disk using a persistent identifier (pid). The `retrieve_object`
         method opens and returns a buffered object stream ready for reading if the object
         associated with the provided `pid` exists on disk.

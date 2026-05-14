@@ -20,7 +20,7 @@ from typing import IO, Any, Dict, Generator, List, Optional, Set, Tuple, Union
 import yaml
 
 import hashstore.folderentry
-from hashstore import HashStore, PidObserver
+from hashstore import HashStore
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
@@ -85,7 +85,6 @@ class FileHashStore(HashStore):
 
     def __init__(self, properties=None):
         self.fhs_logger = logging.getLogger(__name__)
-        self.pid_watchers = []
         # Now check properties
         if properties:
             # Validate properties against existing configuration if present
@@ -517,13 +516,6 @@ class FileHashStore(HashStore):
 
     # Public API / HashStore Interface Methods
 
-    def add_watcher(self, watcher: PidObserver) -> None:
-        self.pid_watchers.append(watcher)
-
-    def notify(self, cid, pid):
-        for watcher in self.pid_watchers:
-            watcher.update(cid, pid)
-
     def store_object(
         self,
         pid: Optional[str] = None,
@@ -586,7 +578,6 @@ class FileHashStore(HashStore):
                     cid = object_metadata.cid
                     self.tag_object(pid, cid)
                     self.fhs_logger.info("Successfully stored object for pid: %s", pid)
-                    self.notify(cid, pid)
                 finally:
                     # Release pid
                     self._release_object_locked_pids(pid)
@@ -1168,7 +1159,6 @@ class FileHashStore(HashStore):
         # of folder entries increases.
         obj_size = entries.to_parquet(cid_path, pid=folder_pid)
         self.tag_object(folder_pid, folder_cid)
-        self.notify(folder_cid, folder_pid)
         return ObjectMetadata(
             pid=folder_pid,
             cid=folder_cid,
@@ -1179,14 +1169,14 @@ class FileHashStore(HashStore):
     def resolve_pidpath(self, pidpath: list[str]) -> dict[str, str]:
         """Return object info dict given a path.
 
-        #TODO:
-        # - write test cases for this.
-        # - consider adding a recursion trap
-
         A path may reference another path:
             c_1 -> sub_1 -> c_0 -> sub_2 -> x
+
+        Similarly, a path rooted in on PID may reference a path rooted in another PID.
+
         In such cases, the full path is not stored as a cidref, instead
-        we have:
+        we have in the example above:
+
             path           name
             c_1            sub_1
             c_1, sub_1     c_0      <- change of context
@@ -1194,11 +1184,8 @@ class FileHashStore(HashStore):
             c_0, sub_2     x
             c_0, sub_2, x
 
-        Hence it is necessary to walk the path to find the next context,
-        switch to that context, then continue looking for the target.
-
-        An alternative strategy is to load the CID from each folder along
-        the path, but that is more IO and iterations to find the target.
+        Hence it is necessary to walk the path following folder entry CIDs
+        to locate the target if it is not directly resolvable by the full path.
         """
         self.fhs_logger.debug("Resolve: %s", pidpath)
         pid = hashstore.folderentry.join_pidpath(pidpath)
@@ -1210,8 +1197,14 @@ class FileHashStore(HashStore):
             # End of the line ?
             if len(pidpath) < 2:
                 raise e
-            # continue
         # Does the root context exist?
+        object_info_dict = {
+            "cid": None,
+            "cid_object_path": None,
+            "cid_refs_path": None,
+            "pid_refs_path": None,
+            "sysmeta_path": "Does not exist.",
+        }
         try:
             object_info_dict = self.find_object(pidpath[0])
             cid_object_path = object_info_dict.get("cid_object_path")
@@ -1221,13 +1214,6 @@ class FileHashStore(HashStore):
         except PidRefsDoesNotExist as e:
             # nope
             raise e
-        object_info_dict = {
-            "cid": None,
-            "cid_object_path": None,
-            "cid_refs_path": None,
-            "pid_refs_path": None,
-            "sysmeta_path": "Does not exist.",
-        }
         entry = None
         # walk the path, following cids referened by folder
         for idx in range(1, len(pidpath)):

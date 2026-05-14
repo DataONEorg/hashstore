@@ -9,6 +9,12 @@ from typing import IO, Generator, Optional, Union
 import hashstore.folderentry
 
 
+class PidObserver(ABC):
+    @abstractmethod
+    def update(self, cid: str, pid: str | None = None):
+        pass
+
+
 class HashStore(ABC):
     """HashStore is a content-addressable file management system that utilizes
     an object's content identifier (hex digest/checksum) to address files."""

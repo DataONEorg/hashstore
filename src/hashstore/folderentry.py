@@ -41,9 +41,9 @@ class FolderEntry:
     cid: str
     """The content hash (CID) for the entry."""
     is_file: bool  # True for file, False for Folder
-    """The type of manifest entry: '1' for file, '0' for directory."""
+    """The type of manifest entry: False for folder, True for file."""
     size: int = 0
-    """Size of the file in bytes or number of entries for directories."""
+    """Size of the file in bytes or number of entries for folders."""
     formatid: str | None = None
     """Optional format identifier for files."""
 

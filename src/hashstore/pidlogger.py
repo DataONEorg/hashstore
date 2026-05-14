@@ -26,6 +26,8 @@ or create a parquet representation:
 import json
 import logging
 
+from hashstore.basehashstore import PidObserver
+
 
 class PidIndexFormatter(logging.Formatter):
     def format(self, record) -> str:
@@ -37,15 +39,17 @@ class PidIndexFormatter(logging.Formatter):
         return json.dumps(pid_record)
 
 
-def getPidLogger(log_file_name: str):
-    """Return a logger for the pid index.
+class PidLogObserver(PidObserver):
+    def __init__(self, log_file_name: str | None = None):
+        self.logger = logging.getLogger("pid_logger")
+        self.logger.handlers.clear()
+        self.logger.propagate = False
+        if log_file_name is None:
+            return
+        self.logger.setLevel(logging.INFO)
+        handler = logging.FileHandler(log_file_name)
+        handler.setFormatter(PidIndexFormatter())
+        self.logger.addHandler(handler)
 
-    PID records are added to the index like:
-        logger.info(CID, extra={"pid":PID})
-    """
-    logger = logging.getLogger("pid_logger")
-    logger.setLevel(logging.INFO)
-    handler = logging.FileHandler(log_file_name)
-    handler.setFormatter(PidIndexFormatter())
-    logger.addHandler(handler)
-    return logger
+    def update(self, cid: str, pid: str | None = None):
+        self.logger.info(cid, extra={"pid": pid})

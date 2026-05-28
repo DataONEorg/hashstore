@@ -134,3 +134,22 @@ class FolderEntries(list[FolderEntry]):
                     )
                 )
         return entries
+
+
+def is_folder(path: str) -> bool:
+    """Test if the target of the path is a folder object.
+
+    This test is fast, reading just a few bytes, but there
+    is of course associated file IO, so avoid use in loops etc.
+    """
+    try:
+        pq_metadata = pyarrow.parquet.read_metadata(path)
+        try:
+            metadata = json.loads(pq_metadata.metadata[PARQUET_METADATA_KEY].decode())
+            _ = metadata["version"]
+        except KeyError:
+            return False
+        return True
+    except Exception:
+        pass
+    return False

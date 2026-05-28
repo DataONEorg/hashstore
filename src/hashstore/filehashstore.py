@@ -1208,6 +1208,8 @@ class FileHashStore(HashStore):
         try:
             object_info_dict = self.find_object(pidpath[0])
             cid_object_path = object_info_dict.get("cid_object_path")
+            if not hashstore.folderentry.is_folder(cid_object_path):
+                return object_info_dict
             current_folder = hashstore.folderentry.FolderEntries.from_parquet(
                 cid_object_path
             )
@@ -1229,9 +1231,12 @@ class FileHashStore(HashStore):
                 entry.cid
             )
             if idx < len(pidpath):
-                current_folder = hashstore.folderentry.FolderEntries.from_parquet(
-                    object_info_dict["cid_object_path"]
-                )
+                if hashstore.folderentry.is_folder(object_info_dict["cid_object_path"]):
+                    current_folder = hashstore.folderentry.FolderEntries.from_parquet(
+                        object_info_dict["cid_object_path"]
+                    )
+                else:
+                    return object_info_dict
         return object_info_dict
 
     def retrieve_object_path(self, pidpath: list[str]) -> IO[bytes]:
@@ -3011,7 +3016,7 @@ class FileHashStore(HashStore):
         if (
             not isinstance(data, str)
             and not isinstance(data, Path)
-            and not isinstance(data, io.BufferedIOBase)
+            and not isinstance(data, io.IOBase)
         ):
             err_msg = (
                 "FileHashStore - _validate_arg_data: Data must be a path, string or buffered"

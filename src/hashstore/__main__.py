@@ -1,10 +1,14 @@
+import concurrent.futures
 import dataclasses
 import datetime
 import json
 import logging
 import os
 import pathlib
+import queue
+import re
 import sys
+import typing
 
 import click
 import rich
@@ -65,6 +69,113 @@ def locate_hashstore(path: pathlib.Path) -> pathlib.Path | None:
             if file_path.is_dir():
                 return file_path
     return None
+
+
+# ctime, cid_value, pid
+def _handle_cid_ref_file(
+    cids_path: str, cid_entry: os.DirEntry, rpattern: re.Pattern | None
+) -> list[tuple[float, str, str]]:
+    result = []
+    # print(cids_root, cids_path, cid_entries)
+    fname = cid_entry.path
+    try:
+        cid_value = fname.replace(cids_path, "").replace("/", "")
+        ctime = cid_entry.stat().st_ctime
+        for _, entry in enumerate(open(fname, "r", encoding="utf-8")):
+            pid = entry.strip()
+            if len(pid) > 0:
+                if rpattern is not None:
+                    if rpattern.fullmatch(pid):
+                        result.append(
+                            (
+                                ctime,
+                                cid_value,
+                                pid,
+                            )
+                        )
+                else:
+                    # print(pid)
+                    result.append(
+                        (
+                            ctime,
+                            cid_value,
+                            pid,
+                        )
+                    )
+    except Exception as e:
+        print(e)
+    return result
+
+
+def enumerate_hs_files(
+    refs_cids_root: str, pattern: str | None = None, max_workers: int = 2
+) -> typing.Generator:
+    """Perform a depth first scan of the hashshore refs/cids to yield PIDs.
+
+    This operation will perform a multi-threaded depth first traversal of the
+    hashstore refs/cids hierarchy, read each file, and yield a three-tuple of
+      create time, cid, pid
+
+    This process is efficient, but still slow due to the number of files that
+    need to be processed in even modeterate sized hash stores. For example,
+    on an m5 mac running with 10 threads on a hashstore with 4 million entries,
+    the process takes about 20 minutes to complete.
+    """
+    _L = get_logger()
+    rpattern = None
+    if pattern is not None:
+        rpattern = re.compile(pattern)
+    ignore_names = [
+        ".DS_Store",
+    ]
+    # Use a LIFO queue for the dirs so we do depth first processing
+    dirs_queue = queue.LifoQueue()
+    # starting point is root of refs/cids
+    dirs_queue.put(refs_cids_root)
+    workers = {}
+    ticker = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # keep doing stuff untill both the dirs_queue and the workers dict are empty
+        while not dirs_queue.empty() or len(workers) > 0:
+            try:
+                current_dir = dirs_queue.get(timeout=0.01)
+                try:
+                    with os.scandir(current_dir) as entries:
+                        for entry in entries:
+                            if entry.name in ignore_names:
+                                continue
+                            if entry.is_dir(follow_symlinks=False):
+                                # entry is a folder, add it to the dirs_queue
+                                dirs_queue.put(entry.path)
+                            else:
+                                # entry is a file. Create a task to process it on a worker
+                                future = executor.submit(
+                                    _handle_cid_ref_file,
+                                    refs_cids_root,
+                                    entry,
+                                    rpattern,
+                                )
+                                workers[future] = entry
+                except PermissionError:
+                    _L.error("Permission denied for %s", current_dir)
+                except Exception as e:
+                    _L.error("Error at %s: %s", current_dir, e)
+            except queue.Empty:
+                # no more dirs to process
+                pass
+            # simple UI feedback
+            if ticker % 1000 == 0:
+                print(f"{ticker:,} {dirs_queue.qsize():,} {len(workers):,}")
+            ticker += 1
+            try:
+                # yield results from workers as they complete. Also remove completed
+                # from the workers dict to keep things compact
+                for worker in concurrent.futures.as_completed(workers, timeout=0.01):
+                    for result in worker.result():
+                        yield result
+                    del workers[worker]
+            except TimeoutError:
+                pass
 
 
 @click.group()
@@ -264,8 +375,21 @@ def add_object(
 )
 def get_object(ctx, pid, stream, recursive):
     """Retrieve an object or folder from hashstore."""
+    logger = get_logger()
     store = ctx.obj["hashstore_path"]
-    pass
+    properties = load_hashstore_properties(store)
+    hashstore_factory = hashstore.HashStoreFactory()
+    try:
+        hash_store = hashstore_factory.get_hashstore(
+            ctx.obj["module_name"], ctx.obj["class_name"], properties
+        )
+        logger.debug(f"Hashstore opened at: {store}")
+    except Exception as e:
+        logger.error(f"Failed to open hashstore: {e}")
+        return
+    pidpath = hashstore.folderentry.split_pidpath(pid, delimiter="|")
+    info = hash_store.resolve_pidpath(pidpath)
+    print(info)
 
 
 @main.command("ls")
@@ -287,8 +411,27 @@ def get_object(ctx, pid, stream, recursive):
 )
 @click.option("-r", "--reference", is_flag=True, help="Include path references.")
 @click.option("-l", "--list-only", is_flag=True, help="Just list the cid, pid values.")
-def list_pids(ctx, pattern, human_readable, show_metadata, reference, list_only):
-    """List PIDs in the hashstore."""
+@click.option("-w", "--workers", default=2, help="Number of workers.")
+@click.option("-o", "--output", default=None, help="Write output to file.")
+def list_pids(
+    ctx, pattern, human_readable, show_metadata, reference, list_only, workers, output
+):
+    """List PIDs in the hashstore (async).
+
+    The resulting ndjson file can be loaded into duckdb for example with:
+
+        CREATE TABLE pids AS SELECT
+            to_timestamp(json[1]::DOUBLE) AS ctime,
+            json[2]->> '$' AS cid,
+            json[3]->>'$' AS pid
+        FROM read_json('pid_index.ndjson');
+
+    or create a parquet representation:
+
+        duckdb -c "COPY (SELECT to_timestamp(json[1]::DOUBLE) AS ctime,
+        json[2]->> '\\$' AS cid, json[3]->>'\\$' AS pid FROM
+        read_json('pid_index.ndjson')) TO 'pid_index.parquet' (FORMAT parquet)"
+    """
     logger = get_logger()
     store = ctx.obj["hashstore_path"]
     properties = load_hashstore_properties(store)
@@ -305,45 +448,98 @@ def list_pids(ctx, pattern, human_readable, show_metadata, reference, list_only)
     # iterate over the refs/cids folder, getting PIDs from each file.
     if not list_only:
         print(f"Hashstore: {str(store.relative_to(pathlib.Path.cwd(), walk_up=True))}")
-    for ctime, cid, pid in hash_store.list_pids(pattern=pattern):
-        if list_only:
-            print(json.dumps((ctime, cid, pid)))
-            continue
-        try:
-            pid_stat = hash_store.get_object_status(pid)
-            fsize = pid_stat.get("size", 0)
-            total_objects += 1
-            t_modified = pid_stat.get("modtime", "-")
-            if t_modified != "-":
-                t_modified = datetime.datetime.fromtimestamp(t_modified).isoformat(
-                    timespec="seconds"
+    dest_file = sys.stdout
+    if output is not None:
+        dest_file = open(output, "w")
+    try:
+        for ctime, cid, pid in enumerate_hs_files(
+            str(hash_store.cids), pattern=pattern, max_workers=workers
+        ):
+            if list_only:
+                dest_file.write(
+                    f"{json.dumps((ctime, cid, pid), ensure_ascii=False)}\n"
                 )
-            t_access = pid_stat.get("accesstime", "-")
-            if t_access != "-":
-                t_access = datetime.datetime.fromtimestamp(t_access).isoformat(
-                    timespec="seconds"
-                )
-            if human_readable:
-                fsize = sizeof_fmt(fsize)
-            if fsize > 0 or reference:
-                print(f"{fsize}\t{t_modified}\t{t_access}\t{pid}")
-            if show_metadata:
-                try:
-                    meta = hash_store.retrieve_metadata(pid).read().decode()
-                    print(meta)
-                    # print(json.dumps(meta, indent=2))
-                except KeyError:
-                    pass
-        except KeyError:
-            logger.warning(f"PID status not available in hashstore: {pid}")
-    if not list_only:
-        print(f"Total {total_objects}")
+                continue
+            try:
+                pid_stat = hash_store.get_object_status(pid)
+                fsize = pid_stat.get("size", 0)
+                total_objects += 1
+                t_modified = pid_stat.get("modtime", "-")
+                if t_modified != "-":
+                    t_modified = datetime.datetime.fromtimestamp(t_modified).isoformat(
+                        timespec="seconds"
+                    )
+                t_access = pid_stat.get("accesstime", "-")
+                if t_access != "-":
+                    t_access = datetime.datetime.fromtimestamp(t_access).isoformat(
+                        timespec="seconds"
+                    )
+                if human_readable:
+                    fsize = sizeof_fmt(fsize)
+                if fsize > 0 or reference:
+                    dest_file.write(f"{fsize}\t{t_modified}\t{t_access}\t{pid}\n")
+                if show_metadata:
+                    try:
+                        meta = hash_store.retrieve_metadata(pid).read().decode()
+                        print(meta)
+                        # print(json.dumps(meta, indent=2))
+                    except KeyError:
+                        pass
+            except KeyError:
+                logger.warning(f"PID status not available in hashstore: {pid}")
+        if not list_only:
+            print(f"Total {total_objects}")
+    finally:
+        if output is not None:
+            dest_file.close()
 
 
-@main.command("finfo")
+@main.command("meta")
 @click.pass_context
 @click.argument("pid", type=str)
-def get_folder_info(ctx, pid) -> None:
+def get_system_metadata(ctx, pid) -> None:
+    """Retrieve system metadata for PID"""
+    logger = get_logger()
+    store = ctx.obj["hashstore_path"]
+    properties = load_hashstore_properties(store)
+    hashstore_factory = hashstore.HashStoreFactory()
+    try:
+        hash_store = hashstore_factory.get_hashstore(
+            ctx.obj["module_name"], ctx.obj["class_name"], properties
+        )
+        logger.debug(f"Hashstore opened at: {store}")
+    except Exception as e:
+        logger.error(f"Failed to open hashstore: {e}")
+        return
+
+    pidpath = hashstore.folderentry.split_pidpath(pid, delimiter="|")
+
+    info = {}
+    sysm_found = False
+    sysm_pid_path = pidpath
+    while len(sysm_pid_path) > 0:
+        print(" | ".join(sysm_pid_path))
+        info = hash_store.resolve_pidpath(sysm_pid_path)
+        print(info)
+        if info.get("sysmeta_path") not in (None, "Does not exist."):
+            sysm_found = True
+            break
+        sysm_pid_path.pop()
+        print("===")
+    if not sysm_found:
+        print(f"No system metadata found for {pid}")
+    sysm_pid = hashstore.folderentry.join_pidpath(sysm_pid_path)
+    with hash_store.retrieve_metadata(
+        sysm_pid, "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    ) as sysmf:
+        sysm = sysmf.read()
+        print(sysm.decode("utf-8"))
+
+
+@main.command("info")
+@click.pass_context
+@click.argument("pid", type=str)
+def get_object_info(ctx, pid) -> None:
     """Compute basic stats for a folder and sub-folders."""
     logger = get_logger()
 
@@ -351,7 +547,14 @@ def get_folder_info(ctx, pid) -> None:
         logger.debug("Current path=%s", path)
         if depth > stats["max_depth"]:
             stats["max_depth"] = depth
-        current_folder = hs.retrieve_folder(path)
+        target = hs.resolve_pidpath(path)
+        cid_object_path = target.get("cid_object_path")
+        if hashstore.folderentry.is_folder(cid_object_path):
+            current_folder = hs.retrieve_folder(path)
+        else:
+            stats["total_files"] += 1
+            stats["total_bytes"] += cid_object_path.stat().st_size
+            return
         for entry in current_folder:
             logger.debug(str(entry))
             if entry.is_file:

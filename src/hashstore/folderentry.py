@@ -153,3 +153,29 @@ def is_folder(path: str) -> bool:
     except Exception:
         pass
     return False
+
+
+# == Folder Operation support
+
+OP_ADD = "add"
+OP_DELETE = "delete"
+OP_MOVE = "move"
+OP_MODIFY = "modify"
+
+
+@dataclasses.dataclass
+class FolderOperation:
+    """Describes a single operation for folder hierarchy changes."""
+
+    operation: str
+    """Operation tyoe: 'add', 'delete', or 'move'."""
+    a: str
+    """Path of item relative to a PID root."""
+    b: str | None = None
+    """New path for move operations. Should be None for add/delete."""
+    c: bytes | None = None
+    """Bytes content for add operations. Should be None for delete/move."""
+
+    def __post_init__(self):
+        if self.operation not in (OP_ADD, OP_DELETE, OP_MOVE):
+            raise ValueError(f"Invalid operation: {self.operation}")

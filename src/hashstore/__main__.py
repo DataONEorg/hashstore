@@ -26,6 +26,7 @@ import hashstore.folderentry
 
 HASHSTORE_FOLDER_NAME = ".hashstore"
 DEFAULT_HASHSTORE = f"./{HASHSTORE_FOLDER_NAME}"
+DATAONE_SYSTEMMETADATA = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
 
 
 def get_logger():
@@ -176,6 +177,41 @@ def enumerate_hs_files(
                     del workers[worker]
             except TimeoutError:
                 pass
+
+
+"""
+def iterate_folder_hierarchy(
+    hash_store: hashstore.HashStore, start_path: list[str]
+) -> typing.Generator:
+
+    visited = set()
+
+    def _drill(node_path: str):
+        if node_path in visited:
+            return
+        visited.add(node_path)
+        # Visit children first
+        path = hashstore.folderentry.split_pidpath(node_path)
+        neighbors = hash_store.retrieve_folder(path)
+        for neighbor in neighbors:
+            if neighbor.is_file:
+                yield neighbor
+            else:
+                yield from _drill(hashstore.folderentry.join_pidpath(path + [neighbor.name]))
+        yield path
+
+    stack = [
+        hashstore.folderentry.join_pidpath(start_path),
+    ]
+    while stack:
+        node_path = stack.pop()
+        if node_path not in visited:
+            visited.add(node_path)
+
+            yield node_path
+
+            # load node entries
+"""
 
 
 @click.group()
@@ -364,6 +400,48 @@ def add_object(
         )
         return 1
     return 0
+
+
+@main.command("delete_object")
+@click.pass_context
+@click.argument("pid", type=str)
+@click.option(
+    "-s", "--sysmeta", "del_sysmeta", is_flag=True, help="Delete system metadata too"
+)
+def delete_object_and_metadata(ctx: click.Context, pid: str, del_sysmeta: bool):
+    """Delete an object and system metadata.
+
+    If the object is a folder, then all content is deleted as well.
+
+    Note that deleting folders DOES NOT currently check for additional content references.
+    """
+    logger = get_logger()
+    store = ctx.obj["hashstore_path"]
+    properties = load_hashstore_properties(store)
+    hashstore_factory = hashstore.HashStoreFactory()
+    try:
+        hash_store = hashstore_factory.get_hashstore(
+            ctx.obj["module_name"], ctx.obj["class_name"], properties
+        )
+        logger.debug(f"Hashstore opened at: {store}")
+    except Exception as e:
+        logger.error(f"Failed to open hashstore: {e}")
+        return
+    pidpath = hashstore.folderentry.split_pidpath(pid, delimiter="|")
+    info = hash_store.resolve_pidpath(pidpath)
+    print(info)
+    if hashstore.folderentry.is_folder(info.get("cid_object_path")):
+        # TODO: Iterate over all entries and remove them
+        pass
+    try:
+        hash_store.delete_metadata(pid, DATAONE_SYSTEMMETADATA)
+    except Exception as e:
+        logger.error(e)
+    try:
+        hash_store.delete_object(pid)
+        print("Done")
+    except Exception as e:
+        logger.error(e)
 
 
 @main.command("get")

@@ -537,7 +537,7 @@ class FileHashStore(HashStore):
             self.fhs_logger.debug("Request to store object for pid: %s", pid)
             # Validate input parameters
             self._check_string(pid, "pid")
-            self._check_arg_data(data)
+            # self._check_arg_data(data)
             self._check_integer(expected_object_size)
             (
                 additional_algorithm_checked,
@@ -3103,8 +3103,10 @@ class Stream:
     """
 
     def __init__(self, obj: Union[IO[bytes], str, Path]):
+        # is it a file like thing
         if hasattr(obj, "read"):
             pos = obj.tell()
+        # or a string
         elif os.path.isfile(obj):
             obj = io.open(obj, "rb")
             pos = None
@@ -3114,7 +3116,9 @@ class Stream:
         try:
             file_stat = os.stat(obj.name)
             buffer_size = file_stat.st_blksize
-        except (FileNotFoundError, PermissionError, OSError):
+            # except (FileNotFoundError, PermissionError, OSError, TypeError):
+        except Exception:
+            # We already know it's file like thing, so don't agonize
             buffer_size = 8192
 
         self._obj = obj

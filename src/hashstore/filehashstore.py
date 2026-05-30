@@ -1045,8 +1045,10 @@ class FileHashStore(HashStore):
             self.fhs_logger.error(err_msg)
             raise ValueError(err_msg)
         cid_stream = self._open(entity, object_cid)
-        hex_digest = self._computehash(cid_stream, algorithm=algorithm)
-        cid_stream.close()
+        try:
+            hex_digest = self._computehash(cid_stream, algorithm=algorithm)
+        finally:
+            cid_stream.close()
         info_string = (
             f"Successfully calculated hex digest for pid: {pid}. "
             f"Hex Digest: {hex_digest}"
@@ -2035,10 +2037,12 @@ class FileHashStore(HashStore):
                     # Otherwise, a data object has been stored without a pid
                     object_cid = hex_digests[self.algorithm]
                     cid_stream = self._open(entity, object_cid)
-                    hex_digest_calculated = self._computehash(
-                        cid_stream, algorithm=checksum_algorithm
-                    )
-                    cid_stream.close()
+                    try:
+                        hex_digest_calculated = self._computehash(
+                            cid_stream, algorithm=checksum_algorithm
+                        )
+                    finally:
+                        cid_stream.close()
                 if hex_digest_calculated != checksum:
                     err_msg = (
                         f"Checksum_algorithm ({checksum_algorithm}) cannot be found "

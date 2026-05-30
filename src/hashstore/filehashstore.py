@@ -1046,7 +1046,7 @@ class FileHashStore(HashStore):
             raise ValueError(err_msg)
         cid_stream = self._open(entity, object_cid)
         hex_digest = self._computehash(cid_stream, algorithm=algorithm)
-
+        cid_stream.close()
         info_string = (
             f"Successfully calculated hex digest for pid: {pid}. "
             f"Hex Digest: {hex_digest}"

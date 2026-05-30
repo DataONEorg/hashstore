@@ -675,7 +675,7 @@ def test_store_object_interrupt_process(store):
     interrupting the process is cleaned up.
     """
     file_size = 2 * 1024 * 1024 * 1024  # 2GB
-    file_path = store.root + "random_file_2.bin"
+    file_path = store.root / "random_file_2.bin"
 
     pid = "Testpid"
     # Generate a random file with the specified size

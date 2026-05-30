@@ -2038,6 +2038,7 @@ class FileHashStore(HashStore):
                     hex_digest_calculated = self._computehash(
                         cid_stream, algorithm=checksum_algorithm
                     )
+                    cid_stream.close()
                 if hex_digest_calculated != checksum:
                     err_msg = (
                         f"Checksum_algorithm ({checksum_algorithm}) cannot be found "

@@ -2,6 +2,7 @@
 
 import importlib.metadata
 import importlib.util
+import pathlib
 from abc import ABC, abstractmethod
 
 
@@ -11,15 +12,15 @@ class HashStore(ABC):
     address files."""
 
     @staticmethod
-    def version():
+    def version() -> str:
         """Return the version number"""
         return importlib.metadata.version("hashstore")
 
     @abstractmethod
     def store_object(
         self,
-        pid,
-        data,
+        pid: str,
+        data: str | pathlib.Path,
         additional_algorithm,
         checksum,
         checksum_algorithm,

@@ -33,7 +33,6 @@ classifiers = [
     "Topic :: System :: Filesystems",
 ]
 dependencies = [
-    "pathlib>=1.0.1",
     "pyyaml>=6.0",
 ]
 
@@ -44,9 +43,10 @@ hashstore = "hashstore.hashstoreclient:main"
 dev = [
     "pytest>=7.2.0",
     "exceptiongroup>=1.1.0",
-    "black>=22.10.0",
-    "pylint>=2.17.4",
+    "pre-commit",
     "pg8000>=1.29.8",
+    "pytest-cov>=7.1.0",
+    "mypy>=1.19.1",
 ]
 
 [build-system]
@@ -54,6 +54,42 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.poetry_bumpversion.file."src/hashstore/__init__.py"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = [
+  "error",
+]
+log_cli_level = "INFO"
+testpaths = [
+  "tests",
+]
+
+[tool.coverage]
+run.source = ["synchronize_member_node"]
+port.exclude_lines = [
+  'pragma: no cover',
+  '\.\.\.',
+  'if typing.TYPE_CHECKING:',
+]
+
+[tool.mypy]
+files = ["src", "tests"]
+python_version = "3.9"
+show_error_codes = true
+warn_unreachable = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+strict = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[[tool.mypy.overrides]]
+module = "synchronize_member_node.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
 
 [tool.ruff]
 src = ["src"]

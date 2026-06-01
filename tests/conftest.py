@@ -2,7 +2,7 @@
 
 import pytest
 
-from hashstore.filehashstore import FileHashStore
+from hashstore.filehashstore import FileHashStore, FileHashStoreProperties
 
 
 def pytest_addoption(parser):
@@ -16,26 +16,25 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture(name="props")
-def init_props(tmp_path):
+def init_props():
     """Properties to initialize HashStore."""
-    directory = tmp_path / "metacat" / "hashstore"
-    directory.mkdir(parents=True)
-    hashstore_path = directory.as_posix()
-    # Note, objects generated via tests are placed in a temporary folder
-    # with the 'directory' parameter above appended
-    return {
-        "store_path": hashstore_path,
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
-    }
+    return FileHashStoreProperties(
+        store_depth=3,
+        store_width=2,
+        store_algorithm="SHA-256",
+        store_metadata_namespace="https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    )
+
+
+@pytest.fixture(name="hashstore_path")
+def hastore_path(tmp_path):
+    return tmp_path / "metacat" / "hashstore"
 
 
 @pytest.fixture(name="store")
-def init_store(props):
+def init_store(hashstore_path, props):
     """Create FileHashStore instance for all tests."""
-    return FileHashStore(props)
+    return FileHashStore.create_hashstore(hashstore_path, props)
 
 
 @pytest.fixture(name="pids")

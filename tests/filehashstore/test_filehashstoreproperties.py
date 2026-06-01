@@ -1,0 +1,92 @@
+"""Test cases for FileHashStoreProperties"""
+
+import pytest
+
+import hashstore.filehashstore
+
+
+def test_defaults():
+    p = hashstore.filehashstore.FileHashStoreProperties()
+    assert p.store_width == 2
+    assert p.store_depth == 3
+    assert p.store_algorithm == "sha256"
+    assert len(p.store_default_algo_list) >= 1
+    assert p.store_algorithm in p.store_default_algo_list
+
+
+def test_from_dict():
+    props = {
+        "store_width": 2,
+        "store_depth": 3,
+        "store_algorithm": "SHA-256",
+        "store_default_algo_list": [
+            "MD5",
+        ],
+    }
+    p = hashstore.filehashstore.FileHashStoreProperties.from_dict(props)
+    assert p.store_width == props["store_width"]
+    assert p.store_depth == props["store_depth"]
+    assert p.store_algorithm == hashstore.filehashstore.from_dataone_algorithm_name(
+        props["store_algorithm"]
+    )
+    assert len(p.store_default_algo_list) == 2
+    assert p.store_algorithm in p.store_default_algo_list
+
+
+def test_from_yaml(tmp_path):
+    props = {
+        "store_width": 2,
+        "store_depth": 3,
+        "store_algorithm": "SHA-256",
+        "store_default_algo_list": [
+            "MD5",
+        ],
+    }
+    p = hashstore.filehashstore.FileHashStoreProperties.from_dict(props)
+    yaml_path = tmp_path / "config.yaml"
+    p.to_yaml(yaml_path)
+    p2 = hashstore.filehashstore.FileHashStoreProperties.from_yaml(yaml_path)
+    assert p == p2
+
+
+def test_invalid_properties():
+    props = {
+        "store_width": 256,
+        "store_depth": 3,
+        "store_algorithm": "SHA-256",
+        "store_default_algo_list": [
+            "MD5",
+        ],
+    }
+    with pytest.raises(ValueError, match="store_width"):
+        hashstore.filehashstore.FileHashStoreProperties.from_dict(props)
+    props = {
+        "store_width": 2,
+        "store_depth": 30,
+        "store_algorithm": "SHA-256",
+        "store_default_algo_list": [
+            "MD5",
+        ],
+    }
+    with pytest.raises(ValueError, match="store_depth"):
+        hashstore.filehashstore.FileHashStoreProperties.from_dict(props)
+    props = {
+        "store_width": 2,
+        "store_depth": 3,
+        "store_algorithm": "blake2s",
+        "store_default_algo_list": [
+            "MD5",
+        ],
+    }
+    with pytest.raises(ValueError, match="algorithm"):
+        hashstore.filehashstore.FileHashStoreProperties.from_dict(props)
+    props = {
+        "store_width": 2,
+        "store_depth": 3,
+        "store_algorithm": "SHA-256",
+        "store_default_algo_list": [
+            "foo",
+        ],
+    }
+    with pytest.raises(ValueError, match="not available"):
+        hashstore.filehashstore.FileHashStoreProperties.from_dict(props)

@@ -10,7 +10,7 @@ from pathlib import Path
 import pg8000
 import yaml
 
-from hashstore import HashStoreFactory
+from hashstore import HashStoreFactory, HashStoreProperties
 
 
 class HashStoreParser:
@@ -195,7 +195,7 @@ class HashStoreParser:
         )
 
     @staticmethod
-    def load_store_properties(hashstore_yaml):
+    def load_store_properties(hashstore_yaml: str):
         """Get and return the contents of the current HashStore config file.
 
         :return: HashStore properties with the following keys (and values):
@@ -208,31 +208,13 @@ class HashStoreParser:
                 metadata.
         :rtype: dict
         """
-        property_required_keys = [
-            "store_depth",
-            "store_width",
-            "store_algorithm",
-            "store_metadata_namespace",
-        ]
-
         if not os.path.exists(hashstore_yaml):
             exception_string = (
                 "HashStoreParser - load_store_properties: hashstore.yaml not found"
                 " in store root path."
             )
             raise FileNotFoundError(exception_string)
-        # Open file
-        with open(hashstore_yaml, encoding="utf-8") as file:
-            yaml_data = yaml.safe_load(file)
-
-        # Get hashstore properties
-        hashstore_yaml_dict = {}
-        for key in property_required_keys:
-            checked_property = yaml_data[key]
-            if key == "store_depth" or key == "store_width":
-                checked_property = int(yaml_data[key])
-            hashstore_yaml_dict[key] = checked_property
-        return hashstore_yaml_dict
+        return HashStoreProperties.from_yaml(Path(hashstore_yaml))
 
     def get_parser_args(self):
         """Get command line arguments."""
@@ -245,7 +227,12 @@ class HashStoreClient:
     OBJ_TYPE = "object"
     MET_TYPE = "metadata"
 
-    def __init__(self, properties, testflag=None):
+    def __init__(
+        self,
+        store_path: Path,
+        store_properties: HashStoreProperties | None = None,
+        testflag: bool | None = None,
+    ):
         """Initialize the HashStoreClient with optional flag to test with the
         test server at 'test.arcticdata.io'
 
@@ -268,6 +255,7 @@ class HashStoreClient:
             "HashStoreClient - use_multiprocessing (bool): %s", use_multiprocessing
         )
 
+        properties = {"store_path": store_path, "store_properties": store_properties}
         # Instance attributes
         self.hashstore = factory.get_hashstore(module_name, class_name, properties)
         logging.info("HashStoreClient - HashStore initialized.")
@@ -744,14 +732,13 @@ def main():
     if args.create_hashstore:
         # Create HashStore if -chs flag is true in a given directory
         # Get store attributes, HashStore will validate properties
-        props = {
-            "store_path": args.store_path,
-            "store_depth": int(args.depth),
-            "store_width": int(args.width),
-            "store_algorithm": args.algorithm,
-            "store_metadata_namespace": args.formatid,
-        }
-        HashStoreClient(props)
+        props = HashStoreProperties(
+            store_depth=int(args.depth),
+            store_width=int(args.width),
+            store_algorithm=args.algorithm,
+            store_metadata_namespace=args.formatid,
+        )
+        HashStoreClient(args.store_path, props)
     # Can't use client app without first initializing HashStore
     store_path = args.store_path
     store_path_config_yaml = store_path + "/hashstore.yaml"
@@ -795,10 +782,9 @@ def main():
         formatid = default_formatid
     knbvm_test = args.knbvm_flag
     # Instantiate HashStore Client
-    props = parser.load_store_properties(store_path_config_yaml)
-    # Reminder: 'hashstore.yaml' only contains 4 of the required 5 properties
-    props["store_path"] = store_path
-    hashstore_c = HashStoreClient(props, knbvm_test)
+    # props = parser.load_store_properties(store_path_config_yaml)
+    props = None
+    hashstore_c = HashStoreClient(store_path, props, knbvm_test)
     if knbvm_test:
         directory_to_convert = args.source_directory
         # Check if the directory to convert exists

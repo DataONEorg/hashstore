@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from hashstore import HashStoreProperties
 from hashstore.filehashstore import (
     FileHashStore,
-    FileHashStoreProperties,
     ObjectMetadata,
     Stream,
 )
@@ -58,7 +58,7 @@ def test_init_existing_store_incorrect_algorithm_format():
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     with pytest.raises(ValueError, match="must be one of"):
-        FileHashStoreProperties.from_dict(properties)
+        HashStoreProperties.from_dict(properties)
 
 
 def test_init_store_correct_algorithm_format(tmp_path):
@@ -70,7 +70,7 @@ def test_init_store_correct_algorithm_format(tmp_path):
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
     hashstore_instance = FileHashStore.create_hashstore(
-        tmp_path / "new-store", FileHashStoreProperties(**properties)
+        tmp_path / "new-store", HashStoreProperties(**properties)
     )
     assert isinstance(hashstore_instance, FileHashStore)
 
@@ -84,7 +84,7 @@ def test_load_properties_hashstore_yaml_missing(store):
     """Confirm FileNotFoundError is raised when hashstore.yaml does not exist."""
     os.remove(FileHashStore.config_path(store.root))
     with pytest.raises(FileNotFoundError):
-        _ = FileHashStoreProperties.from_yaml(FileHashStore.config_path(store.root))
+        _ = HashStoreProperties.from_yaml(FileHashStore.config_path(store.root))
 
 
 # Tests for FileHashStore Core Methods

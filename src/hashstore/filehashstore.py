@@ -1,7 +1,6 @@
 """Core module for FileHashStore"""
 
 import atexit
-import dataclasses
 import fcntl
 import hashlib
 import inspect
@@ -17,9 +16,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import IO, Any, Optional, Union
 
-import yaml
-
-from hashstore import HashStore
+from hashstore import HashStore, HashStoreProperties
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
@@ -37,181 +34,6 @@ from hashstore.filehashstore_exceptions import (
     StoreObjectForPidAlreadyInProgress,
     UnsupportedAlgorithm,
 )
-
-DATAONE_ALGORITHM_TRANSLATION = {
-    "MD5": "md5",
-    "SHA-1": "sha1",
-    "SHA-256": "sha256",
-    "SHA-384": "sha384",
-    "SHA-512": "sha512",
-}
-
-accepted_store_algorithms = ["MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512"]
-
-
-def from_dataone_algorithm_name(algo: str) -> str:
-    """Translate from a DataONE algorithm name to a python hashlib name."""
-    try:
-        return DATAONE_ALGORITHM_TRANSLATION[algo]
-    except KeyError:
-        pass
-    return algo
-
-
-def to_dataone_algorithm_name(algo: str) -> str:
-    "Trnaslate from a python hashlib algorithm name to one used by DataONE."
-    for k, v in DATAONE_ALGORITHM_TRANSLATION.items():
-        if algo == v:
-            return k
-    # no translation available, fail
-    msg = f"Algorithm {algo} is not used in DataONE."
-    raise KeyError(msg)
-
-
-@dataclasses.dataclass
-class FileHashStoreProperties:
-    """Configuration properties for a FileHashStore.
-
-    Values are set to sensible defaults that correspond with the DataONE use.
-
-    Once a hashstore is created, the properties are persisted to the
-    hashstore folder, so there's generally no need to use FileHashStoreProperties
-    except when creating a new HashStore instance.
-
-    After intiailization, hash algorithm names are converted to the native
-    names used by python hashlib. When persisting or loading from YAML
-    config files, the DataONE hash names are expected.
-    """
-
-    # property names align with existing yaml config entries
-    store_depth: int = 3
-    store_width: int = 2
-    store_metadata_namespace: str = (
-        "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    )
-    store_algorithm: str = "SHA-256"
-    store_default_algo_list: list[str] = dataclasses.field(
-        default_factory=lambda: [
-            "MD5",
-            "SHA-1",
-            "SHA-256",
-            "SHA-384",
-            "SHA-512",
-        ]
-    )
-
-    def __post_init__(self):
-        """Hash algorthm names are trnaslated from the DataONE names to the names
-        used by the python hashlib.
-        """
-        # Impose reasonable defaults for folder path depth
-        if not (0 < self.store_depth <= 8):
-            msg = "store_depth not between 0 and 8"
-            raise ValueError(msg)
-        if not (1 <= self.store_width <= 4):
-            msg = "store_width not between 1 and 4"
-            raise ValueError(msg)
-        if (
-            self.store_metadata_namespace is None
-            or len(self.store_metadata_namespace) < 1
-        ):
-            msg = "Value is required for store_metadata_namespace."
-            raise ValueError(msg)
-        if self.store_algorithm not in DATAONE_ALGORITHM_TRANSLATION:
-            msg = (
-                "store_algorithm must be one of "
-                f"{', '.join(DATAONE_ALGORITHM_TRANSLATION.keys())} "
-                f"not {self.store_algorithm}"
-            )
-            raise ValueError(msg)
-        self.store_algorithm = from_dataone_algorithm_name(self.store_algorithm)
-        if self.store_algorithm not in hashlib.algorithms_available:
-            msg = f"store_algorithm: {self.store_algorithm} is not available."
-            raise ValueError(msg)
-        translated_algos = []
-        for algo in self.store_default_algo_list:
-            translated_algo = from_dataone_algorithm_name(algo)
-            if translated_algo not in hashlib.algorithms_available:
-                msg = f"{algo} is not available."
-                raise ValueError(msg)
-            translated_algos.append(translated_algo)
-        self.store_default_algo_list = translated_algos
-        # Ensure that the store algorithm is included in the detault algorithm list
-        if self.store_algorithm not in self.store_default_algo_list:
-            self.store_default_algo_list.append(self.store_algorithm)
-
-    @classmethod
-    def from_yaml(cls, source: Path) -> "FileHashStoreProperties":
-        """Load propertiees from yaml.
-
-        Hash algorthm names are trnaslated from the DataONE names to the names
-        used by the python hashlib.
-        """
-        with source.open("r") as data_source:
-            properties = yaml.safe_load(data_source)
-            return cls(**properties)
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "FileHashStoreProperties":
-        if data["store_algorithm"] not in DATAONE_ALGORITHM_TRANSLATION:
-            msg = (
-                "store_algorithm must be one of "
-                f"{', '.join(DATAONE_ALGORITHM_TRANSLATION.keys())} "
-                f"not {data['store_algorithm']}"
-            )
-            raise ValueError(msg)
-        return FileHashStoreProperties(**data)
-
-    def to_yaml(self, dest_path: Path) -> None:
-        """Save properties to a yaml file.
-
-        Hash algorithm names are translated to DataONE algorithm names.
-        """
-        with dest_path.open("w") as dest:
-            dest.write("""# HashStore Configuration
-#
-############### Notes ###############
-############### Directory Structure ###############
-# store_depth
-# - Desired amount of directories when sharding an object to form the permanent address
-# - **WARNING**: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
-#
-# store_width
-# - Width of directories created when sharding an object to form the permanent address
-# - **WARNING**: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
-#
-# Example:
-# Below, objects are shown listed in directories that are 3 levels deep (DIR_DEPTH=3),
-# with each directory consisting of 2 characters (DIR_WIDTH=2).
-#    /var/filehashstore/objects
-#    ├── 7f
-#    │   └── 5c
-#    │       └── c1
-#    │           └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
-#
-############### Format of the Metadata ###############
-# store_metadata_namespace
-# - The default metadata format (ex. system metadata)
-#
-############### Hash Algorithms ###############
-# store_algorithm
-# - Hash algorithm to use when calculating object's hex digest for the permanent address
-#
-# store_default_algo_list
-# - Algorithm values supported by python hashlib 3.9.0+ for File Hash Store (FHS)
-# - The default algorithm list includes the hash algorithms calculated when storing an
-#   object to disk and returned to the caller after successful storage.
-
-""")
-            properties = dataclasses.asdict(self)
-            properties["store_algorithm"] = to_dataone_algorithm_name(
-                properties["store_algorithm"]
-            )
-            translated_names = []
-            for algo in properties.get("store_default_algo_list", []):
-                translated_names.append(to_dataone_algorithm_name(algo))
-            properties["store_default_algo_list"] = translated_names
-            yaml.dump(properties, dest, default_flow_style=False)
 
 
 class FileHashStore(HashStore):
@@ -235,14 +57,6 @@ class FileHashStore(HashStore):
         - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
     """
 
-    # Property (hashstore configuration) requirements
-    property_required_keys = (
-        "store_path",
-        "store_depth",
-        "store_width",
-        "store_algorithm",
-        "store_metadata_namespace",
-    )
     # Permissions settings for writing files and creating directories
     f_mode = 0o664
     d_mode = 0o755
@@ -258,21 +72,54 @@ class FileHashStore(HashStore):
         "blake2s",
     )
 
-    def __init__(self, store_path: Path):
+    def __init__(
+        self,
+        store_path: str | Path,
+        store_properties: HashStoreProperties | dict | None = None,
+    ):
+        """Open or create a FileHashStore.
+
+        - It is an error to include store_properties when opening an existing store.
+        - If the path exists, then config is loaded from the store_path.
+        - If path does not exist, then a store is created at that path with the
+        provided properties.
+        """
         self.fhs_logger = logging.getLogger(__name__)
+        store_path = Path(store_path)
         config_path = FileHashStore.config_path(store_path)
-        if not config_path.exists() or not config_path.is_file():
-            msg = f"No hashstore at: {store_path}"
-            raise RuntimeError(msg)
-        properties = FileHashStoreProperties.from_yaml(config_path)
+        if config_path.is_file():
+            if store_properties is not None:
+                msg = "Do not include store_properties for an existing hashstore."
+                raise RuntimeError(msg)
+            store_properties = HashStoreProperties.from_yaml(config_path)
+        else:
+            if store_properties is None:
+                msg = f"No hashstore at: {store_path}"
+                raise RuntimeError(msg)
+            # verify reserved folders are not in store_path
+            _reserved_paths = ("objects", "metadata", "refs")
+            for _reserved_path in _reserved_paths:
+                if (store_path / _reserved_path).exists():
+                    msg = (
+                        "Cannot create FileHashstnore in existing folder "
+                        "'{store_path}' with reserved subfolder: {_reserved_path}."
+                    )
+                    raise RuntimeError(msg)
+            if isinstance(store_properties, dict):
+                store_properties = HashStoreProperties.from_dict(store_properties)
+            store_path.mkdir(parents=True, exist_ok=True)
+            store_properties.to_yaml(config_path)
+
+        # sanity check
+        assert store_properties is not None
 
         self.root = store_path
-        self.depth = properties.store_depth
-        self.width = properties.store_width
-        self.sysmeta_ns = properties.store_metadata_namespace
+        self.depth = store_properties.store_depth
+        self.width = store_properties.store_width
+        self.sysmeta_ns = store_properties.store_metadata_namespace
 
-        self.algorithm = properties.store_algorithm
-        self.default_algo_list = properties.store_default_algo_list
+        self.algorithm = store_properties.store_algorithm
+        self.default_algo_list = store_properties.store_default_algo_list
         # Sanity check, ensure algorithm is in the detaulr list
         if self.algorithm not in self.default_algo_list:
             self.default_algo_list.append(self.algorithm)
@@ -344,7 +191,7 @@ class FileHashStore(HashStore):
 
     @classmethod
     def create_hashstore(
-        cls, store_path: Path, properties: FileHashStoreProperties
+        cls, store_path: Path, properties: HashStoreProperties
     ) -> "FileHashStore":
         """Creates a new empty FileHashstore at the specified folder.
 
@@ -367,7 +214,7 @@ class FileHashStore(HashStore):
         """Create a new empty HashStore with the same configuration properties
         as an existing one."""
         config_path = cls.config_path(existing.root)
-        properties = FileHashStoreProperties.from_yaml(config_path)
+        properties = HashStoreProperties.from_yaml(config_path)
         return cls.create_hashstore(new_path, properties)
 
     # Public API / HashStore Interface Methods

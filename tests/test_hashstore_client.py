@@ -1,8 +1,9 @@
 """Test module for the Python client (Public API calls only)."""
 
-import sys
 import os
+import sys
 from pathlib import Path
+
 from hashstore import hashstoreclient
 
 # pylint: disable=W0212
@@ -48,7 +49,7 @@ def test_get_checksum(capsys, store, pids):
     """Test calculating a hash via HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         store.store_object(pid, path)
 
@@ -74,8 +75,8 @@ def test_get_checksum(capsys, store, pids):
         capsystext = capsys.readouterr().out
         expected_output = (
             f"guid/pid: {pid}\n"
-            + f"algorithm: {store.algorithm}\n"
-            + f"Checksum/Hex Digest: {pids[pid][store.algorithm]}\n"
+            f"algorithm: {store.algorithm}\n"
+            f"Checksum/Hex Digest: {pids[pid][store.algorithm]}\n"
         )
         assert capsystext == expected_output
 
@@ -84,12 +85,12 @@ def test_store_object(store, pids):
     """Test storing objects to HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         client_module_path = f"{client_directory}/client.py"
         test_store = str(store.root)
         store_object_opt = "-storeobject"
         client_pid_arg = f"-pid={pid}"
-        path = f'-path={test_dir + pid.replace("/", "_")}'
+        path = f"-path={test_dir + pid.replace('/', '_')}"
         chs_args = [
             client_module_path,
             test_store,
@@ -113,7 +114,7 @@ def test_store_metadata(capsys, store, pids):
     test_dir = "tests/testdata/"
     namespace = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     entity = "metadata"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         client_module_path = f"{client_directory}/client.py"
@@ -154,7 +155,7 @@ def test_retrieve_objects(capsys, pids, store):
     """Test retrieving objects from a HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         store.store_object(pid, path)
 
@@ -193,7 +194,7 @@ def test_retrieve_metadata(capsys, pids, store):
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
     namespace = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _metadata_cid = store.store_metadata(pid, syspath, namespace)
@@ -234,7 +235,7 @@ def test_delete_objects(pids, store):
     """Test deleting objects from a HashStore through client."""
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         store.store_object(pid, path)
 
@@ -263,7 +264,7 @@ def test_delete_metadata(pids, store):
     client_directory = os.getcwd() + "/src/hashstore"
     test_dir = "tests/testdata/"
     namespace = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _metadata_cid = store.store_metadata(pid, syspath, namespace)

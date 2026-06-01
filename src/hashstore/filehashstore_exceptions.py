@@ -2,9 +2,9 @@
 
 
 class StoreObjectForPidAlreadyInProgress(Exception):
-    """Custom exception thrown when called to store a data object for a pid that is already
-    progress. A pid can only ever reference one data object/content identifier so duplicate
-    requests are rejected immediately."""
+    """Custom exception thrown when called to store a data object for a pid that
+    is already progress. A pid can only ever reference one data object/content
+    identifier so duplicate requests are rejected immediately."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)
@@ -12,8 +12,8 @@ class StoreObjectForPidAlreadyInProgress(Exception):
 
 
 class IdentifierNotLocked(Exception):
-    """Custom exception thrown when an identifier (ex. 'pid' or 'cid') is not locked, which is
-    required to ensure thread safety."""
+    """Custom exception thrown when an identifier (ex. 'pid' or 'cid') is not
+    locked, which is required to ensure thread safety."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)
@@ -119,7 +119,8 @@ class RefsFileExistsButCidObjMissing(Exception):
 
 
 class HashStoreRefsAlreadyExists(Exception):
-    """Custom exception thrown when called to tag an object that is already tagged appropriately."""
+    """Custom exception thrown when called to tag an object that is already
+    tagged appropriately."""
 
     def __init__(self, message, errors=None):
         super().__init__(message)

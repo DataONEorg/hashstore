@@ -1,29 +1,30 @@
 """Test module for FileHashStore init, core, utility and supporting methods."""
 
+import hashlib
 import io
 import os
-import hashlib
 import shutil
 from pathlib import Path
+
 import pytest
+
 from hashstore.filehashstore import FileHashStore, ObjectMetadata, Stream
 from hashstore.filehashstore_exceptions import (
-    OrphanPidRefsFileFound,
-    NonMatchingChecksum,
-    NonMatchingObjSize,
-    PidNotFoundInCidRefsFile,
-    PidRefsDoesNotExist,
-    RefsFileExistsButCidObjMissing,
-    UnsupportedAlgorithm,
-    HashStoreRefsAlreadyExists,
-    PidRefsAlreadyExistsError,
     CidRefsContentError,
     CidRefsFileNotFound,
-    PidRefsContentError,
-    PidRefsFileNotFound,
+    HashStoreRefsAlreadyExists,
     IdentifierNotLocked,
+    NonMatchingChecksum,
+    NonMatchingObjSize,
+    OrphanPidRefsFileFound,
+    PidNotFoundInCidRefsFile,
+    PidRefsAlreadyExistsError,
+    PidRefsContentError,
+    PidRefsDoesNotExist,
+    PidRefsFileNotFound,
+    RefsFileExistsButCidObjMissing,
+    UnsupportedAlgorithm,
 )
-
 
 # pylint: disable=W0212
 
@@ -52,7 +53,7 @@ def test_init_existing_store_incorrect_algorithm_format(store):
         "store_algorithm": "sha256",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Must be one of"):
         FileHashStore(properties)
 
 
@@ -84,7 +85,7 @@ def test_init_with_existing_hashstore_mismatched_config_depth(store):
         "store_algorithm": "SHA-256",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="depth"):
         FileHashStore(properties)
 
 
@@ -98,7 +99,7 @@ def test_init_with_existing_hashstore_mismatched_config_width(store):
         "store_algorithm": "SHA-256",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="width"):
         FileHashStore(properties)
 
 
@@ -112,7 +113,7 @@ def test_init_with_existing_hashstore_mismatched_config_algo(store):
         "store_algorithm": "SHA-512",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="configuration"):
         FileHashStore(properties)
 
 
@@ -126,7 +127,7 @@ def test_init_with_existing_hashstore_mismatched_config_metadata_ns(store):
         "store_algorithm": "SHA-512",
         "store_metadata_namespace": "http://ns.dataone.org/service/types/v5.0",
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="configuration"):
         FileHashStore(properties)
 
 
@@ -134,7 +135,7 @@ def test_init_with_existing_hashstore_missing_yaml(store, pids):
     """Test init with existing store raises RuntimeError when hashstore.yaml
     not found but objects exist."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         store._store_and_validate_data(pid, path)
     os.remove(store.hashstore_configuration_yaml)
@@ -205,14 +206,14 @@ def test_validate_properties_key_value_is_none(store):
         "store_algorithm": "SHA-256",
         "store_metadata_namespace": None,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Value for key"):
         store._validate_properties(properties)
 
 
 def test_validate_properties_incorrect_type(store):
     """Confirm exception raised when a bad properties value is given."""
     properties = "etc/filehashstore/hashstore.yaml"
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid"):
         store._validate_properties(properties)
 
 
@@ -220,7 +221,7 @@ def test_set_default_algorithms_missing_yaml(store, pids):
     """Confirm set_default_algorithms raises FileNotFoundError when hashstore.yaml
     not found."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         store._store_and_validate_data(pid, path)
     os.remove(store.hashstore_configuration_yaml)
@@ -234,7 +235,7 @@ def test_set_default_algorithms_missing_yaml(store, pids):
 def test_find_object_no_sysmeta(pids, store):
     """Test _find_object returns the correct content and expected value for non-existent sysmeta."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
         obj_info_dict = store._find_object(pid)
@@ -258,7 +259,7 @@ def test_find_object_sysmeta(pids, store):
     """Test _find_object returns the correct content along with the sysmeta path"""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -285,7 +286,7 @@ def test_find_object_sysmeta(pids, store):
 def test_find_object_refs_exist_but_obj_not_found(pids, store):
     """Test _find_object throws exception when refs file exist but the object does not."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         store.store_object(pid, path)
 
@@ -301,7 +302,7 @@ def test_find_object_cid_refs_not_found(pids, store):
     """Test _find_object throws exception when pid refs file is found (and contains a cid)
     but the cid refs file does not exist."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         _object_metadata = store.store_object(pid, path)
 
@@ -320,7 +321,7 @@ def test_find_object_cid_refs_does_not_contain_pid(pids, store):
     """Test _find_object throws exception when pid refs file is found (and contains a cid)
     but the cid refs file does not contain the pid."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
 
@@ -342,20 +343,20 @@ def test_find_object_pid_refs_not_found(store):
 
 def test_find_object_pid_none(store):
     """Test _find_object throws exception when pid is None."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="empty"):
         store._find_object(None)
 
 
 def test_find_object_pid_empty(store):
     """Test _find_object throws exception when pid is empty."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="empty"):
         store._find_object("")
 
 
 def test_store_and_validate_data_files_path(pids, store):
     """Test _store_and_validate_data accepts path object for the path arg."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = Path(test_dir) / pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
         assert store._exists("objects", object_metadata.cid)
@@ -364,7 +365,7 @@ def test_store_and_validate_data_files_path(pids, store):
 def test_store_and_validate_data_files_string(pids, store):
     """Test _store_and_validate_data accepts string for the path arg."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
         assert store._exists("objects", object_metadata.cid)
@@ -373,11 +374,10 @@ def test_store_and_validate_data_files_string(pids, store):
 def test_store_and_validate_data_files_stream(pids, store):
     """Test _store_and_validate_data accepts stream for the path arg."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        object_metadata = store._store_and_validate_data(pid, input_stream)
-        input_stream.close()
+        with open(path, "rb") as input_stream:
+            object_metadata = store._store_and_validate_data(pid, input_stream)
         assert store._exists("objects", object_metadata.cid)
     assert store._count("objects") == 3
 
@@ -385,7 +385,7 @@ def test_store_and_validate_data_files_stream(pids, store):
 def test_store_and_validate_data_cid(pids, store):
     """Check _store_and_validate_data returns the expected content identifier"""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
         assert object_metadata.cid == pids[pid][store.algorithm]
@@ -394,7 +394,7 @@ def test_store_and_validate_data_cid(pids, store):
 def test_store_and_validate_data_file_size(pids, store):
     """Check _store_and_validate_data returns correct file size."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
         assert object_metadata.obj_size == pids[pid]["file_size_bytes"]
@@ -403,7 +403,7 @@ def test_store_and_validate_data_file_size(pids, store):
 def test_store_and_validate_data_hex_digests(pids, store):
     """Check _store_and_validate_data successfully generates hex digests dictionary."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
         assert object_metadata.hex_digests.get("md5") == pids[pid]["md5"]
@@ -417,7 +417,7 @@ def test_store_and_validate_data_additional_algorithm(pids, store):
     """Check _store_and_validate_data returns an additional algorithm in hex digests
     when provided with an additional algo value."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         algo = "sha224"
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(
@@ -431,7 +431,7 @@ def test_store_and_validate_data_with_correct_checksums(pids, store):
     """Check _store_and_validate_data stores a data object when a valid checksum and checksum
     algorithm is supplied."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         algo = "sha224"
         algo_checksum = pids[pid][algo]
         path = test_dir + pid.replace("/", "_")
@@ -445,7 +445,7 @@ def test_store_and_validate_data_with_incorrect_checksum(pids, store):
     """Check _store_and_validate_data does not store data objects when a bad checksum supplied."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    for pid in pids.keys():
+    for pid in pids:
         algo = "sha224"
         algo_checksum = "badChecksumValue"
         path = test_dir + pid.replace("/", "_")
@@ -459,7 +459,7 @@ def test_store_and_validate_data_with_incorrect_checksum(pids, store):
 def test_store_data_only_cid(pids, store):
     """Check _store_data_only returns correct id."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_data_only(path)
         assert object_metadata.cid == pids[pid][store.algorithm]
@@ -468,7 +468,7 @@ def test_store_data_only_cid(pids, store):
 def test_store_data_only_file_size(pids, store):
     """Check _store_data_only returns correct file size."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_data_only(path)
         assert object_metadata.obj_size == pids[pid]["file_size_bytes"]
@@ -477,7 +477,7 @@ def test_store_data_only_file_size(pids, store):
 def test_store_data_only_hex_digests(pids, store):
     """Check _store_data_only generates a hex digests dictionary."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_data_only(path)
         assert object_metadata.hex_digests.get("md5") == pids[pid]["md5"]
@@ -490,45 +490,42 @@ def test_store_data_only_hex_digests(pids, store):
 def test_move_and_get_checksums_id(pids, store):
     """Test _move_and_get_checksums returns correct id."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        (
-            move_id,
-            _,
-            _,
-        ) = store._move_and_get_checksums(pid, input_stream)
-        input_stream.close()
+        with open(path, "rb") as input_stream:
+            (
+                move_id,
+                _,
+                _,
+            ) = store._move_and_get_checksums(pid, input_stream)
         assert move_id == pids[pid][store.algorithm]
 
 
 def test_move_and_get_checksums_file_size(pids, store):
     """Test _move_and_get_checksums returns correct file size."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        (
-            _,
-            tmp_file_size,
-            _,
-        ) = store._move_and_get_checksums(pid, input_stream)
-        input_stream.close()
+        with open(path, "rb") as input_stream:
+            (
+                _,
+                tmp_file_size,
+                _,
+            ) = store._move_and_get_checksums(pid, input_stream)
         assert tmp_file_size == pids[pid]["file_size_bytes"]
 
 
 def test_move_and_get_checksums_hex_digests(pids, store):
     """Test _move_and_get_checksums returns correct hex digests."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        (
-            _,
-            _,
-            hex_digests,
-        ) = store._move_and_get_checksums(pid, input_stream)
-        input_stream.close()
+        with open(path, "rb") as input_stream:
+            (
+                _,
+                _,
+                hex_digests,
+            ) = store._move_and_get_checksums(pid, input_stream)
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
         assert hex_digests.get("sha256") == pids[pid]["sha256"]
@@ -539,26 +536,23 @@ def test_move_and_get_checksums_hex_digests(pids, store):
 def test_move_and_get_checksums_does_not_store_duplicate(pids, store):
     """Test _move_and_get_checksums does not store duplicate objects."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        store._move_and_get_checksums(pid, input_stream)
-        input_stream.close()
-    for pid in pids.keys():
+        with open(path, "rb") as input_stream:
+            store._move_and_get_checksums(pid, input_stream)
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        store._move_and_get_checksums(pid, input_stream)
-        input_stream.close()
+        with open(path, "rb") as input_stream:
+            store._move_and_get_checksums(pid, input_stream)
     assert store._count("objects") == 3
 
 
 def test_move_and_get_checksums_raises_error_with_nonmatching_checksum(pids, store):
     """Test _move_and_get_checksums raises error when incorrect checksum supplied."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        with pytest.raises(NonMatchingChecksum):
+        with open(path, "rb") as input_stream, pytest.raises(NonMatchingChecksum):
             # pylint: disable=W0212
             store._move_and_get_checksums(
                 pid,
@@ -566,22 +560,24 @@ def test_move_and_get_checksums_raises_error_with_nonmatching_checksum(pids, sto
                 checksum="nonmatchingchecksum",
                 checksum_algorithm="sha256",
             )
-            input_stream.close()
     assert store._count("objects") == 0
 
 
 def test_move_and_get_checksums_incorrect_file_size(pids, store):
     """Test _move_and_get_checksums raises error with an incorrect file size."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
-        with pytest.raises(NonMatchingObjSize):
-            path = test_dir + pid.replace("/", "_")
-            input_stream = io.open(path, "rb")
-            incorrect_file_size = 1000
-            (_, _, _, _,) = store._move_and_get_checksums(
+    for pid in pids:
+        path = test_dir + pid.replace("/", "_")
+        incorrect_file_size = 1000
+        with open(path, "rb") as input_stream, pytest.raises(NonMatchingObjSize):
+            (
+                _,
+                _,
+                _,
+                _,
+            ) = store._move_and_get_checksums(
                 pid, input_stream, file_size_to_validate=incorrect_file_size
             )
-            input_stream.close()
 
 
 def test_write_to_tmp_file_and_get_hex_digests_additional_algo(store):
@@ -589,15 +585,14 @@ def test_write_to_tmp_file_and_get_hex_digests_additional_algo(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    input_stream = io.open(path, "rb")
     checksum_algo = "sha3_256"
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
-        input_stream, additional_algorithm=checksum_algo
-    )
-    input_stream.close()
+    with open(path, "rb") as input_stream:
+        hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+            input_stream, additional_algorithm=checksum_algo
+        )
     assert hex_digests.get("sha3_256") == checksum_correct
 
 
@@ -607,15 +602,14 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_algo(store):
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    input_stream = io.open(path, "rb")
     checksum_algo = "sha3_256"
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
-        input_stream, checksum_algorithm=checksum_algo
-    )
-    input_stream.close()
+    with open(path, "rb") as input_stream:
+        hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+            input_stream, checksum_algorithm=checksum_algo
+        )
     assert hex_digests.get("sha3_256") == checksum_correct
 
 
@@ -625,7 +619,6 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo(stor
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    input_stream = io.open(path, "rb")
     additional_algo = "sha224"
     additional_algo_checksum_correct = (
         "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
@@ -634,12 +627,12 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo(stor
     checksum_correct = (
         "b748069cd0116ba59638e5f3500bbff79b41d6184bc242bd71f5cbbb8cf484cf"
     )
-    hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
-        input_stream,
-        additional_algorithm=additional_algo,
-        checksum_algorithm=checksum_algo,
-    )
-    input_stream.close()
+    with open(path, "rb") as input_stream:
+        hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+            input_stream,
+            additional_algorithm=additional_algo,
+            checksum_algorithm=checksum_algo,
+        )
     assert hex_digests.get("sha3_256") == checksum_correct
     assert hex_digests.get("sha224") == additional_algo_checksum_correct
 
@@ -651,38 +644,39 @@ def test_write_to_tmp_file_and_get_hex_digests_checksum_and_additional_algo_dupl
     test_dir = "tests/testdata/"
     pid = "jtao.1700.1"
     path = test_dir + pid
-    input_stream = io.open(path, "rb")
     additional_algo = "sha224"
     checksum_algo = "sha224"
     checksum_correct = "9b3a96f434f3c894359193a63437ef86fbd5a1a1a6cc37f1d5013ac1"
-    hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
-        input_stream,
-        additional_algorithm=additional_algo,
-        checksum_algorithm=checksum_algo,
-    )
-    input_stream.close()
+    with open(path, "rb") as input_stream:
+        hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+            input_stream,
+            additional_algorithm=additional_algo,
+            checksum_algorithm=checksum_algo,
+        )
     assert hex_digests.get("sha224") == checksum_correct
 
 
 def test_write_to_tmp_file_and_get_hex_digests_file_size(pids, store):
     """Test _write...hex_digests returns correct file size."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        _, _, tmp_file_size = store._write_to_tmp_file_and_get_hex_digests(input_stream)
-        input_stream.close()
+        with open(path, "rb") as input_stream:
+            _, _, tmp_file_size = store._write_to_tmp_file_and_get_hex_digests(
+                input_stream
+            )
         assert tmp_file_size == pids[pid]["file_size_bytes"]
 
 
 def test_write_to_tmp_file_and_get_hex_digests_hex_digests(pids, store):
     """Test _write...hex_digests returns correct hex digests."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(input_stream)
-        input_stream.close()
+        with open(path, "rb") as input_stream:
+            hex_digests, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+                input_stream
+            )
         assert hex_digests.get("md5") == pids[pid]["md5"]
         assert hex_digests.get("sha1") == pids[pid]["sha1"]
         assert hex_digests.get("sha256") == pids[pid]["sha256"]
@@ -693,30 +687,30 @@ def test_write_to_tmp_file_and_get_hex_digests_hex_digests(pids, store):
 def test_write_to_tmp_file_and_get_hex_digests_tmpfile_object(pids, store):
     """Test _write...hex_digests returns a tmp file successfully."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
-        _, tmp_file_name, _ = store._write_to_tmp_file_and_get_hex_digests(input_stream)
-        input_stream.close()
+        with open(path, "rb") as input_stream:
+            _, tmp_file_name, _ = store._write_to_tmp_file_and_get_hex_digests(
+                input_stream
+            )
         assert os.path.isfile(tmp_file_name) is True
 
 
 def test_write_to_tmp_file_and_get_hex_digests_with_unsupported_algorithm(pids, store):
     """Test _write...hex_digests raises an exception when an unsupported algorithm supplied."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path, "rb")
         algo = "md2"
-        with pytest.raises(UnsupportedAlgorithm):
-            _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
-                input_stream, additional_algorithm=algo
-            )
-        with pytest.raises(UnsupportedAlgorithm):
-            _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
-                input_stream, checksum_algorithm=algo
-            )
-        input_stream.close()
+        with open(path, "rb") as input_stream:
+            with pytest.raises(UnsupportedAlgorithm):
+                _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+                    input_stream, additional_algorithm=algo
+                )
+            with pytest.raises(UnsupportedAlgorithm):
+                _, _, _ = store._write_to_tmp_file_and_get_hex_digests(
+                    input_stream, checksum_algorithm=algo
+                )
 
 
 def test_mktmpfile(store):
@@ -741,7 +735,7 @@ def test_mktmpfile_permissions(store):
 
 def test_store_hashstore_refs_files_(pids, store):
     """Test _store_hashstore_refs_files does not throw exception when successful."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid][store.algorithm]
         store._store_hashstore_refs_files(pid, cid)
     assert store._count("pid") == 3
@@ -750,7 +744,7 @@ def test_store_hashstore_refs_files_(pids, store):
 
 def test_store_hashstore_refs_files_pid_refs_file_exists(pids, store):
     """Test _store_hashstore_refs_file creates the expected pid reference file."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid][store.algorithm]
         store._store_hashstore_refs_files(pid, cid)
         pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
@@ -759,7 +753,7 @@ def test_store_hashstore_refs_files_pid_refs_file_exists(pids, store):
 
 def test_store_hashstore_refs_file_cid_refs_file_exists(pids, store):
     """Test _store_hashstore_refs_file creates the cid reference file."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid][store.algorithm]
         store._store_hashstore_refs_files(pid, cid)
         cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
@@ -768,11 +762,11 @@ def test_store_hashstore_refs_file_cid_refs_file_exists(pids, store):
 
 def test_store_hashstore_refs_file_pid_refs_file_content(pids, store):
     """Test _store_hashstore_refs_file created the pid reference file with the expected cid."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid][store.algorithm]
         store._store_hashstore_refs_files(pid, cid)
         pid_refs_file_path = store._get_hashstore_pid_refs_path(pid)
-        with open(pid_refs_file_path, "r", encoding="utf8") as f:
+        with open(pid_refs_file_path, encoding="utf8") as f:
             pid_refs_cid = f.read()
         assert pid_refs_cid == cid
 
@@ -780,11 +774,11 @@ def test_store_hashstore_refs_file_pid_refs_file_content(pids, store):
 def test_store_hashstore_refs_file_cid_refs_file_content(pids, store):
     """Test _store_hashstore_refs_file creates the cid reference file successfully with pid
     tagged."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid][store.algorithm]
         store._store_hashstore_refs_files(pid, cid)
         cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
-        with open(cid_refs_file_path, "r", encoding="utf8") as f:
+        with open(cid_refs_file_path, encoding="utf8") as f:
             pid_refs_cid = f.read().strip()
         assert pid_refs_cid == pid
 
@@ -792,7 +786,7 @@ def test_store_hashstore_refs_file_cid_refs_file_content(pids, store):
 def test_store_hashstore_refs_file_pid_refs_found_cid_refs_found(pids, store):
     """Test _store_hashstore_refs_file does not throw an exception when any refs file already exists
     and verifies the content, and does not double tag the cid refs file."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid][store.algorithm]
         store._store_hashstore_refs_files(pid, cid)
 
@@ -801,7 +795,7 @@ def test_store_hashstore_refs_file_pid_refs_found_cid_refs_found(pids, store):
 
         cid_refs_file_path = store._get_hashstore_cid_refs_path(cid)
         line_count = 0
-        with open(cid_refs_file_path, "r", encoding="utf8") as ref_file:
+        with open(cid_refs_file_path, encoding="utf8") as ref_file:
             for _line in ref_file:
                 line_count += 1
         assert line_count == 1
@@ -810,7 +804,7 @@ def test_store_hashstore_refs_file_pid_refs_found_cid_refs_found(pids, store):
 def test_store_hashstore_refs_files_pid_refs_found_cid_refs_not_found(store, pids):
     """Test that _store_hashstore_refs_files throws an exception when pid refs file exists,
     contains a different cid, and is correctly referenced in the associated cid refs file"""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid][store.algorithm]
         store._store_hashstore_refs_files(pid, cid)
 
@@ -833,11 +827,11 @@ def test_store_hashstore_refs_files_refs_not_found_cid_refs_found(store):
     # Read cid file to confirm cid refs file contains the additional pid
     line_count = 0
     cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
-    with open(cid_ref_abs_path, "r", encoding="utf8") as f:
+    with open(cid_ref_abs_path, encoding="utf8") as f:
         for _, line in enumerate(f, start=1):
             value = line.strip()
             line_count += 1
-            assert value == pid or value == additional_pid
+            assert value in (pid, additional_pid)
     assert line_count == 2
     assert store._count("pid") == 2
     assert store._count("cid") == 1
@@ -846,7 +840,7 @@ def test_store_hashstore_refs_files_refs_not_found_cid_refs_found(store):
 def test_untag_object(pids, store):
     """Test _untag_object untags successfully."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = Path(test_dir + pid.replace("/", "_"))
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.cid
@@ -865,7 +859,7 @@ def test_untag_object(pids, store):
 def test_untag_object_pid_not_locked(pids, store):
     """Test _untag_object throws exception when pid is not locked"""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = Path(test_dir + pid.replace("/", "_"))
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.cid
@@ -877,15 +871,15 @@ def test_untag_object_pid_not_locked(pids, store):
 def test_untag_object_cid_not_locked(pids, store):
     """Test _untag_object throws exception with cid is not locked"""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = Path(test_dir + pid.replace("/", "_"))
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.cid
 
+        store._synchronize_referenced_locked_pids(pid)
         with pytest.raises(IdentifierNotLocked):
-            store._synchronize_referenced_locked_pids(pid)
             store._untag_object(pid, cid)
-            store._release_reference_locked_pids(pid)
+        store._release_reference_locked_pids(pid)
 
 
 def test_untag_object_orphan_pid_refs_file_found(store):
@@ -1037,7 +1031,7 @@ def test_put_metadata_with_path(pids, store):
     entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         metadata_stored_path = store._put_metadata(syspath, pid, format_id)
@@ -1050,7 +1044,7 @@ def test_put_metadata_with_string(pids, store):
     entity = "metadata"
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = str(Path(test_dir) / filename)
         metadata_stored_path = store._put_metadata(syspath, pid, format_id)
@@ -1062,7 +1056,7 @@ def test_put_metadata_stored_path(pids, store):
     """Test put metadata returns correct path to the metadata stored."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         metadata_document_name = store._computehash(pid + format_id)
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -1080,13 +1074,11 @@ def test_put_metadata_stored_path(pids, store):
 def test_mktmpmetadata(pids, store):
     """Test mktmpmetadata creates tmpFile."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
-        sys_stream = io.open(syspath, "rb")
-        # pylint: disable=W0212
-        tmp_name = store._mktmpmetadata(sys_stream)
-        sys_stream.close()
+        with open(syspath, "rb") as sys_stream:
+            tmp_name = store._mktmpmetadata(sys_stream)
         assert os.path.exists(tmp_name)
 
 
@@ -1123,7 +1115,7 @@ def test_delete_marked_files_empty_list_or_none(store):
     list_to_check = []
     store._delete_marked_files(list_to_check)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="None"):
         store._delete_marked_files(None)
 
 
@@ -1184,7 +1176,7 @@ def test_validate_and_check_cid_lock_non_matching_cid(store):
     cid = "thegoodcid"
     cid_to_check = "thebadcid"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="match"):
         store._validate_and_check_cid_lock(pid, cid, cid_to_check)
 
 
@@ -1206,10 +1198,10 @@ def test_write_refs_file_ref_type_cid(store):
 
 def test_write_refs_file_ref_type_content_cid(pids, store):
     """Test that write_refs_file writes the expected content when given a 'cid' update_type."""
-    for pid in pids.keys():
+    for pid in pids:
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
-        with open(tmp_cid_refs_file, "r", encoding="utf8") as f:
+        with open(tmp_cid_refs_file, encoding="utf8") as f:
             cid_ref_file_pid = f.read()
 
         assert pid == cid_ref_file_pid.strip()
@@ -1217,7 +1209,7 @@ def test_write_refs_file_ref_type_content_cid(pids, store):
 
 def test_write_refs_file_ref_type_pid(pids, store):
     """Test that write_pid_refs_file writes a reference file when given a 'pid' update_type."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid]["sha256"]
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")
@@ -1226,11 +1218,11 @@ def test_write_refs_file_ref_type_pid(pids, store):
 
 def test_write_refs_file_ref_type_content_pid(pids, store):
     """Test that write_refs_file writes the expected content when given a 'pid' update_type"""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid]["sha256"]
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")
-        with open(tmp_pid_refs_file, "r", encoding="utf8") as f:
+        with open(tmp_pid_refs_file, encoding="utf8") as f:
             pid_refs_cid = f.read()
 
         assert cid == pid_refs_cid
@@ -1238,31 +1230,31 @@ def test_write_refs_file_ref_type_content_pid(pids, store):
 
 def test_update_refs_file_content(pids, store):
     """Test that update_refs_file updates the ref file as expected."""
-    for pid in pids.keys():
+    for pid in pids:
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
         pid_other = "dou.test.1"
         store._update_refs_file(tmp_cid_refs_file, pid_other, "add")
 
-        with open(tmp_cid_refs_file, "r", encoding="utf8") as f:
+        with open(tmp_cid_refs_file, encoding="utf8") as f:
             for _, line in enumerate(f, start=1):
                 value = line.strip()
-                assert value == pid or value == pid_other
+                assert value in (pid, pid_other)
 
 
 def test_update_refs_file_content_multiple(pids, store):
     """Test that _update_refs_file adds multiple references successfully."""
-    for pid in pids.keys():
+    for pid in pids:
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
 
         cid_reference_list = [pid]
-        for i in range(0, 5):
+        for i in range(5):
             store._update_refs_file(tmp_cid_refs_file, f"dou.test.{i}", "add")
             cid_reference_list.append(f"dou.test.{i}")
 
         line_count = 0
-        with open(tmp_cid_refs_file, "r", encoding="utf8") as f:
+        with open(tmp_cid_refs_file, encoding="utf8") as f:
             for _, line in enumerate(f, start=1):
                 line_count += 1
                 value = line.strip()
@@ -1274,14 +1266,14 @@ def test_update_refs_file_content_multiple(pids, store):
 def test_update_refs_file_deduplicates_pid_already_found(pids, store):
     """Test that _update_refs_file does not add a pid to a refs file that already
     contains the pid."""
-    for pid in pids.keys():
+    for pid in pids:
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
         # Exception should not be thrown
         store._update_refs_file(tmp_cid_refs_file, pid, "add")
 
         line_count = 0
-        with open(tmp_cid_refs_file, "r", encoding="utf8") as ref_file:
+        with open(tmp_cid_refs_file, encoding="utf8") as ref_file:
             for _line in ref_file:
                 line_count += 1
         assert line_count == 1
@@ -1289,7 +1281,7 @@ def test_update_refs_file_deduplicates_pid_already_found(pids, store):
 
 def test_update_refs_file_content_cid_refs_does_not_exist(pids, store):
     """Test that _update_refs_file throws exception if refs file doesn't exist."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid]["sha256"]
         cid_ref_abs_path = store._get_hashstore_cid_refs_path(cid)
         with pytest.raises(FileNotFoundError):
@@ -1298,7 +1290,7 @@ def test_update_refs_file_content_cid_refs_does_not_exist(pids, store):
 
 def test_update_refs_file_remove(pids, store):
     """Test that _update_refs_file deletes the given pid from the ref file."""
-    for pid in pids.keys():
+    for pid in pids:
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
 
@@ -1306,7 +1298,7 @@ def test_update_refs_file_remove(pids, store):
         store._update_refs_file(tmp_cid_refs_file, pid_other, "add")
         store._update_refs_file(tmp_cid_refs_file, pid, "remove")
 
-        with open(tmp_cid_refs_file, "r", encoding="utf8") as f:
+        with open(tmp_cid_refs_file, encoding="utf8") as f:
             for _, line in enumerate(f, start=1):
                 value = line.strip()
                 assert value == pid_other
@@ -1314,7 +1306,7 @@ def test_update_refs_file_remove(pids, store):
 
 def test_update_refs_file_empty_file(pids, store):
     """Test that _update_refs_file leaves a file empty when removing the last pid."""
-    for pid in pids.keys():
+    for pid in pids:
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
         # First remove the pid
@@ -1326,12 +1318,12 @@ def test_update_refs_file_empty_file(pids, store):
 
 def test_is_string_in_refs_file(pids, store):
     """Test that _update_refs_file leaves a file empty when removing the last pid."""
-    for pid in pids.keys():
+    for pid in pids:
         tmp_root_path = store._get_store_path("refs") / "tmp"
         tmp_cid_refs_file = store._write_refs_file(tmp_root_path, pid, "cid")
 
         cid_reference_list = [pid]
-        for i in range(0, 5):
+        for i in range(5):
             store._update_refs_file(tmp_cid_refs_file, f"dou.test.{i}", "add")
             cid_reference_list.append(f"dou.test.{i}")
 
@@ -1341,7 +1333,7 @@ def test_is_string_in_refs_file(pids, store):
 def test_verify_object_information(pids, store):
     """Test _verify_object_information succeeds given good arguments."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
         hex_digests = object_metadata.hex_digests
@@ -1363,7 +1355,7 @@ def test_verify_object_information(pids, store):
 def test_verify_object_information_incorrect_size(pids, store):
     """Test _verify_object_information throws exception when size is incorrect."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
         hex_digests = object_metadata.hex_digests
@@ -1386,7 +1378,7 @@ def test_verify_object_information_incorrect_size_with_pid(pids, store):
     """Test _verify_object_information deletes the expected tmp file if obj size does
     not match and raises an exception."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
         hex_digests = object_metadata.hex_digests
@@ -1408,7 +1400,7 @@ def test_verify_object_information_incorrect_size_with_pid(pids, store):
                 1000,
                 expected_file_size,
             )
-            assert not os.path.isfile(tmp_file.name)
+        assert not os.path.isfile(tmp_file.name)
 
 
 def test_verify_object_information_missing_key_in_hex_digests_unsupported_algo(
@@ -1417,7 +1409,7 @@ def test_verify_object_information_missing_key_in_hex_digests_unsupported_algo(
     """Test _verify_object_information throws exception when algorithm is not found
     in hex digests and is not supported."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
         checksum = object_metadata.hex_digests.get(store.algorithm)
@@ -1442,7 +1434,7 @@ def test_verify_object_information_missing_key_in_hex_digests_supported_algo(
     """Test _verify_object_information throws exception when algorithm is not found
     in hex digests but is supported, and the checksum calculated does not match."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
         checksum = object_metadata.hex_digests.get(store.algorithm)
@@ -1467,7 +1459,7 @@ def test_verify_object_information_missing_key_in_hex_digests_matching_checksum(
     """Test _verify_object_information does not throw exception when algorithm is not found
     in hex digests but is supported, and the checksum calculated matches."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(data=path)
         checksum_algorithm = "blake2s"
@@ -1487,7 +1479,7 @@ def test_verify_object_information_missing_key_in_hex_digests_matching_checksum(
 
 def test_verify_hashstore_references_pid_refs_file_missing(pids, store):
     """Test _verify_hashstore_references throws exception when pid refs file is missing."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid]["sha256"]
         with pytest.raises(PidRefsFileNotFound):
             store._verify_hashstore_references(pid, cid)
@@ -1495,7 +1487,7 @@ def test_verify_hashstore_references_pid_refs_file_missing(pids, store):
 
 def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
     """Test _verify_hashstore_references throws exception when pid refs file cid is incorrect."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid]["sha256"]
         # Write the cid refs file and move it where it needs to be
         tmp_root_path = store._get_store_path("refs") / "tmp"
@@ -1518,7 +1510,7 @@ def test_verify_hashstore_references_pid_refs_incorrect_cid(pids, store):
 
 def test_verify_hashstore_references_cid_refs_file_missing(pids, store):
     """Test _verify_hashstore_references throws exception when cid refs file is missing."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid]["sha256"]
         pid_ref_abs_path = store._get_hashstore_pid_refs_path(pid)
         store._create_path(os.path.dirname(pid_ref_abs_path))
@@ -1533,7 +1525,7 @@ def test_verify_hashstore_references_cid_refs_file_missing(pids, store):
 def test_verify_hashstore_references_cid_refs_file_missing_pid(pids, store):
     """Test _verify_hashstore_references throws exception when cid refs file does not contain
     the expected pid."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid]["sha256"]
         # Get a tmp cid refs file and write the wrong pid into it
         tmp_root_path = store._get_store_path("refs") / "tmp"
@@ -1557,7 +1549,7 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
 ):
     """Test _verify_hashstore_references throws exception when cid refs file with multiple
     references does not contain the expected pid."""
-    for pid in pids.keys():
+    for pid in pids:
         cid = pids[pid]["sha256"]
         # Write the wrong pid into a cid refs file and move it where it needs to be
         tmp_root_path = store._get_store_path("refs") / "tmp"
@@ -1572,7 +1564,7 @@ def test_verify_hashstore_references_cid_refs_file_with_multiple_refs_missing_pi
         tmp_pid_refs_file = store._write_refs_file(tmp_root_path, cid, "pid")
         shutil.move(tmp_pid_refs_file, pid_ref_abs_path)
 
-        for i in range(0, 5):
+        for i in range(5):
             store._update_refs_file(cid_ref_abs_path, f"dou.test.{i}", "add")
 
         with pytest.raises(CidRefsContentError):
@@ -1583,7 +1575,7 @@ def test_delete_object_only(pids, store):
     """Test _delete_object successfully deletes only object."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid=None, data=path)
         store._delete_object_only(object_metadata.cid)
@@ -1595,7 +1587,7 @@ def test_delete_object_only_cid_refs_file_exists(pids, store):
     test_dir = "tests/testdata/"
     entity = "objects"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
@@ -1630,11 +1622,10 @@ def test_clean_algorithm_unsupported_algo(store):
 def test_computehash(pids, store):
     """Test to check computehash method."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
-        obj_stream = io.open(path, "rb")
-        obj_sha256_hash = store._computehash(obj_stream, "sha256")
-        obj_stream.close()
+        with open(path, "rb") as obj_stream:
+            obj_sha256_hash = store._computehash(obj_stream, "sha256")
         assert pids[pid]["sha256"] == obj_sha256_hash
 
 
@@ -1655,7 +1646,7 @@ def test_count(pids, store):
     """Check that count returns expected number of objects."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    for pid in pids.keys():
+    for pid in pids:
         path_string = test_dir + pid.replace("/", "_")
         store._store_and_validate_data(pid, path_string)
     assert store._count(entity) == 3
@@ -1665,7 +1656,7 @@ def test_exists_object_with_object_metadata_id(pids, store):
     """Test exists method with an absolute file path."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
         assert store._exists(entity, object_metadata.cid)
@@ -1675,7 +1666,7 @@ def test_exists_object_with_sharded_path(pids, store):
     """Test exists method with an absolute file path."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
         object_metadata_shard_path = os.path.join(*store._shard(object_metadata.cid))
@@ -1687,7 +1678,7 @@ def test_exists_metadata_files_path(pids, store):
     test_dir = "tests/testdata/"
     entity = "metadata"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         metadata_stored_path = store.store_metadata(pid, syspath, format_id)
@@ -1706,7 +1697,7 @@ def test_open_objects(pids, store):
     """Test open returns a stream."""
     test_dir = "tests/testdata/"
     entity = "objects"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
         object_metadata_id = object_metadata.cid
@@ -1718,7 +1709,7 @@ def test_open_objects(pids, store):
 def test_private_delete_objects(pids, store):
     """Confirm _delete deletes for entity type 'objects'"""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = Path(test_dir + pid.replace("/", "_"))
         object_metadata = store.store_object(pid, path)
 
@@ -1730,7 +1721,7 @@ def test_private_delete_metadata(pids, store):
     """Confirm _delete deletes for entity type 'metadata'"""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         store.store_metadata(pid, syspath, format_id)
@@ -1748,7 +1739,7 @@ def test_private_delete_metadata(pids, store):
 def test_private_delete_absolute_path(pids, store):
     """Confirm _delete deletes for absolute paths'"""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = Path(test_dir + pid.replace("/", "_"))
         object_metadata = store.store_object(pid, path)
 
@@ -1819,7 +1810,7 @@ def test_get_hashstore_data_object_path_file_does_not_exist(store):
 def test_get_hashstore_data_object_path_with_object_id(store, pids):
     """Test _get_hashstore_data_object_path returns absolute path given an object id."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store._store_and_validate_data(pid, path)
         obj_abs_path = store._get_hashstore_data_object_path(object_metadata.cid)
@@ -1830,7 +1821,7 @@ def test_get_hashstore_metadata_path_absolute_path(store, pids):
     """Test _get_hashstore_metadata_path returns absolute path given a metadata id."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         metadata_stored_path = store.store_metadata(pid, syspath, format_id)
@@ -1842,7 +1833,7 @@ def test_get_hashstore_metadata_path_relative_path(pids, store):
     """Confirm resolve path returns correct metadata path."""
     test_dir = "tests/testdata/"
     format_id = "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    for pid in pids.keys():
+    for pid in pids:
         filename = pid.replace("/", "_") + ".xml"
         syspath = Path(test_dir) / filename
         _metadata_stored_path = store.store_metadata(pid, syspath, format_id)
@@ -1863,7 +1854,7 @@ def test_get_hashstore_metadata_path_relative_path(pids, store):
 def test_get_hashstore_pid_refs_path(pids, store):
     """Confirm resolve path returns correct object pid refs path"""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = Path(test_dir + pid.replace("/", "_"))
         _object_metadata = store.store_object(pid, path)
 
@@ -1879,7 +1870,7 @@ def test_get_hashstore_pid_refs_path(pids, store):
 def test_get_hashstore_cid_refs_path(pids, store):
     """Confirm resolve path returns correct object pid refs path"""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = Path(test_dir + pid.replace("/", "_"))
         object_metadata = store.store_object(pid, path)
         cid = object_metadata.cid
@@ -1894,23 +1885,23 @@ def test_check_string(store):
     """Confirm that an exception is raised when a string is None, empty or contains an illegal
     character (ex. tabs or new lines)"""
     empty_pid_with_spaces = "   "
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="empty"):
         store._check_string(empty_pid_with_spaces, "empty_pid_with_spaces")
 
     none_value = None
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="empty"):
         store._check_string(none_value, "none_value")
 
     new_line = "\n"
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="empty"):
         store._check_string(new_line, "new_line")
 
     new_line_with_other_chars = "hello \n"
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="empty"):
         store._check_string(new_line_with_other_chars, "new_line_with_other_chars")
 
     tab_line = "\t"
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="empty"):
         store._check_string(tab_line, "tab_line")
 
 
@@ -1925,7 +1916,7 @@ def test_cast_to_bytes(store):
 def test_stream_reads_file(pids):
     """Test that a stream can read a file and yield its contents."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path_string = test_dir + pid.replace("/", "_")
         obj_stream = Stream(path_string)
         hashobj = hashlib.new("sha256")
@@ -1939,7 +1930,7 @@ def test_stream_reads_file(pids):
 def test_stream_reads_path_object(pids):
     """Test that a stream can read a file-like object and yield its contents."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path = Path(test_dir + pid.replace("/", "_"))
         obj_stream = Stream(path)
         hash_obj = hashlib.new("sha256")
@@ -1953,23 +1944,22 @@ def test_stream_reads_path_object(pids):
 def test_stream_returns_to_original_position_on_close(pids):
     """Test that a stream returns to its original position after closing the file."""
     test_dir = "tests/testdata/"
-    for pid in pids.keys():
+    for pid in pids:
         path_string = test_dir + pid.replace("/", "_")
-        input_stream = io.open(path_string, "rb")
-        input_stream.seek(5)
-        hashobj = hashlib.new("sha256")
-        obj_stream = Stream(input_stream)
-        for data in obj_stream:
-            hashobj.update(data)
-        obj_stream.close()
-        assert input_stream.tell() == 5
-        input_stream.close()
+        with open(path_string, "rb") as input_stream:
+            input_stream.seek(5)
+            hashobj = hashlib.new("sha256")
+            obj_stream = Stream(input_stream)
+            for data in obj_stream:
+                hashobj.update(data)
+            obj_stream.close()
+            assert input_stream.tell() == 5
 
 
 # noinspection PyTypeChecker
 def test_stream_raises_error_for_invalid_object():
     """Test that a stream raises ValueError for an invalid input object."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="readable"):
         Stream(1234)
 
 

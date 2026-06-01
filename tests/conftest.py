@@ -1,6 +1,7 @@
 """Pytest overall configuration file for fixtures"""
 
 import pytest
+
 from hashstore.filehashstore import FileHashStore
 
 
@@ -22,21 +23,19 @@ def init_props(tmp_path):
     hashstore_path = directory.as_posix()
     # Note, objects generated via tests are placed in a temporary folder
     # with the 'directory' parameter above appended
-    properties = {
+    return {
         "store_path": hashstore_path,
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    return properties
 
 
 @pytest.fixture(name="store")
 def init_store(props):
     """Create FileHashStore instance for all tests."""
-    store = FileHashStore(props)
-    return store
+    return FileHashStore(props)
 
 
 @pytest.fixture(name="pids")
@@ -45,7 +44,7 @@ def init_pids():
     - object_cid: hex digest of the pid
     - metadata_cid: hex digest of the pid + store_metadata_namespace
     """
-    test_pids = {
+    return {
         "doi:10.18739/A2901ZH2M": {
             "file_size_bytes": 39993,
             "metadata_cid": "323e0799524cec4c7e14d31289cefd884b563b5c052f154a066de5ec1e477da7",
@@ -80,4 +79,3 @@ def init_pids():
             "blake2s": "c8c9aea2f7ddcfaf8db93ce95f18e467b6293660d1a0b08137636a3c92896765",
         },
     }
-    return test_pids

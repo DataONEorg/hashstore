@@ -1,42 +1,100 @@
-[tool.poetry]
+[project]
 name = "hashstore"
-version = "1.1.0"
+version = "1.1.1"
 description = "HashStore, an object storage system using content identifiers."
-authors = ["Dou Mok <douming.mok@gmail.com>", "Matt Jones <gitcode@magisa.org>",
-  "Matthew Brooke", "Jing Tao", "Jeanette Clark", "Ian M. Nesbitt"]
+authors = [
+    { name = "Dou Mok", email = "douming.mok@gmail.com" },
+    { name = "Matt Jones", email = "gitcode@magisa.org" },
+    { name = "Matthew Brooke" },
+    { name = "Jing Tao" },
+    { name = "Jeanette Clark" },
+    { name = "Ian M. Nesbitt" },
+]
+requires-python = ">=3.9, <4.0"
 readme = "README.md"
-keywords = ["filesystem", "object storage", "hashstore", "storage"]
+keywords = [
+    "filesystem",
+    "object storage",
+    "hashstore",
+    "storage",
+]
 classifiers = [
-  "Development Status :: 4 - Beta",
-  "Intended Audience :: Developers",
-  "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: Apache Software License",
-  "Natural Language :: English",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Topic :: System :: Filesystems"
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Filesystems",
+]
+dependencies = [
+    "pathlib>=1.0.1",
+    "pyyaml>=6.0",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.9"
-pathlib = ">=1.0.1"
-pyyaml = ">=6.0"
+[project.scripts]
+hashstore = "hashstore.hashstoreclient:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=7.2.0",
+    "exceptiongroup>=1.1.0",
+    "black>=22.10.0",
+    "pylint>=2.17.4",
+    "pg8000>=1.29.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.poetry_bumpversion.file."src/hashstore/__init__.py"]
 
-[tool.poetry.group.dev.dependencies]
-pytest = ">=7.2.0"
-black = ">=22.10.0"
-pylint = ">=2.17.4"
-pg8000 = ">=1.29.8"
+[tool.ruff]
+src = ["src"]
+extend-exclude = ["tests/testdata/"]
+force-exclude = true
+line-length = 88  # how long you want lines to be
 
-[tool.poetry.scripts]
-hashstore = "hashstore.hashstoreclient:main"
+[tool.ruff.format]
+docstring-code-format = true  # code snippets in docstrings will be formatted
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.ruff.lint]
+select = [
+  "E", "F", "W", # flake8
+  "B",           # flake8-bugbear
+  "I",           # isort
+  "ARG",         # flake8-unused-arguments
+  "C4",          # flake8-comprehensions
+  "EM",          # flake8-errmsg
+  "ICN",         # flake8-import-conventions
+  "ISC",         # flake8-implicit-str-concat
+  "G",           # flake8-logging-format
+  "PGH",         # pygrep-hooks
+  "PIE",         # flake8-pie
+  "PL",          # pylint
+  "PT",          # flake8-pytest-style
+  "RET",         # flake8-return
+  "RUF",         # Ruff-specific
+  "SIM",         # flake8-simplify
+  "UP",          # pyupgrade
+  "YTT",         # flake8-2020
+  "EXE",         # flake8-executable
+]
+ignore = [
+  "PLR",    # Design related pylint codes
+  "ISC001", # Conflicts with formatter
+]
+unfixable = [
+  "F401",   # Would remove unused imports
+  "F841",   # Would remove unused variables
+]
+flake8-unused-arguments.ignore-variadic-names = true  # allow unused *args/**kwargsisort.required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]

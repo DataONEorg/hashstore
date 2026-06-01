@@ -90,7 +90,15 @@ class FileHashStoreProperties:
         "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
     )
     store_algorithm: str = "SHA-256"
-    store_default_algo_list: list[str] = dataclasses.field(default_factory=list)
+    store_default_algo_list: list[str] = dataclasses.field(
+        default_factory=lambda: [
+            "MD5",
+            "SHA-1",
+            "SHA-256",
+            "SHA-384",
+            "SHA-512",
+        ]
+    )
 
     def __post_init__(self):
         """Hash algorthm names are trnaslated from the DataONE names to the names

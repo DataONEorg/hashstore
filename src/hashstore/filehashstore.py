@@ -58,8 +58,8 @@ class FileHashStore(HashStore):
     """
 
     # Permissions settings for writing files and creating directories
-    f_mode = 0o664
-    d_mode = 0o755
+    f_mode = 0o640  # rw- r-- ---
+    d_mode = 0o750  # rwx r-x ---
     # The other algorithm list consists of additional algorithms that can be included
     # for calculating when storing objects, in addition to the default list.
     other_algo_list = (

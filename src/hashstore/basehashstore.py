@@ -4,14 +4,17 @@ import dataclasses
 import hashlib
 import importlib.metadata
 import importlib.util
+import inspect
+import io
 import pathlib
 from abc import ABC, abstractmethod
 from collections.abc import Generator
-from typing import IO
+from typing import Any, cast
 
 import yaml
 
 import hashstore.folderentry
+from hashstore.filehashstore import ObjectMetadata
 
 DATAONE_ALGORITHM_TRANSLATION = {
     "MD5": "md5",
@@ -73,14 +76,12 @@ class HashStoreProperties:
         ]
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Hash algorthm names are trnaslated from the DataONE names to the names
         used by the python hashlib.
         """
-        if isinstance(self.store_depth, str):
-            self.store_depth = int(self.store_depth)
-        if isinstance(self.store_width, str):
-            self.store_width = int(self.store_width)
+        self.store_depth = int(self.store_depth)
+        self.store_width = int(self.store_width)
         # Impose reasonable defaults for folder path depth
         if not (0 < self.store_depth <= 8):
             msg = "store_depth not between 0 and 8"
@@ -89,7 +90,7 @@ class HashStoreProperties:
             msg = "store_width not between 1 and 4"
             raise ValueError(msg)
         if (
-            self.store_metadata_namespace is None
+            self.store_metadata_namespace is None  # type: ignore[redundant-expr]
             or len(self.store_metadata_namespace) < 1
         ):
             msg = "Value is required for store_metadata_namespace."
@@ -129,7 +130,7 @@ class HashStoreProperties:
             return cls(**properties)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "HashStoreProperties":
+    def from_dict(cls, data: dict[str, Any]) -> "HashStoreProperties":
         if data["store_algorithm"] not in DATAONE_ALGORITHM_TRANSLATION:
             msg = (
                 "store_algorithm must be one of "
@@ -202,15 +203,19 @@ class HashStore(ABC):
         return importlib.metadata.version("hashstore")
 
     @abstractmethod
+    def __init__(self) -> None:
+        pass
+
+    @abstractmethod
     def store_object(
         self,
         pid: str,
         data: str | pathlib.Path,
-        additional_algorithm,
-        checksum,
-        checksum_algorithm,
-        expected_object_size,
-    ):
+        additional_algorithm: str | None,
+        checksum: str | None,
+        checksum_algorithm: str | None,
+        expected_object_size: int | None,
+    ) -> ObjectMetadata:
         """Atomic storage of objects to disk using a given stream. Upon
         successful storage, it returns an `ObjectMetadata` object containing
         relevant file information, such as a persistent identifier that
@@ -286,7 +291,7 @@ class HashStore(ABC):
         checksum: str | None = None,
         checksum_algorithm: str | None = None,
         verify_entry_cids: bool = True,
-    ):
+    ) -> ObjectMetadata:
         """Store a folder object.
 
         A Folder is a list of entries that appear in a folder. Each entry
@@ -346,7 +351,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def tag_object(self, pid, cid):
+    def tag_object(self, pid: str, cid: str) -> None:
         """Creates references that allow objects stored in HashStore to be discoverable.
         Retrieving, deleting or calculating a hex digest of an object is based
         on a pid argument, to proceed, we must be able to find the object
@@ -358,7 +363,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def store_metadata(self, pid, metadata, format_id):
+    def store_metadata(self, pid: str, metadata: str, format_id: str) -> str:
         """Add or update metadata, such as `sysmeta`, to disk using the given
         path/stream. The `store_metadata` method uses a persistent identifier
         `pid` and a metadata `format_id` to determine the permanent address of
@@ -382,7 +387,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def retrieve_object(self, pid):
+    def retrieve_object(self, pid: str) -> io.BufferedReader:
         """Retrieve an object from disk using a persistent identifier (pid). The
         `retrieve_object` method opens and returns a buffered object stream
         ready for reading if the object associated with the provided `pid`
@@ -395,7 +400,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def retrieve_object_path(self, pidpath: list[str]) -> IO[bytes]:
+    def retrieve_object_path(self, pidpath: list[str]) -> io.BufferedReader:
         """Retrieve an object from disk using a persistent identifier (pid). The
         `retrieve_object` method opens and returns a buffered object stream ready
         for reading if the object associated with the provided `pid` exists on disk.
@@ -407,7 +412,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def retrieve_metadata(self, pid, format_id):
+    def retrieve_metadata(self, pid: str, format_id: str) -> io.BufferedReader:
         """Retrieve the metadata object from disk using a persistent identifier
         (pid) and metadata namespace (format_id). If the metadata document
         exists, the method opens and returns a buffered metadata stream ready
@@ -421,7 +426,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_object(self, pid):
+    def delete_object(self, pid: str) -> None:
         """Deletes an object and its related data permanently from HashStore
         using a given persistent identifier. The object associated with the pid
         will be deleted if it is not referenced by any other pids, along with
@@ -434,8 +439,12 @@ class HashStore(ABC):
 
     @abstractmethod
     def delete_if_invalid_object(
-        self, object_metadata, checksum, checksum_algorithm, expected_file_size
-    ):
+        self,
+        object_metadata: ObjectMetadata,
+        checksum: str,
+        checksum_algorithm: str,
+        expected_file_size: int,
+    ) -> None:
         """Confirm equality of content in an ObjectMetadata. The
         `delete_invalid_object` method will delete a data object if the
         object_metadata does not match the specified values.
@@ -448,7 +457,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_metadata(self, pid, format_id):
+    def delete_metadata(self, pid: str, format_id: str) -> None:
         """Deletes a metadata document (ex. `sysmeta`) permanently from
         HashStore using a given persistent identifier (`pid`) and format_id
         (metadata namespace). If a `format_id` is not supplied, all metadata
@@ -460,7 +469,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_hex_digest(self, pid, algorithm):
+    def get_hex_digest(self, pid: str, algorithm: str) -> str:
         """Calculates the hex digest of an object that exists in HashStore using
         a given persistent identifier and hash algorithm.
 
@@ -472,7 +481,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def list_pids(self, pattern: str | None = None) -> Generator:
+    def list_pids(self, pattern: str | None = None) -> Generator[float, str, str]:
         """Yields PIDs from the hashstore.
 
         :param str pattern: Optional regexp pattern to match.
@@ -480,7 +489,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_object_status(self, pid) -> dict:
+    def get_object_status(self, pid: str) -> dict[str, Any]:
         """Returns a dictionary of the object size, modtime, accesstime for the given
         pid.
 
@@ -491,7 +500,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def find_object(self, pid: str) -> dict[str, str]:
+    def find_object(self, pid: str) -> dict[str, Any]:
         """Check if an object referenced by a pid exists and retrieve its content
         identifier.
 
@@ -526,8 +535,8 @@ class HashStoreFactory:
 
     @staticmethod
     def get_hashstore(
-        module_name: str, class_name: str, properties: dict | None = None
-    ):
+        module_name: str, class_name: str, properties: dict[str, Any] | None = None
+    ) -> HashStore:
         """Get a `HashStore`-like object based on the specified `module_name`
         and `class_name`.
 
@@ -568,6 +577,7 @@ class HashStoreFactory:
         # If class is not part of module, raise error
         if hasattr(imported_module, class_name):
             hashstore_class = getattr(imported_module, class_name)
-            return hashstore_class(**properties)
+            assert inspect.isclass(hashstore_class)
+            return cast(HashStore, hashstore_class(**properties))
         msg = f"Class name '{class_name}' is not an attribute of module '{module_name}'"
         raise AttributeError(msg)

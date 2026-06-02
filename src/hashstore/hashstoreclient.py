@@ -1,14 +1,15 @@
-#!/usr/bin/env python
 """HashStore Command Line App"""
 
 import logging
+import multiprocessing
 import os
 from argparse import ArgumentParser
 from datetime import datetime
-import multiprocessing
 from pathlib import Path
-import yaml
+
 import pg8000
+import yaml
+
 from hashstore import HashStoreFactory
 
 
@@ -21,8 +22,8 @@ class HashStoreParser:
         program_name = "HashStore Command Line Client"
         description = (
             "Command line tool to call store, retrieve and delete with a HashStore."
-            + " Additionally, methods are available to test functionality with a"
-            + " metacat postgres db."
+            " Additionally, methods are available to test functionality with a"
+            " metacat postgres db."
         )
         epilog = "Created for DataONE (NCEAS)"
 
@@ -199,9 +200,12 @@ class HashStoreParser:
 
         :return: HashStore properties with the following keys (and values):
             - store_depth (int): Depth when sharding an object's hex digest.
-            - store_width (int): Width of directories when sharding an object's hex digest.
-            - store_algorithm (str): Hash algorithm used for calculating the object's hex digest.
-            - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
+            - store_width (int): Width of directories when sharding an object's hex
+                digest.
+            - store_algorithm (str): Hash algorithm used for calculating the object's
+                hex digest.
+            - store_metadata_namespace (str): Namespace for the HashStore's system
+                metadata.
         :rtype: dict
         """
         property_required_keys = [
@@ -214,11 +218,11 @@ class HashStoreParser:
         if not os.path.exists(hashstore_yaml):
             exception_string = (
                 "HashStoreParser - load_store_properties: hashstore.yaml not found"
-                + " in store root path."
+                " in store root path."
             )
             raise FileNotFoundError(exception_string)
         # Open file
-        with open(hashstore_yaml, "r", encoding="utf-8") as file:
+        with open(hashstore_yaml, encoding="utf-8") as file:
             yaml_data = yaml.safe_load(file)
 
         # Get hashstore properties
@@ -324,8 +328,8 @@ class HashStoreClient:
         content = (
             f"HashStoreClient (store_to_hashstore_from_list):\n"
             f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-            + f"Total Time to Store {len(checked_obj_list)} {obj_type}"
-            + f" Objects: {end_time - start_time}\n"
+            f"Total Time to Store {len(checked_obj_list)} {obj_type}"
+            f" Objects: {end_time - start_time}\n"
         )
         logging.info(content)
 
@@ -337,7 +341,6 @@ class HashStoreClient:
         try:
             self.hashstore.store_object(*obj_tuple)
             return
-        # pylint: disable=W0718
         except Exception as so_exception:
             print(so_exception)
 
@@ -402,8 +405,8 @@ class HashStoreClient:
         content = (
             f"retrieve_and_validate_from_hashstore:\n"
             f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-            + f"Total Time to retrieve and validate {len(checked_obj_list)} {obj_type}"
-            + f" Objects: {end_time - start_time}\n"
+            f"Total Time to retrieve and validate {len(checked_obj_list)} {obj_type}"
+            f" Objects: {end_time - start_time}\n"
         )
         logging.info(content)
 
@@ -423,8 +426,8 @@ class HashStoreClient:
         if computed_digest != obj_db_checksum:
             err_msg = (
                 f"Assertion Error for pid/guid: {pid_guid} -"
-                + f" Digest calculated from stream ({computed_digest}) does not match"
-                + f" checksum from metacat db: {obj_db_checksum}"
+                f" Digest calculated from stream ({computed_digest}) does not match"
+                f" checksum from metacat db: {obj_db_checksum}"
             )
             logging.error(err_msg)
             print(err_msg)
@@ -434,7 +437,8 @@ class HashStoreClient:
     def validate_metadata(self, obj_tuple):
         """Retrieves a metadata from HashStore and validates its checksum.
 
-        :param obj_tuple: Tuple containing pid_guid, format_id, obj_checksum, obj_algorithm.
+        :param obj_tuple: Tuple containing pid_guid, format_id, obj_checksum,
+            obj_algorithm.
         """
         pid_guid = obj_tuple[0]
         namespace = obj_tuple[1]
@@ -448,8 +452,8 @@ class HashStoreClient:
         if computed_digest != metadata_db_checksum:
             err_msg = (
                 f"Assertion Error for pid/guid: {pid_guid} -"
-                + f" Digest calculated from stream ({computed_digest}) does not match"
-                + f" checksum from metacat db: {metadata_db_checksum}"
+                f" Digest calculated from stream ({computed_digest}) does not match"
+                f" checksum from metacat db: {metadata_db_checksum}"
             )
             logging.error(err_msg)
             print(err_msg)
@@ -504,8 +508,8 @@ class HashStoreClient:
         content = (
             f"HashStoreClient (delete_objects_from_list):\n"
             f"Start Time: {start_time}\nEnd Time: {end_time}\n"
-            + f"Total Time to Delete {len(checked_obj_list)} {obj_type}"
-            + f" Objects: {end_time - start_time}\n"
+            f"Total Time to Delete {len(checked_obj_list)} {obj_type}"
+            f" Objects: {end_time - start_time}\n"
         )
         logging.info(content)
 
@@ -517,7 +521,6 @@ class HashStoreClient:
         try:
             self.hashstore.delete_object(obj_pid)
             return
-        # pylint: disable=W0718
         except Exception as do_exception:
             print(do_exception)
 
@@ -531,7 +534,6 @@ class HashStoreClient:
         try:
             self.hashstore.delete_metadata(pid_guid, namespace)
             return
-        # pylint: disable=W0718
         except Exception as do_exception:
             print(do_exception)
 
@@ -553,13 +555,13 @@ class MetacatDB:
         pgyaml_path = hashstore_path + "/pgdb.yaml"
         if not os.path.exists(pgyaml_path):
             exception_string = (
-                "HashStore CLI Client - _load_metacat_db_properties: pgdb.yaml not found"
-                + " in store root path. Must be manually created with the following keys:"
-                + " db_user, db_password, db_host, db_port, db_name"
+                "HashStore CLI Client - _load_metacat_db_properties: pgdb.yaml not "
+                "found in store root path. Must be manually created with the "
+                "following keys: db_user, db_password, db_host, db_port, db_name"
             )
             raise FileNotFoundError(exception_string)
         # Open file
-        with open(pgyaml_path, "r", encoding="utf-8") as file:
+        with open(pgyaml_path, encoding="utf-8") as file:
             yaml_data = yaml.safe_load(file)
 
         # Get database values
@@ -570,11 +572,13 @@ class MetacatDB:
             self.db_yaml_dict[key] = checked_property
 
     def get_object_metadata_list(self, origin_directory, num, skip_obj_size=None):
-        """Query the Metacat database for the full object and metadata list, ordered by GUID.
+        """Query the Metacat database for the full object and metadata list, ordered
+        by GUID.
 
         :param str origin_directory: 'var/metacat/data' or 'var/metacat/documents'.
         :param int num: Number of rows to retrieve from the Metacat database.
-        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB), defaults to 'None'
+        :param int skip_obj_size: Size of obj in GB to skip (ex. 4 = 4GB), defaults
+            to 'None'
         """
         # Create a connection to the database
         db_user = self.db_yaml_dict["db_user"]
@@ -595,15 +599,12 @@ class MetacatDB:
         cursor = conn.cursor()
 
         # Query to refine rows between `identifier` and `systemmetadata`` table
-        if num is None:
-            limit_query = ""
-        else:
-            limit_query = f" LIMIT {num}"
+        limit_query = "" if num is None else f" LIMIT {num}"
         query = f"""SELECT identifier.guid, identifier.docid, identifier.rev,
                 systemmetadata.object_format, systemmetadata.checksum,
-                systemmetadata.checksum_algorithm, systemmetadata.size FROM identifier INNER JOIN
-                systemmetadata ON identifier.guid = systemmetadata.guid ORDER BY
-                identifier.guid{limit_query};"""
+                systemmetadata.checksum_algorithm, systemmetadata.size FROM identifier
+                INNER JOIN systemmetadata ON identifier.guid = systemmetadata.guid
+                ORDER BY identifier.guid{limit_query};"""
         cursor.execute(query)
 
         # Fetch all rows from the result set
@@ -620,23 +621,20 @@ class MetacatDB:
             size = int(row[6])
             if gb_files_to_skip is not None and size > gb_files_to_skip:
                 continue
-            else:
-                # Get pid, filepath and formatId
-                pid_guid = row[0]
-                metadatapath_docid_rev = (
-                    origin_directory + "/" + row[1] + "." + str(row[2])
-                )
-                metadata_namespace = row[3]
-                row_checksum = row[4]
-                row_checksum_algorithm = row[5]
-                tuple_item = (
-                    pid_guid,
-                    metadatapath_docid_rev,
-                    metadata_namespace,
-                    row_checksum,
-                    row_checksum_algorithm,
-                )
-                object_metadata_list.append(tuple_item)
+            # Get pid, filepath and formatId
+            pid_guid = row[0]
+            metadatapath_docid_rev = origin_directory + "/" + row[1] + "." + str(row[2])
+            metadata_namespace = row[3]
+            row_checksum = row[4]
+            row_checksum_algorithm = row[5]
+            tuple_item = (
+                pid_guid,
+                metadatapath_docid_rev,
+                metadata_namespace,
+                row_checksum,
+                row_checksum_algorithm,
+            )
+            object_metadata_list.append(tuple_item)
 
         # Close the cursor and connection when done
         cursor.close()
@@ -646,9 +644,11 @@ class MetacatDB:
 
     @staticmethod
     def refine_list_for_objects(metacat_obj_list, action):
-        """Refine a list of objects by checking for file existence and removing duplicates.
+        """Refine a list of objects by checking for file existence and removing
+        duplicates.
 
-        :param List metacat_obj_list: List of tuple objects representing rows from Metacat database.
+        :param List metacat_obj_list: List of tuple objects representing rows from
+            Metacat database.
         :param str action: Action to perform. Options: "store", "retrieve", or "delete".
             - "store": Create a list of objects to store that do not exist in HashStore.
             - "retrieve": Create a list of objects that exist in HashStore.
@@ -689,11 +689,14 @@ class MetacatDB:
 
     @staticmethod
     def refine_list_for_metadata(metacat_obj_list, action):
-        """Refine a list of metadata by checking for file existence and removing duplicates.
+        """Refine a list of metadata by checking for file existence and removing
+        duplicates.
 
-        :param List metacat_obj_list: List of tuple objects representing rows from metacat db.
+        :param List metacat_obj_list: List of tuple objects representing rows from
+            metacat db.
         :param str action: Action to perform - "store", "retrieve", or "delete".
-            - "store": Create a list of metadata to store that do not exist in HashStore.
+            - "store": Create a list of metadata to store that do not exist in
+                HashStore.
             - "retrieve": Create a list of metadata that exist in HashStore.
             - "delete": Create a list of metadata pids with their format_ids.
 
@@ -709,22 +712,25 @@ class MetacatDB:
             item_checksum_algorithm = tuple_item[4]
             if os.path.exists(filepath_docid_rev):
                 if action == "store":
-                    tuple_item = (pid_guid, filepath_docid_rev, metadata_namespace)
-                    refined_metadata_list.append(tuple_item)
+                    refined_metadata_list.append(
+                        (pid_guid, filepath_docid_rev, metadata_namespace)
+                    )
                 if action == "retrieve":
-                    tuple_item = (
-                        pid_guid,
-                        metadata_namespace,
-                        item_checksum,
-                        item_checksum_algorithm,
+                    refined_metadata_list.append(
+                        (
+                            pid_guid,
+                            metadata_namespace,
+                            item_checksum,
+                            item_checksum_algorithm,
+                        )
                     )
-                    refined_metadata_list.append(tuple_item)
                 if action == "delete":
-                    tuple_item = (
-                        pid_guid,
-                        metadata_namespace,
+                    refined_metadata_list.append(
+                        (
+                            pid_guid,
+                            metadata_namespace,
+                        )
                     )
-                    refined_metadata_list.append(tuple_item)
         return refined_metadata_list
 
 
@@ -735,31 +741,31 @@ def main():
     args = parser.get_parser_args()
 
     # Client setup process
-    if getattr(args, "create_hashstore"):
+    if args.create_hashstore:
         # Create HashStore if -chs flag is true in a given directory
         # Get store attributes, HashStore will validate properties
         props = {
-            "store_path": getattr(args, "store_path"),
-            "store_depth": int(getattr(args, "depth")),
-            "store_width": int(getattr(args, "width")),
-            "store_algorithm": getattr(args, "algorithm"),
-            "store_metadata_namespace": getattr(args, "formatid"),
+            "store_path": args.store_path,
+            "store_depth": int(args.depth),
+            "store_width": int(args.width),
+            "store_algorithm": args.algorithm,
+            "store_metadata_namespace": args.formatid,
         }
         HashStoreClient(props)
     # Can't use client app without first initializing HashStore
-    store_path = getattr(args, "store_path")
+    store_path = args.store_path
     store_path_config_yaml = store_path + "/hashstore.yaml"
     if not os.path.exists(store_path_config_yaml):
-        raise FileNotFoundError(
+        msg = (
             f"Missing config file (hashstore.yaml) at store path: {store_path}."
-            + " HashStore must first be initialized, use `--help` for more information."
+            " HashStore must first be initialized, use `--help` for more information."
         )
-    else:
-        # Get the default format_id for sysmeta
-        with open(store_path_config_yaml, "r", encoding="utf-8") as hs_yaml_file:
-            yaml_data = yaml.safe_load(hs_yaml_file)
+        raise FileNotFoundError(msg)
+    # Get the default format_id for sysmeta
+    with open(store_path_config_yaml, encoding="utf-8") as hs_yaml_file:
+        yaml_data = yaml.safe_load(hs_yaml_file)
 
-        default_formatid = yaml_data["store_metadata_namespace"]
+    default_formatid = yaml_data["store_metadata_namespace"]
 
     # Setup logging, create log file if it doesn't already exist
     hashstore_py_log = store_path + "/python_client.log"
@@ -768,11 +774,8 @@ def main():
         python_log_file_path.parent.mkdir(parents=True, exist_ok=True)
         open(python_log_file_path, "w", encoding="utf-8").close()
     # Check for logging level
-    logging_level_arg = getattr(args, "logging_level")
-    if logging_level_arg is None:
-        logging_level = "INFO"
-    else:
-        logging_level = logging_level_arg
+    logging_level_arg = args.logging_level
+    logging_level = "INFO" if logging_level_arg is None else logging_level_arg
     logging.basicConfig(
         filename=python_log_file_path,
         level=logging_level,
@@ -781,51 +784,52 @@ def main():
     )
 
     # Collect arguments to process
-    pid = getattr(args, "object_pid")
-    path = getattr(args, "object_path")
-    algorithm = getattr(args, "object_algorithm")
-    checksum = getattr(args, "object_checksum")
-    checksum_algorithm = getattr(args, "object_checksum_algorithm")
-    size = getattr(args, "object_size")
-    formatid = getattr(args, "object_formatid")
+    pid = args.object_pid
+    path = args.object_path
+    algorithm = args.object_algorithm
+    checksum = args.object_checksum
+    checksum_algorithm = args.object_checksum_algorithm
+    size = args.object_size
+    formatid = args.object_formatid
     if formatid is None:
         formatid = default_formatid
-    knbvm_test = getattr(args, "knbvm_flag")
+    knbvm_test = args.knbvm_flag
     # Instantiate HashStore Client
     props = parser.load_store_properties(store_path_config_yaml)
     # Reminder: 'hashstore.yaml' only contains 4 of the required 5 properties
     props["store_path"] = store_path
     hashstore_c = HashStoreClient(props, knbvm_test)
     if knbvm_test:
-        directory_to_convert = getattr(args, "source_directory")
+        directory_to_convert = args.source_directory
         # Check if the directory to convert exists
         if os.path.exists(directory_to_convert):
             # If -nobj is supplied, limit the objects we work with
-            number_of_objects_to_convert = getattr(args, "num_obj_to_convert")
+            number_of_objects_to_convert = args.num_obj_to_convert
             # Determine if we are working with objects or metadata
-            directory_type = getattr(args, "source_directory_type")
-            size_of_obj_to_skip = getattr(args, "gb_file_size_to_skip")
+            directory_type = args.source_directory_type
+            size_of_obj_to_skip = args.gb_file_size_to_skip
             accepted_directory_types = ["object", "metadata"]
             if directory_type not in accepted_directory_types:
-                raise ValueError(
-                    "Directory `-stype` cannot be empty, must be 'object' or 'metadata'."
-                    + f" source_directory_type: {directory_type}"
+                msg = (
+                    "Directory `-stype` cannot be empty, must be 'object' or "
+                    f"'metadata'. source_directory_type: {directory_type}"
                 )
-            if getattr(args, "store_to_hashstore"):
+                raise ValueError(msg)
+            if args.store_to_hashstore:
                 hashstore_c.store_to_hashstore_from_list(
                     directory_to_convert,
                     directory_type,
                     number_of_objects_to_convert,
                     size_of_obj_to_skip,
                 )
-            if getattr(args, "retrieve_and_validate"):
+            if args.retrieve_and_validate:
                 hashstore_c.retrieve_and_validate_from_hashstore(
                     directory_to_convert,
                     directory_type,
                     number_of_objects_to_convert,
                     size_of_obj_to_skip,
                 )
-            if getattr(args, "delete_from_hashstore"):
+            if args.delete_from_hashstore:
                 hashstore_c.delete_objects_from_list(
                     directory_to_convert,
                     directory_type,
@@ -833,43 +837,52 @@ def main():
                     size_of_obj_to_skip,
                 )
         else:
-            raise FileNotFoundError(
-                f"Directory to convert is None or does not exist: {directory_to_convert}."
+            msg = (
+                "Directory to convert is None or does not "
+                f"exist: {directory_to_convert}."
             )
-    elif getattr(args, "client_getchecksum"):
+            raise FileNotFoundError(msg)
+    elif args.client_getchecksum:
         if pid is None:
-            raise ValueError("'-pid' option is required")
+            msg = "'-pid' option is required"
+            raise ValueError(msg)
         if algorithm is None:
-            raise ValueError("'-algo' option is required")
+            msg = "'-algo' option is required"
+            raise ValueError(msg)
         # Calculate the hex digest of a given pid with algorithm supplied
         digest = hashstore_c.hashstore.get_hex_digest(pid, algorithm)
         print(f"guid/pid: {pid}")
         print(f"algorithm: {algorithm}")
         print(f"Checksum/Hex Digest: {digest}")
 
-    elif getattr(args, "client_storeobject"):
+    elif args.client_storeobject:
         if pid is None:
-            raise ValueError("'-pid' option is required")
+            msg = "'-pid' option is required"
+            raise ValueError(msg)
         if path is None:
-            raise ValueError("'-path' option is required")
+            msg = "'-path' option is required"
+            raise ValueError(msg)
         # Store object to HashStore
         object_metadata = hashstore_c.hashstore.store_object(
             pid, path, algorithm, checksum, checksum_algorithm, size
         )
         print(f"Object Metadata:\n{object_metadata}")
 
-    elif getattr(args, "client_storemetadata"):
+    elif args.client_storemetadata:
         if pid is None:
-            raise ValueError("'-pid' option is required")
+            msg = "'-pid' option is required"
+            raise ValueError(msg)
         if path is None:
-            raise ValueError("'-path' option is required")
+            msg = "'-path' option is required"
+            raise ValueError(msg)
         # Store metadata to HashStore
         metadata_cid = hashstore_c.hashstore.store_metadata(pid, path, formatid)
         print(f"Metadata Path: {metadata_cid}")
 
-    elif getattr(args, "client_retrieveobject"):
+    elif args.client_retrieveobject:
         if pid is None:
-            raise ValueError("'-pid' option is required")
+            msg = "'-pid' option is required"
+            raise ValueError(msg)
         # Retrieve object from HashStore and display the first 1000 bytes
         object_stream = hashstore_c.hashstore.retrieve_object(pid)
         object_content = object_stream.read(1000).decode("utf-8")
@@ -877,9 +890,10 @@ def main():
         print(object_content)
         print("...\n<-- Truncated for Display Purposes -->")
 
-    elif getattr(args, "client_retrievemetadata"):
+    elif args.client_retrievemetadata:
         if pid is None:
-            raise ValueError("'-pid' option is required")
+            msg = "'-pid' option is required"
+            raise ValueError(msg)
         # Retrieve metadata from HashStore and display the first 1000 bytes
         metadata_stream = hashstore_c.hashstore.retrieve_metadata(pid, formatid)
         metadata_content = metadata_stream.read(1000).decode("utf-8")
@@ -887,20 +901,23 @@ def main():
         print(metadata_content)
         print("...\n<-- Truncated for Display Purposes -->")
 
-    elif getattr(args, "client_deleteobject"):
+    elif args.client_deleteobject:
         if pid is None:
-            raise ValueError("'-pid' option is required")
+            msg = "'-pid' option is required"
+            raise ValueError(msg)
         # Delete object from HashStore
         delete_status = hashstore_c.hashstore.delete_object(pid)
         print(f"Object Deleted (T/F): {delete_status}")
 
-    elif getattr(args, "client_deletemetadata"):
+    elif args.client_deletemetadata:
         if pid is None:
-            raise ValueError("'-pid' option is required")
+            msg = "'-pid' option is required"
+            raise ValueError(msg)
         # Delete metadata from HashStore
         delete_status = hashstore_c.hashstore.delete_metadata(pid, formatid)
         print(
-            f"Metadata for pid: {pid} & formatid: {formatid}\nDeleted (T/F): {delete_status}"
+            f"Metadata for pid: {pid} & formatid: {formatid}\n"
+            f"Deleted (T/F): {delete_status}"
         )
 
 

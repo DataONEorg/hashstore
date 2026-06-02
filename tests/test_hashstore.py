@@ -1,7 +1,9 @@
 """Test module for HashStore's HashStoreFactory and ObjectMetadata class."""
 
 import os
+
 import pytest
+
 from hashstore.basehashstore import HashStoreFactory
 from hashstore.filehashstore import FileHashStore
 
@@ -9,8 +11,7 @@ from hashstore.filehashstore import FileHashStore
 @pytest.fixture(name="factory")
 def init_factory():
     """Create factory for all tests."""
-    factory = HashStoreFactory()
-    return factory
+    return HashStoreFactory()
 
 
 def test_init(factory):
@@ -29,17 +30,17 @@ def test_factory_get_hashstore_filehashstore(factory, props):
 
 def test_factory_get_hashstore_unsupported_class(factory):
     """Check that AttributeError is raised when provided with unsupported class."""
+    module_name = "hashstore.filehashstore"
+    class_name = "S3HashStore"
     with pytest.raises(AttributeError):
-        module_name = "hashstore.filehashstore"
-        class_name = "S3HashStore"
         factory.get_hashstore(module_name, class_name)
 
 
 def test_factory_get_hashstore_unsupported_module(factory):
     """Check that ModuleNotFoundError is raised when provided with unsupported module."""
+    module_name = "hashstore.s3filestore"
+    class_name = "FileHashStore"
     with pytest.raises(ModuleNotFoundError):
-        module_name = "hashstore.s3filestore"
-        class_name = "FileHashStore"
         factory.get_hashstore(module_name, class_name)
 
 
@@ -56,7 +57,7 @@ def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
         "store_algorithm": "MD2",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Must be one of"):
         factory.get_hashstore(module_name, class_name, properties)
 
 
@@ -72,7 +73,7 @@ def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory)
         "store_algorithm": "dou_algo",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Must be one of"):
         factory.get_hashstore(module_name, class_name, properties)
 
 

@@ -9,9 +9,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Generator
 from typing import IO
 
-import hashstore.folderentry
-
 import yaml
+
+import hashstore.folderentry
 
 DATAONE_ALGORITHM_TRANSLATION = {
     "MD5": "md5",

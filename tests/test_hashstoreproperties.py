@@ -3,7 +3,7 @@
 import pytest
 
 import hashstore
-import hashstore.hashstore
+import hashstore.basehashstore
 
 
 def test_defaults():
@@ -29,7 +29,7 @@ def test_from_dict():
     p = hashstore.HashStoreProperties.from_dict(props)
     assert p.store_width == props["store_width"]
     assert p.store_depth == props["store_depth"]
-    assert p.store_algorithm == hashstore.hashstore.from_dataone_algorithm_name(
+    assert p.store_algorithm == hashstore.basehashstore.from_dataone_algorithm_name(
         props["store_algorithm"]
     )
     assert len(p.store_default_algo_list) == 2

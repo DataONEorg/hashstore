@@ -14,7 +14,6 @@ from typing import Any, cast
 import yaml
 
 import hashstore.folderentry
-from hashstore.filehashstore import ObjectMetadata
 
 DATAONE_ALGORITHM_TRANSLATION = {
     "MD5": "md5",
@@ -190,6 +189,28 @@ class HashStoreProperties:
                 translated_names.append(to_dataone_algorithm_name(algo))
             properties["store_default_algo_list"] = translated_names
             yaml.dump(properties, dest, default_flow_style=False)
+
+
+@dataclasses.dataclass
+class ObjectMetadata:
+    """Represents metadata associated with an object.
+
+    The `ObjectMetadata` class represents metadata associated with an object, including
+    a persistent or authority-based identifier (`pid`), a content identifier (`cid`),
+    the size of the object in bytes (`obj_size`), and an optional list of hex digests
+    (`hex_digests`) to assist with validating objects.
+
+    :param str pid: An authority-based or persistent identifier
+    :param str cid: A unique identifier for the object (Hash ID, hex digest).
+    :param int obj_size: The size of the object in bytes.
+    :param dict hex_digests: A list of hex digests to validate objects
+        (md5, sha1, sha256, sha384, sha512) (optional).
+    """
+
+    pid: str
+    cid: str
+    obj_size: int
+    hex_digests: dict
 
 
 class HashStore(ABC):

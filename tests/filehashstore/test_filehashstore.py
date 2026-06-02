@@ -8,10 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from hashstore import HashStoreProperties
+from hashstore import HashStoreProperties, ObjectMetadata
 from hashstore.filehashstore import (
     FileHashStore,
-    ObjectMetadata,
     Stream,
 )
 from hashstore.filehashstore_exceptions import (

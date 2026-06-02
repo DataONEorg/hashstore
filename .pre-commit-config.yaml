@@ -21,12 +21,12 @@ repos:
       - id: requirements-txt-fixer
       - id: trailing-whitespace
 
-  # - repo: https://github.com/astral-sh/ruff-pre-commit
-  #   rev: "v0.14.13"
-  #   hooks:
-  #     # first, lint + autofix
-  #     - id: ruff
-  #       types_or: [python, pyi, jupyter]
-  #       args: ["--fix", "--show-fixes"]
-  #     # then, format
-  #     - id: ruff-format
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.14.13"
+    hooks:
+      # first, lint + autofix
+      - id: ruff
+        types_or: [python, pyi, jupyter]
+        args: ["--fix", "--show-fixes"]
+      # then, format
+      - id: ruff-format

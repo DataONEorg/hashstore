@@ -4,7 +4,7 @@ import importlib.metadata
 import importlib.util
 from abc import ABC, abstractmethod
 from collections.abc import Generator
-from typing import IO, Optional
+from typing import IO
 
 import hashstore.folderentry
 
@@ -100,9 +100,9 @@ class HashStore(ABC):
         self,
         pidpath: list[str],
         entries: hashstore.folderentry.FolderEntries,
-        additional_algorithm: Optional[str] = None,
-        checksum: Optional[str] = None,
-        checksum_algorithm: Optional[str] = None,
+        additional_algorithm: str | None = None,
+        checksum: str | None = None,
+        checksum_algorithm: str | None = None,
         verify_entry_cids: bool = True,
     ):
         """Store a folder object.
@@ -155,7 +155,8 @@ class HashStore(ABC):
         was unchanged between versions.
 
         Args:
-            pid (str): The context (i.e. VMDAG version) within which this folder is being retrieved
+            pid (str): The context (i.e. VMDAG version) within which this folder is
+                being retrieved
             path (str): Path within the context to the desired entry
         Returns:
             FolderEntries
@@ -213,9 +214,9 @@ class HashStore(ABC):
 
     @abstractmethod
     def retrieve_object_path(self, pidpath: list[str]) -> IO[bytes]:
-        """Retrieve an object from disk using a persistent identifier (pid). The `retrieve_object`
-        method opens and returns a buffered object stream ready for reading if the object
-        associated with the provided `pid` exists on disk.
+        """Retrieve an object from disk using a persistent identifier (pid). The
+        `retrieve_object` method opens and returns a buffered object stream ready
+        for reading if the object associated with the provided `pid` exists on disk.
 
         :param str pid: Authority-based identifier.
 
@@ -289,7 +290,7 @@ class HashStore(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def list_pids(self, pattern: Optional[str] = None) -> Generator:
+    def list_pids(self, pattern: str | None = None) -> Generator:
         """Yields PIDs from the hashstore.
 
         :param str pattern: Optional regexp pattern to match.
@@ -298,7 +299,8 @@ class HashStore(ABC):
 
     @abstractmethod
     def get_object_status(self, pid) -> dict:
-        """Returns a dictionary of the object size, modtime, accesstime for the given pid.
+        """Returns a dictionary of the object size, modtime, accesstime for the given
+        pid.
 
         :param str pid: Object identifier
 
@@ -308,13 +310,14 @@ class HashStore(ABC):
 
     @abstractmethod
     def find_object(self, pid: str) -> dict[str, str]:
-        """Check if an object referenced by a pid exists and retrieve its content identifier.
+        """Check if an object referenced by a pid exists and retrieve its content
+        identifier.
 
-        The `find_object` method validates the existence of an object based on the provided
-        pid and returns the associated content identifier and information about how to
-        retrieve various accoutrements. Note that the returned dict will contain values
-        relevant to the type of store, but will always contain a `cid` key if the object
-        is present.
+        The `find_object` method validates the existence of an object based on the
+        provided pid and returns the associated content identifier and information
+        about how to retrieve various accoutrements. Note that the returned dict will
+        contain values relevant to the type of store, but will always contain a `cid`
+        key if the object is present.
 
         :param str pid: Authority-based or persistent identifier of the object.
 

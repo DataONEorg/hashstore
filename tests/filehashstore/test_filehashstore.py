@@ -238,7 +238,7 @@ def test_find_object_no_sysmeta(pids, store):
     for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        obj_info_dict = store._find_object(pid)
+        obj_info_dict = store.find_object(pid)
         retrieved_cid = obj_info_dict["cid"]
 
         assert retrieved_cid == object_metadata.hex_digests.get("sha256")
@@ -266,7 +266,7 @@ def test_find_object_sysmeta(pids, store):
         object_metadata = store.store_object(pid, path)
         stored_metadata_path = store.store_metadata(pid, syspath, format_id)
 
-        obj_info_dict = store._find_object(pid)
+        obj_info_dict = store.find_object(pid)
         retrieved_cid = obj_info_dict["cid"]
 
         assert retrieved_cid == object_metadata.hex_digests.get("sha256")
@@ -290,12 +290,12 @@ def test_find_object_refs_exist_but_obj_not_found(pids, store):
         path = test_dir + pid.replace("/", "_")
         store.store_object(pid, path)
 
-        cid = store._find_object(pid).get("cid")
+        cid = store.find_object(pid).get("cid")
         obj_path = store._get_hashstore_data_object_path(cid)
         os.remove(obj_path)
 
         with pytest.raises(RefsFileExistsButCidObjMissing):
-            store._find_object(pid)
+            store.find_object(pid)
 
 
 def test_find_object_cid_refs_not_found(pids, store):
@@ -314,7 +314,7 @@ def test_find_object_cid_refs_not_found(pids, store):
             pid_ref_file.truncate()
 
         with pytest.raises(OrphanPidRefsFileFound):
-            store._find_object(pid)
+            store.find_object(pid)
 
 
 def test_find_object_cid_refs_does_not_contain_pid(pids, store):
@@ -332,25 +332,25 @@ def test_find_object_cid_refs_does_not_contain_pid(pids, store):
         store._update_refs_file(cid_ref_abs_path, pid, "remove")
 
         with pytest.raises(PidNotFoundInCidRefsFile):
-            store._find_object(pid)
+            store.find_object(pid)
 
 
 def test_find_object_pid_refs_not_found(store):
     """Test _find_object throws exception when a pid refs file does not exist."""
     with pytest.raises(PidRefsDoesNotExist):
-        store._find_object("dou.test.1")
+        store.find_object("dou.test.1")
 
 
 def test_find_object_pid_none(store):
     """Test _find_object throws exception when pid is None."""
     with pytest.raises(ValueError, match="empty"):
-        store._find_object(None)
+        store.find_object(None)
 
 
 def test_find_object_pid_empty(store):
     """Test _find_object throws exception when pid is empty."""
     with pytest.raises(ValueError, match="empty"):
-        store._find_object("")
+        store.find_object("")
 
 
 def test_store_and_validate_data_files_path(pids, store):
@@ -895,7 +895,7 @@ def test_untag_object_orphan_pid_refs_file_found(store):
     os.remove(cid_refs_abs_path)
 
     with pytest.raises(OrphanPidRefsFileFound):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)
@@ -922,7 +922,7 @@ def test_untag_object_orphan_refs_exist_but_data_object_not_found(store):
     os.remove(data_obj_path)
 
     with pytest.raises(RefsFileExistsButCidObjMissing):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)
@@ -953,7 +953,7 @@ def test_untag_object_refs_found_but_pid_not_in_cid_refs(store):
     store._update_refs_file(cid_refs_file, pid, "remove")
 
     with pytest.raises(PidNotFoundInCidRefsFile):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)
@@ -984,7 +984,7 @@ def test_untag_object_pid_refs_file_does_not_exist(store):
     os.remove(pid_refs_file)
 
     with pytest.raises(PidRefsDoesNotExist):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)
@@ -1014,7 +1014,7 @@ def test_untag_object_pid_refs_file_does_not_exist_and_cid_refs_is_empty(store):
     os.remove(pid_refs_file)
 
     with pytest.raises(PidRefsDoesNotExist):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)

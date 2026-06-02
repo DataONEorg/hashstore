@@ -13,13 +13,12 @@ import shutil
 import threading
 from collections.abc import Generator
 from contextlib import closing
-from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import IO, Any, Optional, Union
 
 import hashstore.folderentry
-from hashstore import HashStore, HashStoreProperties
+from hashstore import HashStore, HashStoreProperties, ObjectMetadata
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
@@ -87,6 +86,7 @@ class FileHashStore(HashStore):
         - If path does not exist, then a store is created at that path with the
         provided properties.
         """
+        super().__init__()
         self.fhs_logger = logging.getLogger(__name__)
         store_path = Path(store_path)
         config_path = FileHashStore.config_path(store_path)
@@ -2905,25 +2905,3 @@ class Stream:
             self._obj.close()
         else:
             self._obj.seek(self._pos)
-
-
-@dataclass
-class ObjectMetadata:
-    """Represents metadata associated with an object.
-
-    The `ObjectMetadata` class represents metadata associated with an object, including
-    a persistent or authority-based identifier (`pid`), a content identifier (`cid`),
-    the size of the object in bytes (`obj_size`), and an optional list of hex digests
-    (`hex_digests`) to assist with validating objects.
-
-    :param str pid: An authority-based or persistent identifier
-    :param str cid: A unique identifier for the object (Hash ID, hex digest).
-    :param int obj_size: The size of the object in bytes.
-    :param dict hex_digests: A list of hex digests to validate objects
-        (md5, sha1, sha256, sha384, sha512) (optional).
-    """
-
-    pid: str
-    cid: str
-    obj_size: int
-    hex_digests: dict

@@ -8,17 +8,17 @@ import io
 import logging
 import multiprocessing
 import os
+import re
 import shutil
 import threading
+from collections.abc import Generator
 from contextlib import closing
-from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import IO, Any, Optional, Union
 
-import yaml
-
-from hashstore import HashStore
+import hashstore.folderentry
+from hashstore import HashStore, HashStoreProperties, ObjectMetadata
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
@@ -59,14 +59,6 @@ class FileHashStore(HashStore):
         - store_metadata_namespace (str): Namespace for the HashStore's system metadata.
     """
 
-    # Property (hashstore configuration) requirements
-    property_required_keys = (
-        "store_path",
-        "store_depth",
-        "store_width",
-        "store_algorithm",
-        "store_metadata_namespace",
-    )
     # Permissions settings for writing files and creating directories
     f_mode = 0o640  # rw- r-- ---
     d_mode = 0o750  # rwx r-x ---
@@ -82,529 +74,224 @@ class FileHashStore(HashStore):
         "blake2s",
     )
 
-    def __init__(self, properties=None):
+    def __init__(
+        self,
+        store_path: str | Path,
+        store_properties: HashStoreProperties | dict | None = None,
+    ):
+        """Open or create a FileHashStore.
+
+        - It is an error to include store_properties when opening an existing store.
+        - If the path exists, then config is loaded from the store_path.
+        - If path does not exist, then a store is created at that path with the
+        provided properties.
+        """
+        super().__init__()
         self.fhs_logger = logging.getLogger(__name__)
-        # Now check properties
-        if properties:
-            # Validate properties against existing configuration if present
-            checked_properties = self._validate_properties(properties)
-            (
-                prop_store_path,
-                prop_store_depth,
-                prop_store_width,
-                _,
-                prop_store_metadata_namespace,
-            ) = [
-                checked_properties[property_name]
-                for property_name in self.property_required_keys
-            ]
-
-            # Check to see if a configuration is present in the given store path
-            self.hashstore_configuration_yaml = Path(prop_store_path) / "hashstore.yaml"
-            self._verify_hashstore_properties(properties, prop_store_path)
-
-            # If no exceptions thrown, FileHashStore ready for initialization
-            self.fhs_logger.debug("Initializing, properties verified.")
-            self.root = Path(prop_store_path)
-            self.depth = prop_store_depth
-            self.width = prop_store_width
-            self.sysmeta_ns = prop_store_metadata_namespace
-            # Write 'hashstore.yaml' to store path
-            if not os.path.isfile(self.hashstore_configuration_yaml):
-                # pylint: disable=W1201
-                self.fhs_logger.debug(
-                    "HashStore does not exist & configuration file not found."
-                    " Writing configuration file."
-                )
-                self._write_properties(properties)
-            # Default algorithm list for FileHashStore based on config file written
-            self._set_default_algorithms()
-            # Complete initialization/instantiation by setting and creating store
-            # directories
-            self.objects = self.root / "objects"
-            self.metadata = self.root / "metadata"
-            self.refs = self.root / "refs"
-            self.cids = self.refs / "cids"
-            self.pids = self.refs / "pids"
-            if not os.path.exists(self.objects):
-                self._create_path(self.objects / "tmp")
-            if not os.path.exists(self.metadata):
-                self._create_path(self.metadata / "tmp")
-            if not os.path.exists(self.refs):
-                self._create_path(self.refs / "tmp")
-                self._create_path(self.refs / "pids")
-                self._create_path(self.refs / "cids")
-
-            # Variables to orchestrate parallelization
-            # Check to see whether a multiprocessing or threading sync lock should
-            # be used
-            self.use_multiprocessing = (
-                os.getenv("USE_MULTIPROCESSING", "False") == "True"
-            )
-            if self.use_multiprocessing == "True":
-                # Create multiprocessing synchronization variables
-                # Synchronization values for object locked pids
-                self.object_pid_lock_mp = multiprocessing.Lock()
-                self.object_pid_condition_mp = multiprocessing.Condition(
-                    self.object_pid_lock_mp
-                )
-                self.object_locked_pids_mp = multiprocessing.Manager().list()
-                # Synchronization values for object locked cids
-                self.object_cid_lock_mp = multiprocessing.Lock()
-                self.object_cid_condition_mp = multiprocessing.Condition(
-                    self.object_cid_lock_mp
-                )
-                self.object_locked_cids_mp = multiprocessing.Manager().list()
-                # Synchronization values for metadata locked documents
-                self.metadata_lock_mp = multiprocessing.Lock()
-                self.metadata_condition_mp = multiprocessing.Condition(
-                    self.metadata_lock_mp
-                )
-                self.metadata_locked_docs_mp = multiprocessing.Manager().list()
-                # Synchronization values for reference locked pids
-                self.reference_pid_lock_mp = multiprocessing.Lock()
-                self.reference_pid_condition_mp = multiprocessing.Condition(
-                    self.reference_pid_lock_mp
-                )
-                self.reference_locked_pids_mp = multiprocessing.Manager().list()
-            else:
-                # Create threading synchronization variables
-                # Synchronization values for object locked pids
-                self.object_pid_lock_th = threading.Lock()
-                self.object_pid_condition_th = threading.Condition(
-                    self.object_pid_lock_th
-                )
-                self.object_locked_pids_th = []
-                # Synchronization values for object locked cids
-                self.object_cid_lock_th = threading.Lock()
-                self.object_cid_condition_th = threading.Condition(
-                    self.object_cid_lock_th
-                )
-                self.object_locked_cids_th = []
-                # Synchronization values for metadata locked documents
-                self.metadata_lock_th = threading.Lock()
-                self.metadata_condition_th = threading.Condition(self.metadata_lock_th)
-                self.metadata_locked_docs_th = []
-                # Synchronization values for reference locked pids
-                self.reference_pid_lock_th = threading.Lock()
-                self.reference_pid_condition_th = threading.Condition(
-                    self.metadata_lock_th
-                )
-                self.reference_locked_pids_th = []
-
-            self.fhs_logger.debug("Initialization success. Store root: %s", self.root)
+        store_path = Path(store_path)
+        config_path = FileHashStore.config_path(store_path)
+        if config_path.is_file():
+            if store_properties is not None:
+                msg = "Do not include store_properties for an existing hashstore."
+                raise RuntimeError(msg)
+            store_properties = HashStoreProperties.from_yaml(config_path)
         else:
-            # Cannot instantiate or initialize FileHashStore without config
-            err_msg = (
-                "HashStore properties must be supplied." + f" Properties: {properties}"
-            )
-            self.fhs_logger.debug(err_msg)
-            raise ValueError(err_msg)
+            if store_properties is None:
+                msg = f"No hashstore at: {store_path}"
+                raise RuntimeError(msg)
+            # verify reserved folders are not in store_path
+            _reserved_paths = ("objects", "metadata", "refs")
+            for _reserved_path in _reserved_paths:
+                if (store_path / _reserved_path).exists():
+                    msg = (
+                        "Cannot create FileHashstnore in existing folder "
+                        "'{store_path}' with reserved subfolder: {_reserved_path}."
+                    )
+                    raise RuntimeError(msg)
+            if isinstance(store_properties, dict):
+                store_properties = HashStoreProperties.from_dict(store_properties)
+            store_path.mkdir(parents=True, exist_ok=True)
+            store_properties.to_yaml(config_path)
 
-    # Configuration and Related Methods
+        # sanity check
+        assert store_properties is not None
+
+        self.root = store_path
+        self.depth = store_properties.store_depth
+        self.width = store_properties.store_width
+        self.sysmeta_ns = store_properties.store_metadata_namespace
+
+        self.algorithm = store_properties.store_algorithm
+        self.default_algo_list = store_properties.store_default_algo_list
+        # Sanity check, ensure algorithm is in the detaulr list
+        if self.algorithm not in self.default_algo_list:
+            self.default_algo_list.append(self.algorithm)
+
+        self.objects = self.root / "objects"
+        self.metadata = self.root / "metadata"
+        self.refs = self.root / "refs"
+        self.cids = self.refs / "cids"
+        self.pids = self.refs / "pids"
+        if not os.path.exists(self.objects):
+            self._create_path(self.objects / "tmp")
+        if not os.path.exists(self.metadata):
+            self._create_path(self.metadata / "tmp")
+        if not os.path.exists(self.refs):
+            self._create_path(self.refs / "tmp")
+            self._create_path(self.refs / "pids")
+            self._create_path(self.refs / "cids")
+
+        self.use_multiprocessing = os.getenv("USE_MULTIPROCESSING", "False") == "True"
+
+        if self.use_multiprocessing == "True":
+            # Create multiprocessing synchronization variables
+            # Synchronization values for object locked pids
+            self.object_pid_lock_mp = multiprocessing.Lock()
+            self.object_pid_condition_mp = multiprocessing.Condition(
+                self.object_pid_lock_mp
+            )
+            self.object_locked_pids_mp = multiprocessing.Manager().list()
+            # Synchronization values for object locked cids
+            self.object_cid_lock_mp = multiprocessing.Lock()
+            self.object_cid_condition_mp = multiprocessing.Condition(
+                self.object_cid_lock_mp
+            )
+            self.object_locked_cids_mp = multiprocessing.Manager().list()
+            # Synchronization values for metadata locked documents
+            self.metadata_lock_mp = multiprocessing.Lock()
+            self.metadata_condition_mp = multiprocessing.Condition(
+                self.metadata_lock_mp
+            )
+            self.metadata_locked_docs_mp = multiprocessing.Manager().list()
+            # Synchronization values for reference locked pids
+            self.reference_pid_lock_mp = multiprocessing.Lock()
+            self.reference_pid_condition_mp = multiprocessing.Condition(
+                self.reference_pid_lock_mp
+            )
+            self.reference_locked_pids_mp = multiprocessing.Manager().list()
+        else:
+            # Create threading synchronization variables
+            # Synchronization values for object locked pids
+            self.object_pid_lock_th = threading.Lock()
+            self.object_pid_condition_th = threading.Condition(self.object_pid_lock_th)
+            self.object_locked_pids_th = []
+            # Synchronization values for object locked cids
+            self.object_cid_lock_th = threading.Lock()
+            self.object_cid_condition_th = threading.Condition(self.object_cid_lock_th)
+            self.object_locked_cids_th = []
+            # Synchronization values for metadata locked documents
+            self.metadata_lock_th = threading.Lock()
+            self.metadata_condition_th = threading.Condition(self.metadata_lock_th)
+            self.metadata_locked_docs_th = []
+            # Synchronization values for reference locked pids
+            self.reference_pid_lock_th = threading.Lock()
+            self.reference_pid_condition_th = threading.Condition(self.metadata_lock_th)
+            self.reference_locked_pids_th = []
 
     @staticmethod
-    def _load_properties(
-        hashstore_yaml_path: Path, hashstore_required_prop_keys: list[str]
-    ) -> dict[str, Union[str, int]]:
-        """Get and return the contents of the current HashStore configuration.
+    def config_path(root_path: Path) -> Path:
+        return root_path / "hashstore.yaml"
 
-        :return: HashStore properties with the following keys (and values):
-            - store_depth (int): Depth when sharding an object's hex digest.
-            - store_width (int): Width of directories when sharding an object's
-                hex digest.
-            - store_algorithm (str): Hash algo used for calculating the object's
-                hex digest.
-            - store_metadata_namespace (str): Namespace for the HashStore's system
-                metadata.
+    @classmethod
+    def create_hashstore(
+        cls, store_path: Path, properties: HashStoreProperties
+    ) -> "FileHashStore":
+        """Creates a new empty FileHashstore at the specified folder.
+
+        The folder or config file must not already exist.
         """
-        if not os.path.isfile(hashstore_yaml_path):
-            err_msg = "'hashstore.yaml' not found in store root path."
-            logging.critical(err_msg)
-            raise FileNotFoundError(err_msg)
+        config_path = FileHashStore.config_path(store_path)
+        # Fail if the config is already present, a bit redundant with
+        # what follows, but used to emphasize creation versus
+        # opening a hashstore.
+        if config_path.exists():
+            msg = f"Hashstore already initialized at: {config_path}"
+            raise ValueError(msg)
+        # Force failure if the hashstore root folder already exists
+        store_path.mkdir(parents=True, exist_ok=False)
+        properties.to_yaml(config_path)
+        return cls(store_path)
 
-        # Open file
-        with open(hashstore_yaml_path, encoding="utf-8") as hs_yaml_file:
-            yaml_data = yaml.safe_load(hs_yaml_file)
-
-        # Get hashstore properties
-        hashstore_yaml_dict = {}
-        for key in hashstore_required_prop_keys:
-            if key != "store_path":
-                hashstore_yaml_dict[key] = yaml_data[key]
-        logging.debug("Successfully retrieved 'hashstore.yaml' properties.")
-        return hashstore_yaml_dict
-
-    def _write_properties(self, properties: dict[str, Union[str, int]]) -> None:
-        """Writes 'hashstore.yaml' to FileHashStore's root directory with the respective
-        properties object supplied.
-
-        :param dict properties: A Python dictionary with the following keys
-            (and values):
-            - store_depth (int): Depth when sharding an object's hex digest.
-            - store_width (int): Width of directories when sharding an object's hex
-                digest.
-            - store_algorithm (str): Hash algo used for calculating the object's hex
-                digest.
-            - store_metadata_namespace (str): Namespace for the HashStore's system
-                metadata.
-        """
-        # If hashstore.yaml already exists, must throw exception and proceed with
-        # caution
-        if os.path.isfile(self.hashstore_configuration_yaml):
-            err_msg = "Configuration file 'hashstore.yaml' already exists."
-            logging.error(err_msg)
-            raise FileExistsError(err_msg)
-        # Validate properties
-        checked_properties = self._validate_properties(properties)
-
-        # Collect configuration properties from validated & supplied dictionary
-        (
-            _,
-            store_depth,
-            store_width,
-            store_algorithm,
-            store_metadata_namespace,
-        ) = [
-            checked_properties[property_name]
-            for property_name in self.property_required_keys
-        ]
-
-        # Standardize algorithm value for cross-language compatibility
-        # Note, this must be declared here because HashStore has not yet been
-        # initialized
-        accepted_store_algorithms = ["MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512"]
-        if store_algorithm in accepted_store_algorithms:
-            checked_store_algorithm = store_algorithm
-        else:
-            err_msg = (
-                f"Algorithm supplied ({store_algorithm}) cannot be used as default for"
-                f" HashStore. Must be one of: {', '.join(accepted_store_algorithms)}"
-                f" which are DataONE controlled algorithm values"
-            )
-            logging.error(err_msg)
-            raise ValueError(err_msg)
-
-        # If given store path doesn't exist yet, create it.
-        if not os.path.exists(self.root):
-            self._create_path(self.root)
-
-        # .yaml file to write
-        hashstore_configuration_yaml = self._build_hashstore_yaml_string(
-            store_depth,
-            store_width,
-            checked_store_algorithm,
-            store_metadata_namespace,
-        )
-        # Write 'hashstore.yaml'
-        with open(
-            self.hashstore_configuration_yaml, "w", encoding="utf-8"
-        ) as hs_yaml_file:
-            hs_yaml_file.write(hashstore_configuration_yaml)
-
-        logging.debug(
-            "Configuration file written to: %s", self.hashstore_configuration_yaml
-        )
-        return
-
-    @staticmethod
-    def _build_hashstore_yaml_string(
-        store_depth: int,
-        store_width: int,
-        store_algorithm: str,
-        store_metadata_namespace: str,
-    ) -> str:
-        """Build a YAML string representing the configuration for a HashStore.
-
-        :param int store_depth: Depth when sharding an object's hex digest.
-        :param int store_width: Width of directories when sharding an object's hex
-            digest.
-        :param str store_algorithm: Hash algorithm used for calculating the object's hex
-            digest.
-        :param str store_metadata_namespace: Namespace for the HashStore's system
-            metadata.
-
-        :return: A YAML string representing the configuration for a HashStore.
-        """
-        hashstore_configuration = {
-            "store_depth": store_depth,
-            "store_width": store_width,
-            "store_metadata_namespace": store_metadata_namespace,
-            "store_algorithm": store_algorithm,
-            "store_default_algo_list": [
-                "MD5",
-                "SHA-1",
-                "SHA-256",
-                "SHA-384",
-                "SHA-512",
-            ],
-        }
-
-        # The tabbing here is intentional otherwise the created .yaml will have
-        # extra tabs
-        hashstore_configuration_comments = """
-# Default configuration variables for HashStore
-
-############### HashStore Config Notes ###############
-############### Directory Structure ###############
-# store_depth
-# - Desired amount of directories when sharding an object to form the permanent address
-# - **WARNING**: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
-#
-# store_width
-# - Width of directories created when sharding an object to form the permanent address
-# - **WARNING**: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
-#
-# Example:
-# Below, objects are shown listed in directories that are 3 levels deep (DIR_DEPTH=3),
-# with each directory consisting of 2 characters (DIR_WIDTH=2).
-#    /var/filehashstore/objects
-#    ├── 7f
-#    │   └── 5c
-#    │       └── c1
-#    │           └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
-
-############### Format of the Metadata ###############
-# store_metadata_namespace
-# - The default metadata format (ex. system metadata)
-
-############### Hash Algorithms ###############
-# store_algorithm
-# - Hash algorithm to use when calculating object's hex digest for the permanent address
-#
-# store_default_algo_list
-# - Algorithm values supported by python hashlib 3.9.0+ for File Hash Store (FHS)
-# - The default algorithm list includes the hash algorithms calculated when storing an
-# - object to disk and returned to the caller after successful storage.
-
-"""
-
-        return hashstore_configuration_comments + yaml.dump(
-            hashstore_configuration, sort_keys=False
-        )
-
-    def _verify_hashstore_properties(
-        self, properties: dict[str, Union[str, int]], prop_store_path: str
-    ) -> None:
-        """Determines whether FileHashStore can instantiate by validating a set
-        of arguments and throwing exceptions. HashStore will not instantiate if
-        an existing configuration file's properties (`hashstore.yaml`) are
-        different from what is supplied - or if an object store exists at the
-        given path, but it is missing the `hashstore.yaml` config file.
-
-        If `hashstore.yaml` exists, it will retrieve its properties and compare
-        them with the given values; and if there is a mismatch, an exception
-        will be thrown. If not, it will look to see if any directories/files
-        exist in the given store path and throw an exception if any file or
-        directory is found.
-
-        :param dict properties: HashStore properties.
-        :param str prop_store_path: Store path to check.
-        """
-        if os.path.isfile(self.hashstore_configuration_yaml):
-            self.fhs_logger.debug(
-                "Config found (hashstore.yaml) at {%s}. Verifying properties.",
-                self.hashstore_configuration_yaml,
-            )
-            # If 'hashstore.yaml' is found, verify given properties before init
-            hashstore_yaml_dict = self._load_properties(
-                self.hashstore_configuration_yaml, self.property_required_keys
-            )
-            for key in self.property_required_keys:
-                # 'store_path' is required to init HashStore but not saved in
-                # `hashstore.yaml`
-                if key != "store_path":
-                    supplied_key = properties[key]
-                    if key == "store_depth" or key == "store_width":
-                        supplied_key = int(properties[key])
-                    if hashstore_yaml_dict[key] != supplied_key:
-                        err_msg = (
-                            f"Given properties ({key}: {properties[key]}) does not "
-                            f"match. HashStore configuration "
-                            f"({key}: {hashstore_yaml_dict[key]}) found at: "
-                            f"{self.hashstore_configuration_yaml}"
-                        )
-                        self.fhs_logger.critical(err_msg)
-                        raise ValueError(err_msg)
-        else:
-            if os.path.exists(prop_store_path):
-                # Check if HashStore exists and throw exception if found
-                subfolders = ["objects", "metadata", "refs"]
-                if any(
-                    os.path.isdir(os.path.join(prop_store_path, sub))
-                    for sub in subfolders
-                ):
-                    err_msg = (
-                        "Unable to initialize HashStore. `hashstore.yaml` is not "
-                        "present but conflicting HashStore directory exists. Please "
-                        "delete '/objects', '/metadata' and/or '/refs' at the store "
-                        "path or supply a new path."
-                    )
-                    self.fhs_logger.critical(err_msg)
-                    raise RuntimeError(err_msg)
-
-    def _validate_properties(
-        self, properties: dict[str, Union[str, int]]
-    ) -> dict[str, Union[str, int]]:
-        """Validate a properties dictionary by checking if it contains all the
-        required keys and non-None values.
-
-        :param dict properties: Dictionary containing filehashstore properties.
-
-        :raises KeyError: If key is missing from the required keys.
-        :raises ValueError: If value is missing for a required key.
-
-        :return: The given properties object (that has been validated).
-        """
-        if not isinstance(properties, dict):
-            err_msg = "Invalid argument expected a dictionary."
-            self.fhs_logger.error(err_msg)
-            raise ValueError(err_msg)
-
-        # New dictionary for validated properties
-        checked_properties = {}
-
-        for key in self.property_required_keys:
-            if key not in properties:
-                err_msg = "Missing required key: {key}."
-                self.fhs_logger.error(err_msg)
-                raise KeyError(err_msg)
-
-            value = properties.get(key)
-            if value is None:
-                err_msg = "Value for key: {key} is none."
-                self.fhs_logger.error(err_msg)
-                raise ValueError(err_msg)
-
-            # Add key and values to checked_properties
-            if key == "store_depth" or key == "store_width":
-                # Ensure store depth and width are integers
-                try:
-                    checked_properties[key] = int(value)
-                except Exception as err:
-                    err_msg = (
-                        "Unexpected exception when attempting to ensure store depth "
-                        f"and width are integers. Details: {err}"
-                    )
-                    self.fhs_logger.error(err_msg)
-                    raise ValueError(err_msg) from err
-            else:
-                checked_properties[key] = value
-
-        return checked_properties
-
-    def _set_default_algorithms(self):
-        """Set the default algorithms to calculate when storing objects."""
-
-        def lookup_algo(algo_to_translate):
-            """Translate DataONE controlled algorithms to python hashlib values:
-            https://dataoneorg.github.io/api-documentation/apis/Types.html#Types.ChecksumAlgorithm
-            """
-            dataone_algo_translation = {
-                "MD5": "md5",
-                "SHA-1": "sha1",
-                "SHA-256": "sha256",
-                "SHA-384": "sha384",
-                "SHA-512": "sha512",
-            }
-            return dataone_algo_translation[algo_to_translate]
-
-        if not os.path.isfile(self.hashstore_configuration_yaml):
-            err_msg = "hashstore.yaml not found in store root path."
-            self.fhs_logger.critical(err_msg)
-            raise FileNotFoundError(err_msg)
-
-        with open(self.hashstore_configuration_yaml, encoding="utf-8") as hs_yaml_file:
-            yaml_data = yaml.safe_load(hs_yaml_file)
-
-        # Set default store algorithm
-        self.algorithm = lookup_algo(yaml_data["store_algorithm"])
-        # Takes DataOne controlled algorithm values and translates to hashlib supported
-        # values
-        yaml_store_default_algo_list = yaml_data["store_default_algo_list"]
-        translated_default_algo_list = []
-        for algo in yaml_store_default_algo_list:
-            translated_default_algo_list.append(lookup_algo(algo))
-
-        # Set class variable
-        self.default_algo_list = translated_default_algo_list
-        return
+    @classmethod
+    def clone_empty(cls, new_path: Path, existing: "FileHashStore") -> "FileHashStore":
+        """Create a new empty HashStore with the same configuration properties
+        as an existing one."""
+        config_path = cls.config_path(existing.root)
+        properties = HashStoreProperties.from_yaml(config_path)
+        return cls.create_hashstore(new_path, properties)
 
     # Public API / HashStore Interface Methods
 
     def store_object(
         self,
-        pid: Optional[str] = None,
-        data: Optional[Union[str, bytes]] = None,
-        additional_algorithm: Optional[str] = None,
-        checksum: Optional[str] = None,
-        checksum_algorithm: Optional[str] = None,
-        expected_object_size: Optional[int] = None,
+        pid: str | None = None,
+        data: str | bytes | None = None,
+        additional_algorithm: str | None = None,
+        checksum: str | None = None,
+        checksum_algorithm: str | None = None,
+        expected_object_size: int | None = None,
     ) -> "ObjectMetadata":
-        if pid is None and self._check_arg_data(data):
+        self._check_arg_data(data)
+        if pid is None:
             # If no pid is supplied, store the object only without tagging
             logging.debug("Request to store data only received.")
             object_metadata = self._store_data_only(data)
             self.fhs_logger.info(
                 "Successfully stored object for cid: %s", object_metadata.cid
             )
-        else:
-            # Else the object will be stored and tagged
-            self.fhs_logger.debug("Request to store object for pid: %s", pid)
-            # Validate input parameters
-            self._check_string(pid, "pid")
-            self._check_arg_data(data)
-            self._check_integer(expected_object_size)
-            (
-                additional_algorithm_checked,
-                checksum_algorithm_checked,
-            ) = self._check_arg_algorithms_and_checksum(
-                additional_algorithm, checksum, checksum_algorithm
-            )
+            return object_metadata
+        # Else the object will be stored and tagged
+        self.fhs_logger.debug("Request to store object for pid: %s", pid)
+        # Validate input parameters
+        self._check_string(pid, "pid")
+        self._check_integer(expected_object_size)
+        (
+            additional_algorithm_checked,
+            checksum_algorithm_checked,
+        ) = self._check_arg_algorithms_and_checksum(
+            additional_algorithm, checksum, checksum_algorithm
+        )
+
+        try:
+            err_msg = f"Duplicate object request for pid: {pid}. Already in progress."
+            if self.use_multiprocessing:
+                with self.object_pid_condition_mp:
+                    # Raise exception immediately if pid is in use
+                    if pid in self.object_locked_pids_mp:
+                        self.fhs_logger.error(err_msg)
+                        raise StoreObjectForPidAlreadyInProgress(err_msg)
+            else:
+                with self.object_pid_condition_th:
+                    if pid in self.object_locked_pids_th:
+                        logging.error(err_msg)
+                        raise StoreObjectForPidAlreadyInProgress(err_msg)
 
             try:
-                err_msg = (
-                    f"Duplicate object request for pid: {pid}. Already in progress."
+                self._synchronize_object_locked_pids(pid)
+
+                self.fhs_logger.debug("Attempting to store object for pid: %s", pid)
+                object_metadata = self._store_and_validate_data(
+                    pid,
+                    data,
+                    additional_algorithm=additional_algorithm_checked,
+                    checksum=checksum,
+                    checksum_algorithm=checksum_algorithm_checked,
+                    file_size_to_validate=expected_object_size,
                 )
-                if self.use_multiprocessing:
-                    with self.object_pid_condition_mp:
-                        # Raise exception immediately if pid is in use
-                        if pid in self.object_locked_pids_mp:
-                            self.fhs_logger.error(err_msg)
-                            raise StoreObjectForPidAlreadyInProgress(err_msg)
-                else:
-                    with self.object_pid_condition_th:
-                        if pid in self.object_locked_pids_th:
-                            logging.error(err_msg)
-                            raise StoreObjectForPidAlreadyInProgress(err_msg)
-
-                try:
-                    self._synchronize_object_locked_pids(pid)
-
-                    self.fhs_logger.debug("Attempting to store object for pid: %s", pid)
-                    object_metadata = self._store_and_validate_data(
-                        pid,
-                        data,
-                        additional_algorithm=additional_algorithm_checked,
-                        checksum=checksum,
-                        checksum_algorithm=checksum_algorithm_checked,
-                        file_size_to_validate=expected_object_size,
-                    )
-                    self.fhs_logger.debug("Attempting to tag object for pid: %s", pid)
-                    cid = object_metadata.cid
-                    self.tag_object(pid, cid)
-                    self.fhs_logger.info("Successfully stored object for pid: %s", pid)
-                finally:
-                    # Release pid
-                    self._release_object_locked_pids(pid)
-            except Exception as err:
-                err_msg = (
-                    f"Failed to store object for pid: {pid}. Reference files will not "
-                    f"be created or tagged. Unexpected error: {err})"
-                )
-                self.fhs_logger.error(err_msg)
-                raise err
-
+                self.fhs_logger.debug("Attempting to tag object for pid: %s", pid)
+                cid = object_metadata.cid
+                self.tag_object(pid, cid)
+                self.fhs_logger.info("Successfully stored object for pid: %s", pid)
+            finally:
+                # Release pid
+                self._release_object_locked_pids(pid)
+        except Exception as err:
+            err_msg = (
+                f"Failed to store object for pid: {pid}. Reference files will not "
+                f"be created or tagged. Unexpected error: {err})"
+            )
+            self.fhs_logger.error(err_msg)
+            raise err
         return object_metadata
 
     def tag_object(self, pid: str, cid: str) -> None:
@@ -625,6 +312,30 @@ class FileHashStore(HashStore):
             err_msg = f"A pid can only reference one cid. Details: {praee}"
             self.fhs_logger.error(err_msg)
             raise PidRefsAlreadyExistsError(err_msg) from praee
+
+    def get_object_status(self, pid: str) -> dict:
+        logging.debug("Request to get object status for pid: %s", pid)
+        self._check_string(pid, "pid")
+
+        object_status_dict = {}
+        try:
+            object_info_dict = self.find_object(pid)
+            object_cid = object_info_dict.get("cid")
+            if object_cid:
+                obj_path = self._get_hashstore_data_object_path(object_cid)
+                object_status_dict["size"] = os.path.getsize(obj_path)
+                object_status_dict["modtime"] = os.path.getmtime(obj_path)
+                object_status_dict["accesstime"] = os.path.getatime(obj_path)
+            else:
+                err_msg = f"No object found for pid: {pid}"
+                self.fhs_logger.warning(err_msg)
+                raise KeyError(err_msg)
+        except KeyError as ke:
+            err_msg = f"No object found for pid: {pid}. Details: {ke}"
+            self.fhs_logger.warning(err_msg)
+            raise KeyError(err_msg) from ke
+
+        return object_status_dict
 
     def delete_if_invalid_object(
         self,
@@ -671,7 +382,7 @@ class FileHashStore(HashStore):
         )
 
     def store_metadata(
-        self, pid: str, metadata: Union[str, bytes], format_id: Optional[str] = None
+        self, pid: str, metadata: str | bytes, format_id: str | None = None
     ) -> str:
         self.fhs_logger.debug("Request to store metadata for pid: %s", pid)
         # Validate input parameters
@@ -734,7 +445,7 @@ class FileHashStore(HashStore):
         self.fhs_logger.debug("Request to retrieve object for pid: %s", pid)
         self._check_string(pid, "pid")
 
-        object_info_dict = self._find_object(pid)
+        object_info_dict = self.find_object(pid)
         object_cid = object_info_dict.get("cid")
         entity = "objects"
 
@@ -751,7 +462,7 @@ class FileHashStore(HashStore):
 
         return obj_stream
 
-    def retrieve_metadata(self, pid: str, format_id: Optional[str] = None) -> IO[bytes]:
+    def retrieve_metadata(self, pid: str, format_id: str | None = None) -> IO[bytes]:
         self.fhs_logger.debug("Request to retrieve metadata for pid: %s", pid)
         self._check_string(pid, "pid")
         checked_format_id = self._check_arg_format_id(format_id, "retrieve_metadata")
@@ -772,7 +483,7 @@ class FileHashStore(HashStore):
             self.fhs_logger.info("Retrieved metadata for pid: %s", pid)
             return metadata_stream
         err_msg = f"No metadata found for pid: {pid}"
-        self.fhs_logger.error(err_msg)
+        self.fhs_logger.warning(err_msg)
         raise ValueError(err_msg)
 
     def delete_object(self, pid: str) -> None:
@@ -793,7 +504,7 @@ class FileHashStore(HashStore):
             self._synchronize_object_locked_pids(pid)
 
             try:
-                object_info_dict = self._find_object(pid)
+                object_info_dict = self.find_object(pid)
                 cid = object_info_dict.get("cid")
 
                 # Proceed with next steps - cid has been retrieved without any issues
@@ -912,7 +623,7 @@ class FileHashStore(HashStore):
             # Release pid
             self._release_object_locked_pids(pid)
 
-    def delete_metadata(self, pid: str, format_id: Optional[str] = None) -> None:
+    def delete_metadata(self, pid: str, format_id: str | None = None) -> None:
         self.fhs_logger.debug("Request to delete metadata for pid: %s", pid)
         self._check_string(pid, "pid")
         checked_format_id = self._check_arg_format_id(format_id, "delete_metadata")
@@ -1039,14 +750,16 @@ class FileHashStore(HashStore):
 
         entity = "objects"
         algorithm = self._clean_algorithm(algorithm)
-        object_cid = self._find_object(pid).get("cid")
+        object_cid = self.find_object(pid).get("cid")
         if not self._exists(entity, object_cid):
             err_msg = f"No object found for pid: {pid}"
             self.fhs_logger.error(err_msg)
             raise ValueError(err_msg)
         cid_stream = self._open(entity, object_cid)
-        hex_digest = self._computehash(cid_stream, algorithm=algorithm)
-
+        try:
+            hex_digest = self._computehash(cid_stream, algorithm=algorithm)
+        finally:
+            cid_stream.close()
         info_string = (
             f"Successfully calculated hex digest for pid: {pid}. "
             f"Hex Digest: {hex_digest}"
@@ -1054,13 +767,274 @@ class FileHashStore(HashStore):
         logging.info(info_string)
         return hex_digest
 
+    def store_folder(
+        self,
+        pidpath: list[str],
+        entries: hashstore.folderentry.FolderEntries,
+        additional_algorithm: str | None = None,
+        checksum: str | None = None,  # noqa: ARG002
+        checksum_algorithm: str | None = None,  # noqa: ARG002
+        verify_entry_cids: bool = True,
+    ) -> Optional["ObjectMetadata"]:
+        """Store a folder object.
+
+        #TODO: important: Make thread and multi processing safe.
+
+        A Folder is a list of entries that appear in a folder. Each entry
+        may be a file or a Folder. This method is used instead of store_object
+        because Folders have special requirements to ensure deterministic serialization.
+
+        If FolderEntries have cid = '' | None, then the cid is looked up using
+
+            pid + DELIM + path + DELIM + entry.name
+
+        The Folder is tagged with an identifier that is "{PID}{DELIM}{path}",
+        that is, the PID followed by a single delimiter, then the path. If the
+        path portion is an empty list or a list of length 1 with the first
+        element ".", or DELIM then the Folder is the root Folder within the
+        context of PID.
+
+        Note that since the hash of a Folder is computed from hashes of its content,
+        a Folder hierarchy must be stored starting with the leaves. This method
+        will raise a ValueError if the hash of an entry does not already exist in
+        the hashstore. Hence the general pattern for storing a folder hierarchy is
+        to do a depth first traversal of the hierarchy, storing the files (ensuring
+        their hashes are available) and computing the hash for the containing folder
+        for use in the parent folder reference to the child.
+
+        Args:
+            pid (str): The context within which this folder is being stored
+            path (list[str]): Path to this folder relative to the root.
+            entries (list[FolderEntry]): A list of FolderEntry objects.
+            verify_entry_cids: If True then FolderEntry CID values are
+                verified to to ensure they exist in the hashstore.
+
+        Returns:
+            ObjectMetadata: The computed ObjectMetadata for this entry.
+        """
+        # delim = hashstore.folderentry.PATH_DELIMITER
+        # if path in ("", ".", delim):
+        #    path = ""
+        # folder_pid = f"{pid} {path}" if path != "" else pid
+        folder_pid = hashstore.folderentry.join_pidpath(pidpath)
+        self._check_string(folder_pid, "PID")
+        if verify_entry_cids:
+            # check that each entry CID is present in the hashstore.
+            for entry in entries:
+                if entry.cid is None or entry.cid == "":
+                    # no cid provided, so look it up
+                    _entry_pid = hashstore.folderentry.join_pidpath(
+                        [
+                            *pidpath,
+                            entry.name,
+                        ]
+                    )
+                    _meta = self.find_object(_entry_pid)
+                    entry.cid = _meta["cid"]
+                else:
+                    # verify provided cid is legit
+                    if not self._exists("objects", entry.cid):
+                        msg = f"object {entry.name} cid {entry.cid} does not exist."
+                        raise ValueError(msg)
+        # Sort the entries by cid for consistent hashing
+        entries.sort(key=lambda entry: entry.cid)
+
+        hash_algorithms = {
+            self.algorithm: hashlib.new(self.algorithm),
+        }
+        if additional_algorithm is not None:
+            hash_algorithms[additional_algorithm] = hashlib.new(additional_algorithm)
+
+        # Compute the CID for the folder by iterating over the
+        # list of CIDs and updating the hash being computed. This
+        # is about as fast as serializing the cids to a big string
+        # but much more memory efficient.
+        for entry in entries:
+            v = entry.cid.encode("utf-8")
+            for fhasher in hash_algorithms.values():
+                fhasher.update(v)
+        hex_digests = {
+            name: hasher.hexdigest() for name, hasher in hash_algorithms.items()
+        }
+        folder_cid = hex_digests[self.algorithm]
+
+        # Compute the physical path for the computed CID
+        cid_path = self._build_hashstore_data_object_path(folder_cid)
+        # ensure the folder path exists
+        self._create_path(Path(os.path.dirname(cid_path)))
+
+        # Store the entries to disk. Records are serialized as parquet
+        # which is an indeterminate file format. Hence the need for
+        # computing the hashes seperately to the actual bytes on disk.
+        # The parquet format is very efficient especially as the number
+        # of folder entries increases.
+        obj_size = entries.to_parquet(cid_path, pid=folder_pid)
+        self.tag_object(folder_pid, folder_cid)
+        return ObjectMetadata(
+            pid=folder_pid,
+            cid=folder_cid,
+            hex_digests=hex_digests,
+            obj_size=obj_size,
+        )
+
+    def resolve_pidpath(self, pidpath: list[str]) -> dict[str, str]:
+        """Return object info dict given a path.
+
+        A path may reference another path:
+            c_1 -> sub_1 -> c_0 -> sub_2 -> x
+
+        Similarly, a path rooted in on PID may reference a path rooted in another PID.
+
+        In such cases, the full path is not stored as a cidref, instead
+        we have in the example above:
+
+            path           name
+            c_1            sub_1
+            c_1, sub_1     c_0      <- change of context
+            c_0            sub_2
+            c_0, sub_2     x
+            c_0, sub_2, x
+
+        Hence it is necessary to walk the path following folder entry CIDs
+        to locate the target if it is not directly resolvable by the full path.
+        """
+        self.fhs_logger.debug("Resolve: %s", pidpath)
+        pid = hashstore.folderentry.join_pidpath(pidpath)
+        self._check_string(pid, "PID")
+        # first try the literal path
+        try:
+            return self.find_object(pid)
+        except PidRefsDoesNotExist as e:
+            # End of the line ?
+            if len(pidpath) < 2:
+                raise e
+        # Does the root context exist?
+        object_info_dict = {
+            "cid": None,
+            "cid_object_path": None,
+            "cid_refs_path": None,
+            "pid_refs_path": None,
+            "sysmeta_path": "Does not exist.",
+        }
+        try:
+            object_info_dict = self.find_object(pidpath[0])
+            cid_object_path = object_info_dict.get("cid_object_path")
+            if not hashstore.folderentry.is_folder(cid_object_path):
+                return object_info_dict
+            current_folder = hashstore.folderentry.FolderEntries.from_parquet(
+                cid_object_path
+            )
+        except PidRefsDoesNotExist as e:
+            # nope
+            raise e
+        entry = None
+        # walk the path, following cids referened by folder
+        for idx in range(1, len(pidpath)):
+            _name = pidpath[idx]
+            entry = current_folder.entry_by_name(_name)
+            if entry is None:
+                msg = f"PID not found: {pid}"
+                raise PidRefsDoesNotExist(msg)
+            object_info_dict["cid"] = entry.cid
+            object_info_dict["cid_object_path"] = self._get_hashstore_data_object_path(
+                entry.cid
+            )
+            object_info_dict["cid_ref_path"] = self._get_hashstore_cid_refs_path(
+                entry.cid
+            )
+            if idx < len(pidpath):
+                if hashstore.folderentry.is_folder(object_info_dict["cid_object_path"]):
+                    current_folder = hashstore.folderentry.FolderEntries.from_parquet(
+                        object_info_dict["cid_object_path"]
+                    )
+                else:
+                    return object_info_dict
+        return object_info_dict
+
+    def retrieve_object_path(self, pidpath: list[str]) -> IO[bytes]:
+        object_info_dict = self.resolve_pidpath(pidpath)
+        object_cid = object_info_dict.get("cid")
+        entity = "objects"
+        if object_cid:
+            self.fhs_logger.debug(
+                "Metadata exists for pid: %s, retrieving object.", pidpath
+            )
+            obj_stream = self._open(entity, object_cid)
+        else:
+            err_msg = f"No object found for pid: {pidpath}"
+            self.fhs_logger.error(err_msg)
+            raise ValueError(err_msg)
+        self.fhs_logger.info("Retrieved object for pid: %s", pidpath)
+        return obj_stream
+
+    def retrieve_folder(
+        self,
+        pidpath: list[str],
+    ) -> hashstore.folderentry.FolderEntries:
+        """Retrieve a FolderEntries instance from the hashstore.
+
+        Given a sequence of path segments to a FolderEntries object,
+        return the object.
+
+        Args:
+            pidpath (list[str]): Path segments to the folder
+        Returns:
+            FolderEntries
+        Raises:
+            PidRefsDoesNotExist
+        """
+        # this will raise if pidpath isn't found
+        object_info_dict = self.resolve_pidpath(pidpath)
+        # have info, load the folder object from the cid path
+        folder_cid = object_info_dict.get("cid")
+        if folder_cid is None:
+            msg = f"Entry {pidpath} has no cid?"
+            raise PidRefsDoesNotExist(msg)
+        cid_path = object_info_dict.get("cid_object_path")
+        return hashstore.folderentry.FolderEntries.from_parquet(cid_path)
+
+    def list_pids(self, pattern: str | None = None) -> Generator:
+        """Yield create_timestamp, CID, PID.
+
+        Iterates over all CID entries and yields the create timestamp,
+        CID value, and PID value for all entries or those PIDs that match
+        the optionally provided regexp pattern.
+
+        Note that this can be really slow when there's a large number of
+        ref files.
+        """
+        rpattern = None
+        if pattern is not None:
+            rpattern = re.compile(pattern)
+        ignore_names = [
+            ".DS_Store",
+        ]
+        cids_path = str(self.cids)
+        for cid_entry in self.cids.rglob("*"):
+            if cid_entry.is_file() and cid_entry.name not in ignore_names:
+                cid_value = str(cid_entry).replace(cids_path, "").replace("/", "")
+                ctime = cid_entry.stat().st_ctime
+                with open(cid_entry, encoding="utf-8") as cid_entry_f:
+                    for entry in cid_entry_f:
+                        pid = entry.strip()
+                        if len(pid) > 0:
+                            if rpattern is not None:
+                                if rpattern.fullmatch(pid):
+                                    yield ctime, cid_value, pid
+                            else:
+                                yield ctime, cid_value, pid
+
     # FileHashStore Core Methods
 
-    def _find_object(self, pid: str) -> dict[str, str]:
+    def find_object(self, pid: str) -> dict[str, str]:
         """Check if an object referenced by a pid exists and retrieve its
-        content identifier. The `find_object` method validates the existence of
-        an object based on the provided pid and returns the associated content
-        identifier.
+        content identifier.
+
+        The `find_object` method validates the existence of an object based on
+        the provided pid and returns the associated content identifier and
+        information about how to retrieve various accoutrements. Note that the
+        returned dict will contain values relevant to the type of store, but
+        will always contain a `cid` key if the object is present.
 
         :param str pid: Authority-based or persistent identifier of the object.
 
@@ -1075,70 +1049,71 @@ class FileHashStore(HashStore):
         self._check_string(pid, "pid")
 
         pid_ref_abs_path = self._get_hashstore_pid_refs_path(pid)
-        if os.path.isfile(pid_ref_abs_path):
-            # Read the file to get the cid from the pid reference
-            pid_refs_cid = self._read_small_file_content(pid_ref_abs_path)
+        if not os.path.isfile(pid_ref_abs_path):
+            err_msg = (
+                f"Pid reference file not found for pid ({pid}): {pid_ref_abs_path}"
+            )
+            self.fhs_logger.error(err_msg)
+            raise PidRefsDoesNotExist(err_msg)
 
-            # Confirm that the cid reference file exists
-            cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
-            if os.path.isfile(cid_ref_abs_path):
-                # Check that the pid is actually found in the cid reference file
-                if self._is_string_in_refs_file(pid, cid_ref_abs_path):
-                    # Object must also exist in order to return the cid retrieved
-                    if not self._exists("objects", pid_refs_cid):
-                        err_msg = (
-                            f"Reference file found for pid ({pid}) at "
-                            f"{pid_ref_abs_path}, but object referenced does not "
-                            f"exist, cid: {pid_refs_cid}"
-                        )
-                        self.fhs_logger.error(err_msg)
-                        raise RefsFileExistsButCidObjMissing(err_msg)
-                    sysmeta_doc_name = self._computehash(pid + self.sysmeta_ns)
-                    metadata_directory = self._computehash(pid)
-                    metadata_rel_path = Path(*self._shard(metadata_directory))
-                    sysmeta_full_path = (
-                        self._get_store_path("metadata")
-                        / metadata_rel_path
-                        / sysmeta_doc_name
-                    )
-                    return {
-                        "cid": pid_refs_cid,
-                        "cid_object_path": self._get_hashstore_data_object_path(
-                            pid_refs_cid
-                        ),
-                        "cid_refs_path": cid_ref_abs_path,
-                        "pid_refs_path": pid_ref_abs_path,
-                        "sysmeta_path": (
-                            sysmeta_full_path
-                            if os.path.isfile(sysmeta_full_path)
-                            else "Does not exist."
-                        ),
-                    }
-                # If not, it is an orphan pid refs file
-                err_msg = (
-                    f"Pid reference file exists with cid: {pid_refs_cid} for pid: "
-                    f"{pid} but is missing from cid refs file: {cid_ref_abs_path}"
-                )
-                self.fhs_logger.error(err_msg)
-                raise PidNotFoundInCidRefsFile(err_msg)
+        # Read the file to get the cid from the pid reference
+        pid_refs_cid = self._read_small_file_content(pid_ref_abs_path)
+
+        # Confirm that the cid reference file exists
+        cid_ref_abs_path = self._get_hashstore_cid_refs_path(pid_refs_cid)
+        if not os.path.isfile(cid_ref_abs_path):
             err_msg = (
                 f"Pid reference file exists with cid: {pid_refs_cid} but cid reference "
                 f"file not found: {cid_ref_abs_path} for pid: {pid}"
             )
             self.fhs_logger.error(err_msg)
             raise OrphanPidRefsFileFound(err_msg)
-        err_msg = f"Pid reference file not found for pid ({pid}): {pid_ref_abs_path}"
-        self.fhs_logger.error(err_msg)
-        raise PidRefsDoesNotExist(err_msg)
+
+        # Check that the pid is actually found in the cid reference file
+        if not self._is_string_in_refs_file(pid, cid_ref_abs_path):
+            # If not, it is an orphan pid refs file
+            err_msg = (
+                f"Pid reference file exists with cid: {pid_refs_cid} for pid: "
+                f"{pid} but is missing from cid refs file: {cid_ref_abs_path}"
+            )
+            self.fhs_logger.error(err_msg)
+            raise PidNotFoundInCidRefsFile(err_msg)
+
+        # Object must also exist in order to return the cid retrieved
+        if not self._exists("objects", pid_refs_cid):
+            err_msg = (
+                f"Reference file found for pid ({pid}) at "
+                f"{pid_ref_abs_path}, but object referenced does not "
+                f"exist, cid: {pid_refs_cid}"
+            )
+            self.fhs_logger.error(err_msg)
+            raise RefsFileExistsButCidObjMissing(err_msg)
+        sysmeta_doc_name = self._computehash(f"{pid}{self.sysmeta_ns}")
+        metadata_directory = self._computehash(pid)
+        metadata_rel_path = Path(*self._shard(metadata_directory))
+        sysmeta_full_path = (
+            self._get_store_path("metadata") / metadata_rel_path / sysmeta_doc_name
+        )
+        return {
+            "cid": pid_refs_cid,
+            "cid_object_path": self._get_hashstore_data_object_path(pid_refs_cid),
+            "cid_refs_path": cid_ref_abs_path,
+            "pid_refs_path": pid_ref_abs_path,
+            "sysmeta_path": (
+                sysmeta_full_path
+                if os.path.isfile(sysmeta_full_path)
+                else "Does not exist."
+            ),
+        }
 
     def _store_and_validate_data(
         self,
         pid: str,
-        file: Union[str, bytes],
-        additional_algorithm: Optional[str] = None,
-        checksum: Optional[str] = None,
-        checksum_algorithm: Optional[str] = None,
-        file_size_to_validate: Optional[int] = None,
+        file: str | bytes,
+        additional_algorithm: str | None = None,
+        checksum: str | None = None,
+        checksum_algorithm: str | None = None,
+        file_size_to_validate: int | None = None,
     ) -> "ObjectMetadata":
         """Store contents of `file` on disk, validate the object's parameters if
         provided, and tag/reference the object.
@@ -1178,7 +1153,7 @@ class FileHashStore(HashStore):
         self.fhs_logger.debug("Successfully put object for pid: %s", pid)
         return object_metadata
 
-    def _store_data_only(self, data: Union[str, bytes]) -> "ObjectMetadata":
+    def _store_data_only(self, data: str | bytes) -> "ObjectMetadata":
         """Store an object to HashStore and return a metadata object containing
         the content identifier, object file size and hex digests dictionary of
         the default algorithms. This method does not validate the object and
@@ -1224,12 +1199,12 @@ class FileHashStore(HashStore):
 
     def _move_and_get_checksums(
         self,
-        pid: Optional[str],
+        pid: str | None,
         stream: "Stream",
-        additional_algorithm: Optional[str] = None,
-        checksum: Optional[str] = None,
-        checksum_algorithm: Optional[str] = None,
-        file_size_to_validate: Optional[int] = None,
+        additional_algorithm: str | None = None,
+        checksum: str | None = None,
+        checksum_algorithm: str | None = None,
+        file_size_to_validate: int | None = None,
     ) -> tuple[str, int, dict[str, str]]:
         """Copy the contents of the `Stream` object onto disk. The copy process
         uses a temporary file to store the initial contents and returns a
@@ -1366,8 +1341,8 @@ class FileHashStore(HashStore):
     def _write_to_tmp_file_and_get_hex_digests(
         self,
         stream: "Stream",
-        additional_algorithm: Optional[str] = None,
-        checksum_algorithm: Optional[str] = None,
+        additional_algorithm: str | None = None,
+        checksum_algorithm: str | None = None,
     ) -> tuple[dict[str, str], str, int]:
         """Create a named temporary file from a `Stream` object and return its
         filename and a dictionary of its algorithms and hex digests. If an
@@ -1389,6 +1364,9 @@ class FileHashStore(HashStore):
         algorithm_list_to_calculate = self._refine_algorithm_list(
             additional_algorithm, checksum_algorithm
         )
+        self.fhs_logger.debug("chk algo: %s", checksum_algorithm)
+        self.fhs_logger.debug("add algo: %s", additional_algorithm)
+        self.fhs_logger.debug("algo list: %s", algorithm_list_to_calculate)
         tmp_root_path = self._get_store_path("objects") / "tmp"
         tmp = self._mktmpfile(tmp_root_path)
 
@@ -1416,7 +1394,9 @@ class FileHashStore(HashStore):
             hex_digest_list = [
                 hash_algorithm.hexdigest() for hash_algorithm in hash_algorithms
             ]
-            hex_digest_dict = dict(zip(algorithm_list_to_calculate, hex_digest_list))
+            hex_digest_dict = dict(
+                zip(algorithm_list_to_calculate, hex_digest_list, strict=True)
+            )
             tmp_file_size = os.path.getsize(tmp.name)
             # Ready for validation and atomic move
             tmp_file_completion_flag = True
@@ -1618,7 +1598,7 @@ class FileHashStore(HashStore):
         # `find_object`which will throw custom exceptions if there is an issue with the
         # reference files, which help us determine the path to proceed with.
         try:
-            obj_info_dict = self._find_object(pid)
+            obj_info_dict = self.find_object(pid)
             cid_to_check = obj_info_dict["cid"]
             self._validate_and_check_cid_lock(pid, cid, cid_to_check)
 
@@ -1721,7 +1701,7 @@ class FileHashStore(HashStore):
             self.fhs_logger.warning(warn_msg)
 
     def _put_metadata(
-        self, metadata: Union[str, bytes], pid: str, metadata_doc_name: str
+        self, metadata: str | bytes, pid: str, metadata_doc_name: str
     ) -> Path:
         """Store contents of metadata to `[self.root]/metadata` using the hash of the
         given PID and format ID as the permanent address.
@@ -1982,12 +1962,12 @@ class FileHashStore(HashStore):
 
     def _verify_object_information(
         self,
-        pid: Optional[str],
+        pid: str | None,
         checksum: str,
         checksum_algorithm: str,
         entity: str,
         hex_digests: dict[str, str],
-        tmp_file_name: Optional[str],
+        tmp_file_name: str | None,
         tmp_file_size: int,
         file_size_to_validate: int,
     ) -> None:
@@ -2035,9 +2015,12 @@ class FileHashStore(HashStore):
                     # Otherwise, a data object has been stored without a pid
                     object_cid = hex_digests[self.algorithm]
                     cid_stream = self._open(entity, object_cid)
-                    hex_digest_calculated = self._computehash(
-                        cid_stream, algorithm=checksum_algorithm
-                    )
+                    try:
+                        hex_digest_calculated = self._computehash(
+                            cid_stream, algorithm=checksum_algorithm
+                        )
+                    finally:
+                        cid_stream.close()
                 if hex_digest_calculated != checksum:
                     err_msg = (
                         f"Checksum_algorithm ({checksum_algorithm}) cannot be found "
@@ -2070,9 +2053,9 @@ class FileHashStore(HashStore):
         self,
         pid: str,
         cid: str,
-        pid_refs_path: Optional[Path] = None,
-        cid_refs_path: Optional[Path] = None,
-        additional_log_string: Optional[str] = None,
+        pid_refs_path: Path | None = None,
+        cid_refs_path: Path | None = None,
+        additional_log_string: str | None = None,
     ) -> None:
         """Verifies that the supplied pid and pid reference file and content have been
         written successfully.
@@ -2153,10 +2136,10 @@ class FileHashStore(HashStore):
 
     def _check_arg_algorithms_and_checksum(
         self,
-        additional_algorithm: Optional[str],
-        checksum: Optional[str],
-        checksum_algorithm: Optional[str],
-    ) -> tuple[Optional[str], Optional[str]]:
+        additional_algorithm: str | None,
+        checksum: str | None,
+        checksum_algorithm: str | None,
+    ) -> tuple[str | None, str | None]:
         """Determines whether the caller has supplied the necessary arguments to
         validate an object with a checksum value.
 
@@ -2199,7 +2182,7 @@ class FileHashStore(HashStore):
         return self.sysmeta_ns if format_id is None else format_id
 
     def _refine_algorithm_list(
-        self, additional_algorithm: Optional[str], checksum_algorithm: Optional[str]
+        self, additional_algorithm: str | None, checksum_algorithm: str | None
     ) -> set[str]:
         """Create the final list of hash algorithms to calculate.
 
@@ -2258,7 +2241,7 @@ class FileHashStore(HashStore):
         return cleaned_string
 
     def _computehash(
-        self, stream: Union["Stream", str, IO[bytes]], algorithm: Optional[str] = None
+        self, stream: Union["Stream", str, IO[bytes]], algorithm: str | None = None
     ) -> str:
         """Compute the hash of a file-like object (or string) using the store
         algorithm by default or with an optional supported algorithm.
@@ -2366,9 +2349,7 @@ class FileHashStore(HashStore):
                 return False
         return False
 
-    def _open(
-        self, entity: str, file: str, mode: str = "rb"
-    ) -> Union[IO[bytes], IO[str]]:
+    def _open(self, entity: str, file: str, mode: str = "rb") -> IO[bytes] | IO[str]:
         """Return open buffer object from given id or path. Caller is responsible
         for closing the stream.
 
@@ -2391,7 +2372,7 @@ class FileHashStore(HashStore):
         # mode defaults to "rb"
         return open(realpath, mode)
 
-    def _delete(self, entity: str, file: Union[str, Path]) -> None:
+    def _delete(self, entity: str, file: str | Path) -> None:
         """Delete file using id or path. Remove any empty directories after
         deleting. No exception is raised if file doesn't exist.
 
@@ -2746,7 +2727,7 @@ class FileHashStore(HashStore):
             return opened_path.read()
 
     @staticmethod
-    def _rename_path_for_deletion(path: Union[Path, str]) -> str:
+    def _rename_path_for_deletion(path: Path | str) -> str:
         """Rename a given path by appending '_delete' and move it to the renamed path.
 
         :param Path path: Path to file to rename
@@ -2762,7 +2743,7 @@ class FileHashStore(HashStore):
         return str(delete_path)
 
     @staticmethod
-    def _get_file_paths(directory: Union[str, Path]) -> Optional[list[Path]]:
+    def _get_file_paths(directory: str | Path) -> list[Path] | None:
         """Get the file paths of a given directory if it exists
 
         :param mixed directory: String or path to directory.
@@ -2780,7 +2761,7 @@ class FileHashStore(HashStore):
         return None
 
     @staticmethod
-    def _check_arg_data(data: Union[str, os.PathLike, io.BufferedReader]) -> bool:
+    def _check_arg_data(data: str | os.PathLike | io.BufferedReader) -> bool:
         """Checks a data argument to ensure that it is either a string, path, or stream
         object.
 
@@ -2792,7 +2773,7 @@ class FileHashStore(HashStore):
         if (
             not isinstance(data, str)
             and not isinstance(data, Path)
-            and not isinstance(data, io.BufferedIOBase)
+            and not isinstance(data, io.IOBase)
         ):
             err_msg = (
                 "FileHashStore - _validate_arg_data: Data must be a path, string or "
@@ -2828,13 +2809,19 @@ class FileHashStore(HashStore):
 
     @staticmethod
     def _check_string(string: str, arg: str) -> None:
-        """Check whether a string is None or empty - or if it contains an
-        illegal character; throws an exception if so.
+        """Raises ValueError if string is empty or has leading or trailing whitespace.
+
+        Note: This checks string for valid use as a PID or CID in hashstore. It is
+        the responsibility of the calling application to ensure the string is a
+        valid PID or CID in the context of the application. For example, hashstore
+        allows whitespace in PIDs though Metacat / DataONE does not. This allows
+        for storing a path segment after a Metacat PID which is needed for referencing
+        entries within a folder identified by a PID.
 
         :param str string: Value to check.
         :param str arg: Name of the argument to check.
         """
-        if string is None or string.strip() == "" or any(ch.isspace() for ch in string):
+        if not string or string.strip() != string:
             method = inspect.stack()[1].function
             err_msg = (
                 f"FileHashStore - {method}: {arg} cannot be None"
@@ -2869,9 +2856,11 @@ class Stream:
     set its position back to ``0``.
     """
 
-    def __init__(self, obj: Union[IO[bytes], str, Path]):
+    def __init__(self, obj: IO[bytes] | str | Path):
+        # is it a file like thing
         if hasattr(obj, "read"):
             pos = obj.tell()
+        # or a string
         elif os.path.isfile(obj):
             obj = open(obj, "rb")  # noqa: SIM115
             pos = None
@@ -2882,7 +2871,9 @@ class Stream:
         try:
             file_stat = os.stat(obj.name)
             buffer_size = file_stat.st_blksize
-        except (FileNotFoundError, PermissionError, OSError):
+            # except (FileNotFoundError, PermissionError, OSError, TypeError):
+        except Exception:
+            # We already know it's file like thing, so don't agonize
             buffer_size = 8192
 
         self._obj = obj
@@ -2914,25 +2905,3 @@ class Stream:
             self._obj.close()
         else:
             self._obj.seek(self._pos)
-
-
-@dataclass
-class ObjectMetadata:
-    """Represents metadata associated with an object.
-
-    The `ObjectMetadata` class represents metadata associated with an object, including
-    a persistent or authority-based identifier (`pid`), a content identifier (`cid`),
-    the size of the object in bytes (`obj_size`), and an optional list of hex digests
-    (`hex_digests`) to assist with validating objects.
-
-    :param str pid: An authority-based or persistent identifier
-    :param str cid: A unique identifier for the object (Hash ID, hex digest).
-    :param int obj_size: The size of the object in bytes.
-    :param dict hex_digests: A list of hex digests to validate objects
-        (md5, sha1, sha256, sha384, sha512) (optional).
-    """
-
-    pid: str
-    cid: str
-    obj_size: int
-    hex_digests: dict

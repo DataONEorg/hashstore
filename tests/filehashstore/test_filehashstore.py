@@ -8,7 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from hashstore.filehashstore import FileHashStore, ObjectMetadata, Stream
+from hashstore import HashStoreProperties, ObjectMetadata
+from hashstore.filehashstore import (
+    FileHashStore,
+    Stream,
+)
 from hashstore.filehashstore_exceptions import (
     CidRefsContentError,
     CidRefsFileNotFound,
@@ -42,191 +46,44 @@ def test_init_directories_created(store):
     assert os.path.exists(store.refs / "cids")
 
 
-def test_init_existing_store_incorrect_algorithm_format(store):
+def test_init_existing_store_incorrect_algorithm_format():
     """Confirm that exception is thrown when store_algorithm is not a DataONE controlled value (
     the string must exactly match the expected format). DataONE uses the library of congress
     vocabulary to standardize algorithm types."""
     properties = {
-        "store_path": store.root / "incorrect_algo_format",
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "sha256",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    with pytest.raises(ValueError, match="Must be one of"):
-        FileHashStore(properties)
+    with pytest.raises(ValueError, match="must be one of"):
+        HashStoreProperties.from_dict(properties)
 
 
-def test_init_existing_store_correct_algorithm_format(store):
-    """Confirm second instance of HashStore with DataONE controlled value."""
+def test_init_store_correct_algorithm_format(tmp_path):
+    """Confirm instance of HashStore with DataONE controlled value."""
     properties = {
-        "store_path": store.root,
         "store_depth": 3,
         "store_width": 2,
         "store_algorithm": "SHA-256",
         "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
     }
-    hashstore_instance = FileHashStore(properties)
+    hashstore_instance = FileHashStore.create_hashstore(
+        tmp_path / "new-store", HashStoreProperties(**properties)
+    )
     assert isinstance(hashstore_instance, FileHashStore)
 
 
 def test_init_write_properties_hashstore_yaml_exists(store):
     """Verify config file present in store root directory."""
-    assert os.path.exists(store.hashstore_configuration_yaml)
-
-
-def test_init_with_existing_hashstore_mismatched_config_depth(store):
-    """Test init with existing HashStore raises a ValueError when supplied with
-    mismatching depth."""
-    properties = {
-        "store_path": store.root,
-        "store_depth": 1,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
-    }
-    with pytest.raises(ValueError, match="depth"):
-        FileHashStore(properties)
-
-
-def test_init_with_existing_hashstore_mismatched_config_width(store):
-    """Test init with existing HashStore raises a ValueError when supplied with
-    mismatching width."""
-    properties = {
-        "store_path": store.root,
-        "store_depth": 3,
-        "store_width": 1,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
-    }
-    with pytest.raises(ValueError, match="width"):
-        FileHashStore(properties)
-
-
-def test_init_with_existing_hashstore_mismatched_config_algo(store):
-    """Test init with existing HashStore raises a ValueError when supplied with
-    mismatching default algorithm."""
-    properties = {
-        "store_path": store.root,
-        "store_depth": 3,
-        "store_width": 1,
-        "store_algorithm": "SHA-512",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
-    }
-    with pytest.raises(ValueError, match="configuration"):
-        FileHashStore(properties)
-
-
-def test_init_with_existing_hashstore_mismatched_config_metadata_ns(store):
-    """Test init with existing HashStore raises a ValueError when supplied with
-    mismatching default name space."""
-    properties = {
-        "store_path": store.root,
-        "store_depth": 3,
-        "store_width": 1,
-        "store_algorithm": "SHA-512",
-        "store_metadata_namespace": "http://ns.dataone.org/service/types/v5.0",
-    }
-    with pytest.raises(ValueError, match="configuration"):
-        FileHashStore(properties)
-
-
-def test_init_with_existing_hashstore_missing_yaml(store, pids):
-    """Test init with existing store raises RuntimeError when hashstore.yaml
-    not found but objects exist."""
-    test_dir = "tests/testdata/"
-    for pid in pids:
-        path = test_dir + pid.replace("/", "_")
-        store._store_and_validate_data(pid, path)
-    os.remove(store.hashstore_configuration_yaml)
-    properties = {
-        "store_path": store.root,
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
-    }
-    with pytest.raises(RuntimeError):
-        FileHashStore(properties)
-
-
-def test_load_properties(store):
-    """Verify dictionary returned from _load_properties matches initialization."""
-    hashstore_yaml_dict = store._load_properties(
-        store.hashstore_configuration_yaml, store.property_required_keys
-    )
-    assert hashstore_yaml_dict.get("store_depth") == 3
-    assert hashstore_yaml_dict.get("store_width") == 2
-    assert hashstore_yaml_dict.get("store_algorithm") == "SHA-256"
-    assert (
-        hashstore_yaml_dict.get("store_metadata_namespace")
-        == "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
-    )
+    assert os.path.exists(FileHashStore.config_path(store.root))
 
 
 def test_load_properties_hashstore_yaml_missing(store):
     """Confirm FileNotFoundError is raised when hashstore.yaml does not exist."""
-    os.remove(store.hashstore_configuration_yaml)
+    os.remove(FileHashStore.config_path(store.root))
     with pytest.raises(FileNotFoundError):
-        store._load_properties(
-            store.hashstore_configuration_yaml, store.property_required_keys
-        )
-
-
-def test_validate_properties(store):
-    """Confirm no exceptions are thrown when all key/values are supplied."""
-    properties = {
-        "store_path": "/etc/test",
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
-    }
-    assert store._validate_properties(properties)
-
-
-def test_validate_properties_missing_key(store):
-    """Confirm exception raised when key missing in properties."""
-    properties = {
-        "store_path": "/etc/test",
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-    }
-    with pytest.raises(KeyError):
-        store._validate_properties(properties)
-
-
-def test_validate_properties_key_value_is_none(store):
-    """Confirm exception raised when a value from a key is 'None'."""
-    properties = {
-        "store_path": "/etc/test",
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": None,
-    }
-    with pytest.raises(ValueError, match="Value for key"):
-        store._validate_properties(properties)
-
-
-def test_validate_properties_incorrect_type(store):
-    """Confirm exception raised when a bad properties value is given."""
-    properties = "etc/filehashstore/hashstore.yaml"
-    with pytest.raises(ValueError, match="Invalid"):
-        store._validate_properties(properties)
-
-
-def test_set_default_algorithms_missing_yaml(store, pids):
-    """Confirm set_default_algorithms raises FileNotFoundError when hashstore.yaml
-    not found."""
-    test_dir = "tests/testdata/"
-    for pid in pids:
-        path = test_dir + pid.replace("/", "_")
-        store._store_and_validate_data(pid, path)
-    os.remove(store.hashstore_configuration_yaml)
-    with pytest.raises(FileNotFoundError):
-        store._set_default_algorithms()
+        _ = HashStoreProperties.from_yaml(FileHashStore.config_path(store.root))
 
 
 # Tests for FileHashStore Core Methods
@@ -238,7 +95,7 @@ def test_find_object_no_sysmeta(pids, store):
     for pid in pids:
         path = test_dir + pid.replace("/", "_")
         object_metadata = store.store_object(pid, path)
-        obj_info_dict = store._find_object(pid)
+        obj_info_dict = store.find_object(pid)
         retrieved_cid = obj_info_dict["cid"]
 
         assert retrieved_cid == object_metadata.hex_digests.get("sha256")
@@ -266,7 +123,7 @@ def test_find_object_sysmeta(pids, store):
         object_metadata = store.store_object(pid, path)
         stored_metadata_path = store.store_metadata(pid, syspath, format_id)
 
-        obj_info_dict = store._find_object(pid)
+        obj_info_dict = store.find_object(pid)
         retrieved_cid = obj_info_dict["cid"]
 
         assert retrieved_cid == object_metadata.hex_digests.get("sha256")
@@ -290,12 +147,12 @@ def test_find_object_refs_exist_but_obj_not_found(pids, store):
         path = test_dir + pid.replace("/", "_")
         store.store_object(pid, path)
 
-        cid = store._find_object(pid).get("cid")
+        cid = store.find_object(pid).get("cid")
         obj_path = store._get_hashstore_data_object_path(cid)
         os.remove(obj_path)
 
         with pytest.raises(RefsFileExistsButCidObjMissing):
-            store._find_object(pid)
+            store.find_object(pid)
 
 
 def test_find_object_cid_refs_not_found(pids, store):
@@ -314,7 +171,7 @@ def test_find_object_cid_refs_not_found(pids, store):
             pid_ref_file.truncate()
 
         with pytest.raises(OrphanPidRefsFileFound):
-            store._find_object(pid)
+            store.find_object(pid)
 
 
 def test_find_object_cid_refs_does_not_contain_pid(pids, store):
@@ -332,25 +189,25 @@ def test_find_object_cid_refs_does_not_contain_pid(pids, store):
         store._update_refs_file(cid_ref_abs_path, pid, "remove")
 
         with pytest.raises(PidNotFoundInCidRefsFile):
-            store._find_object(pid)
+            store.find_object(pid)
 
 
 def test_find_object_pid_refs_not_found(store):
     """Test _find_object throws exception when a pid refs file does not exist."""
     with pytest.raises(PidRefsDoesNotExist):
-        store._find_object("dou.test.1")
+        store.find_object("dou.test.1")
 
 
 def test_find_object_pid_none(store):
     """Test _find_object throws exception when pid is None."""
     with pytest.raises(ValueError, match="empty"):
-        store._find_object(None)
+        store.find_object(None)
 
 
 def test_find_object_pid_empty(store):
     """Test _find_object throws exception when pid is empty."""
     with pytest.raises(ValueError, match="empty"):
-        store._find_object("")
+        store.find_object("")
 
 
 def test_store_and_validate_data_files_path(pids, store):
@@ -895,7 +752,7 @@ def test_untag_object_orphan_pid_refs_file_found(store):
     os.remove(cid_refs_abs_path)
 
     with pytest.raises(OrphanPidRefsFileFound):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)
@@ -922,7 +779,7 @@ def test_untag_object_orphan_refs_exist_but_data_object_not_found(store):
     os.remove(data_obj_path)
 
     with pytest.raises(RefsFileExistsButCidObjMissing):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)
@@ -953,7 +810,7 @@ def test_untag_object_refs_found_but_pid_not_in_cid_refs(store):
     store._update_refs_file(cid_refs_file, pid, "remove")
 
     with pytest.raises(PidNotFoundInCidRefsFile):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)
@@ -984,7 +841,7 @@ def test_untag_object_pid_refs_file_does_not_exist(store):
     os.remove(pid_refs_file)
 
     with pytest.raises(PidRefsDoesNotExist):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)
@@ -1014,7 +871,7 @@ def test_untag_object_pid_refs_file_does_not_exist_and_cid_refs_is_empty(store):
     os.remove(pid_refs_file)
 
     with pytest.raises(PidRefsDoesNotExist):
-        store._find_object(pid)
+        store.find_object(pid)
 
     store._synchronize_referenced_locked_pids(pid)
     store._synchronize_object_locked_cids(cid)

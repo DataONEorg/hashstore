@@ -1,6 +1,6 @@
 [project]
 name = "hashstore"
-version = "1.1.1"
+version = "1.2.0"
 description = "HashStore, an object storage system using content identifiers."
 authors = [
     { name = "Dou Mok", email = "douming.mok@gmail.com" },
@@ -10,7 +10,7 @@ authors = [
     { name = "Jeanette Clark" },
     { name = "Ian M. Nesbitt" },
 ]
-requires-python = ">=3.9, <4.0"
+requires-python = ">=3.10, <4.0"
 readme = "README.md"
 keywords = [
     "filesystem",
@@ -33,20 +33,29 @@ classifiers = [
     "Topic :: System :: Filesystems",
 ]
 dependencies = [
+    "click>=8.3.1",
     "pathlib>=1.0.1",
+    "pyarrow>=24.0.0",
     "pyyaml>=6.0",
+    "xattr-compat>=1.0.0",
 ]
 
 [project.scripts]
 hashstore = "hashstore.hashstoreclient:main"
+hs = "hashstore.__main__:main"
 
 [dependency-groups]
+cli = [
+    "rich>=14.3.3",
+]
 dev = [
     "pytest>=7.2.0",
     "exceptiongroup>=1.1.0",
-    "black>=22.10.0",
-    "pylint>=2.17.4",
+    "pre-commit",
     "pg8000>=1.29.8",
+    "pytest-cov>=7.1.0",
+    "mypy>=1.19.1",
+    "types-pyyaml>=6.0.12.20260518",
 ]
 
 [build-system]
@@ -54,6 +63,38 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.poetry_bumpversion.file."src/hashstore/__init__.py"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = [
+  "error",
+]
+log_cli_level = "INFO"
+testpaths = [
+  "tests",
+]
+
+[tool.coverage]
+run.source = ["synchronize_member_node"]
+port.exclude_lines = [
+  'pragma: no cover',
+  '\.\.\.',
+  'if typing.TYPE_CHECKING:',
+]
+
+[tool.mypy]
+files = ["src", "tests"]
+python_version = "3.10"
+show_error_codes = true
+warn_unreachable = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+strict = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
 
 [tool.ruff]
 src = ["src"]

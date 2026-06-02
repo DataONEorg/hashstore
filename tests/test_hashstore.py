@@ -1,7 +1,5 @@
 """Test module for HashStore's HashStoreFactory and ObjectMetadata class."""
 
-import os
-
 import pytest
 
 from hashstore.basehashstore import HashStoreFactory
@@ -44,36 +42,42 @@ def test_factory_get_hashstore_unsupported_module(factory):
         factory.get_hashstore(module_name, class_name)
 
 
-def test_factory_get_hashstore_filehashstore_unsupported_algorithm(factory):
+def test_factory_get_hashstore_filehashstore_unsupported_algorithm(tmp_path, factory):
     """Check factory raises exception with store algorithm value that is not part of
     the default list."""
     module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
 
     properties = {
-        "store_path": os.getcwd() + "/metacat/hashstore",
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "MD2",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        "store_path": tmp_path / "metacat/hashstore",
+        "store_properties": {
+            "store_depth": 3,
+            "store_width": 2,
+            "store_algorithm": "MD2",
+            "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        },
     }
-    with pytest.raises(ValueError, match="Must be one of"):
+    with pytest.raises(ValueError, match="store_algorithm"):
         factory.get_hashstore(module_name, class_name, properties)
 
 
-def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(factory):
+def test_factory_get_hashstore_filehashstore_incorrect_algorithm_format(
+    tmp_path, factory
+):
     """Check factory raises exception with incorrectly formatted algorithm value."""
     module_name = "hashstore.filehashstore"
     class_name = "FileHashStore"
 
     properties = {
-        "store_path": os.getcwd() + "/metacat/hashstore",
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "dou_algo",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        "store_path": tmp_path / "metacat/hashstore",
+        "store_properties": {
+            "store_depth": 3,
+            "store_width": 2,
+            "store_algorithm": "dou_algo",
+            "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        },
     }
-    with pytest.raises(ValueError, match="Must be one of"):
+    with pytest.raises(ValueError, match="store_algorithm"):
         factory.get_hashstore(module_name, class_name, properties)
 
 
@@ -88,10 +92,12 @@ def test_factory_get_hashstore_filehashstore_conflicting_obj_dir(factory, tmp_pa
 
     properties = {
         "store_path": douhspath,
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        "store_properties": {
+            "store_depth": 3,
+            "store_width": 2,
+            "store_algorithm": "SHA-256",
+            "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        },
     }
     with pytest.raises(RuntimeError):
         factory.get_hashstore(module_name, class_name, properties)
@@ -110,10 +116,12 @@ def test_factory_get_hashstore_filehashstore_conflicting_metadata_dir(
 
     properties = {
         "store_path": douhspath,
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        "store_properties": {
+            "store_depth": 3,
+            "store_width": 2,
+            "store_algorithm": "SHA-256",
+            "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        },
     }
     with pytest.raises(RuntimeError):
         factory.get_hashstore(module_name, class_name, properties)
@@ -130,10 +138,12 @@ def test_factory_get_hashstore_filehashstore_conflicting_refs_dir(factory, tmp_p
 
     properties = {
         "store_path": douhspath,
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        "store_properties": {
+            "store_depth": 3,
+            "store_width": 2,
+            "store_algorithm": "SHA-256",
+            "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        },
     }
     with pytest.raises(RuntimeError):
         factory.get_hashstore(module_name, class_name, properties)
@@ -150,16 +160,37 @@ def test_factory_get_hashstore_filehashstore_nonconflicting_dir(factory, tmp_pat
 
     properties = {
         "store_path": douhspath,
-        "store_depth": 3,
-        "store_width": 2,
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        "store_properties": {
+            "store_depth": 3,
+            "store_width": 2,
+            "store_algorithm": "SHA-256",
+            "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        },
     }
 
     factory.get_hashstore(module_name, class_name, properties)
 
 
-def test_factory_get_hashstore_filehashstore_string_int_prop(factory, tmp_path):
+int_properties_as_strings = (
+    {
+        "store_depth": "3",
+        "store_width": "2",
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    },
+    {
+        "store_depth": str(3),
+        "store_width": str(2),
+        "store_algorithm": "SHA-256",
+        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+    },
+)
+
+
+@pytest.mark.parametrize("str_properties", int_properties_as_strings)
+def test_factory_get_hashstore_filehashstore_string_int_prop(
+    factory, tmp_path, str_properties
+):
     """Check factory does not raise exception when an integer is passed as a string in a
     properties object."""
     module_name = "hashstore.filehashstore"
@@ -171,20 +202,6 @@ def test_factory_get_hashstore_filehashstore_string_int_prop(factory, tmp_path):
 
     properties = {
         "store_path": douhspath,
-        "store_depth": "3",
-        "store_width": "2",
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
+        "store_properties": str_properties,
     }
-
-    factory.get_hashstore(module_name, class_name, properties)
-
-    properties = {
-        "store_path": douhspath,
-        "store_depth": str(3),
-        "store_width": str(2),
-        "store_algorithm": "SHA-256",
-        "store_metadata_namespace": "https://ns.dataone.org/service/types/v2.0#SystemMetadata",
-    }
-
     factory.get_hashstore(module_name, class_name, properties)

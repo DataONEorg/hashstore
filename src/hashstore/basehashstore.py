@@ -1,12 +1,194 @@
 """Hashstore Interface"""
 
+import dataclasses
+import hashlib
 import importlib.metadata
 import importlib.util
+import pathlib
 from abc import ABC, abstractmethod
 from collections.abc import Generator
 from typing import IO
 
 import hashstore.folderentry
+
+import yaml
+
+DATAONE_ALGORITHM_TRANSLATION = {
+    "MD5": "md5",
+    "SHA-1": "sha1",
+    "SHA-256": "sha256",
+    "SHA-384": "sha384",
+    "SHA-512": "sha512",
+}
+
+
+def from_dataone_algorithm_name(algo: str) -> str:
+    """Translate from a DataONE algorithm name to a python hashlib name."""
+    try:
+        return DATAONE_ALGORITHM_TRANSLATION[algo]
+    except KeyError:
+        pass
+    return algo
+
+
+def to_dataone_algorithm_name(algo: str) -> str:
+    "Trnaslate from a python hashlib algorithm name to one used by DataONE."
+    for k, v in DATAONE_ALGORITHM_TRANSLATION.items():
+        if algo == v:
+            return k
+    # no translation available, fail
+    msg = f"Algorithm {algo} is not used in DataONE."
+    raise KeyError(msg)
+
+
+@dataclasses.dataclass
+class HashStoreProperties:
+    """Configuration properties for a HashStore.
+
+    Values are set to sensible defaults that correspond with the DataONE use.
+
+    Once a hashstore is created, the properties are persisted to the
+    hashstore folder, so there's generally no need to use HashStoreProperties
+    except when creating a new HashStore instance.
+
+    After intiailization, hash algorithm names are converted to the native
+    names used by python hashlib. When persisting or loading from YAML
+    config files, the DataONE hash names are expected.
+    """
+
+    # property names align with existing yaml config entries
+    store_depth: int = 3
+    store_width: int = 2
+    store_metadata_namespace: str = (
+        "https://ns.dataone.org/service/types/v2.0#SystemMetadata"
+    )
+    store_algorithm: str = "SHA-256"
+    store_default_algo_list: list[str] = dataclasses.field(
+        default_factory=lambda: [
+            "MD5",
+            "SHA-1",
+            "SHA-256",
+            "SHA-384",
+            "SHA-512",
+        ]
+    )
+
+    def __post_init__(self):
+        """Hash algorthm names are trnaslated from the DataONE names to the names
+        used by the python hashlib.
+        """
+        if isinstance(self.store_depth, str):
+            self.store_depth = int(self.store_depth)
+        if isinstance(self.store_width, str):
+            self.store_width = int(self.store_width)
+        # Impose reasonable defaults for folder path depth
+        if not (0 < self.store_depth <= 8):
+            msg = "store_depth not between 0 and 8"
+            raise ValueError(msg)
+        if not (1 <= self.store_width <= 4):
+            msg = "store_width not between 1 and 4"
+            raise ValueError(msg)
+        if (
+            self.store_metadata_namespace is None
+            or len(self.store_metadata_namespace) < 1
+        ):
+            msg = "Value is required for store_metadata_namespace."
+            raise ValueError(msg)
+        if self.store_algorithm not in DATAONE_ALGORITHM_TRANSLATION:
+            msg = (
+                "store_algorithm must be one of "
+                f"{', '.join(DATAONE_ALGORITHM_TRANSLATION.keys())} "
+                f"not {self.store_algorithm}"
+            )
+            raise ValueError(msg)
+        self.store_algorithm = from_dataone_algorithm_name(self.store_algorithm)
+        if self.store_algorithm not in hashlib.algorithms_available:
+            msg = f"store_algorithm: {self.store_algorithm} is not available."
+            raise ValueError(msg)
+        translated_algos = []
+        for algo in self.store_default_algo_list:
+            translated_algo = from_dataone_algorithm_name(algo)
+            if translated_algo not in hashlib.algorithms_available:
+                msg = f"{algo} is not available."
+                raise ValueError(msg)
+            translated_algos.append(translated_algo)
+        self.store_default_algo_list = translated_algos
+        # Ensure that the store algorithm is included in the detault algorithm list
+        if self.store_algorithm not in self.store_default_algo_list:
+            self.store_default_algo_list.append(self.store_algorithm)
+
+    @classmethod
+    def from_yaml(cls, source: pathlib.Path) -> "HashStoreProperties":
+        """Load propertiees from yaml.
+
+        Hash algorthm names are trnaslated from the DataONE names to the names
+        used by the python hashlib.
+        """
+        with source.open("r") as data_source:
+            properties = yaml.safe_load(data_source)
+            return cls(**properties)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "HashStoreProperties":
+        if data["store_algorithm"] not in DATAONE_ALGORITHM_TRANSLATION:
+            msg = (
+                "store_algorithm must be one of "
+                f"{', '.join(DATAONE_ALGORITHM_TRANSLATION.keys())} "
+                f"not {data['store_algorithm']}"
+            )
+            raise ValueError(msg)
+        return HashStoreProperties(**data)
+
+    def to_yaml(self, dest_path: pathlib.Path) -> None:
+        """Save properties to a yaml file.
+
+        Hash algorithm names are translated to DataONE algorithm names.
+        """
+        with dest_path.open("w") as dest:
+            dest.write("""# HashStore Configuration
+#
+############### Notes ###############
+############### Directory Structure ###############
+# store_depth
+# - Desired amount of directories when sharding an object to form the permanent address
+# - **WARNING**: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
+#
+# store_width
+# - Width of directories created when sharding an object to form the permanent address
+# - **WARNING**: DO NOT CHANGE UNLESS SETTING UP NEW HASHSTORE
+#
+# Example:
+# Below, objects are shown listed in directories that are 3 levels deep (DIR_DEPTH=3),
+# with each directory consisting of 2 characters (DIR_WIDTH=2).
+#    /var/filehashstore/objects
+#    ├── 7f
+#    │   └── 5c
+#    │       └── c1
+#    │           └── 8f0b04e812a3b4c8f686ce34e6fec558804bf61e54b176742a7f6368d6
+#
+############### Format of the Metadata ###############
+# store_metadata_namespace
+# - The default metadata format (ex. system metadata)
+#
+############### Hash Algorithms ###############
+# store_algorithm
+# - Hash algorithm to use when calculating object's hex digest for the permanent address
+#
+# store_default_algo_list
+# - Algorithm values supported by python hashlib 3.9.0+ for File Hash Store (FHS)
+# - The default algorithm list includes the hash algorithms calculated when storing an
+#   object to disk and returned to the caller after successful storage.
+
+""")
+            properties = dataclasses.asdict(self)
+            properties["store_algorithm"] = to_dataone_algorithm_name(
+                properties["store_algorithm"]
+            )
+            translated_names = []
+            for algo in properties.get("store_default_algo_list", []):
+                translated_names.append(to_dataone_algorithm_name(algo))
+            properties["store_default_algo_list"] = translated_names
+            yaml.dump(properties, dest, default_flow_style=False)
 
 
 class HashStore(ABC):
@@ -15,15 +197,15 @@ class HashStore(ABC):
     address files."""
 
     @staticmethod
-    def version():
+    def version() -> str:
         """Return the version number"""
         return importlib.metadata.version("hashstore")
 
     @abstractmethod
     def store_object(
         self,
-        pid,
-        data,
+        pid: str,
+        data: str | pathlib.Path,
         additional_algorithm,
         checksum,
         checksum_algorithm,
@@ -343,7 +525,9 @@ class HashStoreFactory:
     name (e.g., "FileHashStore")."""
 
     @staticmethod
-    def get_hashstore(module_name, class_name, properties=None):
+    def get_hashstore(
+        module_name: str, class_name: str, properties: dict | None = None
+    ):
         """Get a `HashStore`-like object based on the specified `module_name`
         and `class_name`.
 
@@ -378,9 +562,12 @@ class HashStoreFactory:
         # Get HashStore
         imported_module = importlib.import_module(module_name)
 
+        if properties is None:
+            properties = {}
+
         # If class is not part of module, raise error
         if hasattr(imported_module, class_name):
             hashstore_class = getattr(imported_module, class_name)
-            return hashstore_class(properties=properties)
+            return hashstore_class(**properties)
         msg = f"Class name '{class_name}' is not an attribute of module '{module_name}'"
         raise AttributeError(msg)
